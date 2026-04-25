@@ -18,7 +18,7 @@ public partial class OverlayWindow : Window
     private Rect _virtualBounds;
 
     // Interaction state
-    private enum Interaction { None, Selecting, Resizing, Moving, Drawing }
+    private enum Interaction { None, Selecting, Resizing, Moving, Drawing, OcrSelecting }
     private Interaction _interaction = Interaction.None;
     private bool _hasSelection;
     private Point _selStart, _selEnd;
@@ -32,6 +32,11 @@ public partial class OverlayWindow : Window
 
     // Pan (Space + drag, like Photoshop)
     private bool _spaceHeld;
+
+    // OCR sub-selection
+    private bool _ocrMode;
+    private Point _ocrStart;
+    private System.Windows.Shapes.Rectangle? _ocrRect;
 
     // Drawing
     private IDrawingTool? _currentTool;
@@ -644,6 +649,26 @@ public partial class OverlayWindow : Window
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
 
+        // OCR sub-selection mode
+        if (_ocrMode)
+        {
+            _interaction = Interaction.OcrSelecting;
+            _ocrStart = pos;
+            _ocrRect = new System.Windows.Shapes.Rectangle
+            {
+                Stroke = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+                StrokeThickness = 2,
+                StrokeDashArray = new System.Windows.Media.DoubleCollection { 4, 2 },
+                Fill = new SolidColorBrush(Color.FromArgb(30, 33, 150, 243))
+            };
+            Canvas.SetLeft(_ocrRect, pos.X);
+            Canvas.SetTop(_ocrRect, pos.Y);
+            DrawingCanvas.Children.Add(_ocrRect);
+            DrawingCanvas.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
         // Space held OR no tool (V move mode) = pan
         if (_spaceHeld || _currentTool == null)
         {
@@ -663,6 +688,22 @@ public partial class OverlayWindow : Window
 
     private void Drawing_MouseMove(object sender, MouseEventArgs e)
     {
+        // OCR sub-selection drag
+        if (_interaction == Interaction.OcrSelecting && _ocrRect != null)
+        {
+            var pos = e.GetPosition(DrawingCanvas);
+            var x = Math.Min(_ocrStart.X, pos.X);
+            var y = Math.Min(_ocrStart.Y, pos.Y);
+            var w = Math.Abs(pos.X - _ocrStart.X);
+            var h = Math.Abs(pos.Y - _ocrStart.Y);
+            Canvas.SetLeft(_ocrRect, x);
+            Canvas.SetTop(_ocrRect, y);
+            _ocrRect.Width = w;
+            _ocrRect.Height = h;
+            e.Handled = true;
+            return;
+        }
+
         if (_interaction != Interaction.Drawing || _currentTool == null) return;
         if (e.LeftButton != MouseButtonState.Pressed) return;
 
@@ -672,6 +713,30 @@ public partial class OverlayWindow : Window
 
     private void Drawing_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        // OCR sub-selection complete
+        if (_interaction == Interaction.OcrSelecting && _ocrRect != null)
+        {
+            _interaction = Interaction.None;
+            DrawingCanvas.ReleaseMouseCapture();
+
+            var pos = e.GetPosition(DrawingCanvas);
+            var x = Math.Min(_ocrStart.X, pos.X);
+            var y = Math.Min(_ocrStart.Y, pos.Y);
+            var w = Math.Abs(pos.X - _ocrStart.X);
+            var h = Math.Abs(pos.Y - _ocrStart.Y);
+
+            // Remove the visual rectangle
+            DrawingCanvas.Children.Remove(_ocrRect);
+            _ocrRect = null;
+            _ocrMode = false;
+
+            if (w > 10 && h > 10)
+                PerformOcr(new Rect(x, y, w, h));
+
+            e.Handled = true;
+            return;
+        }
+
         if (_interaction != Interaction.Drawing || _currentTool == null) return;
         _interaction = Interaction.None;
 
@@ -832,12 +897,35 @@ public partial class OverlayWindow : Window
         Close();
     }
 
-    private async void Ocr_Click(object sender, RoutedEventArgs e)
+    private void Ocr_Click(object sender, RoutedEventArgs e)
     {
-        var image = RenderFinalImage();
+        // Enter OCR sub-selection mode: user drags a rectangle to pick text area
+        if (_currentTool is TextTool tt) tt.FinalizeActiveTextBox();
+        DeselectTool();
+        _ocrMode = true;
+        Cursor = Cursors.Cross;
+        DrawingCanvas.Cursor = Cursors.Cross;
+        Focus();
+    }
+
+    private async void PerformOcr(Rect ocrRegion)
+    {
+        if (_screenshot == null) return;
+
+        // Clamp to screen bounds
+        var region = new Int32Rect(
+            Math.Max(0, (int)ocrRegion.X),
+            Math.Max(0, (int)ocrRegion.Y),
+            Math.Min((int)ocrRegion.Width, _screenshot.PixelWidth - (int)ocrRegion.X),
+            Math.Min((int)ocrRegion.Height, _screenshot.PixelHeight - (int)ocrRegion.Y));
+
+        if (region.Width < 5 || region.Height < 5) return;
+
+        var cropped = ScreenCapture.CropBitmap(_screenshot, region);
+
         try
         {
-            var text = await Core.OcrHelper.ExtractTextAsync(image);
+            var text = await Core.OcrHelper.ExtractTextAsync(cropped);
             if (string.IsNullOrWhiteSpace(text))
                 text = "[No text detected in the selected area]";
 
@@ -905,7 +993,18 @@ public partial class OverlayWindow : Window
 
         if (e.Key == Key.Escape)
         {
-            if (_currentTool != null)
+            if (_ocrMode)
+            {
+                _ocrMode = false;
+                if (_ocrRect != null)
+                {
+                    DrawingCanvas.Children.Remove(_ocrRect);
+                    _ocrRect = null;
+                }
+                Cursor = Cursors.Cross;
+                DrawingCanvas.Cursor = Cursors.Cross;
+            }
+            else if (_currentTool != null)
                 DeselectTool();
             else
                 Close();
