@@ -502,18 +502,18 @@ public partial class OverlayWindow : Window
 
     private void UpdateToolbarPositions()
     {
-        // Adaptive columns: try 1-column first, switch to 2 if it doesn't fit
-        double availableHeight = ActualHeight - _selection.Top - 20;
-
-        // 12 buttons @ 32px each + separator 7px + bottom row 32px + padding ~16px
-        double oneColHeight = 12 * 32 + 7 + 32 + 16;
-        bool useTwoCols = availableHeight < oneColHeight;
-        double wrapWidth = useTwoCols ? 64 : 32;
-        ToolWrapPanel.Width = wrapWidth;
-        BottomToolsPanel.Width = wrapWidth;
-
-        // Re-measure after layout change
+        // Adaptive columns: measure in 1-col, if it doesn't fit use 2-col
+        ToolWrapPanel.Width = 32;
+        BottomToolsPanel.Width = 32;
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        double availableHeight = ActualHeight - 8; // total screen minus margin
+        if (DrawingToolbar.DesiredSize.Height > availableHeight)
+        {
+            ToolWrapPanel.Width = 64;
+            BottomToolsPanel.Width = 64;
+        }
+
         DrawingToolbar.UpdateLayout();
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -555,10 +555,8 @@ public partial class OverlayWindow : Window
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
 
-        // Reset highlights
-        foreach (var child in DrawingToolsPanel.Children)
-            if (child is Button b) b.Background = Brushes.Transparent;
-
+        // Reset all tool button highlights
+        ClearToolHighlights();
         btn.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243));
 
         _currentTool = toolName switch
@@ -586,13 +584,20 @@ public partial class OverlayWindow : Window
         Focus();
     }
 
+    private void ClearToolHighlights()
+    {
+        // Buttons are inside WrapPanel, not direct children of DrawingToolsPanel
+        foreach (UIElement child in ToolWrapPanel.Children)
+            if (child is Button b) b.Background = Brushes.Transparent;
+        BtnMove.Background = Brushes.Transparent;
+    }
+
     private void DeselectTool()
     {
         _currentTool = null;
         Cursor = Cursors.Cross;
         DrawingCanvas.Cursor = Cursors.Cross;
-        foreach (var child in DrawingToolsPanel.Children)
-            if (child is Button b) b.Background = Brushes.Transparent;
+        ClearToolHighlights();
     }
 
     private void ActivateMoveTool()
@@ -836,6 +841,18 @@ public partial class OverlayWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        // Skip all shortcuts when typing in a TextBox
+        if (Keyboard.FocusedElement is TextBox)
+        {
+            if (e.Key == Key.Escape)
+            {
+                // ESC defocuses the textbox
+                Focus();
+                e.Handled = true;
+            }
+            return;
+        }
+
         // Space = pan mode (Photoshop-style)
         if (e.Key == Key.Space && !_spaceHeld && _hasSelection)
         {

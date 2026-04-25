@@ -12,7 +12,7 @@
         <TextBlock Text="Lightweight Screenshot Tool" FontSize="13"
                    Foreground="#AAA" HorizontalAlignment="Center" Margin="0,4,0,16" />
 
-        <TextBlock Text="Version 1.4.1" Foreground="#888"
+        <TextBlock Text="Version 1.4.2" Foreground="#888"
                    HorizontalAlignment="Center" FontSize="12" />
 
         <Separator Background="#444" Margin="0,16" />
