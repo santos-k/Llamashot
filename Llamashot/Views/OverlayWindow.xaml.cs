@@ -832,6 +832,28 @@ public partial class OverlayWindow : Window
         Close();
     }
 
+    private async void Ocr_Click(object sender, RoutedEventArgs e)
+    {
+        var image = RenderFinalImage();
+        try
+        {
+            var text = await Core.OcrHelper.ExtractTextAsync(image);
+            if (string.IsNullOrWhiteSpace(text))
+                text = "[No text detected in the selected area]";
+
+            Hide();
+            var resultWindow = new OcrResultWindow(text);
+            resultWindow.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Hide();
+            System.Windows.MessageBox.Show($"OCR failed: {ex.Message}", "Llamashot",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        Close();
+    }
+
     private void Print_Click(object sender, RoutedEventArgs e)
     {
         var image = RenderFinalImage();

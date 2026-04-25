@@ -222,6 +222,17 @@
                             <Rectangle Canvas.Left="5" Canvas.Top="1" Width="6" Height="2" Fill="White" RadiusX="1" RadiusY="1" />
                         </Canvas>
                     </Button>
+                    <Button x:Name="BtnOcr" ToolTip="Extract Text (OCR)" Click="Ocr_Click" Style="{StaticResource TBtn}">
+                        <Canvas Width="16" Height="16">
+                            <!-- OCR / text extract icon -->
+                            <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="14"
+                                       Stroke="White" StrokeThickness="1.5" RadiusX="1" RadiusY="1" />
+                            <TextBlock Canvas.Left="3" Canvas.Top="1" Text="T" Foreground="White"
+                                       FontSize="11" FontWeight="Bold" />
+                            <Line X1="4" Y1="13" X2="12" Y2="13" Stroke="#2196F3" StrokeThickness="1.5" />
+                            <Line X1="4" Y1="10" X2="10" Y2="10" Stroke="#2196F3" StrokeThickness="1" />
+                        </Canvas>
+                    </Button>
                     <Rectangle Width="1" Fill="#333" Margin="2,4" />
                     <Button x:Name="BtnClose" ToolTip="Close (Esc)" Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
