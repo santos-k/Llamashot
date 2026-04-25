@@ -311,6 +311,8 @@ public partial class OverlayWindow : Window
                 UpdateToolbarPositions();
                 break;
         }
+
+        Focus(); // Restore keyboard focus for shortcuts
     }
 
     private void UpdateSelectionVisuals()
@@ -750,6 +752,7 @@ public partial class OverlayWindow : Window
         }
 
         e.Handled = true;
+        Focus(); // Restore keyboard focus for shortcuts
     }
 
     private void Color_Click(object sender, RoutedEventArgs e)
@@ -992,12 +995,11 @@ public partial class OverlayWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        // Skip all shortcuts when typing in a TextBox
-        if (Keyboard.FocusedElement is TextBox)
+        // Skip shortcuts only when actively typing in a text annotation on the canvas
+        if (Keyboard.FocusedElement is TextBox tb && DrawingCanvas.IsAncestorOf(tb))
         {
             if (e.Key == Key.Escape)
             {
-                // ESC defocuses the textbox
                 Focus();
                 e.Handled = true;
             }
