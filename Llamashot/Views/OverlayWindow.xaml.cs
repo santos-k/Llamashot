@@ -965,6 +965,27 @@ public partial class OverlayWindow : Window
         Close();
     }
 
+    private void Record_Click(object sender, RoutedEventArgs e)
+    {
+        var dpi = GetDpiScale();
+        int px = (int)(_selection.X * dpi);
+        int py = (int)(_selection.Y * dpi);
+        int pw = (int)(_selection.Width * dpi);
+        int ph = (int)(_selection.Height * dpi);
+
+        // DIP coordinates for the border overlay
+        double dx = _selection.X + Left;
+        double dy = _selection.Y + Top;
+        double dw = _selection.Width;
+        double dh = _selection.Height;
+
+        Hide();
+
+        var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, dw, dh);
+        overlay.Show();
+        Close();
+    }
+
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     // ============ KEYBOARD ============

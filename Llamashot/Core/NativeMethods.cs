@@ -135,6 +135,12 @@ internal static class NativeMethods
 
     public const uint GA_ROOTOWNER = 3;
 
+    // --- Exclude window from screen capture ---
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
+    public const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
     // --- DPI ---
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hwnd);

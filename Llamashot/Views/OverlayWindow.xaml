@@ -229,6 +229,15 @@
                             <Line X1="8" Y1="11" X2="8" Y2="15" Stroke="#AB47BC" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
+                    <!-- Record - red -->
+                    <Button x:Name="BtnRecord" ToolTip="Record region (max 2 min)" Click="Record_Click" Style="{StaticResource TBtn}">
+                        <Canvas Width="16" Height="16">
+                            <Ellipse Canvas.Left="1" Canvas.Top="1" Width="14" Height="14"
+                                     Stroke="#F44336" StrokeThickness="2" />
+                            <Ellipse Canvas.Left="4" Canvas.Top="4" Width="8" Height="8"
+                                     Fill="#F44336" />
+                        </Canvas>
+                    </Button>
                     <!-- OCR - cyan -->
                     <Button x:Name="BtnOcr" ToolTip="Extract Text (OCR)" Click="Ocr_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">

@@ -82,6 +82,7 @@ public partial class App : Application
 
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add("Take Screenshot", null, (s, e) => StartRegionCapture());
+        menu.Items.Add("Record Screen", null, (s, e) => StartRecordCapture());
         menu.Items.Add("Delayed Capture...", null, (s, e) => ShowDelayedCapture());
         menu.Items.Add("Fullscreen to Clipboard", null, (s, e) => FullscreenClipboard());
         menu.Items.Add("-");
@@ -125,6 +126,17 @@ public partial class App : Application
         {
             var overlay = new OverlayWindow();
             overlay.StartCapture();
+        });
+    }
+
+    private void StartRecordCapture()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            // Use a simple fullscreen region selection for recording
+            var overlay = new OverlayWindow();
+            overlay.StartCapture();
+            // The overlay's Record button handles the rest
         });
     }
 
