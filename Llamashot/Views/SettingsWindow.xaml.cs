@@ -148,6 +148,7 @@ public partial class SettingsWindow : Window
 
         TxtSaveDir.Text = s.LastSaveDirectory;
         ChkSaveHistory.IsChecked = s.SaveHistory;
+        TxtHistoryDir.Text = s.HistoryDirectory;
         TxtMaxHistory.Text = s.MaxHistoryItems.ToString();
     }
 
@@ -324,6 +325,7 @@ public partial class SettingsWindow : Window
         s.LastSaveDirectory = TxtSaveDir.Text;
 
         s.SaveHistory = ChkSaveHistory.IsChecked ?? true;
+        s.HistoryDirectory = TxtHistoryDir.Text;
         if (int.TryParse(TxtMaxHistory.Text, out int max) && max > 0)
             s.MaxHistoryItems = max;
 
@@ -344,6 +346,17 @@ public partial class SettingsWindow : Window
         };
         if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             TxtSaveDir.Text = dialog.SelectedPath;
+    }
+
+    private void BrowseHistoryDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            SelectedPath = TxtHistoryDir.Text,
+            Description = "Select history folder"
+        };
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            TxtHistoryDir.Text = dialog.SelectedPath;
     }
 
     private static void SetAutoStart(bool enable)

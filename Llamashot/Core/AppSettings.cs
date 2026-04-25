@@ -50,7 +50,7 @@ public class AppSettings
     // History
     public bool SaveHistory { get; set; } = true;
     public string HistoryDirectory { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Llamashot");
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Llamashot");
     public int MaxHistoryItems { get; set; } = 100;
 
     public static void Load()

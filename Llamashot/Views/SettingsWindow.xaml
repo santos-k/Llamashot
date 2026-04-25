@@ -170,7 +170,19 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <CheckBox x:Name="ChkSaveHistory" Content="Save screenshot history" />
-                        <Grid Margin="0,6,0,0">
+                        <Grid Margin="0,6,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="History folder" Style="{StaticResource Label}" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtHistoryDir" Grid.Column="1" Height="28" Padding="6,4"
+                                     Background="#1A1A1E" Foreground="#CCC" BorderBrush="#444" FontSize="11" />
+                            <Button Grid.Column="2" Content="..." Width="32" Height="28" Margin="6,0,0,0"
+                                    Click="BrowseHistoryDir_Click" Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                        </Grid>
+                        <Grid Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="80" />
