@@ -520,9 +520,17 @@ public partial class OverlayWindow : Window
     private void DeselectTool()
     {
         _currentTool = null;
+        Cursor = Cursors.Cross;
         DrawingCanvas.Cursor = Cursors.Cross;
         foreach (var child in DrawingToolsPanel.Children)
             if (child is Button b) b.Background = Brushes.Transparent;
+    }
+
+    private void ActivateMoveTool()
+    {
+        DeselectTool();
+        Cursor = Cursors.SizeAll;
+        DrawingCanvas.Cursor = Cursors.SizeAll;
     }
 
     private void Eraser_Click(object sender, RoutedEventArgs e)
@@ -777,6 +785,9 @@ public partial class OverlayWindow : Window
             case Key.M when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Marker"); break;
             case Key.B when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Blur"); break;
             case Key.X when Keyboard.Modifiers == ModifierKeys.None: Eraser_Click(this, new RoutedEventArgs()); break;
+            case Key.V when Keyboard.Modifiers == ModifierKeys.None:
+                if (_hasSelection) ActivateMoveTool();
+                e.Handled = true; break;
 
             case Key.OemPlus when Keyboard.Modifiers == ModifierKeys.Control:
             case Key.Add when Keyboard.Modifiers == ModifierKeys.Control:
