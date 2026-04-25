@@ -53,6 +53,8 @@ public partial class OverlayWindow : Window
     {
         InitializeComponent();
         InitializeColorPalette();
+        InitializeThicknessPopup();
+        _currentThickness = 1;
     }
 
     public void StartCapture()
@@ -77,6 +79,7 @@ public partial class OverlayWindow : Window
         HandleCanvas.Visibility = Visibility.Collapsed;
         DrawingCanvas.Visibility = Visibility.Collapsed;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
         DrawingCanvas.Children.Clear();
         _undoStack.Clear();
         _redoStack.Clear();
@@ -109,6 +112,53 @@ public partial class OverlayWindow : Window
                 e.Handled = true;
             };
             ColorSwatches.Children.Add(swatch);
+        }
+    }
+
+    private void InitializeThicknessPopup()
+    {
+        for (int i = 1; i <= 10; i++)
+        {
+            int val = i;
+            var btn = new Button
+            {
+                Width = 36, Height = 28,
+                Content = new StackPanel
+                {
+                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+                    Children =
+                    {
+                        new System.Windows.Shapes.Ellipse
+                        {
+                            Width = Math.Max(4, val * 1.6),
+                            Height = Math.Max(4, val * 1.6),
+                            Fill = Brushes.White,
+                            Margin = new Thickness(2, 0, 4, 0),
+                            VerticalAlignment = VerticalAlignment.Center
+                        },
+                        new TextBlock
+                        {
+                            Text = val.ToString(),
+                            Foreground = Brushes.White,
+                            FontSize = 12,
+                            VerticalAlignment = VerticalAlignment.Center
+                        }
+                    }
+                },
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                Focusable = false,
+                Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _currentThickness = val;
+                ThicknessLabel.Text = val.ToString();
+                if (_currentTool != null) _currentTool.Thickness = val;
+                ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+            };
+            ThicknessOptions.Children.Add(btn);
         }
     }
 
@@ -452,15 +502,33 @@ public partial class OverlayWindow : Window
 
     private void UpdateToolbarPositions()
     {
+        // Adaptive columns: try 1-column first, switch to 2 if it doesn't fit
+        double availableHeight = ActualHeight - _selection.Top - 20;
+
+        // 12 buttons @ 32px each + separator 7px + bottom row 32px + padding ~16px
+        double oneColHeight = 12 * 32 + 7 + 32 + 16;
+        bool useTwoCols = availableHeight < oneColHeight;
+        double wrapWidth = useTwoCols ? 64 : 32;
+        ToolWrapPanel.Width = wrapWidth;
+        BottomToolsPanel.Width = wrapWidth;
+
+        // Re-measure after layout change
+        DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        DrawingToolbar.UpdateLayout();
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
         double dtLeft = _selection.Right + 8;
         double dtTop = _selection.Top;
+
+        // If toolbar goes off right edge, put it on the left
         if (dtLeft + DrawingToolbar.DesiredSize.Width > ActualWidth)
             dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 8;
-        if (dtTop + DrawingToolbar.DesiredSize.Height > ActualHeight)
+
+        // Clamp to screen bounds
+        if (dtTop + DrawingToolbar.DesiredSize.Height > ActualHeight - 4)
             dtTop = ActualHeight - DrawingToolbar.DesiredSize.Height - 4;
+        if (dtTop < 4) dtTop = 4;
 
         Canvas.SetLeft(DrawingToolbar, dtLeft);
         Canvas.SetTop(DrawingToolbar, dtTop);
@@ -485,6 +553,7 @@ public partial class OverlayWindow : Window
     {
         if (sender is not Button btn || btn.Tag is not string toolName) return;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
 
         // Reset highlights
         foreach (var child in DrawingToolsPanel.Children)
@@ -599,6 +668,7 @@ public partial class OverlayWindow : Window
 
     private void Color_Click(object sender, RoutedEventArgs e)
     {
+        ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
         if (ColorPaletteCanvas.Visibility == Visibility.Visible)
         {
             ColorPaletteCanvas.Visibility = Visibility.Collapsed;
@@ -610,15 +680,31 @@ public partial class OverlayWindow : Window
         ColorPaletteCanvas.Visibility = Visibility.Visible;
     }
 
-    private void ThicknessUp_Click(object sender, RoutedEventArgs e)
+    private void Thickness_Click(object sender, RoutedEventArgs e)
     {
-        _currentThickness = Math.Min(20, _currentThickness + 1);
+        ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        if (ThicknessPopupCanvas.Visibility == Visibility.Visible)
+        {
+            ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var btnPos = BtnThickness.TranslatePoint(new Point(0, 0), RootGrid);
+        Canvas.SetLeft(ThicknessPopup, btnPos.X + 40);
+        Canvas.SetTop(ThicknessPopup, btnPos.Y);
+        ThicknessPopupCanvas.Visibility = Visibility.Visible;
+    }
+
+    private void ThicknessUp_Click(object? sender, RoutedEventArgs e)
+    {
+        _currentThickness = Math.Min(10, _currentThickness + 1);
+        ThicknessLabel.Text = ((int)_currentThickness).ToString();
         if (_currentTool != null) _currentTool.Thickness = _currentThickness;
     }
 
-    private void ThicknessDown_Click(object sender, RoutedEventArgs e)
+    private void ThicknessDown_Click(object? sender, RoutedEventArgs e)
     {
         _currentThickness = Math.Max(1, _currentThickness - 1);
+        ThicknessLabel.Text = ((int)_currentThickness).ToString();
         if (_currentTool != null) _currentTool.Thickness = _currentThickness;
     }
 
