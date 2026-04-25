@@ -2,7 +2,7 @@
 
 A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text with a single hotkey.
 
-**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup.exe)**
+**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.5.0.exe)** | **[Download Executable](https://github.com/santos-k/Llamashot/raw/main/Llamashot.exe)**
 
 Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
@@ -17,16 +17,16 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **DPI aware** - PerMonitorV2 for crisp rendering on high-DPI screens
 
 ### Annotation Tools
-- **Pencil** - Freehand drawing
-- **Line** - Straight lines
-- **Arrow** - Arrows with filled heads
-- **Rectangle** - Outlined rectangles
-- **Ellipse** - Outlined ellipses
-- **Text** - Text annotations with configurable font size
-- **Marker** - Semi-transparent highlighter
-- **Blur** - Pixelate/blur sensitive areas
-- **Check stamp** - Green checkmark with circle (for reviews)
-- **Cross stamp** - Red X with circle (for reviews)
+- **Pencil (P)** - Freehand drawing
+- **Line (L)** - Straight lines
+- **Arrow (A)** - Arrows with filled heads
+- **Rectangle (R)** - Outlined rectangles
+- **Ellipse (E)** - Outlined ellipses
+- **Text (T)** - Text annotations with configurable font size
+- **Marker (M)** - Semi-transparent highlighter
+- **Blur (B)** - Pixelate/blur sensitive areas
+- **Check stamp (K)** - Green checkmark with circle (for reviews)
+- **Cross stamp (D)** - Red X with circle (for reviews)
 
 ### Screen Recording
 - Record any selected region as MP4 video
@@ -59,19 +59,27 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Move tool (V)** - Drag selection and annotations together
 - **Space+drag** - Photoshop-style temporary pan
 - **Undo/Redo** - Ctrl+Z / Ctrl+Y
-- **Thickness control** - Dropdown 1-10 with visual preview
-- **Color picker** - 24-color palette
+- **Thickness control (W)** - Dropdown 1-10 with visual preview
+- **Color picker (C)** - 24-color palette
 - **Adaptive toolbar** - Auto-switches between 1 and 2 columns based on screen height
+- **21 configurable shortcuts** - Every tool and action has a keyboard shortcut
 
 ## Keyboard Shortcuts
 
-All shortcuts are customizable in Settings.
+All 21 shortcuts are customizable in Settings.
+
+### Global Hotkeys
 
 | Action | Default |
 |--------|---------|
 | Capture region | PrintScreen |
 | Fullscreen save | Shift+PrintScreen |
 | Fullscreen copy | Ctrl+PrintScreen |
+
+### Overlay Shortcuts
+
+| Action | Default |
+|--------|---------|
 | Save | Ctrl+S |
 | Copy | Ctrl+C |
 | Undo | Ctrl+Z |
@@ -84,25 +92,32 @@ All shortcuts are customizable in Settings.
 | Text | T |
 | Marker | M |
 | Blur | B |
+| Check stamp | K |
+| Cross stamp | D |
 | Undo last | X |
 | Move | V |
+| Color picker | C |
+| Thickness | W |
+| History | H |
+| Record | Ctrl+R |
+| OCR | O |
+| Pin | F |
 | Pan (temporary) | Space+drag |
 | Close overlay | Escape |
 
 ## Installation
 
 ### Installer
-Download and run `LlamashotSetup.exe` from the [Releases](releases) page.
+Download and run `LlamashotSetup_v2.5.0.exe` from the [Releases](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.5.0.exe) page.
 
-### Manual
-1. Install [.NET 10 Runtime](https://dotnet.microsoft.com/download)
-2. Download `Llamashot.exe` from Releases
-3. Run the executable
+### Standalone Executable
+Download `Llamashot.exe` directly — self-contained, no runtime needed:
+[Download Llamashot.exe](https://github.com/santos-k/Llamashot/raw/main/Llamashot.exe)
 
 ### Build from Source
 ```bash
-git clone https://github.com/user/llamashot.git
-cd llamashot/Llamashot
+git clone https://github.com/santos-k/Llamashot.git
+cd Llamashot/Llamashot
 dotnet build
 dotnet run
 ```

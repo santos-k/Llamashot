@@ -31,6 +31,14 @@ public class AppSettings
     public string ShortcutBlur { get; set; } = "B";
     public string ShortcutEraser { get; set; } = "X";
     public string ShortcutMove { get; set; } = "V";
+    public string ShortcutCheck { get; set; } = "K";
+    public string ShortcutCross { get; set; } = "D";
+    public string ShortcutColor { get; set; } = "C";
+    public string ShortcutThickness { get; set; } = "W";
+    public string ShortcutHistory { get; set; } = "H";
+    public string ShortcutRecord { get; set; } = "Ctrl+R";
+    public string ShortcutOcr { get; set; } = "O";
+    public string ShortcutPin { get; set; } = "F";
 
     // Save settings
     public string DefaultSaveFormat { get; set; } = "PNG";
