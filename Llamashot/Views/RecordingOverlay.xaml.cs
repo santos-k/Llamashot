@@ -59,15 +59,15 @@ public partial class RecordingOverlay : Window
         {
             _recorder.Resume();
             RecDot.Fill = new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36));
-            PauseIcon1.Visibility = Visibility.Visible;
-            PauseIcon2.Visibility = Visibility.Visible;
+            PauseIcon.Visibility = Visibility.Visible;
+            PlayIcon.Visibility = Visibility.Collapsed;
         }
         else
         {
             _recorder.Pause();
             RecDot.Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xA7, 0x26));
-            PauseIcon1.Visibility = Visibility.Collapsed;
-            PauseIcon2.Visibility = Visibility.Collapsed;
+            PauseIcon.Visibility = Visibility.Collapsed;
+            PlayIcon.Visibility = Visibility.Visible;
         }
     }
 
@@ -103,19 +103,17 @@ public partial class RecordingOverlay : Window
 
         if (dialog.ShowDialog() == true)
         {
-            // Show encoding state
             TxtTimer.Text = "Saving...";
             RecDot.Fill = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
             BtnStop.IsEnabled = false;
             BtnPause.IsEnabled = false;
 
             bool success = await _recorder.SaveAsMp4Async(dialog.FileName);
-
             Hide();
 
             if (!success)
             {
-                MessageBox.Show("Failed to encode MP4.", "Llamashot",
+                MessageBox.Show($"Failed to encode MP4.\n{_recorder.LastError}", "Llamashot",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

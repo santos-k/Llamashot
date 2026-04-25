@@ -52,10 +52,17 @@
             <Button x:Name="BtnPause" Grid.Column="3" Click="Pause_Click"
                     Width="28" Height="28" Margin="8,0,4,0" Cursor="Hand"
                     Background="Transparent" BorderBrush="Transparent" Focusable="False">
-                <Canvas Width="14" Height="14">
-                    <Rectangle x:Name="PauseIcon1" Canvas.Left="2" Width="4" Height="14" Fill="White" />
-                    <Rectangle x:Name="PauseIcon2" Canvas.Left="8" Width="4" Height="14" Fill="White" />
-                </Canvas>
+                <Grid Width="14" Height="14">
+                    <!-- Pause icon (two bars) -->
+                    <Canvas x:Name="PauseIcon" Visibility="Visible">
+                        <Rectangle Canvas.Left="2" Width="4" Height="14" Fill="White" />
+                        <Rectangle Canvas.Left="8" Width="4" Height="14" Fill="White" />
+                    </Canvas>
+                    <!-- Play icon (triangle) -->
+                    <Canvas x:Name="PlayIcon" Visibility="Collapsed">
+                        <Path Fill="#4CAF50" Data="M2,0 L14,7 L2,14 Z" />
+                    </Canvas>
+                </Grid>
             </Button>
 
             <!-- Stop -->

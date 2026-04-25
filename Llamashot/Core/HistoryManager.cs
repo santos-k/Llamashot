@@ -18,7 +18,7 @@ public class ScreenshotRecord
 
 public static class HistoryManager
 {
-    private static readonly string IndexPath = Path.Combine(
+    private static string IndexPath => Path.Combine(
         AppSettings.Instance.HistoryDirectory, "history.json");
     private static List<ScreenshotRecord> _records = new();
 
@@ -49,70 +49,103 @@ public static class HistoryManager
 
     public static void AddClipRecord(BitmapSource image)
     {
-        if (!AppSettings.Instance.SaveHistory) return;
+        try
+        {
+            // Ensure image is frozen
+            if (!image.IsFrozen)
+            {
+                image = image.Clone();
+                image.Freeze();
+            }
 
-        // Save full image to clips folder so user can re-copy later
-        var dir = AppSettings.Instance.HistoryDirectory;
-        var clipsDir = Path.Combine(dir, "clips");
-        Directory.CreateDirectory(clipsDir);
+            var dir = AppSettings.Instance.HistoryDirectory;
+            var clipsDir = Path.Combine(dir, "clips");
+            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(clipsDir);
 
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-        var clipPath = Path.Combine(clipsDir, $"clip_{timestamp}.png");
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+            var clipPath = Path.Combine(clipsDir, $"clip_{timestamp}.png");
 
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(image));
-        using (var fs = File.Create(clipPath))
-            encoder.Save(fs);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using (var fs = File.Create(clipPath))
+                encoder.Save(fs);
 
-        AddEntry(image, clipPath, RecordType.Clipboard);
+            AddEntry(image, clipPath, RecordType.Clipboard);
+        }
+        catch { }
     }
 
     private static void AddEntry(BitmapSource image, string filePath, RecordType type)
     {
-        if (!AppSettings.Instance.SaveHistory) return;
-
-        var dir = AppSettings.Instance.HistoryDirectory;
-        var thumbDir = Path.Combine(dir, "thumbnails");
-        Directory.CreateDirectory(thumbDir);
-
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-        var thumbPath = Path.Combine(thumbDir, $"thumb_{timestamp}.png");
-
-        var scale = Math.Min(200.0 / image.PixelWidth, 1.0);
-        var thumb = new TransformedBitmap(image, new System.Windows.Media.ScaleTransform(scale, scale));
-
-        var enc = new PngBitmapEncoder();
-        enc.Frames.Add(BitmapFrame.Create(thumb));
-        using (var fs = File.Create(thumbPath))
-            enc.Save(fs);
-
-        var record = new ScreenshotRecord
+        try
         {
-            FilePath = filePath,
-            ThumbnailPath = thumbPath,
-            CapturedAt = DateTime.Now,
-            Width = image.PixelWidth,
-            Height = image.PixelHeight,
-            Type = type
-        };
+            // Ensure image is frozen
+            if (!image.IsFrozen)
+            {
+                image = image.Clone();
+                image.Freeze();
+            }
 
-        _records.Insert(0, record);
+            string thumbPath = "";
 
-        while (_records.Count > AppSettings.Instance.MaxHistoryItems)
-        {
-            var old = _records[^1];
-            try { File.Delete(old.ThumbnailPath); } catch { }
-            _records.RemoveAt(_records.Count - 1);
+            // Save thumbnail to disk if history saving is enabled
+            if (AppSettings.Instance.SaveHistory)
+            {
+                var dir = AppSettings.Instance.HistoryDirectory;
+                var thumbDir = Path.Combine(dir, "thumbnails");
+                Directory.CreateDirectory(dir);
+                Directory.CreateDirectory(thumbDir);
+
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                thumbPath = Path.Combine(thumbDir, $"thumb_{timestamp}.png");
+
+                double scale = Math.Min(200.0 / image.PixelWidth, 1.0);
+                var thumb = new TransformedBitmap(image, new System.Windows.Media.ScaleTransform(scale, scale));
+                thumb.Freeze();
+
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(thumb));
+                using (var fs = File.Create(thumbPath))
+                    enc.Save(fs);
+            }
+
+            // Always track in memory
+            var record = new ScreenshotRecord
+            {
+                FilePath = filePath,
+                ThumbnailPath = thumbPath,
+                CapturedAt = DateTime.Now,
+                Width = image.PixelWidth,
+                Height = image.PixelHeight,
+                Type = type
+            };
+
+            _records.Insert(0, record);
+
+            while (_records.Count > AppSettings.Instance.MaxHistoryItems)
+            {
+                var old = _records[^1];
+                if (!string.IsNullOrEmpty(old.ThumbnailPath))
+                    try { File.Delete(old.ThumbnailPath); } catch { }
+                _records.RemoveAt(_records.Count - 1);
+            }
+
+            if (AppSettings.Instance.SaveHistory)
+                Save();
         }
-
-        Save();
+        catch { }
     }
 
     private static void Save()
     {
-        Directory.CreateDirectory(AppSettings.Instance.HistoryDirectory);
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        File.WriteAllText(IndexPath, JsonSerializer.Serialize(_records, options));
+        try
+        {
+            Directory.CreateDirectory(AppSettings.Instance.HistoryDirectory);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            File.WriteAllText(IndexPath, JsonSerializer.Serialize(_records, options));
+        }
+        catch { }
     }
 
     public static void Clear()

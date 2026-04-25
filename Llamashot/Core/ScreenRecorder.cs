@@ -22,7 +22,6 @@ public class ScreenRecorder : IDisposable
     public bool IsRecording => _recording;
     public bool IsPaused => _paused;
     public int FramesCaptured => _frameCount;
-    public int Fps => _fps;
 
     public TimeSpan Elapsed
     {
@@ -51,8 +50,9 @@ public class ScreenRecorder : IDisposable
 
         _regionX = x;
         _regionY = y;
-        _regionW = width;
-        _regionH = height;
+        // H.264 requires even dimensions
+        _regionW = width % 2 == 0 ? width : width - 1;
+        _regionH = height % 2 == 0 ? height : height - 1;
         _frameCount = 0;
         _pausedElapsed = TimeSpan.Zero;
 
@@ -121,10 +121,10 @@ public class ScreenRecorder : IDisposable
                     : Windows.Media.MediaProperties.VideoEncodingQuality.Vga;
 
             var profile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateMp4(quality);
-            profile.Video.Width = (uint)_regionW;
-            profile.Video.Height = (uint)_regionH;
+            // Ensure even dimensions for H.264
+            profile.Video.Width = (uint)(_regionW % 2 == 0 ? _regionW : _regionW - 1);
+            profile.Video.Height = (uint)(_regionH % 2 == 0 ? _regionH : _regionH - 1);
 
-            // Ensure output directory exists
             var dir = Path.GetDirectoryName(outputPath)!;
             Directory.CreateDirectory(dir);
 
@@ -138,11 +138,14 @@ public class ScreenRecorder : IDisposable
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = ex.Message;
             return false;
         }
     }
+
+    public string? LastError { get; private set; }
 
     public void CleanupFrames()
     {
