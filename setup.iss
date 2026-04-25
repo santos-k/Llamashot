@@ -33,4 +33,5 @@ Name: "startupicon"; Description: "Start with &Windows"; GroupDescription: "Addi
 Filename: "{app}\Llamashot.exe"; Description: "Launch Llamashot"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesandirs; Name: "{app}"
+Type: files; Name: "{app}\*"
+Type: dirifempty; Name: "{app}"
