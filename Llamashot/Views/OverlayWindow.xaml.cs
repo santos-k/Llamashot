@@ -14,11 +14,9 @@ namespace Llamashot.Views;
 
 public partial class OverlayWindow : Window
 {
-    // Screenshot
     private BitmapSource? _screenshot;
     private Rect _virtualBounds;
 
-    // Selection state
     private enum Mode { Selecting, Selected, Drawing }
     private Mode _mode = Mode.Selecting;
     private Point _selStart;
@@ -26,20 +24,18 @@ public partial class OverlayWindow : Window
     private Rect _selection;
     private bool _isDragging;
 
-    // Resize
     private enum ResizeHandle { None, TopLeft, Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left, Move }
     private ResizeHandle _activeHandle = ResizeHandle.None;
     private Point _resizeStart;
     private Rect _resizeOriginal;
 
-    // Drawing
     private IDrawingTool? _currentTool;
     private readonly Stack<DrawingAction> _undoStack = new();
     private readonly Stack<DrawingAction> _redoStack = new();
     private Color _currentColor = Colors.Red;
     private double _currentThickness = 2;
+    private bool _isDrawingStroke;
 
-    // Color palette
     private static readonly Color[] PaletteColors = {
         Colors.Red, Colors.OrangeRed, Colors.Orange, Colors.Gold,
         Colors.Yellow, Colors.GreenYellow, Colors.LimeGreen, Colors.Green,
@@ -59,20 +55,19 @@ public partial class OverlayWindow : Window
     {
         _virtualBounds = ScreenCapture.GetVirtualScreenBounds();
         _screenshot = ScreenCapture.CaptureFullScreen();
-
         ScreenshotImage.Source = _screenshot;
 
-        // Position window to cover all screens
         Left = _virtualBounds.X;
         Top = _virtualBounds.Y;
         Width = _virtualBounds.Width;
         Height = _virtualBounds.Height;
 
-        // Set initial full dimming
         UpdateDimming(Rect.Empty);
 
         _mode = Mode.Selecting;
         _isDragging = false;
+        _isDrawingStroke = false;
+        _currentTool = null;
         SelectionBorder.Visibility = Visibility.Collapsed;
         DimensionBorder.Visibility = Visibility.Collapsed;
         ToolbarCanvas.Visibility = Visibility.Collapsed;
@@ -85,6 +80,7 @@ public partial class OverlayWindow : Window
 
         Show();
         Activate();
+        Focus();
     }
 
     private void InitializeColorPalette()
@@ -93,12 +89,12 @@ public partial class OverlayWindow : Window
         {
             var swatch = new Border
             {
-                Width = 22, Height = 22,
+                Width = 24, Height = 24,
                 Margin = new Thickness(2),
                 Background = new SolidColorBrush(color),
                 BorderBrush = new SolidColorBrush(Colors.White),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(2),
+                BorderThickness = new Thickness(1.5),
+                CornerRadius = new CornerRadius(3),
                 Cursor = Cursors.Hand
             };
             swatch.MouseLeftButtonDown += (s, e) =>
@@ -123,7 +119,6 @@ public partial class OverlayWindow : Window
 
         if (_mode == Mode.Selected)
         {
-            // Check if clicking on a resize handle
             var handle = HitTestHandle(pos);
             if (handle != ResizeHandle.None)
             {
@@ -136,9 +131,17 @@ public partial class OverlayWindow : Window
                 return;
             }
 
-            // Check if clicking inside selection (move)
-            if (_selection.Contains(pos))
+            // Clicking outside selection - start new selection
+            if (!_selection.Contains(pos))
             {
+                HideToolbars();
+                DrawingCanvas.Children.Clear();
+                _undoStack.Clear();
+                _redoStack.Clear();
+            }
+            else
+            {
+                // Inside selection - move
                 _activeHandle = ResizeHandle.Move;
                 _resizeStart = pos;
                 _resizeOriginal = _selection;
@@ -147,9 +150,6 @@ public partial class OverlayWindow : Window
                 e.Handled = true;
                 return;
             }
-
-            // Clicking outside - start new selection
-            HideToolbars();
         }
 
         _mode = Mode.Selecting;
@@ -217,6 +217,7 @@ public partial class OverlayWindow : Window
         else if (_mode == Mode.Selected)
         {
             _activeHandle = ResizeHandle.None;
+            ShowResizeHandles();
             UpdateToolbarPositions();
         }
     }
@@ -236,10 +237,9 @@ public partial class OverlayWindow : Window
         SelectionBorder.Height = h;
         SelectionBorder.Visibility = Visibility.Visible;
 
-        // Update dimension text
         DimensionText.Text = $"{(int)w} x {(int)h}";
         Canvas.SetLeft(DimensionBorder, x);
-        Canvas.SetTop(DimensionBorder, Math.Max(0, y - 25));
+        Canvas.SetTop(DimensionBorder, Math.Max(0, y - 28));
         DimensionBorder.Visibility = Visibility.Visible;
 
         UpdateDimming(_selection);
@@ -264,13 +264,14 @@ public partial class OverlayWindow : Window
     // ============ RESIZE HANDLES ============
 
     private const double HandleSize = 8;
+    private const double HandleHitMargin = 6;
 
     private void ShowResizeHandles()
     {
         HandleCanvas.Children.Clear();
         HandleCanvas.Visibility = Visibility.Visible;
 
-        var positions = new (ResizeHandle, double, double)[]
+        var positions = new (ResizeHandle handle, double cx, double cy)[]
         {
             (ResizeHandle.TopLeft, _selection.Left, _selection.Top),
             (ResizeHandle.Top, _selection.Left + _selection.Width / 2, _selection.Top),
@@ -284,21 +285,13 @@ public partial class OverlayWindow : Window
 
         foreach (var (handle, cx, cy) in positions)
         {
-            var rect = new Rectangle
+            var rect = new System.Windows.Shapes.Rectangle
             {
                 Width = HandleSize, Height = HandleSize,
                 Fill = new SolidColorBrush(Colors.White),
                 Stroke = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
                 StrokeThickness = 1.5,
                 Tag = handle,
-                Cursor = handle switch
-                {
-                    ResizeHandle.TopLeft or ResizeHandle.BottomRight => Cursors.SizeNWSE,
-                    ResizeHandle.TopRight or ResizeHandle.BottomLeft => Cursors.SizeNESW,
-                    ResizeHandle.Top or ResizeHandle.Bottom => Cursors.SizeNS,
-                    ResizeHandle.Left or ResizeHandle.Right => Cursors.SizeWE,
-                    _ => Cursors.Arrow
-                }
             };
 
             Canvas.SetLeft(rect, cx - HandleSize / 2);
@@ -311,19 +304,16 @@ public partial class OverlayWindow : Window
     {
         foreach (UIElement child in HandleCanvas.Children)
         {
-            if (child is Rectangle rect && rect.Tag is ResizeHandle handle)
+            if (child is System.Windows.Shapes.Rectangle rect && rect.Tag is ResizeHandle handle)
             {
                 double x = Canvas.GetLeft(rect);
                 double y = Canvas.GetTop(rect);
-                var hitRect = new Rect(x - 4, y - 4, HandleSize + 8, HandleSize + 8);
+                var hitRect = new Rect(x - HandleHitMargin, y - HandleHitMargin,
+                    HandleSize + HandleHitMargin * 2, HandleSize + HandleHitMargin * 2);
                 if (hitRect.Contains(pos))
                     return handle;
             }
         }
-
-        if (_selection.Contains(pos))
-            return ResizeHandle.Move;
-
         return ResizeHandle.None;
     }
 
@@ -336,41 +326,31 @@ public partial class OverlayWindow : Window
         switch (_activeHandle)
         {
             case ResizeHandle.TopLeft:
-                _selection = new Rect(r.Left + dx, r.Top + dy, r.Width - dx, r.Height - dy);
-                break;
+                _selection = new Rect(r.Left + dx, r.Top + dy, r.Width - dx, r.Height - dy); break;
             case ResizeHandle.Top:
-                _selection = new Rect(r.Left, r.Top + dy, r.Width, r.Height - dy);
-                break;
+                _selection = new Rect(r.Left, r.Top + dy, r.Width, r.Height - dy); break;
             case ResizeHandle.TopRight:
-                _selection = new Rect(r.Left, r.Top + dy, r.Width + dx, r.Height - dy);
-                break;
+                _selection = new Rect(r.Left, r.Top + dy, r.Width + dx, r.Height - dy); break;
             case ResizeHandle.Right:
-                _selection = new Rect(r.Left, r.Top, r.Width + dx, r.Height);
-                break;
+                _selection = new Rect(r.Left, r.Top, r.Width + dx, r.Height); break;
             case ResizeHandle.BottomRight:
-                _selection = new Rect(r.Left, r.Top, r.Width + dx, r.Height + dy);
-                break;
+                _selection = new Rect(r.Left, r.Top, r.Width + dx, r.Height + dy); break;
             case ResizeHandle.Bottom:
-                _selection = new Rect(r.Left, r.Top, r.Width, r.Height + dy);
-                break;
+                _selection = new Rect(r.Left, r.Top, r.Width, r.Height + dy); break;
             case ResizeHandle.BottomLeft:
-                _selection = new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height + dy);
-                break;
+                _selection = new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height + dy); break;
             case ResizeHandle.Left:
-                _selection = new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height);
-                break;
+                _selection = new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height); break;
             case ResizeHandle.Move:
-                _selection = new Rect(r.Left + dx, r.Top + dy, r.Width, r.Height);
-                break;
+                _selection = new Rect(r.Left + dx, r.Top + dy, r.Width, r.Height); break;
         }
 
-        // Normalize (ensure positive width/height)
-        if (_selection.Width < 0)
-            _selection = new Rect(_selection.Right, _selection.Top, -_selection.Width, _selection.Height);
-        if (_selection.Height < 0)
-            _selection = new Rect(_selection.Left, _selection.Bottom, _selection.Width, -_selection.Height);
+        // Normalize
+        if (_selection.Width < 10)
+            _selection = new Rect(_selection.Left, _selection.Top, 10, _selection.Height);
+        if (_selection.Height < 10)
+            _selection = new Rect(_selection.Left, _selection.Top, _selection.Width, 10);
 
-        // Update visuals
         Canvas.SetLeft(SelectionBorder, _selection.Left);
         Canvas.SetTop(SelectionBorder, _selection.Top);
         SelectionBorder.Width = _selection.Width;
@@ -378,11 +358,12 @@ public partial class OverlayWindow : Window
 
         DimensionText.Text = $"{(int)_selection.Width} x {(int)_selection.Height}";
         Canvas.SetLeft(DimensionBorder, _selection.Left);
-        Canvas.SetTop(DimensionBorder, Math.Max(0, _selection.Top - 25));
+        Canvas.SetTop(DimensionBorder, Math.Max(0, _selection.Top - 28));
 
         UpdateDimming(_selection);
         ShowResizeHandles();
         UpdateDrawingCanvasClip();
+        UpdateToolbarPositions();
     }
 
     // ============ TOOLBARS ============
@@ -405,25 +386,25 @@ public partial class OverlayWindow : Window
 
     private void UpdateToolbarPositions()
     {
-        // Drawing toolbar: right side of selection
-        double dtLeft = _selection.Right + 6;
-        double dtTop = _selection.Top;
-
-        // If toolbar would go off screen, put it on the left
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        // Drawing toolbar: right side of selection
+        double dtLeft = _selection.Right + 8;
+        double dtTop = _selection.Top;
         if (dtLeft + DrawingToolbar.DesiredSize.Width > ActualWidth)
-            dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 6;
+            dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 8;
+        if (dtTop + DrawingToolbar.DesiredSize.Height > ActualHeight)
+            dtTop = ActualHeight - DrawingToolbar.DesiredSize.Height - 4;
 
         Canvas.SetLeft(DrawingToolbar, dtLeft);
         Canvas.SetTop(DrawingToolbar, dtTop);
 
         // Action toolbar: below selection
         double atLeft = _selection.Left;
-        double atTop = _selection.Bottom + 6;
-
-        ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double atTop = _selection.Bottom + 8;
         if (atTop + ActionToolbar.DesiredSize.Height > ActualHeight)
-            atTop = _selection.Top - ActionToolbar.DesiredSize.Height - 6;
+            atTop = _selection.Top - ActionToolbar.DesiredSize.Height - 8;
 
         Canvas.SetLeft(ActionToolbar, atLeft);
         Canvas.SetTop(ActionToolbar, atTop);
@@ -435,6 +416,28 @@ public partial class OverlayWindow : Window
     }
 
     // ============ DRAWING ============
+
+    private void EnterDrawingMode()
+    {
+        _mode = Mode.Drawing;
+        // Hide resize handles so they don't interfere with drawing
+        HandleCanvas.Visibility = Visibility.Collapsed;
+    }
+
+    private void ExitDrawingMode()
+    {
+        _mode = Mode.Selected;
+        _currentTool = null;
+        _isDrawingStroke = false;
+        DrawingCanvas.Cursor = Cursors.Cross;
+        HandleCanvas.Visibility = Visibility.Visible;
+        ShowResizeHandles();
+
+        // Reset tool button highlights
+        foreach (var child in DrawingToolsPanel.Children)
+            if (child is Button b && b.Content is Border border)
+                border.Background = new SolidColorBrush(Colors.Transparent);
+    }
 
     private void Tool_Click(object sender, RoutedEventArgs e)
     {
@@ -470,9 +473,18 @@ public partial class OverlayWindow : Window
         {
             _currentTool.StrokeColor = _currentColor;
             _currentTool.Thickness = _currentThickness;
-            _mode = Mode.Drawing;
             DrawingCanvas.Cursor = _currentTool.Cursor;
+            EnterDrawingMode();
         }
+
+        Focus();
+    }
+
+    private void Eraser_Click(object sender, RoutedEventArgs e)
+    {
+        // Erase last drawn annotation (same as undo)
+        PerformUndo();
+        Focus();
     }
 
     private void Drawing_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -481,6 +493,7 @@ public partial class OverlayWindow : Window
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
 
+        _isDrawingStroke = true;
         _currentTool.OnMouseDown(pos, DrawingCanvas);
         DrawingCanvas.CaptureMouse();
         e.Handled = true;
@@ -488,7 +501,7 @@ public partial class OverlayWindow : Window
 
     private void Drawing_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_mode != Mode.Drawing || _currentTool == null) return;
+        if (_mode != Mode.Drawing || _currentTool == null || !_isDrawingStroke) return;
         if (e.LeftButton != MouseButtonState.Pressed) return;
 
         var pos = e.GetPosition(DrawingCanvas);
@@ -498,7 +511,9 @@ public partial class OverlayWindow : Window
 
     private void Drawing_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_mode != Mode.Drawing || _currentTool == null) return;
+        if (_mode != Mode.Drawing || _currentTool == null || !_isDrawingStroke) return;
+        _isDrawingStroke = false;
+
         var pos = e.GetPosition(DrawingCanvas);
         _currentTool.OnMouseUp(pos, DrawingCanvas);
         DrawingCanvas.ReleaseMouseCapture();
@@ -520,9 +535,8 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        // Position palette near the color button
         var btnPos = BtnColor.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ColorPalette, btnPos.X + 40);
+        Canvas.SetLeft(ColorPalette, btnPos.X + 44);
         Canvas.SetTop(ColorPalette, btnPos.Y);
         ColorPaletteCanvas.Visibility = Visibility.Visible;
     }
@@ -570,7 +584,6 @@ public partial class OverlayWindow : Window
     {
         if (_screenshot == null) return new BitmapImage();
 
-        // Crop screenshot to selection
         var cropRect = new Int32Rect(
             (int)_selection.X, (int)_selection.Y,
             (int)_selection.Width, (int)_selection.Height);
@@ -580,7 +593,6 @@ public partial class OverlayWindow : Window
         if (DrawingCanvas.Children.Count == 0)
             return cropped;
 
-        // Render drawing canvas content onto the cropped image
         var dpi = 96.0;
         var width = (int)_selection.Width;
         var height = (int)_selection.Height;
@@ -588,29 +600,14 @@ public partial class OverlayWindow : Window
         var drawingVisual = new DrawingVisual();
         using (var dc = drawingVisual.RenderOpen())
         {
-            // Draw the cropped screenshot
             dc.DrawImage(cropped, new Rect(0, 0, width, height));
 
-            // Render the drawing canvas
-            var canvasSize = new Size(_selection.Width, _selection.Height);
-
-            // We need to translate since DrawingCanvas elements are in screen coordinates
-            dc.PushTransform(new TranslateTransform(-_selection.X, -_selection.Y));
-
-            foreach (UIElement child in DrawingCanvas.Children)
-            {
-                child.Measure(new Size(ActualWidth, ActualHeight));
-                child.Arrange(new Rect(0, 0, ActualWidth, ActualHeight));
-            }
-
-            // Render the entire drawing canvas
             var canvasBrush = new VisualBrush(DrawingCanvas)
             {
                 ViewboxUnits = BrushMappingMode.Absolute,
                 Viewbox = _selection,
                 Stretch = Stretch.None
             };
-            dc.Pop();
             dc.DrawRectangle(canvasBrush, null, new Rect(0, 0, width, height));
         }
 
@@ -633,7 +630,6 @@ public partial class OverlayWindow : Window
             FileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss}"
         };
 
-        // Set filter index based on default format
         dialog.FilterIndex = settings.DefaultSaveFormat.ToUpper() switch
         {
             "JPG" or "JPEG" => 2,
@@ -641,7 +637,7 @@ public partial class OverlayWindow : Window
             _ => 1
         };
 
-        Hide(); // Hide overlay for save dialog
+        Hide();
 
         if (dialog.ShowDialog() == true)
         {
@@ -659,7 +655,6 @@ public partial class OverlayWindow : Window
             settings.LastSaveDirectory = System.IO.Path.GetDirectoryName(dialog.FileName) ?? settings.LastSaveDirectory;
             AppSettings.Save();
 
-            // Add to history
             HistoryManager.AddRecord(image, dialog.FileName);
         }
 
@@ -709,65 +704,80 @@ public partial class OverlayWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        // ESC always closes (first press exits drawing mode, second closes)
+        if (e.Key == Key.Escape)
+        {
+            if (_mode == Mode.Drawing)
+            {
+                ExitDrawingMode();
+            }
+            else
+            {
+                Close();
+            }
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
-            case Key.Escape:
-                if (_mode == Mode.Drawing)
-                {
-                    _mode = Mode.Selected;
-                    _currentTool = null;
-                    DrawingCanvas.Cursor = Cursors.Cross;
-                    // Reset tool button highlights
-                    foreach (var child in DrawingToolsPanel.Children)
-                        if (child is Button b && b.Content is Border border)
-                            border.Background = new SolidColorBrush(Colors.Transparent);
-                }
-                else
-                {
-                    Close();
-                }
-                break;
-
             case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
                 if (_mode == Mode.Selected || _mode == Mode.Drawing)
                     Save_Click(this, new RoutedEventArgs());
+                e.Handled = true;
                 break;
 
             case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
                 if (_mode == Mode.Selected || _mode == Mode.Drawing)
                     Copy_Click(this, new RoutedEventArgs());
+                e.Handled = true;
                 break;
 
             case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
                 PerformUndo();
+                e.Handled = true;
                 break;
 
             case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
                 PerformRedo();
+                e.Handled = true;
                 break;
 
             // Tool shortcuts
-            case Key.P: SelectToolByTag("Pen"); break;
-            case Key.L: SelectToolByTag("Line"); break;
-            case Key.A when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Arrow"); break;
-            case Key.R: SelectToolByTag("Rectangle"); break;
-            case Key.E: SelectToolByTag("Ellipse"); break;
-            case Key.T: SelectToolByTag("Text"); break;
-            case Key.M: SelectToolByTag("Marker"); break;
-            case Key.B: SelectToolByTag("Blur"); break;
+            case Key.P when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Pen"); e.Handled = true; break;
+            case Key.L when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Line"); e.Handled = true; break;
+            case Key.A when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Arrow"); e.Handled = true; break;
+            case Key.R when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Rectangle"); e.Handled = true; break;
+            case Key.E when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Ellipse"); e.Handled = true; break;
+            case Key.T when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Text"); e.Handled = true; break;
+            case Key.M when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Marker"); e.Handled = true; break;
+            case Key.B when Keyboard.Modifiers == ModifierKeys.None:
+                SelectToolByTag("Blur"); e.Handled = true; break;
+            case Key.X when Keyboard.Modifiers == ModifierKeys.None:
+                Eraser_Click(this, new RoutedEventArgs()); e.Handled = true; break;
 
             case Key.OemPlus when Keyboard.Modifiers == ModifierKeys.Control:
+            case Key.Add when Keyboard.Modifiers == ModifierKeys.Control:
                 ThicknessUp_Click(this, new RoutedEventArgs());
+                e.Handled = true;
                 break;
             case Key.OemMinus when Keyboard.Modifiers == ModifierKeys.Control:
+            case Key.Subtract when Keyboard.Modifiers == ModifierKeys.Control:
                 ThicknessDown_Click(this, new RoutedEventArgs());
+                e.Handled = true;
                 break;
         }
     }
 
     private void Window_MouseWheel(object sender, MouseWheelEventArgs e)
     {
-        // Mouse wheel adjusts thickness when a tool is active
         if (_currentTool != null)
         {
             if (e.Delta > 0)

@@ -8,8 +8,9 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         Cursor="Cross"
-        KeyDown="Window_KeyDown"
-        MouseWheel="Window_MouseWheel">
+        PreviewKeyDown="Window_KeyDown"
+        MouseWheel="Window_MouseWheel"
+        Focusable="True">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -26,10 +27,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#40FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="#50FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#60FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="#70FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -47,7 +48,7 @@
             <Path x:Name="DimmingPath" Fill="#80000000" />
         </Canvas>
 
-        <!-- Layer 3: Selection + Annotations -->
+        <!-- Layer 3: Selection -->
         <Canvas x:Name="MainCanvas"
                 MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
                 MouseMove="Canvas_MouseMove"
@@ -57,20 +58,20 @@
             <!-- Selection border -->
             <Border x:Name="SelectionBorder"
                     BorderBrush="#2196F3"
-                    BorderThickness="1.5"
+                    BorderThickness="2"
                     Visibility="Collapsed"
                     IsHitTestVisible="False" />
 
             <!-- Dimension label -->
             <Border x:Name="DimensionBorder"
-                    Background="#CC333333"
+                    Background="#DD333333"
                     CornerRadius="3"
-                    Padding="6,2"
+                    Padding="8,3"
                     Visibility="Collapsed"
                     IsHitTestVisible="False">
                 <TextBlock x:Name="DimensionText"
                            Foreground="White"
-                           FontSize="12"
+                           FontSize="13"
                            FontFamily="Segoe UI" />
             </Border>
         </Canvas>
@@ -83,114 +84,127 @@
                 Background="Transparent"
                 Visibility="Collapsed" />
 
-        <!-- Layer 5: Resize handles -->
-        <Canvas x:Name="HandleCanvas" IsHitTestVisible="True" Visibility="Collapsed" />
+        <!-- Layer 5: Resize handles (visual only, hit testing done in MainCanvas) -->
+        <Canvas x:Name="HandleCanvas" IsHitTestVisible="False" Visibility="Collapsed" />
 
         <!-- Layer 6: Toolbars -->
         <Canvas x:Name="ToolbarCanvas" Visibility="Collapsed">
             <!-- Vertical drawing tools toolbar (right side) -->
             <Border x:Name="DrawingToolbar"
-                    Background="#F0333333"
-                    CornerRadius="4"
-                    Padding="3"
+                    Background="#EE2D2D30"
+                    CornerRadius="6"
+                    Padding="4"
                     BorderBrush="#555"
                     BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" />
+                </Border.Effect>
                 <StackPanel x:Name="DrawingToolsPanel" Orientation="Vertical">
                     <Button x:Name="BtnPen" ToolTip="Pen (P)" Click="Tool_Click" Tag="Pen" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Path Stroke="White" StrokeThickness="1.5" Data="M2,16 Q5,8 10,6 Q14,4 16,2" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Path Stroke="#E0E0E0" StrokeThickness="2" Data="M2,20 Q6,10 12,7 Q16,5 20,2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnLine" ToolTip="Line (L)" Click="Tool_Click" Tag="Line" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Line X1="2" Y1="16" X2="16" Y2="2" Stroke="White" StrokeThickness="1.5" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Line X1="2" Y1="20" X2="20" Y2="2" Stroke="#E0E0E0" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnArrow" ToolTip="Arrow (A)" Click="Tool_Click" Tag="Arrow" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Line X1="2" Y1="16" X2="14" Y2="4" Stroke="White" StrokeThickness="1.5" />
-                                <Path Stroke="White" StrokeThickness="1.5" Data="M10,2 L16,2 L16,8" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Line X1="2" Y1="20" X2="16" Y2="5" Stroke="#E0E0E0" StrokeThickness="2" StrokeStartLineCap="Round" />
+                                <Path Fill="#E0E0E0" Data="M20,2 L12,5 L16,9 Z" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnRect" ToolTip="Rectangle (R)" Click="Tool_Click" Tag="Rectangle" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Rectangle Canvas.Left="2" Canvas.Top="3" Width="14" Height="12"
-                                           Stroke="White" StrokeThickness="1.5" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Rectangle Canvas.Left="2" Canvas.Top="4" Width="18" Height="14"
+                                           Stroke="#E0E0E0" StrokeThickness="2" RadiusX="1" RadiusY="1" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnEllipse" ToolTip="Ellipse (E)" Click="Tool_Click" Tag="Ellipse" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Ellipse Canvas.Left="1" Canvas.Top="2" Width="16" Height="14"
-                                         Stroke="White" StrokeThickness="1.5" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Ellipse Canvas.Left="1" Canvas.Top="3" Width="20" Height="16"
+                                         Stroke="#E0E0E0" StrokeThickness="2" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnText" ToolTip="Text (T)" Click="Tool_Click" Tag="Text" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <TextBlock Text="A" Foreground="White" FontSize="14" FontWeight="Bold"
-                                       HorizontalAlignment="Center" Width="18" TextAlignment="Center" />
+                        <Border Background="Transparent" Padding="7">
+                            <TextBlock Text="A" Foreground="#E0E0E0" FontSize="17" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Width="22" TextAlignment="Center" />
                         </Border>
                     </Button>
                     <Button x:Name="BtnMarker" ToolTip="Marker (M)" Click="Tool_Click" Tag="Marker" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Rectangle Canvas.Left="2" Canvas.Top="6" Width="14" Height="6"
-                                           Fill="#80FFFF00" Stroke="White" StrokeThickness="0.5" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Rectangle Canvas.Left="1" Canvas.Top="7" Width="20" Height="8"
+                                           Fill="#90FFFF00" RadiusX="2" RadiusY="2" />
+                                <Line X1="4" Y1="11" X2="18" Y2="11" Stroke="#E0E0E0" StrokeThickness="1" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnBlur" ToolTip="Blur (B)" Click="Tool_Click" Tag="Blur" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Rectangle Canvas.Left="2" Canvas.Top="2" Width="14" Height="14"
-                                           Fill="#40888888" Stroke="White" StrokeThickness="1" StrokeDashArray="2,1" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Rectangle Canvas.Left="2" Canvas.Top="2" Width="18" Height="18"
+                                           Fill="#50888888" Stroke="#E0E0E0" StrokeThickness="1.5" StrokeDashArray="3,2" RadiusX="2" RadiusY="2" />
                             </Canvas>
                         </Border>
                     </Button>
-                    <Separator Background="#555" Margin="2,4" />
+                    <Button x:Name="BtnEraser" ToolTip="Eraser (X)" Click="Eraser_Click" Style="{x:Null}">
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Path Stroke="#E0E0E0" StrokeThickness="2" Data="M4,18 L14,8 L18,12 L8,22" StrokeLineJoin="Round" />
+                                <Path Fill="#E0E0E0" Data="M14,8 L18,4 L22,8 L18,12 Z" />
+                                <Line X1="2" Y1="21" X2="12" Y2="21" Stroke="#E0E0E0" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Border>
+                    </Button>
+                    <Separator Background="#555" Margin="3,6" />
                     <!-- Color picker button -->
                     <Button x:Name="BtnColor" ToolTip="Color (C)" Click="Color_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Ellipse x:Name="ColorIndicator" Width="18" Height="18"
-                                     Fill="Red" Stroke="White" StrokeThickness="1.5" />
+                        <Border Background="Transparent" Padding="7">
+                            <Ellipse x:Name="ColorIndicator" Width="22" Height="22"
+                                     Fill="Red" Stroke="White" StrokeThickness="2" />
                         </Border>
                     </Button>
                     <!-- Thickness buttons -->
                     <Button x:Name="BtnThicknessUp" ToolTip="Thicker (Ctrl++)" Click="ThicknessUp_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <TextBlock Text="+" Foreground="White" FontSize="16" FontWeight="Bold"
-                                       Width="18" TextAlignment="Center" />
+                        <Border Background="Transparent" Padding="7">
+                            <TextBlock Text="+" Foreground="#E0E0E0" FontSize="20" FontWeight="Bold"
+                                       Width="22" TextAlignment="Center" />
                         </Border>
                     </Button>
                     <Button x:Name="BtnThicknessDown" ToolTip="Thinner (Ctrl+-)" Click="ThicknessDown_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <TextBlock Text="-" Foreground="White" FontSize="16" FontWeight="Bold"
-                                       Width="18" TextAlignment="Center" />
+                        <Border Background="Transparent" Padding="7">
+                            <TextBlock Text="-" Foreground="#E0E0E0" FontSize="20" FontWeight="Bold"
+                                       Width="22" TextAlignment="Center" />
                         </Border>
                     </Button>
-                    <Separator Background="#555" Margin="2,4" />
+                    <Separator Background="#555" Margin="3,6" />
                     <Button x:Name="BtnUndo" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Path Stroke="White" StrokeThickness="1.5" Data="M6,4 L2,8 L6,12" />
-                                <Path Stroke="White" StrokeThickness="1.5" Data="M2,8 L12,8 A4,4 0 0,1 12,16 L8,16" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Path Stroke="#E0E0E0" StrokeThickness="2" Data="M7,5 L2,10 L7,15" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                <Path Stroke="#E0E0E0" StrokeThickness="2" Data="M2,10 L14,10 A5,5 0 0,1 14,20 L10,20" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Border>
                     </Button>
                     <Button x:Name="BtnRedo" ToolTip="Redo (Ctrl+Y)" Click="Redo_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Path Stroke="White" StrokeThickness="1.5" Data="M12,4 L16,8 L12,12" />
-                                <Path Stroke="White" StrokeThickness="1.5" Data="M16,8 L6,8 A4,4 0 0,0 6,16 L10,16" />
+                        <Border Background="Transparent" Padding="7">
+                            <Canvas Width="22" Height="22">
+                                <Path Stroke="#E0E0E0" StrokeThickness="2" Data="M15,5 L20,10 L15,15" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                <Path Stroke="#E0E0E0" StrokeThickness="2" Data="M20,10 L8,10 A5,5 0 0,0 8,20 L12,20" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Border>
                     </Button>
@@ -199,51 +213,65 @@
 
             <!-- Horizontal action toolbar (bottom) -->
             <Border x:Name="ActionToolbar"
-                    Background="#F0333333"
-                    CornerRadius="4"
-                    Padding="3"
+                    Background="#EE2D2D30"
+                    CornerRadius="6"
+                    Padding="4"
                     BorderBrush="#555"
                     BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" />
+                </Border.Effect>
                 <StackPanel x:Name="ActionToolsPanel" Orientation="Horizontal">
                     <Button x:Name="BtnSave" ToolTip="Save (Ctrl+S)" Click="Save_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Path Fill="White" Data="M2,2 L14,2 L16,4 L16,16 L2,16 Z M5,2 L5,7 L13,7 L13,2 M5,10 L13,10 M5,12 L13,12 M5,14 L11,14" />
-                            </Canvas>
+                        <Border Background="Transparent" Padding="8,6">
+                            <StackPanel Orientation="Horizontal">
+                                <Canvas Width="20" Height="20">
+                                    <Path Fill="#64B5F6" Data="M2,1 L15,1 L19,5 L19,19 L2,19 Z" />
+                                    <Rectangle Canvas.Left="6" Canvas.Top="1" Width="7" Height="7" Fill="#2D2D30" />
+                                    <Rectangle Canvas.Left="5" Canvas.Top="11" Width="10" Height="7" Fill="#E0E0E0" RadiusX="1" RadiusY="1" />
+                                </Canvas>
+                                <TextBlock Text="Save" Foreground="#E0E0E0" FontSize="12" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            </StackPanel>
                         </Border>
                     </Button>
                     <Button x:Name="BtnCopy" ToolTip="Copy (Ctrl+C)" Click="Copy_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Rectangle Canvas.Left="4" Canvas.Top="4" Width="12" Height="12"
-                                           Stroke="White" StrokeThickness="1.5" />
-                                <Rectangle Canvas.Left="2" Canvas.Top="2" Width="12" Height="12"
-                                           Stroke="White" StrokeThickness="1.5" Fill="#333" />
-                            </Canvas>
+                        <Border Background="Transparent" Padding="8,6">
+                            <StackPanel Orientation="Horizontal">
+                                <Canvas Width="20" Height="20">
+                                    <Rectangle Canvas.Left="5" Canvas.Top="5" Width="13" Height="13"
+                                               Stroke="#64B5F6" StrokeThickness="2" RadiusX="1" RadiusY="1" />
+                                    <Rectangle Canvas.Left="2" Canvas.Top="2" Width="13" Height="13"
+                                               Stroke="#E0E0E0" StrokeThickness="2" Fill="#2D2D30" RadiusX="1" RadiusY="1" />
+                                </Canvas>
+                                <TextBlock Text="Copy" Foreground="#E0E0E0" FontSize="12" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            </StackPanel>
                         </Border>
                     </Button>
                     <Button x:Name="BtnPrint" ToolTip="Print" Click="Print_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Path Fill="White" Data="M3,12 L3,6 L15,6 L15,12 M1,8 L1,14 L4,14 L4,11 L14,11 L14,14 L17,14 L17,8 Z" />
-                                <Rectangle Canvas.Left="5" Canvas.Top="2" Width="8" Height="5" Stroke="White" StrokeThickness="1" />
+                        <Border Background="Transparent" Padding="8,6">
+                            <Canvas Width="20" Height="20">
+                                <Rectangle Canvas.Left="4" Canvas.Top="1" Width="12" Height="6" Stroke="#E0E0E0" StrokeThickness="1.5" />
+                                <Rectangle Canvas.Left="1" Canvas.Top="7" Width="18" Height="8" Fill="#64B5F6" RadiusX="2" RadiusY="2" />
+                                <Rectangle Canvas.Left="4" Canvas.Top="12" Width="12" Height="7" Stroke="#E0E0E0" StrokeThickness="1.5" Fill="#2D2D30" />
                             </Canvas>
                         </Border>
                     </Button>
-                    <Separator Background="#555" Margin="4,2" />
+                    <Rectangle Width="1" Fill="#555" Margin="6,4" />
                     <Button x:Name="BtnPin" ToolTip="Pin on screen" Click="Pin_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Path Fill="White" Data="M9,16 L9,11 M5,11 L13,11 M7,3 L7,8 L5,11 L13,11 L11,8 L11,3 Z M6,2 L12,2 L12,3 L6,3 Z" />
+                        <Border Background="Transparent" Padding="8,6">
+                            <Canvas Width="20" Height="20">
+                                <Path Fill="#64B5F6" Data="M10,18 L10,13 M6,13 L14,13 M8,4 L8,10 L6,13 L14,13 L12,10 L12,4 Z" />
+                                <Rectangle Canvas.Left="7" Canvas.Top="2" Width="6" Height="2" Fill="#E0E0E0" RadiusX="1" RadiusY="1" />
+                                <Line X1="10" Y1="13" X2="10" Y2="18" Stroke="#E0E0E0" StrokeThickness="2" />
                             </Canvas>
                         </Border>
                     </Button>
-                    <Separator Background="#555" Margin="4,2" />
+                    <Rectangle Width="1" Fill="#555" Margin="6,4" />
                     <Button x:Name="BtnClose" ToolTip="Close (Escape)" Click="Close_Click" Style="{x:Null}">
-                        <Border Background="Transparent" Padding="6">
-                            <Canvas Width="18" Height="18">
-                                <Line X1="3" Y1="3" X2="15" Y2="15" Stroke="#FF6666" StrokeThickness="2" />
-                                <Line X1="15" Y1="3" X2="3" Y2="15" Stroke="#FF6666" StrokeThickness="2" />
+                        <Border Background="Transparent" Padding="8,6">
+                            <Canvas Width="20" Height="20">
+                                <Line X1="4" Y1="4" X2="16" Y2="16" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="16" Y1="4" X2="4" Y2="16" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Border>
                     </Button>
@@ -254,12 +282,15 @@
         <!-- Color palette popup -->
         <Canvas x:Name="ColorPaletteCanvas" Visibility="Collapsed">
             <Border x:Name="ColorPalette"
-                    Background="#F0333333"
-                    CornerRadius="4"
+                    Background="#EE2D2D30"
+                    CornerRadius="6"
                     Padding="6"
                     BorderBrush="#555"
                     BorderThickness="1">
-                <WrapPanel x:Name="ColorSwatches" Width="132" />
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" />
+                </Border.Effect>
+                <WrapPanel x:Name="ColorSwatches" Width="156" />
             </Border>
         </Canvas>
     </Grid>
