@@ -31,6 +31,14 @@ public partial class SettingsWindow : Window
         ("ShortcutBlur", "Blur", "B"),
         ("ShortcutEraser", "Undo last", "X"),
         ("ShortcutMove", "Move", "V"),
+        ("ShortcutCheck", "Check mark", "K"),
+        ("ShortcutCross", "Cross mark", "D"),
+        ("ShortcutColor", "Color", "C"),
+        ("ShortcutThickness", "Thickness", "W"),
+        ("ShortcutHistory", "History", "H"),
+        ("ShortcutRecord", "Record", "Ctrl+R"),
+        ("ShortcutOcr", "OCR", "O"),
+        ("ShortcutPin", "Pin", "F"),
     };
 
     private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();
@@ -134,6 +142,14 @@ public partial class SettingsWindow : Window
         _toolShortcutBoxes["ShortcutBlur"].Text = s.ShortcutBlur;
         _toolShortcutBoxes["ShortcutEraser"].Text = s.ShortcutEraser;
         _toolShortcutBoxes["ShortcutMove"].Text = s.ShortcutMove;
+        _toolShortcutBoxes["ShortcutCheck"].Text = s.ShortcutCheck;
+        _toolShortcutBoxes["ShortcutCross"].Text = s.ShortcutCross;
+        _toolShortcutBoxes["ShortcutColor"].Text = s.ShortcutColor;
+        _toolShortcutBoxes["ShortcutThickness"].Text = s.ShortcutThickness;
+        _toolShortcutBoxes["ShortcutHistory"].Text = s.ShortcutHistory;
+        _toolShortcutBoxes["ShortcutRecord"].Text = s.ShortcutRecord;
+        _toolShortcutBoxes["ShortcutOcr"].Text = s.ShortcutOcr;
+        _toolShortcutBoxes["ShortcutPin"].Text = s.ShortcutPin;
 
         foreach (ComboBoxItem item in CmbFormat.Items)
         {
@@ -319,6 +335,14 @@ public partial class SettingsWindow : Window
         s.ShortcutBlur = _toolShortcutBoxes["ShortcutBlur"].Text;
         s.ShortcutEraser = _toolShortcutBoxes["ShortcutEraser"].Text;
         s.ShortcutMove = _toolShortcutBoxes["ShortcutMove"].Text;
+        s.ShortcutCheck = _toolShortcutBoxes["ShortcutCheck"].Text;
+        s.ShortcutCross = _toolShortcutBoxes["ShortcutCross"].Text;
+        s.ShortcutColor = _toolShortcutBoxes["ShortcutColor"].Text;
+        s.ShortcutThickness = _toolShortcutBoxes["ShortcutThickness"].Text;
+        s.ShortcutHistory = _toolShortcutBoxes["ShortcutHistory"].Text;
+        s.ShortcutRecord = _toolShortcutBoxes["ShortcutRecord"].Text;
+        s.ShortcutOcr = _toolShortcutBoxes["ShortcutOcr"].Text;
+        s.ShortcutPin = _toolShortcutBoxes["ShortcutPin"].Text;
 
         s.DefaultSaveFormat = (CmbFormat.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "PNG";
         s.JpegQuality = (int)SldJpegQuality.Value;

@@ -1065,10 +1065,26 @@ public partial class OverlayWindow : Window
         { SelectToolByTag("Marker"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutBlur))
         { SelectToolByTag("Blur"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutCheck))
+        { SelectToolByTag("Check"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutCross))
+        { SelectToolByTag("CrossMark"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser))
         { Eraser_Click(this, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutMove))
-        { if (_hasSelection) ActivateMoveTool(); e.Handled = true; }
+        { if (_hasSelection) { ActivateMoveTool(); BtnMove.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243)); } e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutColor))
+        { if (_hasSelection) Color_Click(BtnColor, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutThickness))
+        { if (_hasSelection) Thickness_Click(BtnThickness, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutHistory))
+        { if (_hasSelection) History_Click(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutRecord))
+        { if (_hasSelection) Record_Click(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutOcr))
+        { if (_hasSelection) Ocr_Click(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutPin))
+        { if (_hasSelection) Pin_Click(this, new RoutedEventArgs()); e.Handled = true; }
     }
 
     private void Window_KeyUp(object sender, KeyEventArgs e)
@@ -1094,7 +1110,7 @@ public partial class OverlayWindow : Window
     private void SelectToolByTag(string tag)
     {
         if (!_hasSelection) return;
-        foreach (var child in DrawingToolsPanel.Children)
+        foreach (var child in ToolWrapPanel.Children)
             if (child is Button btn && btn.Tag is string t && t == tag)
             { Tool_Click(btn, new RoutedEventArgs()); return; }
     }

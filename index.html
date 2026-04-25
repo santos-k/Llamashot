@@ -123,7 +123,7 @@
         /* Tools Showcase */
         .tools-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 16px;
         }
         .tool-item {
@@ -281,10 +281,16 @@
             <div class="tool-item"><div class="name">Text</div><div class="key">T</div></div>
             <div class="tool-item"><div class="name">Marker</div><div class="key">M</div></div>
             <div class="tool-item"><div class="name">Blur</div><div class="key">B</div></div>
-            <div class="tool-item"><div class="name">Check</div><div class="key" style="color: #4caf50;">&#x2714;</div></div>
-            <div class="tool-item"><div class="name">Cross</div><div class="key" style="color: #f44336;">&#x2718;</div></div>
+            <div class="tool-item"><div class="name">Check</div><div class="key">K</div></div>
+            <div class="tool-item"><div class="name">Cross</div><div class="key">D</div></div>
             <div class="tool-item"><div class="name">Undo</div><div class="key">X</div></div>
             <div class="tool-item"><div class="name">Move</div><div class="key">V</div></div>
+            <div class="tool-item"><div class="name">Color</div><div class="key">C</div></div>
+            <div class="tool-item"><div class="name">Thickness</div><div class="key">W</div></div>
+            <div class="tool-item"><div class="name">History</div><div class="key">H</div></div>
+            <div class="tool-item"><div class="name">Record</div><div class="key">Ctrl+R</div></div>
+            <div class="tool-item"><div class="name">OCR</div><div class="key">O</div></div>
+            <div class="tool-item"><div class="name">Pin</div><div class="key">F</div></div>
         </div>
     </div>
 </section>
@@ -299,8 +305,8 @@
         <div class="features-grid">
             <div class="feature-card">
                 <div class="icon icon-blue">&#x2328;&#xFE0F;</div>
-                <h3>Fully Customizable Shortcuts</h3>
-                <p>17 configurable shortcuts for all tools and actions. Click-to-record in Settings. Duplicate detection prevents conflicts. Single keys or combos supported.</p>
+                <h3>21 Customizable Shortcuts</h3>
+                <p>Every tool and action has a keyboard shortcut. Click-to-record in Settings. Duplicate detection prevents conflicts. Single keys or combos supported.</p>
             </div>
             <div class="feature-card">
                 <div class="icon icon-green">&#x1F5C2;&#xFE0F;</div>
@@ -336,7 +342,7 @@
     <div class="container">
         <div class="section-title">
             <h2>Keyboard Shortcuts</h2>
-            <p>All shortcuts customizable in Settings</p>
+            <p>All 21 shortcuts customizable in Settings</p>
         </div>
         <div style="max-width: 600px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
             <table class="shortcuts-table">
@@ -348,8 +354,25 @@
                     <tr><td>Save</td><td>Ctrl+S</td></tr>
                     <tr><td>Copy to clipboard</td><td>Ctrl+C</td></tr>
                     <tr><td>Undo / Redo</td><td>Ctrl+Z / Ctrl+Y</td></tr>
-                    <tr><td>Pan (temporary)</td><td>Space+drag</td></tr>
+                    <tr><td>Pencil</td><td>P</td></tr>
+                    <tr><td>Line</td><td>L</td></tr>
+                    <tr><td>Arrow</td><td>A</td></tr>
+                    <tr><td>Rectangle</td><td>R</td></tr>
+                    <tr><td>Ellipse</td><td>E</td></tr>
+                    <tr><td>Text</td><td>T</td></tr>
+                    <tr><td>Marker</td><td>M</td></tr>
+                    <tr><td>Blur</td><td>B</td></tr>
+                    <tr><td>Check stamp</td><td>K</td></tr>
+                    <tr><td>Cross stamp</td><td>D</td></tr>
+                    <tr><td>Undo last</td><td>X</td></tr>
                     <tr><td>Move tool</td><td>V</td></tr>
+                    <tr><td>Color picker</td><td>C</td></tr>
+                    <tr><td>Thickness</td><td>W</td></tr>
+                    <tr><td>History</td><td>H</td></tr>
+                    <tr><td>Record</td><td>Ctrl+R</td></tr>
+                    <tr><td>OCR</td><td>O</td></tr>
+                    <tr><td>Pin on screen</td><td>F</td></tr>
+                    <tr><td>Pan (temporary)</td><td>Space+drag</td></tr>
                     <tr><td>Close overlay</td><td>Escape</td></tr>
                 </tbody>
             </table>
@@ -388,7 +411,7 @@
             <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View on GitHub</a>
         </div>
         <p style="margin-top: 24px; color: var(--muted); font-size: 0.9rem;">
-            Version 2.4.0 &bull; ~52 MB installer (self-contained, no runtime needed)
+            Version 2.5.0 &bull; Self-contained, no runtime needed
         </p>
     </div>
 </section>
