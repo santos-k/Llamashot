@@ -11,10 +11,26 @@ public class AppSettings
 
     public static AppSettings Instance { get; private set; } = new();
 
-    // Hotkeys
+    // Global hotkeys (system-wide, registered via RegisterHotKey)
     public string CaptureHotkey { get; set; } = "PrintScreen";
     public string FullscreenSaveHotkey { get; set; } = "Shift+PrintScreen";
     public string FullscreenClipboardHotkey { get; set; } = "Ctrl+PrintScreen";
+
+    // Tool shortcuts (active during overlay)
+    public string ShortcutSave { get; set; } = "Ctrl+S";
+    public string ShortcutCopy { get; set; } = "Ctrl+C";
+    public string ShortcutUndo { get; set; } = "Ctrl+Z";
+    public string ShortcutRedo { get; set; } = "Ctrl+Y";
+    public string ShortcutPen { get; set; } = "P";
+    public string ShortcutLine { get; set; } = "L";
+    public string ShortcutArrow { get; set; } = "A";
+    public string ShortcutRectangle { get; set; } = "R";
+    public string ShortcutEllipse { get; set; } = "E";
+    public string ShortcutText { get; set; } = "T";
+    public string ShortcutMarker { get; set; } = "M";
+    public string ShortcutBlur { get; set; } = "B";
+    public string ShortcutEraser { get; set; } = "X";
+    public string ShortcutMove { get; set; } = "V";
 
     // Save settings
     public string DefaultSaveFormat { get; set; } = "PNG";
@@ -29,7 +45,7 @@ public class AppSettings
 
     // Drawing defaults
     public string DefaultColor { get; set; } = "#FF0000";
-    public int DefaultThickness { get; set; } = 2;
+    public int DefaultThickness { get; set; } = 3;
 
     // History
     public bool SaveHistory { get; set; } = true;
@@ -44,7 +60,6 @@ public class AppSettings
             Instance = new AppSettings();
             return;
         }
-
         try
         {
             var json = File.ReadAllText(SettingsPath);
@@ -60,7 +75,6 @@ public class AppSettings
     {
         Directory.CreateDirectory(SettingsDir);
         var options = new JsonSerializerOptions { WriteIndented = true };
-        var json = JsonSerializer.Serialize(Instance, options);
-        File.WriteAllText(SettingsPath, json);
+        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(Instance, options));
     }
 }

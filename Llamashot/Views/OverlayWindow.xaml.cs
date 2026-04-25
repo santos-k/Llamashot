@@ -1014,40 +1014,38 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        switch (e.Key)
-        {
-            case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
-                if (_hasSelection) Save_Click(this, new RoutedEventArgs());
-                e.Handled = true; break;
-            case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
-                if (_hasSelection) Copy_Click(this, new RoutedEventArgs());
-                e.Handled = true; break;
-            case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
-            case Key.X when Keyboard.Modifiers == ModifierKeys.Control:
-                PerformUndo(); e.Handled = true; break;
-            case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
-                PerformRedo(); e.Handled = true; break;
+        var s = AppSettings.Instance;
 
-            case Key.P when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Pen"); break;
-            case Key.L when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Line"); break;
-            case Key.A when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Arrow"); break;
-            case Key.R when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Rectangle"); break;
-            case Key.E when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Ellipse"); break;
-            case Key.T when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Text"); break;
-            case Key.M when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Marker"); break;
-            case Key.B when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Blur"); break;
-            case Key.X when Keyboard.Modifiers == ModifierKeys.None: Eraser_Click(this, new RoutedEventArgs()); break;
-            case Key.V when Keyboard.Modifiers == ModifierKeys.None:
-                if (_hasSelection) ActivateMoveTool();
-                e.Handled = true; break;
-
-            case Key.OemPlus when Keyboard.Modifiers == ModifierKeys.Control:
-            case Key.Add when Keyboard.Modifiers == ModifierKeys.Control:
-                ThicknessUp_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-            case Key.OemMinus when Keyboard.Modifiers == ModifierKeys.Control:
-            case Key.Subtract when Keyboard.Modifiers == ModifierKeys.Control:
-                ThicknessDown_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-        }
+        // Action shortcuts
+        if (ShortcutHelper.Matches(e, s.ShortcutSave))
+        { if (_hasSelection) Save_Click(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutCopy))
+        { if (_hasSelection) Copy_Click(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutUndo))
+        { PerformUndo(); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutRedo))
+        { PerformRedo(); e.Handled = true; }
+        // Tool shortcuts
+        else if (ShortcutHelper.Matches(e, s.ShortcutPen))
+        { SelectToolByTag("Pen"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutLine))
+        { SelectToolByTag("Line"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutArrow))
+        { SelectToolByTag("Arrow"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutRectangle))
+        { SelectToolByTag("Rectangle"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutEllipse))
+        { SelectToolByTag("Ellipse"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutText))
+        { SelectToolByTag("Text"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutMarker))
+        { SelectToolByTag("Marker"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutBlur))
+        { SelectToolByTag("Blur"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutEraser))
+        { Eraser_Click(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutMove))
+        { if (_hasSelection) ActivateMoveTool(); e.Handled = true; }
     }
 
     private void Window_KeyUp(object sender, KeyEventArgs e)

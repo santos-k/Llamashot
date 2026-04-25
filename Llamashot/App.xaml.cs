@@ -57,15 +57,18 @@ public partial class App : Application
     private void RegisterHotkeys()
     {
         if (_hotkeyManager == null) return;
+        var s = AppSettings.Instance;
 
-        // PrintScreen → region capture
-        _hotkeyManager.Register(NativeMethods.MOD_NONE, NativeMethods.VK_SNAPSHOT, StartRegionCapture);
+        RegisterFromString(s.CaptureHotkey, StartRegionCapture);
+        RegisterFromString(s.FullscreenSaveHotkey, FullscreenSave);
+        RegisterFromString(s.FullscreenClipboardHotkey, FullscreenClipboard);
+    }
 
-        // Shift+PrintScreen → fullscreen save
-        _hotkeyManager.Register(NativeMethods.MOD_SHIFT, NativeMethods.VK_SNAPSHOT, FullscreenSave);
-
-        // Ctrl+PrintScreen → fullscreen to clipboard
-        _hotkeyManager.Register(NativeMethods.MOD_CONTROL, NativeMethods.VK_SNAPSHOT, FullscreenClipboard);
+    private void RegisterFromString(string shortcut, Action callback)
+    {
+        var (mods, vk) = ShortcutHelper.ParseGlobalHotkey(shortcut);
+        if (vk != 0)
+            _hotkeyManager!.Register(mods, vk, callback);
     }
 
     private void SetupTrayIcon()

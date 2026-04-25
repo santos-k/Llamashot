@@ -8,18 +8,102 @@ namespace Llamashot.Views;
 
 public partial class SettingsWindow : Window
 {
-    // Default hotkeys for reset
-    private static readonly Dictionary<string, string> Defaults = new()
+    private static readonly Dictionary<string, string> GlobalDefaults = new()
     {
         { "CaptureHotkey", "PrintScreen" },
         { "FullscreenSaveHotkey", "Shift+PrintScreen" },
         { "FullscreenClipHotkey", "Ctrl+PrintScreen" }
     };
 
+    private static readonly (string Key, string Label, string Default)[] ToolShortcuts =
+    {
+        ("ShortcutSave", "Save", "Ctrl+S"),
+        ("ShortcutCopy", "Copy", "Ctrl+C"),
+        ("ShortcutUndo", "Undo", "Ctrl+Z"),
+        ("ShortcutRedo", "Redo", "Ctrl+Y"),
+        ("ShortcutPen", "Pencil", "P"),
+        ("ShortcutLine", "Line", "L"),
+        ("ShortcutArrow", "Arrow", "A"),
+        ("ShortcutRectangle", "Rectangle", "R"),
+        ("ShortcutEllipse", "Ellipse", "E"),
+        ("ShortcutText", "Text", "T"),
+        ("ShortcutMarker", "Marker", "M"),
+        ("ShortcutBlur", "Blur", "B"),
+        ("ShortcutEraser", "Undo last", "X"),
+        ("ShortcutMove", "Move", "V"),
+    };
+
+    private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();
+
     public SettingsWindow()
     {
         InitializeComponent();
+        BuildToolShortcutFields();
         LoadSettings();
+    }
+
+    private void BuildToolShortcutFields()
+    {
+        foreach (var (key, label, def) in ToolShortcuts)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var lbl = new TextBlock
+            {
+                Text = label,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(lbl, 0);
+
+            var tb = new TextBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1E)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                BorderThickness = new Thickness(1),
+                Height = 28,
+                Padding = new Thickness(8, 4, 8, 4),
+                FontSize = 12,
+                IsReadOnly = true,
+                Cursor = Cursors.Hand
+            };
+            tb.PreviewKeyDown += HotkeyBox_PreviewKeyDown;
+            tb.GotFocus += HotkeyBox_GotFocus;
+            tb.LostFocus += HotkeyBox_LostFocus;
+            Grid.SetColumn(tb, 1);
+
+            var resetBtn = new Button
+            {
+                Content = "Reset",
+                Width = 44,
+                Height = 24,
+                Margin = new Thickness(4, 0, 0, 0),
+                FontSize = 10,
+                Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                Cursor = Cursors.Hand,
+                Tag = key
+            };
+            resetBtn.Click += (s, e) =>
+            {
+                tb.Text = def;
+                ValidateAllShortcuts();
+            };
+            Grid.SetColumn(resetBtn, 2);
+
+            grid.Children.Add(lbl);
+            grid.Children.Add(tb);
+            grid.Children.Add(resetBtn);
+
+            ToolShortcutsPanel.Children.Add(grid);
+            _toolShortcutBoxes[key] = tb;
+        }
     }
 
     private void LoadSettings()
@@ -34,6 +118,22 @@ public partial class SettingsWindow : Window
         TxtCaptureHotkey.Text = s.CaptureHotkey;
         TxtFullscreenSaveHotkey.Text = s.FullscreenSaveHotkey;
         TxtFullscreenClipHotkey.Text = s.FullscreenClipboardHotkey;
+
+        // Load tool shortcuts
+        _toolShortcutBoxes["ShortcutSave"].Text = s.ShortcutSave;
+        _toolShortcutBoxes["ShortcutCopy"].Text = s.ShortcutCopy;
+        _toolShortcutBoxes["ShortcutUndo"].Text = s.ShortcutUndo;
+        _toolShortcutBoxes["ShortcutRedo"].Text = s.ShortcutRedo;
+        _toolShortcutBoxes["ShortcutPen"].Text = s.ShortcutPen;
+        _toolShortcutBoxes["ShortcutLine"].Text = s.ShortcutLine;
+        _toolShortcutBoxes["ShortcutArrow"].Text = s.ShortcutArrow;
+        _toolShortcutBoxes["ShortcutRectangle"].Text = s.ShortcutRectangle;
+        _toolShortcutBoxes["ShortcutEllipse"].Text = s.ShortcutEllipse;
+        _toolShortcutBoxes["ShortcutText"].Text = s.ShortcutText;
+        _toolShortcutBoxes["ShortcutMarker"].Text = s.ShortcutMarker;
+        _toolShortcutBoxes["ShortcutBlur"].Text = s.ShortcutBlur;
+        _toolShortcutBoxes["ShortcutEraser"].Text = s.ShortcutEraser;
+        _toolShortcutBoxes["ShortcutMove"].Text = s.ShortcutMove;
 
         foreach (ComboBoxItem item in CmbFormat.Items)
         {
@@ -69,6 +169,7 @@ public partial class SettingsWindow : Window
             tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44));
             tb.Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1E));
         }
+        ValidateAllShortcuts();
     }
 
     private void HotkeyBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -78,20 +179,17 @@ public partial class SettingsWindow : Window
 
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
 
-        // Ignore lone modifier keys
         if (key == Key.LeftCtrl || key == Key.RightCtrl ||
             key == Key.LeftShift || key == Key.RightShift ||
             key == Key.LeftAlt || key == Key.RightAlt ||
             key == Key.LWin || key == Key.RWin)
             return;
 
-        // Build combo string
         var parts = new List<string>();
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
 
-        // Map key name
         string keyName = key switch
         {
             Key.Snapshot => "PrintScreen",
@@ -105,15 +203,14 @@ public partial class SettingsWindow : Window
 
         parts.Add(keyName);
         tb.Text = string.Join("+", parts);
-
-        ValidateHotkeys();
+        ValidateAllShortcuts();
     }
 
     private void ResetHotkey_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not string tag) return;
 
-        if (Defaults.TryGetValue(tag, out var defaultVal))
+        if (GlobalDefaults.TryGetValue(tag, out var defaultVal))
         {
             var tb = tag switch
             {
@@ -124,28 +221,35 @@ public partial class SettingsWindow : Window
             };
             if (tb != null) tb.Text = defaultVal;
         }
-
-        ValidateHotkeys();
+        ValidateAllShortcuts();
     }
 
-    private void ValidateHotkeys()
+    private void ValidateAllShortcuts()
     {
-        var hotkeys = new Dictionary<string, string>
+        // Collect all shortcut values with labels
+        var all = new Dictionary<string, string>
         {
             { "Capture region", TxtCaptureHotkey.Text },
             { "Fullscreen save", TxtFullscreenSaveHotkey.Text },
             { "Fullscreen copy", TxtFullscreenClipHotkey.Text }
         };
 
-        var duplicates = hotkeys
+        foreach (var (key, label, _) in ToolShortcuts)
+        {
+            if (_toolShortcutBoxes.TryGetValue(key, out var tb))
+                all[label] = tb.Text;
+        }
+
+        var duplicates = all
+            .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
             .GroupBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
             .SelectMany(g => g.Select(kv => kv.Key))
-            .ToList();
+            .ToHashSet();
 
         if (duplicates.Count > 0)
         {
-            TxtHotkeyWarning.Text = $"Duplicate hotkey: {string.Join(", ", duplicates)}";
+            TxtHotkeyWarning.Text = $"Duplicate: {string.Join(", ", duplicates)}";
             TxtHotkeyWarning.Visibility = Visibility.Visible;
         }
         else
@@ -153,13 +257,20 @@ public partial class SettingsWindow : Window
             TxtHotkeyWarning.Visibility = Visibility.Collapsed;
         }
 
-        // Highlight duplicates
-        HighlightDuplicate(TxtCaptureHotkey, duplicates.Contains("Capture region"));
-        HighlightDuplicate(TxtFullscreenSaveHotkey, duplicates.Contains("Fullscreen save"));
-        HighlightDuplicate(TxtFullscreenClipHotkey, duplicates.Contains("Fullscreen copy"));
+        // Highlight global hotkey duplicates
+        SetBorder(TxtCaptureHotkey, duplicates.Contains("Capture region"));
+        SetBorder(TxtFullscreenSaveHotkey, duplicates.Contains("Fullscreen save"));
+        SetBorder(TxtFullscreenClipHotkey, duplicates.Contains("Fullscreen copy"));
+
+        // Highlight tool shortcut duplicates
+        foreach (var (key, label, _) in ToolShortcuts)
+        {
+            if (_toolShortcutBoxes.TryGetValue(key, out var tb))
+                SetBorder(tb, duplicates.Contains(label));
+        }
     }
 
-    private void HighlightDuplicate(TextBox tb, bool isDuplicate)
+    private void SetBorder(TextBox tb, bool isDuplicate)
     {
         if (isDuplicate)
             tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
@@ -173,11 +284,10 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        // Check for duplicates
-        ValidateHotkeys();
+        ValidateAllShortcuts();
         if (TxtHotkeyWarning.Visibility == Visibility.Visible)
         {
-            System.Windows.MessageBox.Show("Please fix duplicate hotkeys before saving.",
+            System.Windows.MessageBox.Show("Please fix duplicate shortcuts before saving.",
                 "Llamashot", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -192,6 +302,22 @@ public partial class SettingsWindow : Window
         s.CaptureHotkey = TxtCaptureHotkey.Text;
         s.FullscreenSaveHotkey = TxtFullscreenSaveHotkey.Text;
         s.FullscreenClipboardHotkey = TxtFullscreenClipHotkey.Text;
+
+        // Save tool shortcuts
+        s.ShortcutSave = _toolShortcutBoxes["ShortcutSave"].Text;
+        s.ShortcutCopy = _toolShortcutBoxes["ShortcutCopy"].Text;
+        s.ShortcutUndo = _toolShortcutBoxes["ShortcutUndo"].Text;
+        s.ShortcutRedo = _toolShortcutBoxes["ShortcutRedo"].Text;
+        s.ShortcutPen = _toolShortcutBoxes["ShortcutPen"].Text;
+        s.ShortcutLine = _toolShortcutBoxes["ShortcutLine"].Text;
+        s.ShortcutArrow = _toolShortcutBoxes["ShortcutArrow"].Text;
+        s.ShortcutRectangle = _toolShortcutBoxes["ShortcutRectangle"].Text;
+        s.ShortcutEllipse = _toolShortcutBoxes["ShortcutEllipse"].Text;
+        s.ShortcutText = _toolShortcutBoxes["ShortcutText"].Text;
+        s.ShortcutMarker = _toolShortcutBoxes["ShortcutMarker"].Text;
+        s.ShortcutBlur = _toolShortcutBoxes["ShortcutBlur"].Text;
+        s.ShortcutEraser = _toolShortcutBoxes["ShortcutEraser"].Text;
+        s.ShortcutMove = _toolShortcutBoxes["ShortcutMove"].Text;
 
         s.DefaultSaveFormat = (CmbFormat.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "PNG";
         s.JpegQuality = (int)SldJpegQuality.Value;
