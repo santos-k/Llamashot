@@ -1,0 +1,2 @@
+LlamashotSetup.exe filter=lfs diff=lfs merge=lfs -text
+Llamashot.exe filter=lfs diff=lfs merge=lfs -text
