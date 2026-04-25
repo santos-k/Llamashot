@@ -503,20 +503,26 @@ public partial class OverlayWindow : Window
 
     private void UpdateToolbarPositions()
     {
-        // Adaptive columns: measure in 1-col, if it doesn't fit use 2-col
+        // Adaptive columns: try 1-col, measure, switch to 2-col if it won't fit
+        double availableHeight = ActualHeight - 8;
+
+        // Measure in 1-col mode
         ToolWrapPanel.Width = 32;
         BottomToolsPanel.Width = 32;
-        DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-
-        double availableHeight = ActualHeight - 8; // total screen minus margin
-        if (DrawingToolbar.DesiredSize.Height > availableHeight)
-        {
-            ToolWrapPanel.Width = 64;
-            BottomToolsPanel.Width = 64;
-        }
-
+        DrawingToolbar.InvalidateMeasure();
         DrawingToolbar.UpdateLayout();
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        if (DrawingToolbar.DesiredSize.Height > availableHeight)
+        {
+            // Switch to 2-col
+            ToolWrapPanel.Width = 64;
+            BottomToolsPanel.Width = 64;
+            DrawingToolbar.InvalidateMeasure();
+            DrawingToolbar.UpdateLayout();
+            DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        }
+
         ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
         double dtTop = _selection.Top;
@@ -559,6 +565,10 @@ public partial class OverlayWindow : Window
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
 
+        // Finalize any active text box before switching tools
+        if (_currentTool is TextTool tt)
+            tt.FinalizeActiveTextBox();
+
         // Reset all tool button highlights
         ClearToolHighlights();
         btn.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243));
@@ -570,7 +580,7 @@ public partial class OverlayWindow : Window
             "Arrow" => new ArrowTool(),
             "Rectangle" => new RectangleTool(),
             "Ellipse" => new EllipseTool(),
-            "Text" => new TextTool { FontSize = Math.Max(12, _currentThickness * 8) },
+            "Text" => new TextTool(),
             "Marker" => new MarkerTool(),
             "Blur" => new BlurTool { ScreenshotSource = _screenshot },
             "Check" => new StampTool(StampType.Check),
@@ -598,6 +608,8 @@ public partial class OverlayWindow : Window
 
     private void DeselectTool()
     {
+        if (_currentTool is TextTool tt)
+            tt.FinalizeActiveTextBox();
         _currentTool = null;
         Cursor = Cursors.Cross;
         DrawingCanvas.Cursor = Cursors.Cross;

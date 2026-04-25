@@ -11,76 +11,115 @@ public class TextTool : BaseDrawingTool
     public override DrawingToolType ToolType => DrawingToolType.Text;
     public override Cursor Cursor => Cursors.IBeam;
     public double FontSize { get; set; } = 16;
+    private TextBox? _activeTextBox;
+    private Canvas? _canvas;
 
     public override void OnMouseDown(Point position, Canvas canvas)
     {
-        var textBox = new TextBox
+        // If there's already an active textbox, finalize it first
+        FinalizeActiveTextBox();
+
+        _canvas = canvas;
+
+        // Font size follows thickness: thickness 1=12px, 3=16px, 5=20px, 10=30px
+        double fontSize = 10 + Thickness * 2;
+
+        _activeTextBox = new TextBox
         {
             Foreground = new SolidColorBrush(StrokeColor),
             Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(128, StrokeColor.R, StrokeColor.G, StrokeColor.B)),
             BorderThickness = new Thickness(1),
-            FontSize = FontSize,
+            FontSize = fontSize,
             FontFamily = new FontFamily("Segoe UI"),
-            MinWidth = 100,
-            MinHeight = 28,
+            MinWidth = 80,
+            MinHeight = (int)(fontSize * 1.6),
             Padding = new Thickness(4, 2, 4, 2),
             AcceptsReturn = true,
             CaretBrush = new SolidColorBrush(StrokeColor)
         };
 
-        Canvas.SetLeft(textBox, position.X);
-        Canvas.SetTop(textBox, position.Y);
-        canvas.Children.Add(textBox);
+        Canvas.SetLeft(_activeTextBox, position.X);
+        Canvas.SetTop(_activeTextBox, position.Y);
+        canvas.Children.Add(_activeTextBox);
 
         CurrentAction = new DrawingAction
         {
             ToolType = DrawingToolType.Text,
             StrokeColor = StrokeColor,
-            FontSize = FontSize,
+            FontSize = fontSize,
             Points = new List<Point> { position },
-            RenderedElement = textBox
+            RenderedElement = _activeTextBox
         };
 
-        // Focus the textbox
-        textBox.Loaded += (s, e) =>
+        var tb = _activeTextBox;
+        tb.Loaded += (s, e) =>
         {
-            textBox.Focus();
-            Keyboard.Focus(textBox);
+            tb.Focus();
+            Keyboard.Focus(tb);
         };
 
-        // Finalize on lost focus
-        textBox.LostFocus += (s, e) =>
+        // Ctrl+Enter or Escape finalizes
+        tb.PreviewKeyDown += (s, e) =>
         {
-            if (string.IsNullOrWhiteSpace(textBox.Text))
+            if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift)
             {
-                canvas.Children.Remove(textBox);
-                return;
+                FinalizeActiveTextBox();
+                e.Handled = true;
             }
+        };
 
-            // Convert to TextBlock for final rendering
-            var textBlock = new TextBlock
-            {
-                Text = textBox.Text,
-                Foreground = textBox.Foreground,
-                FontSize = textBox.FontSize,
-                FontFamily = textBox.FontFamily,
-                TextWrapping = TextWrapping.Wrap
-            };
+        tb.LostFocus += (s, e) => FinalizeTextBox(tb, canvas);
+    }
 
-            Canvas.SetLeft(textBlock, Canvas.GetLeft(textBox));
-            Canvas.SetTop(textBlock, Canvas.GetTop(textBox));
+    public void FinalizeActiveTextBox()
+    {
+        if (_activeTextBox != null && _canvas != null)
+        {
+            FinalizeTextBox(_activeTextBox, _canvas);
+            _activeTextBox = null;
+        }
+    }
 
-            var idx = canvas.Children.IndexOf(textBox);
+    private void FinalizeTextBox(TextBox textBox, Canvas canvas)
+    {
+        if (!canvas.Children.Contains(textBox)) return;
+
+        if (string.IsNullOrWhiteSpace(textBox.Text))
+        {
             canvas.Children.Remove(textBox);
-            canvas.Children.Insert(idx, textBlock);
+            if (CurrentAction?.RenderedElement == textBox)
+                CurrentAction = null;
+            return;
+        }
 
-            if (CurrentAction != null)
-            {
-                CurrentAction.Text = textBox.Text;
-                CurrentAction.RenderedElement = textBlock;
-            }
+        var textBlock = new TextBlock
+        {
+            Text = textBox.Text,
+            Foreground = textBox.Foreground,
+            FontSize = textBox.FontSize,
+            FontFamily = textBox.FontFamily,
+            TextWrapping = TextWrapping.Wrap
         };
+
+        Canvas.SetLeft(textBlock, Canvas.GetLeft(textBox));
+        Canvas.SetTop(textBlock, Canvas.GetTop(textBox));
+
+        var idx = canvas.Children.IndexOf(textBox);
+        canvas.Children.Remove(textBox);
+        if (idx >= 0 && idx <= canvas.Children.Count)
+            canvas.Children.Insert(idx, textBlock);
+        else
+            canvas.Children.Add(textBlock);
+
+        if (CurrentAction?.RenderedElement == textBox)
+        {
+            CurrentAction.Text = textBox.Text;
+            CurrentAction.RenderedElement = textBlock;
+        }
+
+        if (_activeTextBox == textBox)
+            _activeTextBox = null;
     }
 
     public override void OnMouseMove(Point position, Canvas canvas) { }
