@@ -15,11 +15,13 @@
         <!-- Header -->
         <Border Background="#222" Padding="20,18" BorderBrush="#333" BorderThickness="0,0,0,1">
             <StackPanel HorizontalAlignment="Center">
+                <Image Source="/Resources/icon128.png" Width="80" Height="80" Margin="0,0,0,10"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
                 <TextBlock Text="Llamashot" FontSize="28" FontWeight="Bold"
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 2.5.0" Foreground="#666"
+                <TextBlock Text="Version 2.5.1" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
             </StackPanel>
         </Border>

@@ -10,9 +10,10 @@
     <AssemblyName>Llamashot</AssemblyName>
     <RootNamespace>Llamashot</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>2.5.0</Version>
-    <AssemblyVersion>2.5.0</AssemblyVersion>
-    <FileVersion>2.5.0</FileVersion>
+    <ApplicationIcon>..\assets\icon.ico</ApplicationIcon>
+    <Version>2.5.1</Version>
+    <AssemblyVersion>2.5.1</AssemblyVersion>
+    <FileVersion>2.5.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
