@@ -865,6 +865,7 @@ public partial class OverlayWindow : Window
                 if (_hasSelection) Copy_Click(this, new RoutedEventArgs());
                 e.Handled = true; break;
             case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
+            case Key.X when Keyboard.Modifiers == ModifierKeys.Control:
                 PerformUndo(); e.Handled = true; break;
             case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
                 PerformRedo(); e.Handled = true; break;
