@@ -8,17 +8,26 @@ public partial class OcrResultWindow : Window
     {
         InitializeComponent();
         ResultText.Text = text;
-        ResultText.SelectAll();
+
+        var chars = text.Length;
+        var words = text.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length;
+        TxtCharCount.Text = $"{words} word{(words != 1 ? "s" : "")}, {chars} char{(chars != 1 ? "s" : "")}";
+
         ResultText.Focus();
+        ResultText.SelectAll();
+    }
+
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        ResultText.Focus();
+        ResultText.SelectAll();
     }
 
     private void CopyAll_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetText(ResultText.Text);
+        if (!string.IsNullOrEmpty(ResultText.Text))
+            Clipboard.SetText(ResultText.Text);
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

@@ -35,13 +35,15 @@ public partial class HistoryWindow : Window
             ThumbnailPath = r.ThumbnailPath,
             FilePath = r.FilePath,
             DateText = r.CapturedAt.ToString("MMM dd, HH:mm"),
-            SizeText = $"{r.Width}x{r.Height}",
+            SizeText = $"{r.Width} x {r.Height}",
             TypeText = r.Type == RecordType.Clipboard ? "Copied" : "Saved",
-            TypeColor = r.Type == RecordType.Clipboard ? "#2196F3" : "#4CAF50",
-            ToolTipText = $"{r.FilePath}\n{r.CapturedAt:yyyy-MM-dd HH:mm:ss}\n{r.Width}x{r.Height}\n{(r.Type == RecordType.Clipboard ? "Copied to clipboard" : "Saved to file")}"
+            TypeColor = r.Type == RecordType.Clipboard ? "#42A5F5" : "#66BB6A",
+            ToolTipText = $"{r.FilePath}\n{r.CapturedAt:yyyy-MM-dd HH:mm:ss}\n{r.Width} x {r.Height}\n{(r.Type == RecordType.Clipboard ? "Copied to clipboard" : "Saved to file")}"
         }).ToList();
 
         HistoryList.ItemsSource = items;
+        TxtCount.Text = $"{items.Count} screenshot{(items.Count != 1 ? "s" : "")}";
+        TxtEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void Item_Click(object sender, MouseButtonEventArgs e)
@@ -49,9 +51,7 @@ public partial class HistoryWindow : Window
         if (sender is FrameworkElement fe && fe.DataContext is HistoryItemViewModel item)
         {
             if (File.Exists(item.FilePath))
-            {
                 Process.Start(new ProcessStartInfo(item.FilePath) { UseShellExecute = true });
-            }
         }
     }
 
@@ -69,8 +69,9 @@ public partial class HistoryWindow : Window
 
     private void ClearHistory_Click(object sender, RoutedEventArgs e)
     {
-        var result = MessageBox.Show("Clear all screenshot history?", "Confirm",
-            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var result = System.Windows.MessageBox.Show(
+            "Delete all screenshot history and thumbnails?",
+            "Clear History", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
         if (result == MessageBoxResult.Yes)
         {
@@ -79,8 +80,5 @@ public partial class HistoryWindow : Window
         }
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }
