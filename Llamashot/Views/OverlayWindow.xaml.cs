@@ -826,7 +826,9 @@ public partial class OverlayWindow : Window
 
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetImage(RenderFinalImage());
+        var image = RenderFinalImage();
+        Clipboard.SetImage(image);
+        HistoryManager.AddClipRecord(image);
         Close();
     }
 

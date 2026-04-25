@@ -4,6 +4,8 @@ using System.Windows.Media.Imaging;
 
 namespace Llamashot.Core;
 
+public enum RecordType { Saved, Clipboard }
+
 public class ScreenshotRecord
 {
     public string FilePath { get; set; } = "";
@@ -11,6 +13,7 @@ public class ScreenshotRecord
     public DateTime CapturedAt { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
+    public RecordType Type { get; set; } = RecordType.Saved;
 }
 
 public static class HistoryManager
@@ -41,6 +44,31 @@ public static class HistoryManager
 
     public static void AddRecord(BitmapSource image, string savedPath)
     {
+        AddEntry(image, savedPath, RecordType.Saved);
+    }
+
+    public static void AddClipRecord(BitmapSource image)
+    {
+        if (!AppSettings.Instance.SaveHistory) return;
+
+        // Save full image to clips folder so user can re-copy later
+        var dir = AppSettings.Instance.HistoryDirectory;
+        var clipsDir = Path.Combine(dir, "clips");
+        Directory.CreateDirectory(clipsDir);
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+        var clipPath = Path.Combine(clipsDir, $"clip_{timestamp}.png");
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(image));
+        using (var fs = File.Create(clipPath))
+            encoder.Save(fs);
+
+        AddEntry(image, clipPath, RecordType.Clipboard);
+    }
+
+    private static void AddEntry(BitmapSource image, string filePath, RecordType type)
+    {
         if (!AppSettings.Instance.SaveHistory) return;
 
         var dir = AppSettings.Instance.HistoryDirectory;
@@ -50,28 +78,26 @@ public static class HistoryManager
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
         var thumbPath = Path.Combine(thumbDir, $"thumb_{timestamp}.png");
 
-        // Create thumbnail (200px wide)
-        var scale = 200.0 / image.PixelWidth;
-        var thumbHeight = (int)(image.PixelHeight * scale);
+        var scale = Math.Min(200.0 / image.PixelWidth, 1.0);
         var thumb = new TransformedBitmap(image, new System.Windows.Media.ScaleTransform(scale, scale));
 
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(thumb));
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(thumb));
         using (var fs = File.Create(thumbPath))
-            encoder.Save(fs);
+            enc.Save(fs);
 
         var record = new ScreenshotRecord
         {
-            FilePath = savedPath,
+            FilePath = filePath,
             ThumbnailPath = thumbPath,
             CapturedAt = DateTime.Now,
             Width = image.PixelWidth,
-            Height = image.PixelHeight
+            Height = image.PixelHeight,
+            Type = type
         };
 
         _records.Insert(0, record);
 
-        // Trim to max
         while (_records.Count > AppSettings.Instance.MaxHistoryItems)
         {
             var old = _records[^1];

@@ -162,6 +162,7 @@ public partial class App : Application
         {
             var screenshot = ScreenCapture.CaptureFullScreen();
             Clipboard.SetImage(screenshot);
+            HistoryManager.AddClipRecord(screenshot);
 
             if (AppSettings.Instance.ShowNotifications)
                 _trayIcon?.ShowBalloonTip(2000, "Llamashot", "Screenshot copied to clipboard", WinForms.ToolTipIcon.Info);
