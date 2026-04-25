@@ -14,7 +14,18 @@ public class HotkeyManager : IDisposable
     public HotkeyManager(Window window)
     {
         _window = window;
-        _window.SourceInitialized += OnSourceInitialized;
+
+        // If window handle already exists (window was already shown), hook immediately
+        var helper = new WindowInteropHelper(_window);
+        if (helper.Handle != IntPtr.Zero)
+        {
+            _source = HwndSource.FromHwnd(helper.Handle);
+            _source?.AddHook(WndProc);
+        }
+        else
+        {
+            _window.SourceInitialized += OnSourceInitialized;
+        }
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
