@@ -103,21 +103,27 @@ public partial class App : Application
 
     private System.Drawing.Icon CreateDefaultIcon()
     {
-        var bmp = new System.Drawing.Bitmap(32, 32);
-        using var g = System.Drawing.Graphics.FromImage(bmp);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        try
+        {
+            var uri = new Uri("pack://application:,,,/Resources/icon32.png", UriKind.Absolute);
+            var sri = Application.GetResourceStream(uri);
+            if (sri != null)
+            {
+                using var bmp = new System.Drawing.Bitmap(sri.Stream);
+                var handle = bmp.GetHicon();
+                return System.Drawing.Icon.FromHandle(handle);
+            }
+        }
+        catch { }
 
+        // Fallback: simple generated icon
+        var fallback = new System.Drawing.Bitmap(32, 32);
+        using var g = System.Drawing.Graphics.FromImage(fallback);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(33, 150, 243));
         g.FillEllipse(bgBrush, 2, 2, 28, 28);
-
-        using var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f);
-        g.DrawRectangle(pen, 8, 10, 16, 12);
-        g.DrawLine(pen, 16, 7, 16, 10);
-        g.DrawLine(pen, 14, 8, 18, 8);
-        g.DrawEllipse(pen, 12, 13, 8, 6);
-
-        var handle = bmp.GetHicon();
-        return System.Drawing.Icon.FromHandle(handle);
+        var h = fallback.GetHicon();
+        return System.Drawing.Icon.FromHandle(h);
     }
 
     private void StartRegionCapture()
