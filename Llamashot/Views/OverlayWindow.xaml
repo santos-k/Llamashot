@@ -88,9 +88,12 @@
                 <StackPanel x:Name="DrawingToolsPanel">
                     <!-- Tool buttons in a WrapPanel (width controls columns) -->
                     <WrapPanel x:Name="ToolWrapPanel" Width="32">
-                        <Button x:Name="BtnPen" ToolTip="Pen (P)" Click="Tool_Click" Tag="Pen" Style="{StaticResource TBtn}">
+                        <Button x:Name="BtnPen" ToolTip="Pencil (P)" Click="Tool_Click" Tag="Pen" Style="{StaticResource TBtn}">
                             <Canvas Width="16" Height="16">
-                                <Path Stroke="White" StrokeThickness="2" Data="M1,15 Q4,7 8,5 Q12,3 15,1" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <!-- Pencil icon -->
+                                <Path Fill="White" Data="M12.5,0.5 L15.5,3.5 L5,14 L1,15 L2,11 Z" />
+                                <Path Stroke="#111" StrokeThickness="0.5" Data="M11,2 L14,5" />
+                                <Path Fill="#111" Data="M1.5,14.5 L2,11 L5,14 Z" />
                             </Canvas>
                         </Button>
                         <Button x:Name="BtnLine" ToolTip="Line (L)" Click="Tool_Click" Tag="Line" Style="{StaticResource TBtn}">
