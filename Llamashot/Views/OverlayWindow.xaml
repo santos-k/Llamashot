@@ -177,7 +177,7 @@
                         <Button x:Name="BtnThickness" ToolTip="Thickness" Click="Thickness_Click" Style="{StaticResource TBtn}">
                             <Grid Width="20" Height="20">
                                 <Ellipse Width="20" Height="20" Fill="#444" Stroke="#666" StrokeThickness="1" />
-                                <TextBlock x:Name="ThicknessLabel" Text="1" Foreground="White"
+                                <TextBlock x:Name="ThicknessLabel" Text="3" Foreground="White"
                                            FontSize="12" FontWeight="Bold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>

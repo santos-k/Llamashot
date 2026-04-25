@@ -54,7 +54,8 @@ public partial class OverlayWindow : Window
         InitializeComponent();
         InitializeColorPalette();
         InitializeThicknessPopup();
-        _currentThickness = 1;
+        _currentThickness = 3;
+        ThicknessLabel.Text = "3";
     }
 
     public void StartCapture()
