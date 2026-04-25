@@ -194,50 +194,58 @@
                     <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
                 </Border.Effect>
                 <StackPanel x:Name="ActionToolsPanel" Orientation="Horizontal">
+                    <!-- Save - blue floppy -->
                     <Button x:Name="BtnSave" ToolTip="Save (Ctrl+S)" Click="Save_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <Path Fill="White" Data="M1,1 L12,1 L15,4 L15,15 L1,15 Z" />
-                            <Rectangle Canvas.Left="4" Canvas.Top="1" Width="6" Height="5" Fill="#111" />
-                            <Rectangle Canvas.Left="4" Canvas.Top="9" Width="8" Height="5" Fill="#111" RadiusX="1" RadiusY="1" />
+                            <Path Fill="#42A5F5" Data="M1,1 L12,1 L15,4 L15,15 L1,15 Z" />
+                            <Rectangle Canvas.Left="4" Canvas.Top="1" Width="6" Height="5" Fill="#1E88E5" />
+                            <Rectangle Canvas.Left="4" Canvas.Top="9" Width="8" Height="5" Fill="White" RadiusX="1" RadiusY="1" />
                         </Canvas>
                     </Button>
+                    <!-- Copy - green -->
                     <Button x:Name="BtnCopy" ToolTip="Copy (Ctrl+C)" Click="Copy_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
                             <Rectangle Canvas.Left="4" Canvas.Top="4" Width="11" Height="11"
-                                       Stroke="White" StrokeThickness="1.5" />
+                                       Stroke="#66BB6A" StrokeThickness="1.5" />
                             <Rectangle Canvas.Left="1" Canvas.Top="1" Width="11" Height="11"
-                                       Stroke="White" StrokeThickness="1.5" Fill="#111" />
+                                       Stroke="#66BB6A" StrokeThickness="1.5" Fill="#111" />
+                            <Path Fill="#66BB6A" Data="M4,7 L6,7 L6,4 L4,4 Z" />
                         </Canvas>
                     </Button>
-                    <Button x:Name="BtnPrint" ToolTip="Print" Click="Print_Click" Style="{StaticResource TBtn}">
+                    <!-- History - orange clock -->
+                    <Button x:Name="BtnHistory" ToolTip="History" Click="History_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <Rectangle Canvas.Left="3" Canvas.Top="1" Width="10" Height="4" Stroke="White" StrokeThickness="1.5" />
-                            <Rectangle Canvas.Left="1" Canvas.Top="5" Width="14" Height="7" Fill="White" RadiusX="1" RadiusY="1" />
-                            <Rectangle Canvas.Left="3" Canvas.Top="10" Width="10" Height="5" Stroke="White" StrokeThickness="1.5" Fill="#111" />
+                            <Ellipse Canvas.Left="1" Canvas.Top="1" Width="14" Height="14"
+                                     Stroke="#FFA726" StrokeThickness="1.5" />
+                            <Line X1="8" Y1="4" X2="8" Y2="8" Stroke="#FFA726" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="8" Y1="8" X2="11" Y2="10" Stroke="#FFA726" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
+                    <!-- Pin - purple -->
                     <Button x:Name="BtnPin" ToolTip="Pin on screen" Click="Pin_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <Path Fill="White" Data="M8,15 L8,11 M5,11 L11,11 M6,3 L6,8 L5,11 L11,11 L10,8 L10,3 Z" />
-                            <Rectangle Canvas.Left="5" Canvas.Top="1" Width="6" Height="2" Fill="White" RadiusX="1" RadiusY="1" />
+                            <Path Fill="#AB47BC" Data="M8,15 L8,11 M5,11 L11,11 M6,3 L6,8 L5,11 L11,11 L10,8 L10,3 Z" />
+                            <Rectangle Canvas.Left="5" Canvas.Top="1" Width="6" Height="2" Fill="#CE93D8" RadiusX="1" RadiusY="1" />
+                            <Line X1="8" Y1="11" X2="8" Y2="15" Stroke="#AB47BC" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
+                    <!-- OCR - cyan -->
                     <Button x:Name="BtnOcr" ToolTip="Extract Text (OCR)" Click="Ocr_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <!-- OCR / text extract icon -->
                             <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="14"
-                                       Stroke="White" StrokeThickness="1.5" RadiusX="1" RadiusY="1" />
-                            <TextBlock Canvas.Left="3" Canvas.Top="1" Text="T" Foreground="White"
+                                       Stroke="#26C6DA" StrokeThickness="1.5" RadiusX="2" RadiusY="2" />
+                            <TextBlock Canvas.Left="4" Canvas.Top="0" Text="T" Foreground="#26C6DA"
                                        FontSize="11" FontWeight="Bold" />
-                            <Line X1="4" Y1="13" X2="12" Y2="13" Stroke="#2196F3" StrokeThickness="1.5" />
-                            <Line X1="4" Y1="10" X2="10" Y2="10" Stroke="#2196F3" StrokeThickness="1" />
+                            <Line X1="4" Y1="13" X2="12" Y2="13" Stroke="#00ACC1" StrokeThickness="1.5" />
+                            <Line X1="4" Y1="10.5" X2="10" Y2="10.5" Stroke="#00ACC1" StrokeThickness="1" />
                         </Canvas>
                     </Button>
                     <Rectangle Width="1" Fill="#333" Margin="2,4" />
+                    <!-- Close - red X -->
                     <Button x:Name="BtnClose" ToolTip="Close (Esc)" Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <Line X1="3" Y1="3" X2="13" Y2="13" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <Line X1="13" Y1="3" X2="3" Y2="13" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="3" Y1="3" X2="13" Y2="13" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="13" Y1="3" X2="3" Y2="13" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
                 </StackPanel>

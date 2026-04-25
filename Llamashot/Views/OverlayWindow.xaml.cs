@@ -942,31 +942,20 @@ public partial class OverlayWindow : Window
             if (string.IsNullOrWhiteSpace(text))
                 text = "[No text detected in the selected area]";
 
-            Hide();
-            var resultWindow = new OcrResultWindow(text);
-            resultWindow.ShowDialog();
+            var win = new OcrResultWindow(text) { Topmost = true };
+            win.Show();
         }
         catch (Exception ex)
         {
-            Hide();
             System.Windows.MessageBox.Show($"OCR failed: {ex.Message}", "Llamashot",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        Close();
     }
 
-    private void Print_Click(object sender, RoutedEventArgs e)
+    private void History_Click(object sender, RoutedEventArgs e)
     {
-        var image = RenderFinalImage();
-        var pd = new PrintDialog();
-        if (pd.ShowDialog() == true)
-        {
-            var v = new DrawingVisual();
-            using (var dc = v.RenderOpen())
-                dc.DrawImage(image, new Rect(0, 0, pd.PrintableAreaWidth, pd.PrintableAreaHeight));
-            pd.PrintVisual(v, "Llamashot Screenshot");
-        }
-        Close();
+        var win = new HistoryWindow { Topmost = true };
+        win.Show();
     }
 
     private void Pin_Click(object sender, RoutedEventArgs e)
