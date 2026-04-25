@@ -1,0 +1,36 @@
+<Window x:Class="Llamashot.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About Llamashot"
+        Width="360" Height="280"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#1E1E1E">
+    <StackPanel Margin="30" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <TextBlock Text="Llamashot" FontSize="28" FontWeight="Bold"
+                   Foreground="#2196F3" HorizontalAlignment="Center" />
+        <TextBlock Text="Lightweight Screenshot Tool" FontSize="13"
+                   Foreground="#AAA" HorizontalAlignment="Center" Margin="0,4,0,16" />
+
+        <TextBlock Text="Version 1.0.0" Foreground="#888"
+                   HorizontalAlignment="Center" FontSize="12" />
+
+        <Separator Background="#444" Margin="0,16" />
+
+        <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12"
+                   HorizontalAlignment="Center" TextAlignment="Center"
+                   Text="A fast, lightweight screenshot tool with annotation support. Inspired by Lightshot." />
+
+        <Separator Background="#444" Margin="0,16" />
+
+        <TextBlock Foreground="#666" FontSize="11" HorizontalAlignment="Center">
+            <Run Text="Hotkeys: " />
+            <Run Text="PrtSc" Foreground="#2196F3" />
+            <Run Text=" (region) | " />
+            <Run Text="Shift+PrtSc" Foreground="#2196F3" />
+            <Run Text=" (save) | " />
+            <Run Text="Ctrl+PrtSc" Foreground="#2196F3" />
+            <Run Text=" (copy)" />
+        </TextBlock>
+    </StackPanel>
+</Window>
