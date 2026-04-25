@@ -2,6 +2,8 @@
 
 A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text with a single hotkey.
 
+**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup.exe)**
+
 Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ## Features
