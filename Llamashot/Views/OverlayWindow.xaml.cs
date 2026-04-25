@@ -539,14 +539,23 @@ public partial class OverlayWindow : Window
         Focus();
     }
 
+    private void Move_Click(object sender, RoutedEventArgs e)
+    {
+        if (_hasSelection) ActivateMoveTool();
+        // Highlight the move button
+        if (sender is Button btn)
+            btn.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243));
+        Focus();
+    }
+
     private void Drawing_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (!_hasSelection) return;
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
 
-        // Space held = pan override (Photoshop-style)
-        if (_spaceHeld)
+        // Space held OR no tool (V move mode) = pan
+        if (_spaceHeld || _currentTool == null)
         {
             _interaction = Interaction.Moving;
             _dragStart = e.GetPosition(MainCanvas);
@@ -555,8 +564,6 @@ public partial class OverlayWindow : Window
             e.Handled = true;
             return;
         }
-
-        if (_currentTool == null) return;
 
         _interaction = Interaction.Drawing;
         _currentTool.OnMouseDown(pos, DrawingCanvas);

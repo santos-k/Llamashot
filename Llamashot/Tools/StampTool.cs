@@ -11,9 +11,9 @@ public enum StampType { Check, Cross }
 
 public class StampTool : BaseDrawingTool
 {
-    public override DrawingToolType ToolType => DrawingToolType.Pen; // reuse
+    public override DrawingToolType ToolType => DrawingToolType.Pen;
     public StampType Stamp { get; }
-    public double StampSize { get; set; } = 28;
+    public double StampSize { get; set; } = 36;
 
     public StampTool(StampType stamp)
     {
@@ -22,33 +22,54 @@ public class StampTool : BaseDrawingTool
 
     public override void OnMouseDown(Point position, Canvas canvas)
     {
-        var path = new Path
+        double s = StampSize;
+        double x = position.X - s / 2;
+        double y = position.Y - s / 2;
+
+        var group = new System.Windows.Controls.Canvas();
+        Canvas.SetLeft(group, x);
+        Canvas.SetTop(group, y);
+        group.Width = s;
+        group.Height = s;
+
+        // Circle background
+        var circle = new Ellipse
         {
-            StrokeThickness = 3,
+            Width = s, Height = s,
+            StrokeThickness = 2.5,
+        };
+
+        var mark = new Path
+        {
+            StrokeThickness = 4,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
             StrokeLineJoin = PenLineJoin.Round
         };
 
-        double s = StampSize;
-        double x = position.X - s / 2;
-        double y = position.Y - s / 2;
-
         if (Stamp == StampType.Check)
         {
-            path.Stroke = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50)); // Green
-            path.Data = Geometry.Parse($"M{x + s * 0.15},{y + s * 0.55} L{x + s * 0.4},{y + s * 0.8} L{x + s * 0.85},{y + s * 0.2}");
+            var green = Color.FromRgb(0x4C, 0xAF, 0x50);
+            circle.Stroke = new SolidColorBrush(green);
+            circle.Fill = new SolidColorBrush(Color.FromArgb(40, 0x4C, 0xAF, 0x50));
+            mark.Stroke = new SolidColorBrush(green);
+            mark.Data = Geometry.Parse($"M{s * 0.22},{s * 0.52} L{s * 0.42},{s * 0.72} L{s * 0.78},{s * 0.28}");
         }
         else
         {
-            path.Stroke = new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36)); // Red
-            var group = new GeometryGroup();
-            group.Children.Add(Geometry.Parse($"M{x + s * 0.2},{y + s * 0.2} L{x + s * 0.8},{y + s * 0.8}"));
-            group.Children.Add(Geometry.Parse($"M{x + s * 0.8},{y + s * 0.2} L{x + s * 0.2},{y + s * 0.8}"));
-            path.Data = group;
+            var red = Color.FromRgb(0xF4, 0x43, 0x36);
+            circle.Stroke = new SolidColorBrush(red);
+            circle.Fill = new SolidColorBrush(Color.FromArgb(40, 0xF4, 0x43, 0x36));
+            mark.Stroke = new SolidColorBrush(red);
+            var g = new GeometryGroup();
+            g.Children.Add(Geometry.Parse($"M{s * 0.28},{s * 0.28} L{s * 0.72},{s * 0.72}"));
+            g.Children.Add(Geometry.Parse($"M{s * 0.72},{s * 0.28} L{s * 0.28},{s * 0.72}"));
+            mark.Data = g;
         }
 
-        canvas.Children.Add(path);
+        group.Children.Add(circle);
+        group.Children.Add(mark);
+        canvas.Children.Add(group);
 
         CurrentAction = new DrawingAction
         {
@@ -56,7 +77,7 @@ public class StampTool : BaseDrawingTool
             StrokeColor = StrokeColor,
             Thickness = Thickness,
             Points = new List<Point> { position },
-            RenderedElement = path
+            RenderedElement = group
         };
     }
 

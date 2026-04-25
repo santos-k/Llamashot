@@ -13,10 +13,9 @@
         MouseWheel="Window_MouseWheel"
         Focusable="True">
     <Window.Resources>
-        <!-- Uniform toolbar button style -->
         <Style x:Key="TBtn" TargetType="Button">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="32" />
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -27,7 +26,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                CornerRadius="4" Width="32" Height="32">
+                                CornerRadius="4" Width="30" Height="30">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -79,99 +78,136 @@
 
         <!-- Toolbars -->
         <Canvas x:Name="ToolbarCanvas" Visibility="Collapsed">
-            <!-- Drawing tools (right side) -->
+            <!-- Drawing tools (right side) - 2 columns -->
             <Border x:Name="DrawingToolbar"
-                    Background="#FF111111" CornerRadius="6" Padding="2"
+                    Background="#FF111111" CornerRadius="6" Padding="3"
                     BorderBrush="#333" BorderThickness="1">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
                 </Border.Effect>
-                <StackPanel x:Name="DrawingToolsPanel" Orientation="Vertical">
-                    <Button x:Name="BtnPen" ToolTip="Pen (P)" Click="Tool_Click" Tag="Pen" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Path Stroke="White" StrokeThickness="2" Data="M1,15 Q4,7 8,5 Q12,3 15,1" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnLine" ToolTip="Line (L)" Click="Tool_Click" Tag="Line" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Line X1="1" Y1="15" X2="15" Y2="1" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnArrow" ToolTip="Arrow (A)" Click="Tool_Click" Tag="Arrow" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Line X1="1" Y1="15" X2="12" Y2="4" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" />
-                            <Path Fill="White" Data="M15,1 L9,4 L12,7 Z" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnRect" ToolTip="Rectangle (R)" Click="Tool_Click" Tag="Rectangle" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Rectangle Canvas.Left="1" Canvas.Top="2" Width="14" Height="12"
-                                       Stroke="White" StrokeThickness="2" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnEllipse" ToolTip="Ellipse (E)" Click="Tool_Click" Tag="Ellipse" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Ellipse Canvas.Left="1" Canvas.Top="2" Width="14" Height="12"
-                                     Stroke="White" StrokeThickness="2" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnText" ToolTip="Text (T)" Click="Tool_Click" Tag="Text" Style="{StaticResource TBtn}">
-                        <TextBlock Text="A" Foreground="White" FontSize="15" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Button>
-                    <Button x:Name="BtnMarker" ToolTip="Marker (M)" Click="Tool_Click" Tag="Marker" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Rectangle Canvas.Left="1" Canvas.Top="5" Width="14" Height="6"
-                                       Fill="#AAFFFF00" RadiusX="1" RadiusY="1" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnBlur" ToolTip="Blur (B)" Click="Tool_Click" Tag="Blur" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="14"
-                                       Fill="#50888888" Stroke="White" StrokeThickness="1.5" StrokeDashArray="2,1" />
-                        </Canvas>
-                    </Button>
-                    <Button x:Name="BtnEraser" ToolTip="Eraser (X)" Click="Eraser_Click" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Path Stroke="White" StrokeThickness="1.5" Data="M3,14 L10,7 L13,10 L6,17" StrokeLineJoin="Round" />
-                            <Path Fill="White" Data="M10,7 L13,4 L16,7 L13,10 Z" />
-                            <Line X1="1" Y1="16" X2="9" Y2="16" Stroke="White" StrokeThickness="1.5" />
-                        </Canvas>
-                    </Button>
-                    <Rectangle Height="1" Fill="#333" Margin="4,3" />
-                    <!-- Check stamp (green) -->
-                    <Button x:Name="BtnCheck" ToolTip="Check mark" Click="Tool_Click" Tag="Check" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Path Stroke="#4CAF50" StrokeThickness="3" Data="M2,9 L6,13 L14,3"
-                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
-                        </Canvas>
-                    </Button>
-                    <!-- Cross stamp (red) -->
-                    <Button x:Name="BtnCross" ToolTip="Cross mark" Click="Tool_Click" Tag="CrossMark" Style="{StaticResource TBtn}">
-                        <Canvas Width="16" Height="16">
-                            <Line X1="3" Y1="3" X2="13" Y2="13" Stroke="#F44336" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <Line X1="13" Y1="3" X2="3" Y2="13" Stroke="#F44336" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                        </Canvas>
-                    </Button>
-                    <Rectangle Height="1" Fill="#333" Margin="4,3" />
-                    <!-- Color picker -->
-                    <Button x:Name="BtnColor" ToolTip="Color (C)" Click="Color_Click" Style="{StaticResource TBtn}">
-                        <Ellipse x:Name="ColorIndicator" Width="18" Height="18"
-                                 Fill="Red" Stroke="White" StrokeThickness="2" />
-                    </Button>
-                    <!-- Thickness -->
-                    <Button x:Name="BtnThicknessUp" ToolTip="Thicker (Ctrl++)" Click="ThicknessUp_Click" Style="{StaticResource TBtn}">
-                        <TextBlock Text="+" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0" />
-                    </Button>
-                    <Button x:Name="BtnThicknessDown" ToolTip="Thinner (Ctrl+-)" Click="ThicknessDown_Click" Style="{StaticResource TBtn}">
-                        <TextBlock Text="-" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-3,0,0" />
-                    </Button>
+                <StackPanel x:Name="DrawingToolsPanel">
+                    <!-- Row 1: Pen, Line -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnPen" ToolTip="Pen (P)" Click="Tool_Click" Tag="Pen" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Path Stroke="White" StrokeThickness="2" Data="M1,15 Q4,7 8,5 Q12,3 15,1" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="BtnLine" ToolTip="Line (L)" Click="Tool_Click" Tag="Line" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Line X1="1" Y1="15" X2="15" Y2="1" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+                    <!-- Row 2: Arrow, Rectangle -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnArrow" ToolTip="Arrow (A)" Click="Tool_Click" Tag="Arrow" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Line X1="1" Y1="15" X2="12" Y2="4" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" />
+                                <Path Fill="White" Data="M15,1 L9,4 L12,7 Z" />
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="BtnRect" ToolTip="Rectangle (R)" Click="Tool_Click" Tag="Rectangle" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="2" Width="14" Height="12"
+                                           Stroke="White" StrokeThickness="2" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+                    <!-- Row 3: Ellipse, Text -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnEllipse" ToolTip="Ellipse (E)" Click="Tool_Click" Tag="Ellipse" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Ellipse Canvas.Left="1" Canvas.Top="2" Width="14" Height="12"
+                                         Stroke="White" StrokeThickness="2" />
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="BtnText" ToolTip="Text (T)" Click="Tool_Click" Tag="Text" Style="{StaticResource TBtn}">
+                            <TextBlock Text="A" Foreground="White" FontSize="14" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                    <!-- Row 4: Marker, Blur -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnMarker" ToolTip="Marker (M)" Click="Tool_Click" Tag="Marker" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="5" Width="14" Height="6"
+                                           Fill="#AAFFFF00" RadiusX="1" RadiusY="1" />
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="BtnBlur" ToolTip="Blur (B)" Click="Tool_Click" Tag="Blur" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="14"
+                                           Fill="#50888888" Stroke="White" StrokeThickness="1.5" StrokeDashArray="2,1" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+                    <!-- Row 5: Check, Cross -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnCheck" ToolTip="Check mark" Click="Tool_Click" Tag="Check" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Ellipse Width="16" Height="16" Stroke="#4CAF50" StrokeThickness="1.5" Fill="#304CAF50" />
+                                <Path Stroke="#4CAF50" StrokeThickness="2.5" Data="M4,8.5 L7,11.5 L12,4.5"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="BtnCross" ToolTip="Cross mark" Click="Tool_Click" Tag="CrossMark" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Ellipse Width="16" Height="16" Stroke="#F44336" StrokeThickness="1.5" Fill="#30F44336" />
+                                <Line X1="4.5" Y1="4.5" X2="11.5" Y2="11.5" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="11.5" Y1="4.5" X2="4.5" Y2="11.5" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+                    <Rectangle Height="1" Fill="#333" Margin="2,3" />
+                    <!-- Row 6: Eraser (dustbin), Move -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnEraser" ToolTip="Delete last (X)" Click="Eraser_Click" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <!-- Dustbin / trash icon -->
+                                <Rectangle Canvas.Left="3" Canvas.Top="4" Width="10" Height="11"
+                                           Stroke="White" StrokeThickness="1.5" RadiusX="1" RadiusY="1" />
+                                <Line X1="1" Y1="4" X2="15" Y2="4" Stroke="White" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Rectangle Canvas.Left="5.5" Canvas.Top="2" Width="5" Height="2" Stroke="White" StrokeThickness="1" RadiusX="1" RadiusY="1" />
+                                <Line X1="6" Y1="7" X2="6" Y2="13" Stroke="White" StrokeThickness="1" />
+                                <Line X1="8" Y1="7" X2="8" Y2="13" Stroke="White" StrokeThickness="1" />
+                                <Line X1="10" Y1="7" X2="10" Y2="13" Stroke="White" StrokeThickness="1" />
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="BtnMove" ToolTip="Move (V)" Click="Move_Click" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <!-- Move / 4-arrow icon -->
+                                <Line X1="8" Y1="1" X2="8" Y2="15" Stroke="White" StrokeThickness="1.5" />
+                                <Line X1="1" Y1="8" X2="15" Y2="8" Stroke="White" StrokeThickness="1.5" />
+                                <Path Fill="White" Data="M8,0 L5,3 L11,3 Z" />
+                                <Path Fill="White" Data="M8,16 L5,13 L11,13 Z" />
+                                <Path Fill="White" Data="M0,8 L3,5 L3,11 Z" />
+                                <Path Fill="White" Data="M16,8 L13,5 L13,11 Z" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+                    <Rectangle Height="1" Fill="#333" Margin="2,3" />
+                    <!-- Row 7: Color, Thickness -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnColor" ToolTip="Color (C)" Click="Color_Click" Style="{StaticResource TBtn}">
+                            <Ellipse x:Name="ColorIndicator" Width="18" Height="18"
+                                     Fill="Red" Stroke="White" StrokeThickness="2" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="BtnThicknessDown" ToolTip="Thinner" Click="ThicknessDown_Click" Style="{StaticResource TBtn}" Width="15">
+                                <TextBlock Text="-" Foreground="White" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-3,0,0" />
+                            </Button>
+                            <Button x:Name="BtnThicknessUp" ToolTip="Thicker" Click="ThicknessUp_Click" Style="{StaticResource TBtn}" Width="15">
+                                <TextBlock Text="+" Foreground="White" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0" />
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- Action toolbar (bottom) -->
             <Border x:Name="ActionToolbar"
-                    Background="#FF111111" CornerRadius="6" Padding="2"
+                    Background="#FF111111" CornerRadius="6" Padding="3"
                     BorderBrush="#333" BorderThickness="1">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
@@ -199,14 +235,13 @@
                             <Rectangle Canvas.Left="3" Canvas.Top="10" Width="10" Height="5" Stroke="White" StrokeThickness="1.5" Fill="#111" />
                         </Canvas>
                     </Button>
-                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
                     <Button x:Name="BtnPin" ToolTip="Pin on screen" Click="Pin_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
                             <Path Fill="White" Data="M8,15 L8,11 M5,11 L11,11 M6,3 L6,8 L5,11 L11,11 L10,8 L10,3 Z" />
                             <Rectangle Canvas.Left="5" Canvas.Top="1" Width="6" Height="2" Fill="White" RadiusX="1" RadiusY="1" />
                         </Canvas>
                     </Button>
-                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
+                    <Rectangle Width="1" Fill="#333" Margin="2,4" />
                     <Button x:Name="BtnClose" ToolTip="Close (Esc)" Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
                             <Line X1="3" Y1="3" X2="13" Y2="13" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
