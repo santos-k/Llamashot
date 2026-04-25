@@ -9,6 +9,7 @@
         ResizeMode="NoResize"
         Cursor="Cross"
         PreviewKeyDown="Window_KeyDown"
+        PreviewKeyUp="Window_KeyUp"
         MouseWheel="Window_MouseWheel"
         Focusable="True">
     <Window.Resources>

@@ -30,6 +30,9 @@ public partial class OverlayWindow : Window
     private Point _dragStart;
     private Rect _dragOrigSelection;
 
+    // Pan (Space + drag, like Photoshop)
+    private bool _spaceHeld;
+
     // Drawing
     private IDrawingTool? _currentTool;
     private readonly Stack<DrawingAction> _undoStack = new();
@@ -118,6 +121,17 @@ public partial class OverlayWindow : Window
 
         if (_hasSelection)
         {
+            // Priority 0: Space held = pan (Photoshop-style)
+            if (_spaceHeld && _selection.Contains(pos))
+            {
+                _interaction = Interaction.Moving;
+                _dragStart = pos;
+                _dragOrigSelection = _selection;
+                MainCanvas.CaptureMouse();
+                e.Handled = true;
+                return;
+            }
+
             // Priority 1: Resize handle
             var handle = HitTestHandle(pos);
             if (handle != Handle.None)
@@ -141,7 +155,7 @@ public partial class OverlayWindow : Window
                 }
                 else
                 {
-                    // Pan / move selection + annotations
+                    // No tool selected = move
                     _interaction = Interaction.Moving;
                     _dragStart = pos;
                     _dragOrigSelection = _selection;
@@ -519,9 +533,22 @@ public partial class OverlayWindow : Window
 
     private void Drawing_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_currentTool == null || !_hasSelection) return;
+        if (!_hasSelection) return;
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
+
+        // Space held = pan override (Photoshop-style)
+        if (_spaceHeld)
+        {
+            _interaction = Interaction.Moving;
+            _dragStart = e.GetPosition(MainCanvas);
+            _dragOrigSelection = _selection;
+            MainCanvas.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
+        if (_currentTool == null) return;
 
         _interaction = Interaction.Drawing;
         _currentTool.OnMouseDown(pos, DrawingCanvas);
@@ -708,6 +735,16 @@ public partial class OverlayWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        // Space = pan mode (Photoshop-style)
+        if (e.Key == Key.Space && !_spaceHeld && _hasSelection)
+        {
+            _spaceHeld = true;
+            Cursor = Cursors.Hand;
+            DrawingCanvas.Cursor = Cursors.Hand;
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
             if (_currentTool != null)
@@ -747,6 +784,17 @@ public partial class OverlayWindow : Window
             case Key.OemMinus when Keyboard.Modifiers == ModifierKeys.Control:
             case Key.Subtract when Keyboard.Modifiers == ModifierKeys.Control:
                 ThicknessDown_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+        }
+    }
+
+    private void Window_KeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space && _spaceHeld)
+        {
+            _spaceHeld = false;
+            Cursor = Cursors.Cross;
+            DrawingCanvas.Cursor = _currentTool?.Cursor ?? Cursors.Cross;
+            e.Handled = true;
         }
     }
 
