@@ -27,3 +27,4 @@ global using TextBlock = System.Windows.Controls.TextBlock;
 global using Label = System.Windows.Controls.Label;
 global using ComboBox = System.Windows.Controls.ComboBox;
 global using CheckBox = System.Windows.Controls.CheckBox;
+global using Brushes = System.Windows.Media.Brushes;

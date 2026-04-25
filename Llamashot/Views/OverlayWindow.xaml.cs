@@ -17,24 +17,25 @@ public partial class OverlayWindow : Window
     private BitmapSource? _screenshot;
     private Rect _virtualBounds;
 
-    private enum Mode { Selecting, Selected, Drawing }
-    private Mode _mode = Mode.Selecting;
-    private Point _selStart;
-    private Point _selEnd;
+    // Interaction state
+    private enum Interaction { None, Selecting, Resizing, Moving, Drawing }
+    private Interaction _interaction = Interaction.None;
+    private bool _hasSelection;
+    private Point _selStart, _selEnd;
     private Rect _selection;
-    private bool _isDragging;
 
-    private enum ResizeHandle { None, TopLeft, Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left, Move }
-    private ResizeHandle _activeHandle = ResizeHandle.None;
-    private Point _resizeStart;
-    private Rect _resizeOriginal;
+    // Resize
+    private enum Handle { None, TL, T, TR, R, BR, B, BL, L }
+    private Handle _activeHandle = Handle.None;
+    private Point _dragStart;
+    private Rect _dragOrigSelection;
 
+    // Drawing
     private IDrawingTool? _currentTool;
     private readonly Stack<DrawingAction> _undoStack = new();
     private readonly Stack<DrawingAction> _redoStack = new();
     private Color _currentColor = Colors.Red;
     private double _currentThickness = 2;
-    private bool _isDrawingStroke;
 
     private static readonly Color[] PaletteColors = {
         Colors.Red, Colors.OrangeRed, Colors.Orange, Colors.Gold,
@@ -64,9 +65,8 @@ public partial class OverlayWindow : Window
 
         UpdateDimming(Rect.Empty);
 
-        _mode = Mode.Selecting;
-        _isDragging = false;
-        _isDrawingStroke = false;
+        _interaction = Interaction.None;
+        _hasSelection = false;
         _currentTool = null;
         SelectionBorder.Visibility = Visibility.Collapsed;
         DimensionBorder.Visibility = Visibility.Collapsed;
@@ -109,120 +109,141 @@ public partial class OverlayWindow : Window
         }
     }
 
-    // ============ SELECTION ============
+    // ============ UNIFIED MOUSE HANDLING ON MainCanvas ============
 
     private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_mode == Mode.Drawing) return;
-
         var pos = e.GetPosition(MainCanvas);
+        ColorPaletteCanvas.Visibility = Visibility.Collapsed;
 
-        if (_mode == Mode.Selected)
+        if (_hasSelection)
         {
+            // Priority 1: Resize handle
             var handle = HitTestHandle(pos);
-            if (handle != ResizeHandle.None)
+            if (handle != Handle.None)
             {
+                _interaction = Interaction.Resizing;
                 _activeHandle = handle;
-                _resizeStart = pos;
-                _resizeOriginal = _selection;
-                _isDragging = true;
+                _dragStart = pos;
+                _dragOrigSelection = _selection;
                 MainCanvas.CaptureMouse();
                 e.Handled = true;
                 return;
             }
 
-            // Clicking outside selection - start new selection
-            if (!_selection.Contains(pos))
+            // Priority 2: Inside selection
+            if (_selection.Contains(pos))
             {
-                HideToolbars();
-                DrawingCanvas.Children.Clear();
-                _undoStack.Clear();
-                _redoStack.Clear();
+                if (_currentTool != null)
+                {
+                    // Delegate to drawing canvas
+                    return; // Let DrawingCanvas handle it
+                }
+                else
+                {
+                    // Pan / move selection + annotations
+                    _interaction = Interaction.Moving;
+                    _dragStart = pos;
+                    _dragOrigSelection = _selection;
+                    MainCanvas.CaptureMouse();
+                    e.Handled = true;
+                    return;
+                }
             }
-            else
-            {
-                // Inside selection - move
-                _activeHandle = ResizeHandle.Move;
-                _resizeStart = pos;
-                _resizeOriginal = _selection;
-                _isDragging = true;
-                MainCanvas.CaptureMouse();
-                e.Handled = true;
-                return;
-            }
+
+            // Priority 3: Outside selection - new selection
+            HideToolbars();
+            DrawingCanvas.Children.Clear();
+            _undoStack.Clear();
+            _redoStack.Clear();
+            _hasSelection = false;
+            _currentTool = null;
         }
 
-        _mode = Mode.Selecting;
+        // Start new selection
+        _interaction = Interaction.Selecting;
         _selStart = pos;
         _selEnd = pos;
-        _isDragging = true;
         MainCanvas.CaptureMouse();
 
         SelectionBorder.Visibility = Visibility.Visible;
         DimensionBorder.Visibility = Visibility.Visible;
-        UpdateSelection();
+        UpdateSelectionVisuals();
     }
 
     private void Canvas_MouseMove(object sender, MouseEventArgs e)
     {
         var pos = e.GetPosition(MainCanvas);
 
-        if (!_isDragging)
+        switch (_interaction)
         {
-            if (_mode == Mode.Selected)
-            {
-                var handle = HitTestHandle(pos);
-                Cursor = handle switch
-                {
-                    ResizeHandle.TopLeft or ResizeHandle.BottomRight => Cursors.SizeNWSE,
-                    ResizeHandle.TopRight or ResizeHandle.BottomLeft => Cursors.SizeNESW,
-                    ResizeHandle.Top or ResizeHandle.Bottom => Cursors.SizeNS,
-                    ResizeHandle.Left or ResizeHandle.Right => Cursors.SizeWE,
-                    ResizeHandle.Move when _selection.Contains(pos) => Cursors.SizeAll,
-                    _ => Cursors.Cross
-                };
-            }
-            return;
-        }
+            case Interaction.Selecting:
+                _selEnd = pos;
+                UpdateSelectionVisuals();
+                break;
 
-        if (_mode == Mode.Selecting)
-        {
-            _selEnd = pos;
-            UpdateSelection();
-        }
-        else if (_mode == Mode.Selected && _activeHandle != ResizeHandle.None)
-        {
-            ApplyResize(pos);
+            case Interaction.Resizing:
+                ApplyResize(pos);
+                break;
+
+            case Interaction.Moving:
+                ApplyMove(pos);
+                break;
+
+            case Interaction.None when _hasSelection:
+                // Update cursor based on position
+                var handle = HitTestHandle(pos);
+                if (handle != Handle.None)
+                {
+                    Cursor = handle switch
+                    {
+                        Handle.TL or Handle.BR => Cursors.SizeNWSE,
+                        Handle.TR or Handle.BL => Cursors.SizeNESW,
+                        Handle.T or Handle.B => Cursors.SizeNS,
+                        Handle.L or Handle.R => Cursors.SizeWE,
+                        _ => Cursors.Cross
+                    };
+                }
+                else if (_selection.Contains(pos))
+                {
+                    Cursor = _currentTool != null ? _currentTool.Cursor : Cursors.SizeAll;
+                }
+                else
+                {
+                    Cursor = Cursors.Cross;
+                }
+                break;
         }
     }
 
     private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_isDragging) return;
-        _isDragging = false;
+        var interaction = _interaction;
+        _interaction = Interaction.None;
         MainCanvas.ReleaseMouseCapture();
 
-        if (_mode == Mode.Selecting)
+        switch (interaction)
         {
-            _selEnd = e.GetPosition(MainCanvas);
-            UpdateSelection();
+            case Interaction.Selecting:
+                _selEnd = e.GetPosition(MainCanvas);
+                UpdateSelectionVisuals();
+                if (_selection.Width > 5 && _selection.Height > 5)
+                {
+                    _hasSelection = true;
+                    ShowToolbars();
+                    ShowResizeHandles();
+                }
+                break;
 
-            if (_selection.Width > 5 && _selection.Height > 5)
-            {
-                _mode = Mode.Selected;
-                ShowToolbars();
+            case Interaction.Resizing:
+            case Interaction.Moving:
                 ShowResizeHandles();
-            }
-        }
-        else if (_mode == Mode.Selected)
-        {
-            _activeHandle = ResizeHandle.None;
-            ShowResizeHandles();
-            UpdateToolbarPositions();
+                UpdateToolbarPositions();
+                break;
         }
     }
 
-    private void UpdateSelection()
+    private void UpdateSelectionVisuals()
     {
         double x = Math.Min(_selStart.X, _selEnd.X);
         double y = Math.Min(_selStart.Y, _selEnd.Y);
@@ -245,112 +266,143 @@ public partial class OverlayWindow : Window
         UpdateDimming(_selection);
     }
 
-    private void UpdateDimming(Rect selectionRect)
+    private void UpdateDimming(Rect sel)
     {
-        var fullRect = new RectangleGeometry(new Rect(0, 0, ActualWidth, ActualHeight));
-
-        if (selectionRect.Width > 0 && selectionRect.Height > 0)
+        var full = new RectangleGeometry(new Rect(0, 0, ActualWidth, ActualHeight));
+        if (sel.Width > 0 && sel.Height > 0)
         {
-            var selGeom = new RectangleGeometry(selectionRect);
-            var combined = new CombinedGeometry(GeometryCombineMode.Exclude, fullRect, selGeom);
-            DimmingPath.Data = combined;
+            var hole = new RectangleGeometry(sel);
+            DimmingPath.Data = new CombinedGeometry(GeometryCombineMode.Exclude, full, hole);
         }
         else
         {
-            DimmingPath.Data = fullRect;
+            DimmingPath.Data = full;
         }
     }
 
-    // ============ RESIZE HANDLES ============
+    // ============ RESIZE ============
 
     private const double HandleSize = 8;
-    private const double HandleHitMargin = 6;
+    private const double HitMargin = 8;
 
     private void ShowResizeHandles()
     {
         HandleCanvas.Children.Clear();
         HandleCanvas.Visibility = Visibility.Visible;
 
-        var positions = new (ResizeHandle handle, double cx, double cy)[]
+        var pts = new (Handle h, double x, double y)[]
         {
-            (ResizeHandle.TopLeft, _selection.Left, _selection.Top),
-            (ResizeHandle.Top, _selection.Left + _selection.Width / 2, _selection.Top),
-            (ResizeHandle.TopRight, _selection.Right, _selection.Top),
-            (ResizeHandle.Right, _selection.Right, _selection.Top + _selection.Height / 2),
-            (ResizeHandle.BottomRight, _selection.Right, _selection.Bottom),
-            (ResizeHandle.Bottom, _selection.Left + _selection.Width / 2, _selection.Bottom),
-            (ResizeHandle.BottomLeft, _selection.Left, _selection.Bottom),
-            (ResizeHandle.Left, _selection.Left, _selection.Top + _selection.Height / 2),
+            (Handle.TL, _selection.Left, _selection.Top),
+            (Handle.T, _selection.Left + _selection.Width / 2, _selection.Top),
+            (Handle.TR, _selection.Right, _selection.Top),
+            (Handle.R, _selection.Right, _selection.Top + _selection.Height / 2),
+            (Handle.BR, _selection.Right, _selection.Bottom),
+            (Handle.B, _selection.Left + _selection.Width / 2, _selection.Bottom),
+            (Handle.BL, _selection.Left, _selection.Bottom),
+            (Handle.L, _selection.Left, _selection.Top + _selection.Height / 2),
         };
 
-        foreach (var (handle, cx, cy) in positions)
+        foreach (var (h, cx, cy) in pts)
         {
-            var rect = new System.Windows.Shapes.Rectangle
+            var r = new System.Windows.Shapes.Rectangle
             {
                 Width = HandleSize, Height = HandleSize,
-                Fill = new SolidColorBrush(Colors.White),
+                Fill = Brushes.White,
                 Stroke = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
                 StrokeThickness = 1.5,
-                Tag = handle,
+                Tag = h,
             };
-
-            Canvas.SetLeft(rect, cx - HandleSize / 2);
-            Canvas.SetTop(rect, cy - HandleSize / 2);
-            HandleCanvas.Children.Add(rect);
+            Canvas.SetLeft(r, cx - HandleSize / 2);
+            Canvas.SetTop(r, cy - HandleSize / 2);
+            HandleCanvas.Children.Add(r);
         }
     }
 
-    private ResizeHandle HitTestHandle(Point pos)
+    private Handle HitTestHandle(Point pos)
     {
         foreach (UIElement child in HandleCanvas.Children)
         {
-            if (child is System.Windows.Shapes.Rectangle rect && rect.Tag is ResizeHandle handle)
+            if (child is System.Windows.Shapes.Rectangle r && r.Tag is Handle h)
             {
-                double x = Canvas.GetLeft(rect);
-                double y = Canvas.GetTop(rect);
-                var hitRect = new Rect(x - HandleHitMargin, y - HandleHitMargin,
-                    HandleSize + HandleHitMargin * 2, HandleSize + HandleHitMargin * 2);
-                if (hitRect.Contains(pos))
-                    return handle;
+                double x = Canvas.GetLeft(r);
+                double y = Canvas.GetTop(r);
+                if (new Rect(x - HitMargin, y - HitMargin, HandleSize + HitMargin * 2, HandleSize + HitMargin * 2).Contains(pos))
+                    return h;
             }
         }
-        return ResizeHandle.None;
+        return Handle.None;
     }
 
     private void ApplyResize(Point pos)
     {
-        var dx = pos.X - _resizeStart.X;
-        var dy = pos.Y - _resizeStart.Y;
-        var r = _resizeOriginal;
+        var dx = pos.X - _dragStart.X;
+        var dy = pos.Y - _dragStart.Y;
+        var r = _dragOrigSelection;
 
-        switch (_activeHandle)
+        _selection = _activeHandle switch
         {
-            case ResizeHandle.TopLeft:
-                _selection = new Rect(r.Left + dx, r.Top + dy, r.Width - dx, r.Height - dy); break;
-            case ResizeHandle.Top:
-                _selection = new Rect(r.Left, r.Top + dy, r.Width, r.Height - dy); break;
-            case ResizeHandle.TopRight:
-                _selection = new Rect(r.Left, r.Top + dy, r.Width + dx, r.Height - dy); break;
-            case ResizeHandle.Right:
-                _selection = new Rect(r.Left, r.Top, r.Width + dx, r.Height); break;
-            case ResizeHandle.BottomRight:
-                _selection = new Rect(r.Left, r.Top, r.Width + dx, r.Height + dy); break;
-            case ResizeHandle.Bottom:
-                _selection = new Rect(r.Left, r.Top, r.Width, r.Height + dy); break;
-            case ResizeHandle.BottomLeft:
-                _selection = new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height + dy); break;
-            case ResizeHandle.Left:
-                _selection = new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height); break;
-            case ResizeHandle.Move:
-                _selection = new Rect(r.Left + dx, r.Top + dy, r.Width, r.Height); break;
-        }
+            Handle.TL => new Rect(r.Left + dx, r.Top + dy, r.Width - dx, r.Height - dy),
+            Handle.T  => new Rect(r.Left, r.Top + dy, r.Width, r.Height - dy),
+            Handle.TR => new Rect(r.Left, r.Top + dy, r.Width + dx, r.Height - dy),
+            Handle.R  => new Rect(r.Left, r.Top, r.Width + dx, r.Height),
+            Handle.BR => new Rect(r.Left, r.Top, r.Width + dx, r.Height + dy),
+            Handle.B  => new Rect(r.Left, r.Top, r.Width, r.Height + dy),
+            Handle.BL => new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height + dy),
+            Handle.L  => new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height),
+            _ => _selection
+        };
 
-        // Normalize
+        // Enforce minimum
         if (_selection.Width < 10)
             _selection = new Rect(_selection.Left, _selection.Top, 10, _selection.Height);
         if (_selection.Height < 10)
             _selection = new Rect(_selection.Left, _selection.Top, _selection.Width, 10);
 
+        RefreshSelectionUI();
+    }
+
+    private void ApplyMove(Point pos)
+    {
+        var dx = pos.X - _dragStart.X;
+        var dy = pos.Y - _dragStart.Y;
+
+        var newSel = new Rect(
+            _dragOrigSelection.Left + dx, _dragOrigSelection.Top + dy,
+            _dragOrigSelection.Width, _dragOrigSelection.Height);
+
+        // Move all annotations by the delta
+        var moveDx = newSel.Left - _selection.Left;
+        var moveDy = newSel.Top - _selection.Top;
+
+        foreach (UIElement child in DrawingCanvas.Children)
+        {
+            if (child is Polyline pl)
+            {
+                var newPts = new PointCollection();
+                foreach (var p in pl.Points)
+                    newPts.Add(new Point(p.X + moveDx, p.Y + moveDy));
+                pl.Points = newPts;
+            }
+            else if (child is Line ln)
+            {
+                ln.X1 += moveDx; ln.Y1 += moveDy;
+                ln.X2 += moveDx; ln.Y2 += moveDy;
+            }
+            else
+            {
+                var cx = Canvas.GetLeft(child);
+                var cy = Canvas.GetTop(child);
+                if (!double.IsNaN(cx)) Canvas.SetLeft(child, cx + moveDx);
+                if (!double.IsNaN(cy)) Canvas.SetTop(child, cy + moveDy);
+            }
+        }
+
+        _selection = newSel;
+        RefreshSelectionUI();
+    }
+
+    private void RefreshSelectionUI()
+    {
         Canvas.SetLeft(SelectionBorder, _selection.Left);
         Canvas.SetTop(SelectionBorder, _selection.Top);
         SelectionBorder.Width = _selection.Width;
@@ -389,7 +441,6 @@ public partial class OverlayWindow : Window
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
-        // Drawing toolbar: right side of selection
         double dtLeft = _selection.Right + 8;
         double dtTop = _selection.Top;
         if (dtLeft + DrawingToolbar.DesiredSize.Width > ActualWidth)
@@ -400,7 +451,6 @@ public partial class OverlayWindow : Window
         Canvas.SetLeft(DrawingToolbar, dtLeft);
         Canvas.SetTop(DrawingToolbar, dtTop);
 
-        // Action toolbar: below selection
         double atLeft = _selection.Left;
         double atTop = _selection.Bottom + 8;
         if (atTop + ActionToolbar.DesiredSize.Height > ActualHeight)
@@ -417,44 +467,16 @@ public partial class OverlayWindow : Window
 
     // ============ DRAWING ============
 
-    private void EnterDrawingMode()
-    {
-        _mode = Mode.Drawing;
-        // Hide resize handles so they don't interfere with drawing
-        HandleCanvas.Visibility = Visibility.Collapsed;
-    }
-
-    private void ExitDrawingMode()
-    {
-        _mode = Mode.Selected;
-        _currentTool = null;
-        _isDrawingStroke = false;
-        DrawingCanvas.Cursor = Cursors.Cross;
-        HandleCanvas.Visibility = Visibility.Visible;
-        ShowResizeHandles();
-
-        // Reset tool button highlights
-        foreach (var child in DrawingToolsPanel.Children)
-            if (child is Button b && b.Content is Border border)
-                border.Background = new SolidColorBrush(Colors.Transparent);
-    }
-
     private void Tool_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not string toolName) return;
-
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
 
-        // Reset all button backgrounds
+        // Reset highlights
         foreach (var child in DrawingToolsPanel.Children)
-        {
-            if (child is Button b && b.Content is Border border)
-                border.Background = new SolidColorBrush(Colors.Transparent);
-        }
+            if (child is Button b) b.Background = Brushes.Transparent;
 
-        // Highlight selected tool
-        if (btn.Content is Border selectedBorder)
-            selectedBorder.Background = new SolidColorBrush(Color.FromArgb(60, 33, 150, 243));
+        btn.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243));
 
         _currentTool = toolName switch
         {
@@ -466,6 +488,8 @@ public partial class OverlayWindow : Window
             "Text" => new TextTool { FontSize = Math.Max(12, _currentThickness * 8) },
             "Marker" => new MarkerTool(),
             "Blur" => new BlurTool { ScreenshotSource = _screenshot },
+            "Check" => new StampTool(StampType.Check),
+            "CrossMark" => new StampTool(StampType.Cross),
             _ => null
         };
 
@@ -474,26 +498,32 @@ public partial class OverlayWindow : Window
             _currentTool.StrokeColor = _currentColor;
             _currentTool.Thickness = _currentThickness;
             DrawingCanvas.Cursor = _currentTool.Cursor;
-            EnterDrawingMode();
         }
 
         Focus();
     }
 
+    private void DeselectTool()
+    {
+        _currentTool = null;
+        DrawingCanvas.Cursor = Cursors.Cross;
+        foreach (var child in DrawingToolsPanel.Children)
+            if (child is Button b) b.Background = Brushes.Transparent;
+    }
+
     private void Eraser_Click(object sender, RoutedEventArgs e)
     {
-        // Erase last drawn annotation (same as undo)
         PerformUndo();
         Focus();
     }
 
     private void Drawing_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_mode != Mode.Drawing || _currentTool == null) return;
+        if (_currentTool == null || !_hasSelection) return;
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
 
-        _isDrawingStroke = true;
+        _interaction = Interaction.Drawing;
         _currentTool.OnMouseDown(pos, DrawingCanvas);
         DrawingCanvas.CaptureMouse();
         e.Handled = true;
@@ -501,21 +531,19 @@ public partial class OverlayWindow : Window
 
     private void Drawing_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_mode != Mode.Drawing || _currentTool == null || !_isDrawingStroke) return;
+        if (_interaction != Interaction.Drawing || _currentTool == null) return;
         if (e.LeftButton != MouseButtonState.Pressed) return;
 
-        var pos = e.GetPosition(DrawingCanvas);
-        _currentTool.OnMouseMove(pos, DrawingCanvas);
+        _currentTool.OnMouseMove(e.GetPosition(DrawingCanvas), DrawingCanvas);
         e.Handled = true;
     }
 
     private void Drawing_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_mode != Mode.Drawing || _currentTool == null || !_isDrawingStroke) return;
-        _isDrawingStroke = false;
+        if (_interaction != Interaction.Drawing || _currentTool == null) return;
+        _interaction = Interaction.None;
 
-        var pos = e.GetPosition(DrawingCanvas);
-        _currentTool.OnMouseUp(pos, DrawingCanvas);
+        _currentTool.OnMouseUp(e.GetPosition(DrawingCanvas), DrawingCanvas);
         DrawingCanvas.ReleaseMouseCapture();
 
         if (_currentTool.CurrentAction?.RenderedElement != null)
@@ -534,9 +562,8 @@ public partial class OverlayWindow : Window
             ColorPaletteCanvas.Visibility = Visibility.Collapsed;
             return;
         }
-
         var btnPos = BtnColor.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ColorPalette, btnPos.X + 44);
+        Canvas.SetLeft(ColorPalette, btnPos.X + 40);
         Canvas.SetTop(ColorPalette, btnPos.Y);
         ColorPaletteCanvas.Visibility = Visibility.Visible;
     }
@@ -552,9 +579,6 @@ public partial class OverlayWindow : Window
         _currentThickness = Math.Max(1, _currentThickness - 1);
         if (_currentTool != null) _currentTool.Thickness = _currentThickness;
     }
-
-    private void Undo_Click(object sender, RoutedEventArgs e) => PerformUndo();
-    private void Redo_Click(object sender, RoutedEventArgs e) => PerformRedo();
 
     private void PerformUndo()
     {
@@ -587,32 +611,29 @@ public partial class OverlayWindow : Window
         var cropRect = new Int32Rect(
             (int)_selection.X, (int)_selection.Y,
             (int)_selection.Width, (int)_selection.Height);
-
         var cropped = ScreenCapture.CropBitmap(_screenshot, cropRect);
 
         if (DrawingCanvas.Children.Count == 0)
             return cropped;
 
-        var dpi = 96.0;
         var width = (int)_selection.Width;
         var height = (int)_selection.Height;
 
-        var drawingVisual = new DrawingVisual();
-        using (var dc = drawingVisual.RenderOpen())
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
         {
             dc.DrawImage(cropped, new Rect(0, 0, width, height));
-
-            var canvasBrush = new VisualBrush(DrawingCanvas)
+            var brush = new VisualBrush(DrawingCanvas)
             {
                 ViewboxUnits = BrushMappingMode.Absolute,
                 Viewbox = _selection,
                 Stretch = Stretch.None
             };
-            dc.DrawRectangle(canvasBrush, null, new Rect(0, 0, width, height));
+            dc.DrawRectangle(brush, null, new Rect(0, 0, width, height));
         }
 
-        var rtb = new RenderTargetBitmap(width, height, dpi, dpi, PixelFormats.Pbgra32);
-        rtb.Render(drawingVisual);
+        var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(dv);
         rtb.Freeze();
         return rtb;
     }
@@ -629,16 +650,12 @@ public partial class OverlayWindow : Window
             InitialDirectory = settings.LastSaveDirectory,
             FileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss}"
         };
-
         dialog.FilterIndex = settings.DefaultSaveFormat.ToUpper() switch
         {
-            "JPG" or "JPEG" => 2,
-            "BMP" => 3,
-            _ => 1
+            "JPG" or "JPEG" => 2, "BMP" => 3, _ => 1
         };
 
         Hide();
-
         if (dialog.ShowDialog() == true)
         {
             BitmapEncoder encoder = System.IO.Path.GetExtension(dialog.FileName).ToLower() switch
@@ -647,74 +664,56 @@ public partial class OverlayWindow : Window
                 ".bmp" => new BmpBitmapEncoder(),
                 _ => new PngBitmapEncoder()
             };
-
             encoder.Frames.Add(BitmapFrame.Create(image));
             using var fs = File.Create(dialog.FileName);
             encoder.Save(fs);
 
             settings.LastSaveDirectory = System.IO.Path.GetDirectoryName(dialog.FileName) ?? settings.LastSaveDirectory;
             AppSettings.Save();
-
             HistoryManager.AddRecord(image, dialog.FileName);
         }
-
         Close();
     }
 
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
-        var image = RenderFinalImage();
-        Clipboard.SetImage(image as BitmapSource ?? new BitmapImage());
+        Clipboard.SetImage(RenderFinalImage());
         Close();
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
     {
         var image = RenderFinalImage();
-
-        var printDialog = new PrintDialog();
-        if (printDialog.ShowDialog() == true)
+        var pd = new PrintDialog();
+        if (pd.ShowDialog() == true)
         {
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
-            {
-                dc.DrawImage(image, new Rect(0, 0,
-                    printDialog.PrintableAreaWidth, printDialog.PrintableAreaHeight));
-            }
-            printDialog.PrintVisual(visual, "Llamashot Screenshot");
+            var v = new DrawingVisual();
+            using (var dc = v.RenderOpen())
+                dc.DrawImage(image, new Rect(0, 0, pd.PrintableAreaWidth, pd.PrintableAreaHeight));
+            pd.PrintVisual(v, "Llamashot Screenshot");
         }
-
         Close();
     }
 
     private void Pin_Click(object sender, RoutedEventArgs e)
     {
         var image = RenderFinalImage();
-        var pinWindow = new PinWindow(image, _selection);
-        pinWindow.Show();
+        new PinWindow(image, _selection).Show();
         Close();
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     // ============ KEYBOARD ============
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        // ESC always closes (first press exits drawing mode, second closes)
         if (e.Key == Key.Escape)
         {
-            if (_mode == Mode.Drawing)
-            {
-                ExitDrawingMode();
-            }
+            if (_currentTool != null)
+                DeselectTool();
             else
-            {
                 Close();
-            }
             e.Handled = true;
             return;
         }
@@ -722,57 +721,32 @@ public partial class OverlayWindow : Window
         switch (e.Key)
         {
             case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
-                if (_mode == Mode.Selected || _mode == Mode.Drawing)
-                    Save_Click(this, new RoutedEventArgs());
-                e.Handled = true;
-                break;
-
+                if (_hasSelection) Save_Click(this, new RoutedEventArgs());
+                e.Handled = true; break;
             case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
-                if (_mode == Mode.Selected || _mode == Mode.Drawing)
-                    Copy_Click(this, new RoutedEventArgs());
-                e.Handled = true;
-                break;
-
+                if (_hasSelection) Copy_Click(this, new RoutedEventArgs());
+                e.Handled = true; break;
             case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
-                PerformUndo();
-                e.Handled = true;
-                break;
-
+                PerformUndo(); e.Handled = true; break;
             case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
-                PerformRedo();
-                e.Handled = true;
-                break;
+                PerformRedo(); e.Handled = true; break;
 
-            // Tool shortcuts
-            case Key.P when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Pen"); e.Handled = true; break;
-            case Key.L when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Line"); e.Handled = true; break;
-            case Key.A when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Arrow"); e.Handled = true; break;
-            case Key.R when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Rectangle"); e.Handled = true; break;
-            case Key.E when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Ellipse"); e.Handled = true; break;
-            case Key.T when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Text"); e.Handled = true; break;
-            case Key.M when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Marker"); e.Handled = true; break;
-            case Key.B when Keyboard.Modifiers == ModifierKeys.None:
-                SelectToolByTag("Blur"); e.Handled = true; break;
-            case Key.X when Keyboard.Modifiers == ModifierKeys.None:
-                Eraser_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            case Key.P when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Pen"); break;
+            case Key.L when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Line"); break;
+            case Key.A when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Arrow"); break;
+            case Key.R when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Rectangle"); break;
+            case Key.E when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Ellipse"); break;
+            case Key.T when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Text"); break;
+            case Key.M when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Marker"); break;
+            case Key.B when Keyboard.Modifiers == ModifierKeys.None: SelectToolByTag("Blur"); break;
+            case Key.X when Keyboard.Modifiers == ModifierKeys.None: Eraser_Click(this, new RoutedEventArgs()); break;
 
             case Key.OemPlus when Keyboard.Modifiers == ModifierKeys.Control:
             case Key.Add when Keyboard.Modifiers == ModifierKeys.Control:
-                ThicknessUp_Click(this, new RoutedEventArgs());
-                e.Handled = true;
-                break;
+                ThicknessUp_Click(this, new RoutedEventArgs()); e.Handled = true; break;
             case Key.OemMinus when Keyboard.Modifiers == ModifierKeys.Control:
             case Key.Subtract when Keyboard.Modifiers == ModifierKeys.Control:
-                ThicknessDown_Click(this, new RoutedEventArgs());
-                e.Handled = true;
-                break;
+                ThicknessDown_Click(this, new RoutedEventArgs()); e.Handled = true; break;
         }
     }
 
@@ -780,25 +754,17 @@ public partial class OverlayWindow : Window
     {
         if (_currentTool != null)
         {
-            if (e.Delta > 0)
-                ThicknessUp_Click(this, new RoutedEventArgs());
-            else
-                ThicknessDown_Click(this, new RoutedEventArgs());
+            if (e.Delta > 0) ThicknessUp_Click(this, new RoutedEventArgs());
+            else ThicknessDown_Click(this, new RoutedEventArgs());
         }
     }
 
     private void SelectToolByTag(string tag)
     {
-        if (_mode != Mode.Selected && _mode != Mode.Drawing) return;
-
+        if (!_hasSelection) return;
         foreach (var child in DrawingToolsPanel.Children)
-        {
             if (child is Button btn && btn.Tag is string t && t == tag)
-            {
-                Tool_Click(btn, new RoutedEventArgs());
-                return;
-            }
-        }
+            { Tool_Click(btn, new RoutedEventArgs()); return; }
     }
 
     protected override void OnClosed(EventArgs e)
