@@ -1,13 +1,13 @@
 [Setup]
 AppName=Llamashot
-AppVersion=2.5.0
-AppVerName=Llamashot 2.5.0
+AppVersion=2.5.1
+AppVerName=Llamashot 2.5.1
 AppPublisher=Santosh Kumar
 AppPublisherURL=https://github.com/user/llamashot
 DefaultDirName={autopf}\Llamashot
 DefaultGroupName=Llamashot
 OutputDir=dist
-OutputBaseFilename=LlamashotSetup_v2.5.0
+OutputBaseFilename=LlamashotSetup_v2.5.1
 SetupIconFile=assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

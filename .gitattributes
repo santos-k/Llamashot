@@ -1,3 +1,4 @@
 LlamashotSetup.exe filter=lfs diff=lfs merge=lfs -text
 Llamashot.exe filter=lfs diff=lfs merge=lfs -text
 LlamashotSetup_v2.5.0.exe filter=lfs diff=lfs merge=lfs -text
+LlamashotSetup_v2.5.1.exe filter=lfs diff=lfs merge=lfs -text
