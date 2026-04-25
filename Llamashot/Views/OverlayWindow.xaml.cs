@@ -521,11 +521,11 @@ public partial class OverlayWindow : Window
 
         double dtTop = _selection.Top;
 
-        // Prefer LEFT side of selection, fallback to right
-        double dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 8;
-        if (dtLeft < 4)
-            dtLeft = _selection.Right + 8;
+        // Prefer RIGHT side of selection, fallback to left
+        double dtLeft = _selection.Right + 8;
         if (dtLeft + DrawingToolbar.DesiredSize.Width > ActualWidth)
+            dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 8;
+        if (dtLeft < 4)
             dtLeft = 4;
 
         // Clamp to screen bounds
@@ -536,8 +536,9 @@ public partial class OverlayWindow : Window
         Canvas.SetLeft(DrawingToolbar, dtLeft);
         Canvas.SetTop(DrawingToolbar, dtTop);
 
-        double atLeft = _selection.Left;
+        double atLeft = _selection.Right - ActionToolbar.DesiredSize.Width;
         double atTop = _selection.Bottom + 8;
+        if (atLeft < 4) atLeft = _selection.Left;
         if (atTop + ActionToolbar.DesiredSize.Height > ActualHeight)
             atTop = _selection.Top - ActionToolbar.DesiredSize.Height - 8;
 
