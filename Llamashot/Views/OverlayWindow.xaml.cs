@@ -908,19 +908,32 @@ public partial class OverlayWindow : Window
         Focus();
     }
 
+    private double GetDpiScale()
+    {
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget != null)
+            return source.CompositionTarget.TransformToDevice.M11;
+        return 1.0;
+    }
+
     private async void PerformOcr(Rect ocrRegion)
     {
         if (_screenshot == null) return;
 
-        // Clamp to screen bounds
-        var region = new Int32Rect(
-            Math.Max(0, (int)ocrRegion.X),
-            Math.Max(0, (int)ocrRegion.Y),
-            Math.Min((int)ocrRegion.Width, _screenshot.PixelWidth - (int)ocrRegion.X),
-            Math.Min((int)ocrRegion.Height, _screenshot.PixelHeight - (int)ocrRegion.Y));
+        // Scale WPF DIPs to physical pixels (handles DPI scaling)
+        double dpi = GetDpiScale();
+        int x = Math.Max(0, (int)(ocrRegion.X * dpi));
+        int y = Math.Max(0, (int)(ocrRegion.Y * dpi));
+        int w = (int)(ocrRegion.Width * dpi);
+        int h = (int)(ocrRegion.Height * dpi);
 
-        if (region.Width < 5 || region.Height < 5) return;
+        // Clamp to screenshot bounds
+        w = Math.Min(w, _screenshot.PixelWidth - x);
+        h = Math.Min(h, _screenshot.PixelHeight - y);
 
+        if (w < 5 || h < 5) return;
+
+        var region = new Int32Rect(x, y, w, h);
         var cropped = ScreenCapture.CropBitmap(_screenshot, region);
 
         try
