@@ -518,12 +518,14 @@ public partial class OverlayWindow : Window
         DrawingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         ActionToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
-        double dtLeft = _selection.Right + 8;
         double dtTop = _selection.Top;
 
-        // If toolbar goes off right edge, put it on the left
+        // Prefer LEFT side of selection, fallback to right
+        double dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 8;
+        if (dtLeft < 4)
+            dtLeft = _selection.Right + 8;
         if (dtLeft + DrawingToolbar.DesiredSize.Width > ActualWidth)
-            dtLeft = _selection.Left - DrawingToolbar.DesiredSize.Width - 8;
+            dtLeft = 4;
 
         // Clamp to screen bounds
         if (dtTop + DrawingToolbar.DesiredSize.Height > ActualHeight - 4)

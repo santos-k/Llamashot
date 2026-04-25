@@ -89,7 +89,12 @@ public partial class App : Application
         menu.Items.Add("Exit", null, (s, e) => ExitApp());
 
         _trayIcon.ContextMenuStrip = menu;
-        _trayIcon.DoubleClick += (s, e) => StartRegionCapture();
+        _trayIcon.MouseClick += (s, e) =>
+        {
+            if (e.Button == WinForms.MouseButtons.Left)
+                StartRegionCapture();
+        };
+        _trayIcon.DoubleClick += (s, e) => ShowSettings();
     }
 
     private System.Drawing.Icon CreateDefaultIcon()
