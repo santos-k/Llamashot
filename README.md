@@ -2,7 +2,7 @@
 
 A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text with a single hotkey.
 
-**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup.exe)**
+**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.6.0.exe)**
 
 Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
@@ -15,6 +15,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Delayed capture** - 1/3/5/10 second countdown timer
 - **Multi-monitor support** - Captures across all connected displays
 - **DPI aware** - PerMonitorV2 for crisp rendering on high-DPI screens
+- **Double-click toggle** - Double-click selection to expand to full screen, again to revert
 
 ### Annotation Tools
 - **Pencil (P)** - Freehand drawing
@@ -27,10 +28,15 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Blur (B)** - Pixelate/blur sensitive areas
 - **Check stamp (K)** - Green checkmark with circle (for reviews)
 - **Cross stamp (D)** - Red X with circle (for reviews)
+- **Object eraser (G)** - Click any annotation to remove it entirely (undoable)
+- **Custom cursors** - Each tool shows a matching cursor icon
 
 ### Screen Recording
 - Record any selected region as MP4 video
-- Max 2 minutes duration, 10fps
+- **Unlimited duration**, 10fps
+- **Audio recording** - Microphone + system audio (loopback)
+- Toggle audio on/off during recording with mic button
+- Audio source status shown on recording bar (Mic / System / both)
 - Pause/resume with visual indicators
 - Red pulsing border shows recorded area
 - Recording toolbar excluded from capture
@@ -45,6 +51,9 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 ### Screenshot History
 - Thumbnails for all saved and copied screenshots
 - Type badges: green "Saved", blue "Copied"
+- **Multi-select** with checkboxes and "Select All"
+- **Bulk copy** - Single image as clipboard, multiple as file drop list
+- **Delete** - Single or bulk delete with confirmation
 - One-click re-copy from history
 - Configurable storage location and max items
 
@@ -62,11 +71,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Thickness control (W)** - Dropdown 1-10 with visual preview
 - **Color picker (C)** - 24-color palette
 - **Adaptive toolbar** - Auto-switches between 1 and 2 columns based on screen height
-- **21 configurable shortcuts** - Every tool and action has a keyboard shortcut
+- **22 configurable shortcuts** - Every tool and action has a keyboard shortcut
 
 ## Keyboard Shortcuts
 
-All 21 shortcuts are customizable in Settings.
+All 22 shortcuts are customizable in Settings.
 
 ### Global Hotkeys
 
@@ -94,6 +103,7 @@ All 21 shortcuts are customizable in Settings.
 | Blur | B |
 | Check stamp | K |
 | Cross stamp | D |
+| Object eraser | G |
 | Undo last | X |
 | Move | V |
 | Color picker | C |
@@ -103,12 +113,13 @@ All 21 shortcuts are customizable in Settings.
 | OCR | O |
 | Pin | F |
 | Pan (temporary) | Space+drag |
+| Double-click | Toggle full region |
 | Close overlay | Escape |
 
 ## Installation
 
 ### Installer
-Download and run `LlamashotSetup.exe` from the [Releases](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup.exe) page.
+Download and run `LlamashotSetup_v2.6.0.exe` from the [Releases](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.6.0.exe) page.
 
 ### Build from Source
 ```bash
@@ -123,6 +134,7 @@ dotnet run
 - **Framework**: .NET 10, WPF
 - **Screen capture**: GDI BitBlt via P/Invoke
 - **Video encoding**: WinRT MediaComposition (JPEG frames to MP4)
+- **Audio capture**: WinRT AudioGraph (microphone + system loopback)
 - **OCR**: Windows.Media.Ocr (built-in, offline)
 - **Settings**: JSON file in AppData/Roaming
 - **Installer**: Inno Setup 6
