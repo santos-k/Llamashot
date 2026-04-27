@@ -55,6 +55,9 @@ public class AppSettings
     public string DefaultColor { get; set; } = "#FF0000";
     public int DefaultThickness { get; set; } = 3;
 
+    // Recording
+    public bool RecordAudio { get; set; } = false;
+
     // History
     public bool SaveHistory { get; set; } = true;
     public string HistoryDirectory { get; set; } = Path.Combine(

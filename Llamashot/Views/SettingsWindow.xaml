@@ -165,6 +165,16 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Recording -->
+                <TextBlock Text="Recording" Style="{StaticResource SectionTitle}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <CheckBox x:Name="ChkRecordAudio" Content="Enable audio recording (microphone)" />
+                        <TextBlock Text="When enabled, microphone audio is captured with video. Can also be toggled during recording."
+                                   Foreground="#666" FontSize="11" Margin="20,4,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <!-- History -->
                 <TextBlock Text="History" Style="{StaticResource SectionTitle}" />
                 <Border Style="{StaticResource Card}">

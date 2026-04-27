@@ -163,6 +163,7 @@ public partial class SettingsWindow : Window
             TxtJpegQuality.Text = ((int)e.NewValue).ToString();
 
         TxtSaveDir.Text = s.LastSaveDirectory;
+        ChkRecordAudio.IsChecked = s.RecordAudio;
         ChkSaveHistory.IsChecked = s.SaveHistory;
         TxtHistoryDir.Text = s.HistoryDirectory;
         TxtMaxHistory.Text = s.MaxHistoryItems.ToString();
@@ -348,6 +349,7 @@ public partial class SettingsWindow : Window
         s.JpegQuality = (int)SldJpegQuality.Value;
         s.LastSaveDirectory = TxtSaveDir.Text;
 
+        s.RecordAudio = ChkRecordAudio.IsChecked ?? false;
         s.SaveHistory = ChkSaveHistory.IsChecked ?? true;
         s.HistoryDirectory = TxtHistoryDir.Text;
         if (int.TryParse(TxtMaxHistory.Text, out int max) && max > 0)
