@@ -33,6 +33,10 @@ public partial class OverlayWindow : Window
     // Pan (Space + drag, like Photoshop)
     private bool _spaceHeld;
 
+    // Full-region toggle (double-click)
+    private Rect _originalSelection;
+    private bool _isFullRegion;
+
     // OCR sub-selection
     private bool _ocrMode;
     private Point _ocrStart;
@@ -227,6 +231,7 @@ public partial class OverlayWindow : Window
             _undoStack.Clear();
             _redoStack.Clear();
             _hasSelection = false;
+            _isFullRegion = false;
             _currentTool = null;
         }
 
@@ -490,6 +495,24 @@ public partial class OverlayWindow : Window
         UpdateToolbarPositions();
     }
 
+    // ============ FULL-REGION TOGGLE ============
+
+    private void ToggleFullRegion()
+    {
+        if (_isFullRegion)
+        {
+            _selection = _originalSelection;
+            _isFullRegion = false;
+        }
+        else
+        {
+            _originalSelection = _selection;
+            _selection = new Rect(0, 0, ActualWidth, ActualHeight);
+            _isFullRegion = true;
+        }
+        RefreshSelectionUI();
+    }
+
     // ============ TOOLBARS ============
 
     private void ShowToolbars()
@@ -651,6 +674,14 @@ public partial class OverlayWindow : Window
         if (!_hasSelection) return;
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
+
+        // Double-click: toggle between full region and original selection
+        if (e.ClickCount == 2)
+        {
+            ToggleFullRegion();
+            e.Handled = true;
+            return;
+        }
 
         // OCR sub-selection mode
         if (_ocrMode)
