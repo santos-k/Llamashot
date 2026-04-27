@@ -1,7 +1,7 @@
 [Setup]
 AppName=Llamashot
-AppVersion=2.5.0
-AppVerName=Llamashot 2.5.0
+AppVersion=2.6.0
+AppVerName=Llamashot 2.6.0
 AppPublisher=Santosh Kumar
 AppPublisherURL=https://github.com/user/llamashot
 DefaultDirName={autopf}\Llamashot
