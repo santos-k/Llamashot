@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Llamashot.Core;
 using Llamashot.Models;
 
 namespace Llamashot.Tools;
@@ -10,6 +11,7 @@ namespace Llamashot.Tools;
 public class LineTool : BaseDrawingTool
 {
     public override DrawingToolType ToolType => DrawingToolType.Line;
+    public override Cursor Cursor => CursorHelper.Get("Line");
     private Line? _line;
 
     public override void OnMouseDown(Point position, Canvas canvas)

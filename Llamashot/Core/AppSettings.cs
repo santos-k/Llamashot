@@ -30,6 +30,7 @@ public class AppSettings
     public string ShortcutMarker { get; set; } = "M";
     public string ShortcutBlur { get; set; } = "B";
     public string ShortcutEraser { get; set; } = "X";
+    public string ShortcutObjectEraser { get; set; } = "G";
     public string ShortcutMove { get; set; } = "V";
     public string ShortcutCheck { get; set; } = "K";
     public string ShortcutCross { get; set; } = "D";

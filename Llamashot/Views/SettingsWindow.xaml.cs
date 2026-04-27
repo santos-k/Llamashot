@@ -30,6 +30,7 @@ public partial class SettingsWindow : Window
         ("ShortcutMarker", "Marker", "M"),
         ("ShortcutBlur", "Blur", "B"),
         ("ShortcutEraser", "Undo last", "X"),
+        ("ShortcutObjectEraser", "Eraser", "G"),
         ("ShortcutMove", "Move", "V"),
         ("ShortcutCheck", "Check mark", "K"),
         ("ShortcutCross", "Cross mark", "D"),
@@ -141,6 +142,7 @@ public partial class SettingsWindow : Window
         _toolShortcutBoxes["ShortcutMarker"].Text = s.ShortcutMarker;
         _toolShortcutBoxes["ShortcutBlur"].Text = s.ShortcutBlur;
         _toolShortcutBoxes["ShortcutEraser"].Text = s.ShortcutEraser;
+        _toolShortcutBoxes["ShortcutObjectEraser"].Text = s.ShortcutObjectEraser;
         _toolShortcutBoxes["ShortcutMove"].Text = s.ShortcutMove;
         _toolShortcutBoxes["ShortcutCheck"].Text = s.ShortcutCheck;
         _toolShortcutBoxes["ShortcutCross"].Text = s.ShortcutCross;
@@ -335,6 +337,7 @@ public partial class SettingsWindow : Window
         s.ShortcutMarker = _toolShortcutBoxes["ShortcutMarker"].Text;
         s.ShortcutBlur = _toolShortcutBoxes["ShortcutBlur"].Text;
         s.ShortcutEraser = _toolShortcutBoxes["ShortcutEraser"].Text;
+        s.ShortcutObjectEraser = _toolShortcutBoxes["ShortcutObjectEraser"].Text;
         s.ShortcutMove = _toolShortcutBoxes["ShortcutMove"].Text;
         s.ShortcutCheck = _toolShortcutBoxes["ShortcutCheck"].Text;
         s.ShortcutCross = _toolShortcutBoxes["ShortcutCross"].Text;

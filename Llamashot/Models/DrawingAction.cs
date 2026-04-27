@@ -28,4 +28,5 @@ public class DrawingAction
     public string? Text { get; set; }
     public double FontSize { get; set; } = 16;
     public UIElement? RenderedElement { get; set; }
+    public UIElement? ErasedElement { get; set; }  // For eraser: the element that was removed
 }
