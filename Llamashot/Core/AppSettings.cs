@@ -56,6 +56,9 @@ public class AppSettings
     public string DefaultColor { get; set; } = "#FF0000";
     public int DefaultThickness { get; set; } = 3;
 
+    // Updates
+    public bool AutoCheckUpdates { get; set; } = true;
+
     // Recording
     public bool RecordAudio { get; set; } = false;
 

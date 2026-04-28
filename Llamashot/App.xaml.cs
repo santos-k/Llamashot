@@ -21,6 +21,23 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Global exception handler - log to file, never show modal dialogs
+        // (modal MessageBox behind a fullscreen overlay = system deadlock)
+        DispatcherUnhandledException += (s, ex) =>
+        {
+            try
+            {
+                var logDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Llamashot");
+                Directory.CreateDirectory(logDir);
+                var logPath = Path.Combine(logDir, "crash.log");
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex.Exception.Message}\n{ex.Exception.StackTrace}\n\n");
+            }
+            catch { }
+            ex.Handled = true;
+        };
+
         // Single instance check
         _mutex = new Mutex(true, "LlamashotAppMutex", out bool isNew);
         if (!isNew)
@@ -30,28 +47,41 @@ public partial class App : Application
             return;
         }
 
-        // Load settings
-        AppSettings.Load();
-        HistoryManager.Load();
-
-        // Create hidden window for hotkey handling
-        _hiddenWindow = new Window
+        try
         {
-            Width = 0, Height = 0,
-            WindowStyle = WindowStyle.None,
-            ShowInTaskbar = false,
-            ShowActivated = false,
-            Visibility = Visibility.Hidden
-        };
-        _hiddenWindow.Show();
-        _hiddenWindow.Hide();
+            // Load settings
+            AppSettings.Load();
+            HistoryManager.Load();
 
-        // Register hotkeys
-        _hotkeyManager = new HotkeyManager(_hiddenWindow);
-        RegisterHotkeys();
+            // Create hidden window for hotkey handling
+            _hiddenWindow = new Window
+            {
+                Width = 0, Height = 0,
+                WindowStyle = WindowStyle.None,
+                ShowInTaskbar = false,
+                ShowActivated = false,
+                Visibility = Visibility.Hidden
+            };
+            _hiddenWindow.Show();
+            _hiddenWindow.Hide();
 
-        // System tray
-        SetupTrayIcon();
+            // Register hotkeys
+            _hotkeyManager = new HotkeyManager(_hiddenWindow);
+            RegisterHotkeys();
+
+            // System tray
+            SetupTrayIcon();
+
+            // Check for updates in background
+            if (AppSettings.Instance.AutoCheckUpdates)
+                _ = CheckForUpdatesAsync(silent: true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Llamashot failed to start:\n\n{ex.Message}",
+                "Llamashot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
     }
 
     private void RegisterHotkeys()
@@ -76,7 +106,7 @@ public partial class App : Application
         _trayIcon = new WinForms.NotifyIcon
         {
             Icon = CreateDefaultIcon(),
-            Text = "Llamashot - Press PrintScreen to capture",
+            Text = $"Llamashot - Press {AppSettings.Instance.CaptureHotkey} to capture",
             Visible = true
         };
 
@@ -88,6 +118,7 @@ public partial class App : Application
         menu.Items.Add("-");
         menu.Items.Add("History", null, (s, e) => ShowHistory());
         menu.Items.Add("Settings", null, (s, e) => ShowSettings());
+        menu.Items.Add("Check for Updates", null, (s, e) => _ = CheckForUpdatesAsync(silent: false));
         menu.Items.Add("About", null, (s, e) => ShowAbout());
         menu.Items.Add("-");
         menu.Items.Add("Exit", null, (s, e) => ExitApp());
@@ -98,26 +129,100 @@ public partial class App : Application
             if (e.Button == WinForms.MouseButtons.Left)
                 StartRegionCapture();
         };
-        _trayIcon.DoubleClick += (s, e) => ShowSettings();
     }
 
     private System.Drawing.Icon CreateDefaultIcon()
     {
-        var bmp = new System.Drawing.Bitmap(32, 32);
-        using var g = System.Drawing.Graphics.FromImage(bmp);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        try
+        {
+            var uri = new Uri("pack://application:,,,/Resources/icon32.png", UriKind.Absolute);
+            var sri = GetResourceStream(uri);
+            if (sri != null)
+            {
+                using var bmp = new System.Drawing.Bitmap(sri.Stream);
+                var handle = bmp.GetHicon();
+                return System.Drawing.Icon.FromHandle(handle);
+            }
+        }
+        catch { }
 
+        // Fallback: simple generated icon
+        var fallback = new System.Drawing.Bitmap(32, 32);
+        using var g = System.Drawing.Graphics.FromImage(fallback);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(33, 150, 243));
         g.FillEllipse(bgBrush, 2, 2, 28, 28);
+        var h = fallback.GetHicon();
+        return System.Drawing.Icon.FromHandle(h);
+    }
 
-        using var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f);
-        g.DrawRectangle(pen, 8, 10, 16, 12);
-        g.DrawLine(pen, 16, 7, 16, 10);
-        g.DrawLine(pen, 14, 8, 18, 8);
-        g.DrawEllipse(pen, 12, 13, 8, 6);
+    private async Task CheckForUpdatesAsync(bool silent)
+    {
+        try
+        {
+            var result = await UpdateChecker.CheckForUpdateAsync();
+            if (result != null)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _trayIcon?.ShowBalloonTip(5000, "Llamashot Update Available",
+                        $"Version {result.Version} is available. Right-click tray icon > Check for Updates to download.",
+                        WinForms.ToolTipIcon.Info);
 
-        var handle = bmp.GetHicon();
-        return System.Drawing.Icon.FromHandle(handle);
+                    _trayIcon!.BalloonTipClicked += (s, e) => _ = DownloadAndInstallUpdateAsync(result);
+                });
+            }
+            else if (!silent)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show("You're running the latest version of Llamashot.",
+                        "Llamashot", MessageBoxButton.OK, MessageBoxImage.Information);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!silent)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show($"Failed to check for updates:\n{ex.Message}",
+                        "Llamashot", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+            }
+        }
+    }
+
+    private async Task DownloadAndInstallUpdateAsync(UpdateChecker.UpdateInfo update)
+    {
+        try
+        {
+            _trayIcon?.ShowBalloonTip(3000, "Llamashot", "Downloading update...", WinForms.ToolTipIcon.Info);
+
+            var installerPath = await UpdateChecker.DownloadUpdateAsync(update);
+            if (installerPath != null)
+            {
+                var result = MessageBox.Show(
+                    $"Llamashot {update.Version} has been downloaded.\n\nInstall now? The application will close.",
+                    "Llamashot Update", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = installerPath,
+                        UseShellExecute = true
+                    });
+                    ExitApp();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to download update:\n{ex.Message}",
+                "Llamashot", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void StartRegionCapture()
@@ -133,10 +238,8 @@ public partial class App : Application
     {
         Dispatcher.Invoke(() =>
         {
-            // Use a simple fullscreen region selection for recording
             var overlay = new OverlayWindow();
             overlay.StartCapture();
-            // The overlay's Record button handles the rest
         });
     }
 
@@ -213,6 +316,10 @@ public partial class App : Application
                 _hotkeyManager?.Dispose();
                 _hotkeyManager = new HotkeyManager(_hiddenWindow!);
                 RegisterHotkeys();
+
+                // Update tray tooltip with current hotkey
+                if (_trayIcon != null)
+                    _trayIcon.Text = $"Llamashot - Press {AppSettings.Instance.CaptureHotkey} to capture";
             }
         });
     }

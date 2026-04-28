@@ -123,6 +123,7 @@ public partial class SettingsWindow : Window
         ChkCaptureCursor.IsChecked = s.CaptureCursor;
         ChkShowNotifications.IsChecked = s.ShowNotifications;
         ChkMinimizeToTray.IsChecked = s.MinimizeToTray;
+        ChkAutoCheckUpdates.IsChecked = s.AutoCheckUpdates;
 
         TxtCaptureHotkey.Text = s.CaptureHotkey;
         TxtFullscreenSaveHotkey.Text = s.FullscreenSaveHotkey;
@@ -318,6 +319,7 @@ public partial class SettingsWindow : Window
         s.CaptureCursor = ChkCaptureCursor.IsChecked ?? false;
         s.ShowNotifications = ChkShowNotifications.IsChecked ?? true;
         s.MinimizeToTray = ChkMinimizeToTray.IsChecked ?? true;
+        s.AutoCheckUpdates = ChkAutoCheckUpdates.IsChecked ?? true;
 
         s.CaptureHotkey = TxtCaptureHotkey.Text;
         s.FullscreenSaveHotkey = TxtFullscreenSaveHotkey.Text;
@@ -386,6 +388,47 @@ public partial class SettingsWindow : Window
         };
         if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             TxtHistoryDir.Text = dialog.SelectedPath;
+    }
+
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        BtnCheckUpdates.IsEnabled = false;
+        BtnCheckUpdates.Content = "Checking...";
+
+        try
+        {
+            var update = await Core.UpdateChecker.CheckForUpdateAsync();
+            if (update != null)
+            {
+                var result = System.Windows.MessageBox.Show(
+                    $"Version {update.Version} is available!\n\n{update.ReleaseNotes}\n\nDownload now?",
+                    "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = update.DownloadUrl,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            else
+            {
+                System.Windows.MessageBox.Show("You're running the latest version.",
+                    "Llamashot", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show($"Failed to check for updates:\n{ex.Message}",
+                "Llamashot", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            BtnCheckUpdates.Content = "Check for Updates Now";
+            BtnCheckUpdates.IsEnabled = true;
+        }
     }
 
     private static void SetAutoStart(bool enable)

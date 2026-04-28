@@ -1,13 +1,13 @@
 [Setup]
 AppName=Llamashot
-AppVersion=2.6.0
-AppVerName=Llamashot 2.6.0
+AppVersion=2.8.0
+AppVerName=Llamashot 2.8.0
 AppPublisher=Santosh Kumar
-AppPublisherURL=https://github.com/user/llamashot
+AppPublisherURL=https://github.com/santos-k/Llamashot
 DefaultDirName={autopf}\Llamashot
 DefaultGroupName=Llamashot
 OutputDir=dist
-OutputBaseFilename=LlamashotSetup_v2.6.0
+OutputBaseFilename=LlamashotSetup_v2.8.0
 SetupIconFile=assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -18,7 +18,7 @@ WizardStyle=modern
 DisableProgramGroupPage=yes
 
 [Files]
-Source: "Llamashot\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\Llamashot.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "Llamashot\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\Llamashot"; Filename: "{app}\Llamashot.exe"
