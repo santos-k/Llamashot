@@ -3,11 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-        <!-- Global window icon -->
-        <Style TargetType="Window">
-            <Setter Property="Icon" Value="/Resources/icon32.png" />
-        </Style>
-
         <!-- Global button style for toolbar buttons -->
         <Style x:Key="ToolbarButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />

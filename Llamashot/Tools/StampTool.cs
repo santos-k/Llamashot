@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Llamashot.Core;
 using Llamashot.Models;
 
 namespace Llamashot.Tools;
@@ -12,6 +13,8 @@ public enum StampType { Check, Cross }
 public class StampTool : BaseDrawingTool
 {
     public override DrawingToolType ToolType => DrawingToolType.Pen;
+    public override Cursor Cursor => Stamp == StampType.Check
+        ? CursorHelper.Get("Check") : CursorHelper.Get("CrossMark");
     public StampType Stamp { get; }
     public double StampSize { get; set; } = 36;
 

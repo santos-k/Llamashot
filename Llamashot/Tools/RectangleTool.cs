@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Llamashot.Core;
 using Llamashot.Models;
 
 namespace Llamashot.Tools;
@@ -10,6 +11,7 @@ namespace Llamashot.Tools;
 public class RectangleTool : BaseDrawingTool
 {
     public override DrawingToolType ToolType => DrawingToolType.Rectangle;
+    public override Cursor Cursor => CursorHelper.Get("Rectangle");
     private Rectangle? _rectangle;
     private bool _filled;
 

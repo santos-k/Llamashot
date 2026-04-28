@@ -33,6 +33,10 @@ public partial class OverlayWindow : Window
     // Pan (Space + drag, like Photoshop)
     private bool _spaceHeld;
 
+    // Full-region toggle (double-click)
+    private Rect _originalSelection;
+    private bool _isFullRegion;
+
     // OCR sub-selection
     private bool _ocrMode;
     private Point _ocrStart;
@@ -227,6 +231,7 @@ public partial class OverlayWindow : Window
             _undoStack.Clear();
             _redoStack.Clear();
             _hasSelection = false;
+            _isFullRegion = false;
             _currentTool = null;
         }
 
@@ -490,6 +495,24 @@ public partial class OverlayWindow : Window
         UpdateToolbarPositions();
     }
 
+    // ============ FULL-REGION TOGGLE ============
+
+    private void ToggleFullRegion()
+    {
+        if (_isFullRegion)
+        {
+            _selection = _originalSelection;
+            _isFullRegion = false;
+        }
+        else
+        {
+            _originalSelection = _selection;
+            _selection = new Rect(0, 0, ActualWidth, ActualHeight);
+            _isFullRegion = true;
+        }
+        RefreshSelectionUI();
+    }
+
     // ============ TOOLBARS ============
 
     private void ShowToolbars()
@@ -592,6 +615,7 @@ public partial class OverlayWindow : Window
             "Blur" => new BlurTool { ScreenshotSource = _screenshot },
             "Check" => new StampTool(StampType.Check),
             "CrossMark" => new StampTool(StampType.Cross),
+            "Eraser" => new EraserTool(),
             _ => null
         };
 
@@ -651,6 +675,14 @@ public partial class OverlayWindow : Window
         var pos = e.GetPosition(DrawingCanvas);
         if (!_selection.Contains(pos)) return;
 
+        // Double-click: toggle between full region and original selection
+        if (e.ClickCount == 2)
+        {
+            ToggleFullRegion();
+            e.Handled = true;
+            return;
+        }
+
         // OCR sub-selection mode
         if (_ocrMode)
         {
@@ -678,6 +710,14 @@ public partial class OverlayWindow : Window
             _dragStart = e.GetPosition(MainCanvas);
             _dragOrigSelection = _selection;
             MainCanvas.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
+        // Object eraser: hit-test and remove clicked annotation
+        if (_currentTool is EraserTool)
+        {
+            EraseElementAt(pos);
             e.Handled = true;
             return;
         }
@@ -801,7 +841,14 @@ public partial class OverlayWindow : Window
     {
         if (_undoStack.Count == 0) return;
         var action = _undoStack.Pop();
-        if (action.RenderedElement != null)
+
+        if (action.ToolType == Models.DrawingToolType.Eraser && action.ErasedElement != null)
+        {
+            // Undo an erase = restore the element
+            DrawingCanvas.Children.Add(action.ErasedElement);
+            _redoStack.Push(action);
+        }
+        else if (action.RenderedElement != null)
         {
             DrawingCanvas.Children.Remove(action.RenderedElement);
             _redoStack.Push(action);
@@ -812,11 +859,87 @@ public partial class OverlayWindow : Window
     {
         if (_redoStack.Count == 0) return;
         var action = _redoStack.Pop();
-        if (action.RenderedElement != null)
+
+        if (action.ToolType == Models.DrawingToolType.Eraser && action.ErasedElement != null)
+        {
+            // Redo an erase = remove the element again
+            DrawingCanvas.Children.Remove(action.ErasedElement);
+            _undoStack.Push(action);
+        }
+        else if (action.RenderedElement != null)
         {
             DrawingCanvas.Children.Add(action.RenderedElement);
             _undoStack.Push(action);
         }
+    }
+
+    // ============ OBJECT ERASER ============
+
+    private void EraseElementAt(Point pos)
+    {
+        // Hit-test with a small area for easier clicking on thin elements
+        UIElement? hitChild = null;
+        var hitArea = new EllipseGeometry(pos, 6, 6);
+        var hitParams = new GeometryHitTestParameters(hitArea);
+
+        VisualTreeHelper.HitTest(DrawingCanvas, null,
+            result =>
+            {
+                var found = GetDrawingCanvasChild(result.VisualHit);
+                if (found != null)
+                {
+                    hitChild = found;
+                    return HitTestResultBehavior.Stop;
+                }
+                return HitTestResultBehavior.Continue;
+            },
+            hitParams);
+
+        if (hitChild == null) return;
+
+        // Find and remove the matching DrawingAction from the undo stack
+        var remaining = new Stack<DrawingAction>();
+        DrawingAction? erased = null;
+
+        while (_undoStack.Count > 0)
+        {
+            var action = _undoStack.Pop();
+            if (erased == null && action.RenderedElement == hitChild)
+            {
+                erased = action;
+            }
+            else
+            {
+                remaining.Push(action);
+            }
+        }
+
+        // Rebuild undo stack without the erased action
+        while (remaining.Count > 0)
+            _undoStack.Push(remaining.Pop());
+
+        // Remove from canvas
+        DrawingCanvas.Children.Remove(hitChild);
+
+        // Push an erase action so it can be undone
+        _undoStack.Push(new DrawingAction
+        {
+            ToolType = Models.DrawingToolType.Eraser,
+            ErasedElement = hitChild
+        });
+        _redoStack.Clear();
+    }
+
+    private UIElement? GetDrawingCanvasChild(DependencyObject? visual)
+    {
+        while (visual != null && visual != DrawingCanvas)
+        {
+            var parent = VisualTreeHelper.GetParent(visual);
+            if (parent == DrawingCanvas)
+                return visual as UIElement;
+            visual = parent;
+        }
+        return null;
     }
 
     // ============ ACTIONS ============
@@ -1069,6 +1192,8 @@ public partial class OverlayWindow : Window
         { SelectToolByTag("Check"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCross))
         { SelectToolByTag("CrossMark"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutObjectEraser))
+        { SelectToolByTag("Eraser"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser))
         { Eraser_Click(this, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutMove))

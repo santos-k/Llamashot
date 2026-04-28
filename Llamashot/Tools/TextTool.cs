@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Llamashot.Core;
 using Llamashot.Models;
 
 namespace Llamashot.Tools;
@@ -9,7 +10,7 @@ namespace Llamashot.Tools;
 public class TextTool : BaseDrawingTool
 {
     public override DrawingToolType ToolType => DrawingToolType.Text;
-    public override Cursor Cursor => Cursors.IBeam;
+    public override Cursor Cursor => CursorHelper.Get("Text");
     public double FontSize { get; set; } = 16;
     private TextBox? _activeTextBox;
     private Canvas? _canvas;

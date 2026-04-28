@@ -7,7 +7,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        Width="260" Height="50"
+        Width="310" Height="50"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
     <Border Background="#EE111111" CornerRadius="8" Padding="12,6"
             BorderBrush="#333" BorderThickness="1">
@@ -19,6 +19,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -44,13 +45,32 @@
                        Foreground="White" FontSize="16" FontWeight="SemiBold" FontFamily="Consolas"
                        VerticalAlignment="Center" Margin="0,0,8,0" />
 
-            <!-- Max time hint -->
-            <TextBlock x:Name="TxtMax" Grid.Column="2" Text="/ 02:00"
-                       Foreground="#666" FontSize="11" VerticalAlignment="Center" />
+            <!-- Audio status -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtAudioStatus" Text="" Foreground="#666" FontSize="11"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Audio toggle -->
+            <Button x:Name="BtnAudio" Grid.Column="3" Click="Audio_Click"
+                    Width="28" Height="28" Margin="4,0" Cursor="Hand" ToolTip="Toggle audio recording"
+                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
+                <Canvas x:Name="AudioIcon" Width="16" Height="16">
+                    <!-- Mic icon -->
+                    <Rectangle x:Name="MicBody" Canvas.Left="5.5" Canvas.Top="1" Width="5" Height="9"
+                               RadiusX="2.5" RadiusY="2.5" Fill="#666" />
+                    <Path x:Name="MicArc" Data="M3,8 A5,5 0 0,0 13,8" Stroke="#666" StrokeThickness="1.5"
+                          Canvas.Top="2" Fill="Transparent" />
+                    <Line x:Name="MicStand" X1="8" Y1="13" X2="8" Y2="15" Stroke="#666" StrokeThickness="1.5" />
+                    <!-- Mute slash (shown when muted) -->
+                    <Line x:Name="MicSlash" X1="2" Y1="14" X2="14" Y2="2" Stroke="#EF5350"
+                          StrokeThickness="2" Visibility="Visible" />
+                </Canvas>
+            </Button>
 
             <!-- Pause/Resume -->
-            <Button x:Name="BtnPause" Grid.Column="3" Click="Pause_Click"
-                    Width="28" Height="28" Margin="8,0,4,0" Cursor="Hand"
+            <Button x:Name="BtnPause" Grid.Column="4" Click="Pause_Click"
+                    Width="28" Height="28" Margin="0,0,4,0" Cursor="Hand"
                     Background="Transparent" BorderBrush="Transparent" Focusable="False">
                 <Grid Width="14" Height="14">
                     <!-- Pause icon (two bars) -->
@@ -66,7 +86,7 @@
             </Button>
 
             <!-- Stop -->
-            <Button x:Name="BtnStop" Grid.Column="4" Click="Stop_Click"
+            <Button x:Name="BtnStop" Grid.Column="5" Click="Stop_Click"
                     Width="28" Height="28" Cursor="Hand"
                     Background="Transparent" BorderBrush="Transparent" Focusable="False">
                 <Canvas Width="14" Height="14">

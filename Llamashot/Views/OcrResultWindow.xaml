@@ -1,6 +1,7 @@
 <Window x:Class="Llamashot.Views.OcrResultWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Icon="/Resources/icon32.png"
         Title="Llamashot - Extracted Text"
         Width="520" Height="400"
         WindowStartupLocation="CenterScreen"

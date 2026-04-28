@@ -30,6 +30,7 @@ public class AppSettings
     public string ShortcutMarker { get; set; } = "M";
     public string ShortcutBlur { get; set; } = "B";
     public string ShortcutEraser { get; set; } = "X";
+    public string ShortcutObjectEraser { get; set; } = "G";
     public string ShortcutMove { get; set; } = "V";
     public string ShortcutCheck { get; set; } = "K";
     public string ShortcutCross { get; set; } = "D";
@@ -54,6 +55,12 @@ public class AppSettings
     // Drawing defaults
     public string DefaultColor { get; set; } = "#FF0000";
     public int DefaultThickness { get; set; } = 3;
+
+    // Updates
+    public bool AutoCheckUpdates { get; set; } = true;
+
+    // Recording
+    public bool RecordAudio { get; set; } = false;
 
     // History
     public bool SaveHistory { get; set; } = true;

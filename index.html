@@ -69,7 +69,7 @@
         .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
         /* Sections */
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
         section { padding: 80px 0; }
         section:nth-child(even) { background: var(--card); }
         .section-title {
@@ -79,53 +79,57 @@
         .section-title h2 { font-size: 2rem; margin-bottom: 8px; }
         .section-title p { color: var(--muted); font-size: 1.1rem; }
 
-        /* Feature Grid */
+        /* Feature Cards with Illustrations */
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 24px;
         }
         .feature-card {
             background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 28px;
+            border-radius: 16px;
+            overflow: hidden;
             transition: border-color 0.3s, transform 0.3s;
         }
-        .feature-card:hover { border-color: var(--accent); transform: translateY(-4px); }
-        .feature-card .icon {
-            width: 44px; height: 44px;
-            border-radius: 10px;
+        .feature-card:hover { border-color: var(--accent); transform: translateY(-6px); }
+        .feature-illust {
+            height: 200px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 16px;
-            font-size: 1.4rem;
+            position: relative;
+            overflow: hidden;
         }
-        .feature-card h3 { font-size: 1.15rem; margin-bottom: 8px; }
-        .feature-card p { color: var(--muted); font-size: 0.95rem; }
-        .icon-blue { background: rgba(66,165,245,0.15); color: var(--accent); }
-        .icon-green { background: rgba(76,175,80,0.15); color: var(--green); }
-        .icon-red { background: rgba(244,67,54,0.15); color: var(--red); }
-        .icon-orange { background: rgba(255,167,38,0.15); color: var(--orange); }
-        .icon-purple { background: rgba(171,71,188,0.15); color: var(--purple); }
-        .icon-cyan { background: rgba(38,198,218,0.15); color: var(--cyan); }
+        .feature-card .info {
+            padding: 20px 24px 24px;
+        }
+        .feature-card h3 { font-size: 1.1rem; margin-bottom: 6px; font-weight: 700; }
+        .feature-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+
+        /* Illustration backgrounds */
+        .illust-blue { background: linear-gradient(135deg, #1a2a4a, #1e3a5f); }
+        .illust-red { background: linear-gradient(135deg, #2a1a1a, #3f1e1e); }
+        .illust-green { background: linear-gradient(135deg, #1a2a1a, #1e3f2e); }
+        .illust-cyan { background: linear-gradient(135deg, #1a2a2a, #1e3f3f); }
+        .illust-orange { background: linear-gradient(135deg, #2a2a1a, #3f3520); }
+        .illust-purple { background: linear-gradient(135deg, #2a1a2a, #3f1e3f); }
 
         /* Tools Showcase */
         .tools-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 14px;
         }
         .tool-item {
             background: var(--bg);
             border: 1px solid var(--border);
             border-radius: 10px;
-            padding: 20px 16px;
+            padding: 16px 12px;
             text-align: center;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, transform 0.2s;
         }
-        .tool-item:hover { border-color: var(--accent); }
+        .tool-item:hover { border-color: var(--accent); transform: translateY(-2px); }
         .tool-item .key {
             display: inline-block;
             background: var(--card);
@@ -137,7 +141,7 @@
             color: var(--accent);
             margin-top: 8px;
         }
-        .tool-item .name { font-weight: 600; font-size: 0.95rem; }
+        .tool-item .name { font-weight: 600; font-size: 0.9rem; }
 
         /* Shortcuts Table */
         .shortcuts-table {
@@ -151,10 +155,7 @@
             border-bottom: 1px solid var(--border);
         }
         .shortcuts-table th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
-        .shortcuts-table td:last-child {
-            font-family: 'Consolas', monospace;
-            color: var(--accent);
-        }
+        .shortcuts-table td:last-child { font-family: 'Consolas', monospace; color: var(--accent); }
         .shortcuts-table tr:hover { background: rgba(66,165,245,0.05); }
 
         /* Tech Stack */
@@ -183,7 +184,10 @@
         footer .heart { color: var(--red); }
 
         /* Responsive */
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
             .hero h1 { font-size: 2rem; }
             .features-grid { grid-template-columns: 1fr; }
         }
@@ -202,49 +206,315 @@
         <span class="badge badge-purple">Windows 10/11</span>
     </div>
     <div class="cta-buttons">
-        <a href="https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.5.1.exe" class="btn btn-primary">Download Installer</a>
+        <a href="https://github.com/santos-k/Llamashot/releases/latest" class="btn btn-primary">Download Installer</a>
         <a href="#features" class="btn btn-outline">Explore Features</a>
     </div>
 </div>
 
-<!-- Core Features -->
+<!-- Core Features with Illustrations -->
 <section id="features">
     <div class="container">
         <div class="section-title">
             <h2>Everything You Need</h2>
-            <p>Screenshot, annotate, record, and extract text — all in one lightweight tool</p>
+            <p>Screenshot, annotate, record, and extract text &mdash; all in one lightweight tool</p>
         </div>
         <div class="features-grid">
+
+            <!-- Screenshot -->
             <div class="feature-card">
-                <div class="icon icon-blue">&#x1F4F7;</div>
-                <h3>Region Capture</h3>
-                <p>Press PrintScreen, drag to select any area. Dimmed overlay with crosshair cursor and live dimension display. Resize handles for pixel-perfect adjustment.</p>
+                <div class="feature-illust illust-blue">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Screen -->
+                        <rect x="30" y="20" width="180" height="120" rx="8" fill="#1e3a5f" stroke="#42a5f5" stroke-width="1.5"/>
+                        <rect x="38" y="28" width="164" height="96" rx="4" fill="#0d1117"/>
+                        <!-- Content lines -->
+                        <rect x="48" y="42" width="80" height="6" rx="3" fill="#30363d"/>
+                        <rect x="48" y="56" width="60" height="6" rx="3" fill="#30363d"/>
+                        <rect x="48" y="70" width="90" height="6" rx="3" fill="#30363d"/>
+                        <rect x="48" y="84" width="50" height="6" rx="3" fill="#30363d"/>
+                        <!-- Selection region with dashed border -->
+                        <rect x="60" y="46" width="100" height="60" rx="2" stroke="#42a5f5" stroke-width="2" stroke-dasharray="6 3" fill="rgba(66,165,245,0.08)"/>
+                        <!-- Corner handles -->
+                        <rect x="56" y="42" width="8" height="8" rx="2" fill="#42a5f5"/>
+                        <rect x="156" y="42" width="8" height="8" rx="2" fill="#42a5f5"/>
+                        <rect x="56" y="102" width="8" height="8" rx="2" fill="#42a5f5"/>
+                        <rect x="156" y="102" width="8" height="8" rx="2" fill="#42a5f5"/>
+                        <!-- Crosshair -->
+                        <line x1="110" y1="66" x2="110" y2="86" stroke="#fff" stroke-width="1" opacity="0.5"/>
+                        <line x1="100" y1="76" x2="120" y2="76" stroke="#fff" stroke-width="1" opacity="0.5"/>
+                        <!-- Dimension label -->
+                        <rect x="85" y="112" width="56" height="18" rx="4" fill="#42a5f5"/>
+                        <text x="113" y="125" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" font-family="sans-serif">640 x 480</text>
+                        <!-- Camera icon -->
+                        <rect x="160" y="130" width="36" height="30" rx="8" fill="#42a5f5"/>
+                        <circle cx="178" cy="145" r="7" stroke="#fff" stroke-width="2" fill="none"/>
+                        <rect x="172" y="132" width="12" height="4" rx="2" fill="#1e88e5"/>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>Region Capture</h3>
+                    <p>Capture full screen, window, or custom region instantly. Drag to select with live dimensions and resize handles.</p>
+                </div>
             </div>
+
+            <!-- Screen Recording -->
             <div class="feature-card">
-                <div class="icon icon-green">&#x270F;&#xFE0F;</div>
-                <h3>10 Annotation Tools</h3>
-                <p>Pencil, line, arrow, rectangle, ellipse, text, marker, blur, plus check and cross stamps for review workflows. Configurable color and thickness.</p>
+                <div class="feature-illust illust-red">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Recording window -->
+                        <rect x="35" y="20" width="170" height="115" rx="10" fill="#1a1a1e" stroke="#f44336" stroke-width="2"/>
+                        <!-- Window chrome -->
+                        <rect x="35" y="20" width="170" height="28" rx="10" fill="#222"/>
+                        <rect x="35" y="38" width="170" height="10" fill="#222"/>
+                        <circle cx="52" cy="34" r="5" fill="#f44336"/>
+                        <circle cx="66" cy="34" r="5" fill="#ffa726"/>
+                        <circle cx="80" cy="34" r="5" fill="#4caf50"/>
+                        <!-- REC indicator -->
+                        <circle cx="170" cy="34" r="4" fill="#f44336">
+                            <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <text x="180" y="38" fill="#f44336" font-size="10" font-weight="700" font-family="sans-serif">REC</text>
+                        <!-- Chart/content -->
+                        <polyline points="50,95 70,80 90,100 110,70 130,90 150,60 170,75 190,65" stroke="#42a5f5" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="50" y="108" width="80" height="5" rx="2.5" fill="#30363d"/>
+                        <rect x="50" y="118" width="50" height="5" rx="2.5" fill="#30363d"/>
+                        <!-- Recording toolbar -->
+                        <rect x="65" y="142" width="110" height="30" rx="10" fill="#1a1a1e" stroke="#444" stroke-width="1"/>
+                        <polygon points="82,152 82,164 92,158" fill="#4caf50"/>
+                        <circle cx="120" cy="158" r="9" fill="#f44336"/>
+                        <circle cx="120" cy="158" r="5" fill="#c62828"/>
+                        <!-- Mic icon -->
+                        <rect x="146" y="151" width="8" height="12" rx="4" fill="#8b949e"/>
+                        <path d="M148,165 C148,168 156,168 156,165" stroke="#8b949e" stroke-width="1.5" fill="none"/>
+                        <line x1="152" y1="168" x2="152" y2="172" stroke="#8b949e" stroke-width="1.5"/>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>Screen Recording + Audio</h3>
+                    <p>Record any region as MP4 with unlimited duration. Capture microphone audio. Pause and resume anytime.</p>
+                </div>
             </div>
+
+            <!-- Annotations -->
             <div class="feature-card">
-                <div class="icon icon-red">&#x23FA;</div>
-                <h3>Screen Recording</h3>
-                <p>Record any selected region as MP4 video. Up to 2 minutes at 10fps with pause/resume. Red pulsing border shows the recorded area. Recording toolbar hidden from capture.</p>
+                <div class="feature-illust illust-purple">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Canvas area -->
+                        <rect x="25" y="20" width="160" height="140" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <!-- Drawing content -->
+                        <line x1="45" y1="55" x2="120" y2="55" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
+                        <line x1="105" y1="45" x2="120" y2="55" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
+                        <line x1="105" y1="65" x2="120" y2="55" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
+                        <rect x="40" y="75" width="70" height="40" rx="2" stroke="#ffa726" stroke-width="2.5" fill="none"/>
+                        <ellipse cx="145" cy="110" rx="22" ry="16" stroke="#42a5f5" stroke-width="2.5" fill="none"/>
+                        <text x="48" y="100" fill="#4caf50" font-size="14" font-weight="700" font-family="sans-serif">Hello!</text>
+                        <!-- Marker highlight -->
+                        <rect x="40" y="128" width="65" height="12" rx="2" fill="rgba(255,235,59,0.3)"/>
+                        <rect x="40" y="128" width="65" height="12" rx="2" stroke="#ffeb3b" stroke-width="1"/>
+                        <!-- Tool sidebar -->
+                        <rect x="195" y="25" width="30" height="130" rx="6" fill="#111" stroke="#444" stroke-width="1"/>
+                        <rect x="200" y="33" width="20" height="20" rx="3" fill="#333"/>
+                        <path d="M205,38 L215,48" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                        <rect x="200" y="58" width="20" height="20" rx="3" fill="#333"/>
+                        <rect x="205" y="63" width="10" height="10" rx="1" stroke="#fff" stroke-width="1.5" fill="none"/>
+                        <rect x="200" y="83" width="20" height="20" rx="3" fill="#333"/>
+                        <ellipse cx="210" cy="93" rx="6" ry="5" stroke="#fff" stroke-width="1.5" fill="none"/>
+                        <rect x="200" y="108" width="20" height="20" rx="3" fill="#333"/>
+                        <text x="205" y="123" fill="#fff" font-size="13" font-weight="700" font-family="sans-serif">T</text>
+                        <rect x="200" y="133" width="20" height="20" rx="3" fill="#333"/>
+                        <circle cx="210" cy="143" r="6" fill="#f44336" opacity="0.9"/>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>11 Annotation Tools</h3>
+                    <p>Pencil, arrow, rectangle, ellipse, text, marker, blur, stamps, and eraser. Configurable color and thickness.</p>
+                </div>
             </div>
+
+            <!-- OCR -->
             <div class="feature-card">
-                <div class="icon icon-cyan">&#x1F524;</div>
-                <h3>OCR Text Extraction</h3>
-                <p>Extract text from any area of the screen. Drag a sub-region to target specific text. Auto-inverts dark backgrounds for better recognition. Uses Windows built-in OCR.</p>
+                <div class="feature-illust illust-cyan">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Document -->
+                        <rect x="50" y="15" width="140" height="120" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <!-- Text lines being scanned -->
+                        <rect x="65" y="32" width="110" height="8" rx="3" fill="#30363d"/>
+                        <rect x="65" y="48" width="90" height="8" rx="3" fill="#30363d"/>
+                        <rect x="65" y="64" width="100" height="8" rx="3" fill="#30363d"/>
+                        <rect x="65" y="80" width="70" height="8" rx="3" fill="#30363d"/>
+                        <rect x="65" y="96" width="95" height="8" rx="3" fill="#30363d"/>
+                        <rect x="65" y="112" width="60" height="8" rx="3" fill="#30363d"/>
+                        <!-- OCR selection box -->
+                        <rect x="60" y="42" width="105" height="55" rx="2" stroke="#26c6da" stroke-width="2" stroke-dasharray="5 3" fill="rgba(38,198,218,0.06)"/>
+                        <!-- Scan line animation -->
+                        <line x1="62" y1="60" x2="163" y2="60" stroke="#26c6da" stroke-width="1.5" opacity="0.6">
+                            <animate attributeName="y1" values="44;95;44" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="y2" values="44;95;44" dur="2s" repeatCount="indefinite"/>
+                        </line>
+                        <!-- Result popup -->
+                        <rect x="55" y="138" width="130" height="32" rx="8" fill="#111" stroke="#26c6da" stroke-width="1.5"/>
+                        <text x="68" y="152" fill="#26c6da" font-size="9" font-weight="600" font-family="monospace">T</text>
+                        <rect x="80" y="145" width="4" height="14" rx="1" fill="#26c6da" opacity="0.3"/>
+                        <text x="90" y="158" fill="#e6edf3" font-size="11" font-weight="500" font-family="sans-serif">Llamashot</text>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>Text Extraction (OCR)</h3>
+                    <p>Extract text from any area of the screen with one click. Auto-inverts dark backgrounds for better recognition.</p>
+                </div>
             </div>
+
+            <!-- History -->
             <div class="feature-card">
-                <div class="icon icon-orange">&#x1F4CB;</div>
-                <h3>Screenshot History</h3>
-                <p>Thumbnail gallery of all saved and copied screenshots. Green "Saved" and blue "Copied" badges. One-click re-copy from history. Configurable storage location.</p>
+                <div class="feature-illust illust-orange">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- History window -->
+                        <rect x="30" y="15" width="180" height="130" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <rect x="30" y="15" width="180" height="24" rx="8" fill="#222"/>
+                        <rect x="30" y="31" width="180" height="8" fill="#222"/>
+                        <text x="45" y="32" fill="#ffa726" font-size="10" font-weight="600" font-family="sans-serif">History</text>
+                        <!-- Thumbnail grid -->
+                        <rect x="40" y="46" width="46" height="36" rx="4" fill="#1e3a5f"/>
+                        <rect x="40" y="46" width="46" height="36" rx="4" stroke="#42a5f5" stroke-width="1.5"/>
+                        <rect x="92" y="46" width="46" height="36" rx="4" fill="#2a1a2a"/>
+                        <rect x="144" y="46" width="46" height="36" rx="4" fill="#1a2a1a"/>
+                        <rect x="40" y="90" width="46" height="36" rx="4" fill="#2a2a1a"/>
+                        <rect x="92" y="90" width="46" height="36" rx="4" fill="#1a2a2a"/>
+                        <rect x="144" y="90" width="46" height="36" rx="4" fill="#1e3a5f"/>
+                        <!-- Badges -->
+                        <rect x="42" y="73" width="30" height="10" rx="5" fill="#4caf50"/>
+                        <text x="50" y="81" fill="#fff" font-size="6" font-family="sans-serif">Saved</text>
+                        <rect x="94" y="73" width="30" height="10" rx="5" fill="#42a5f5"/>
+                        <text x="101" y="81" fill="#fff" font-size="6" font-family="sans-serif">Copied</text>
+                        <!-- Checkboxes -->
+                        <rect x="149" y="48" width="10" height="10" rx="2" fill="#42a5f5"/>
+                        <polyline points="151,53 154,56 158,50" stroke="#fff" stroke-width="1.5" fill="none"/>
+                        <!-- Select all -->
+                        <rect x="40" y="135" width="10" height="10" rx="2" fill="#42a5f5"/>
+                        <polyline points="42,140 45,143 49,137" stroke="#fff" stroke-width="1.5" fill="none"/>
+                        <text x="56" y="145" fill="#8b949e" font-size="9" font-family="sans-serif">Select All</text>
+                        <rect x="130" y="133" width="50" height="16" rx="4" fill="#f44336" opacity="0.9"/>
+                        <text x="140" y="144" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Delete</text>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>Screenshot History</h3>
+                    <p>Thumbnail gallery with multi-select, bulk copy, and delete. Green &ldquo;Saved&rdquo; and blue &ldquo;Copied&rdquo; badges.</p>
+                </div>
             </div>
+
+            <!-- Quick Sharing -->
             <div class="feature-card">
-                <div class="icon icon-purple">&#x1F4CC;</div>
-                <h3>Pin on Screen</h3>
-                <p>Pin any screenshot as a floating always-on-top window. Adjustable opacity with mouse wheel. Drag to reposition, double-click to copy, right-click to dismiss.</p>
+                <div class="feature-illust illust-green">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Success popup -->
+                        <rect x="50" y="15" width="140" height="100" rx="12" fill="#161b22" stroke="#4caf50" stroke-width="1.5"/>
+                        <!-- Checkmark circle -->
+                        <circle cx="120" cy="50" r="20" fill="rgba(76,175,80,0.15)" stroke="#4caf50" stroke-width="2"/>
+                        <polyline points="110,50 117,57 132,42" stroke="#4caf50" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        <text x="120" y="86" text-anchor="middle" fill="#e6edf3" font-size="12" font-weight="600" font-family="sans-serif">Capture saved!</text>
+                        <text x="120" y="104" text-anchor="middle" fill="#8b949e" font-size="9" font-family="sans-serif">screenshot_20250428.png</text>
+                        <!-- Action buttons -->
+                        <rect x="38" y="125" width="52" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <rect x="94" y="125" width="52" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <rect x="150" y="125" width="52" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <!-- Copy icon -->
+                        <rect x="56" y="132" width="14" height="14" rx="2" stroke="#42a5f5" stroke-width="1.5" fill="none"/>
+                        <rect x="60" y="136" width="14" height="14" rx="2" stroke="#42a5f5" stroke-width="1.5" fill="#161b22"/>
+                        <text x="64" y="157" text-anchor="middle" fill="#8b949e" font-size="8" font-family="sans-serif">Copy</text>
+                        <!-- Save icon -->
+                        <path d="M112,133 L124,133 L127,136 L127,147 L112,147 Z" fill="#4caf50"/>
+                        <rect x="115" y="133" width="6" height="5" rx="0" fill="#2e7d32"/>
+                        <rect x="115" y="141" width="8" height="5" rx="1" fill="#fff"/>
+                        <text x="120" y="157" text-anchor="middle" fill="#8b949e" font-size="8" font-family="sans-serif">Save</text>
+                        <!-- Pin icon -->
+                        <path d="M176,147 L176,143 M173,143 L179,143 M174,135 L174,141 L173,143 L179,143 L178,141 L178,135 Z" fill="#ab47bc"/>
+                        <rect x="173" y="133" width="6" height="2" rx="1" fill="#ce93d8"/>
+                        <text x="176" y="157" text-anchor="middle" fill="#8b949e" font-size="8" font-family="sans-serif">Pin</text>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>Quick Sharing</h3>
+                    <p>Copy, save, or pin your capture in seconds. Multiple output formats: PNG, JPG, BMP with quality control.</p>
+                </div>
             </div>
+
+            <!-- Keyboard Shortcuts -->
+            <div class="feature-card">
+                <div class="feature-illust illust-blue">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Key: PrintScreen -->
+                        <rect x="60" y="18" width="120" height="32" rx="8" fill="#222" stroke="#444" stroke-width="1.5"/>
+                        <text x="120" y="39" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="700" font-family="sans-serif">Print Screen</text>
+                        <!-- Row 1: Ctrl + Shift + 1 -->
+                        <rect x="30" y="60" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
+                        <text x="51" y="78" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">Ctrl</text>
+                        <text x="80" y="78" fill="#444" font-size="14" font-weight="700">+</text>
+                        <rect x="89" y="60" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
+                        <text x="110" y="78" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">S</text>
+                        <text x="142" y="78" fill="#8b949e" font-size="9" font-family="sans-serif">Save</text>
+                        <!-- Row 2 -->
+                        <rect x="30" y="96" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
+                        <text x="51" y="114" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">Ctrl</text>
+                        <text x="80" y="114" fill="#444" font-size="14" font-weight="700">+</text>
+                        <rect x="89" y="96" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
+                        <text x="110" y="114" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">C</text>
+                        <text x="142" y="114" fill="#8b949e" font-size="9" font-family="sans-serif">Copy</text>
+                        <!-- Row 3 -->
+                        <rect x="30" y="132" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
+                        <text x="51" y="150" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">Ctrl</text>
+                        <text x="80" y="150" fill="#444" font-size="14" font-weight="700">+</text>
+                        <rect x="89" y="132" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
+                        <text x="110" y="150" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">R</text>
+                        <text x="142" y="150" fill="#8b949e" font-size="9" font-family="sans-serif">Record</text>
+                        <!-- Customizable badge -->
+                        <rect x="142" y="60" width="72" height="18" rx="9" fill="rgba(66,165,245,0.15)" stroke="rgba(66,165,245,0.3)" stroke-width="1"/>
+                        <text x="178" y="72" text-anchor="middle" fill="#42a5f5" font-size="8" font-weight="600" font-family="sans-serif">Customizable</text>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>22 Keyboard Shortcuts</h3>
+                    <p>Every tool and action has a shortcut. Click-to-record in Settings. Duplicate detection prevents conflicts.</p>
+                </div>
+            </div>
+
+            <!-- Lightweight -->
+            <div class="feature-card">
+                <div class="feature-illust illust-green">
+                    <svg viewBox="0 0 240 180" width="220" fill="none">
+                        <!-- Speed gauge -->
+                        <path d="M70,130 A65,65 0 0,1 200,130" stroke="#30363d" stroke-width="10" fill="none" stroke-linecap="round"/>
+                        <path d="M70,130 A65,65 0 0,1 185,78" stroke="url(#gaugeGrad)" stroke-width="10" fill="none" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stop-color="#4caf50"/>
+                                <stop offset="50%" stop-color="#42a5f5"/>
+                                <stop offset="100%" stop-color="#1e88e5"/>
+                            </linearGradient>
+                        </defs>
+                        <!-- Needle -->
+                        <line x1="135" y1="130" x2="178" y2="88" stroke="#e6edf3" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="135" cy="130" r="6" fill="#e6edf3"/>
+                        <circle cx="135" cy="130" r="3" fill="#0d1117"/>
+                        <!-- Speed lines -->
+                        <line x1="10" y1="88" x2="40" y2="88" stroke="#42a5f5" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+                        <line x1="15" y1="100" x2="38" y2="100" stroke="#42a5f5" stroke-width="1.5" opacity="0.2" stroke-linecap="round"/>
+                        <line x1="10" y1="112" x2="35" y2="112" stroke="#42a5f5" stroke-width="1" opacity="0.15" stroke-linecap="round"/>
+                        <!-- RAM badge -->
+                        <rect x="95" y="140" width="80" height="30" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                        <text x="110" y="154" fill="#8b949e" font-size="8" font-family="sans-serif">RAM</text>
+                        <text x="140" y="161" fill="#e6edf3" font-size="16" font-weight="800" font-family="sans-serif">28</text>
+                        <text x="162" y="157" fill="#8b949e" font-size="9" font-family="sans-serif">MB</text>
+                        <!-- Fast label -->
+                        <text x="135" y="30" text-anchor="middle" fill="#4caf50" font-size="11" font-weight="700" font-family="sans-serif">INSTANT STARTUP</text>
+                    </svg>
+                </div>
+                <div class="info">
+                    <h3>Lightweight &amp; Fast</h3>
+                    <p>Tiny memory footprint. Instant startup. No background services. Self-contained single-file executable.</p>
+                </div>
+            </div>
+
         </div>
     </div>
 </section>
@@ -267,6 +537,7 @@
             <div class="tool-item"><div class="name">Blur</div><div class="key">B</div></div>
             <div class="tool-item"><div class="name">Check</div><div class="key">K</div></div>
             <div class="tool-item"><div class="name">Cross</div><div class="key">D</div></div>
+            <div class="tool-item"><div class="name">Eraser</div><div class="key">G</div></div>
             <div class="tool-item"><div class="name">Undo</div><div class="key">X</div></div>
             <div class="tool-item"><div class="name">Move</div><div class="key">V</div></div>
             <div class="tool-item"><div class="name">Color</div><div class="key">C</div></div>
@@ -275,91 +546,6 @@
             <div class="tool-item"><div class="name">Record</div><div class="key">Ctrl+R</div></div>
             <div class="tool-item"><div class="name">OCR</div><div class="key">O</div></div>
             <div class="tool-item"><div class="name">Pin</div><div class="key">F</div></div>
-        </div>
-    </div>
-</section>
-
-<!-- Additional Features -->
-<section>
-    <div class="container">
-        <div class="section-title">
-            <h2>Designed for Speed</h2>
-            <p>Every detail crafted for a seamless workflow</p>
-        </div>
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="icon icon-blue">&#x2328;&#xFE0F;</div>
-                <h3>21 Customizable Shortcuts</h3>
-                <p>Every tool and action has a keyboard shortcut. Click-to-record in Settings. Duplicate detection prevents conflicts. Single keys or combos supported.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon icon-green">&#x1F5C2;&#xFE0F;</div>
-                <h3>Smart Toolbar</h3>
-                <p>Adaptive layout auto-switches between 1 and 2 columns based on screen height. Black background with white icons for maximum contrast. No buttons ever hidden.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon icon-orange">&#x23F1;&#xFE0F;</div>
-                <h3>Delayed Capture</h3>
-                <p>1, 3, 5, or 10 second countdown timer. Perfect for capturing menus, tooltips, and hover states that disappear on click.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon icon-purple">&#x1F4BE;</div>
-                <h3>Multiple Output Formats</h3>
-                <p>Save as PNG, JPG, or BMP. Configurable JPEG quality slider. Copy to clipboard with one click. All screenshots tracked in history.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon icon-cyan">&#x1F5A5;&#xFE0F;</div>
-                <h3>Multi-Monitor & DPI Aware</h3>
-                <p>Captures across all connected displays. PerMonitorV2 DPI awareness for crisp rendering on high-DPI screens. Proper coordinate mapping.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon icon-red">&#x21A9;&#xFE0F;</div>
-                <h3>Resize & Pan After Drawing</h3>
-                <p>Selection handles stay active even after annotations. Drag to resize, Space+drag or V key to pan selection with all annotations together.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Shortcuts -->
-<section>
-    <div class="container">
-        <div class="section-title">
-            <h2>Keyboard Shortcuts</h2>
-            <p>All 21 shortcuts customizable in Settings</p>
-        </div>
-        <div style="max-width: 600px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
-            <table class="shortcuts-table">
-                <thead><tr><th>Action</th><th>Default</th></tr></thead>
-                <tbody>
-                    <tr><td>Capture region</td><td>PrintScreen</td></tr>
-                    <tr><td>Fullscreen save</td><td>Shift+PrintScreen</td></tr>
-                    <tr><td>Fullscreen copy</td><td>Ctrl+PrintScreen</td></tr>
-                    <tr><td>Save</td><td>Ctrl+S</td></tr>
-                    <tr><td>Copy to clipboard</td><td>Ctrl+C</td></tr>
-                    <tr><td>Undo / Redo</td><td>Ctrl+Z / Ctrl+Y</td></tr>
-                    <tr><td>Pencil</td><td>P</td></tr>
-                    <tr><td>Line</td><td>L</td></tr>
-                    <tr><td>Arrow</td><td>A</td></tr>
-                    <tr><td>Rectangle</td><td>R</td></tr>
-                    <tr><td>Ellipse</td><td>E</td></tr>
-                    <tr><td>Text</td><td>T</td></tr>
-                    <tr><td>Marker</td><td>M</td></tr>
-                    <tr><td>Blur</td><td>B</td></tr>
-                    <tr><td>Check stamp</td><td>K</td></tr>
-                    <tr><td>Cross stamp</td><td>D</td></tr>
-                    <tr><td>Undo last</td><td>X</td></tr>
-                    <tr><td>Move tool</td><td>V</td></tr>
-                    <tr><td>Color picker</td><td>C</td></tr>
-                    <tr><td>Thickness</td><td>W</td></tr>
-                    <tr><td>History</td><td>H</td></tr>
-                    <tr><td>Record</td><td>Ctrl+R</td></tr>
-                    <tr><td>OCR</td><td>O</td></tr>
-                    <tr><td>Pin on screen</td><td>F</td></tr>
-                    <tr><td>Pan (temporary)</td><td>Space+drag</td></tr>
-                    <tr><td>Close overlay</td><td>Escape</td></tr>
-                </tbody>
-            </table>
         </div>
     </div>
 </section>
@@ -391,11 +577,11 @@
             <p>Free and open source. Windows 10 (1903+) or later.</p>
         </div>
         <div class="cta-buttons">
-            <a href="https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.5.1.exe" class="btn btn-primary">Download Installer (.exe)</a>
+            <a href="https://github.com/santos-k/Llamashot/releases/latest" class="btn btn-primary">Download Installer (.exe)</a>
             <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View on GitHub</a>
         </div>
         <p style="margin-top: 24px; color: var(--muted); font-size: 0.9rem;">
-            Version 2.5.1 &bull; Self-contained, no runtime needed
+            Version 2.8.0 &bull; Self-contained, no runtime needed
         </p>
     </div>
 </section>

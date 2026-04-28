@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Llamashot.Core;
 using Microsoft.Win32;
 
@@ -13,22 +14,25 @@ public partial class RecordingOverlay : Window
     private readonly ScreenRecorder _recorder;
     private readonly RecordingBorder _border;
     private bool _finished;
+    private bool _audioEnabled;
 
     public RecordingOverlay(int pixelX, int pixelY, int pixelW, int pixelH,
                             double dipX, double dipY, double dipW, double dipH)
     {
         InitializeComponent();
 
-        _recorder = new ScreenRecorder(fps: 10, maxSeconds: 120);
+        _recorder = new ScreenRecorder(fps: 10);
         _recorder.OnTick += () => Dispatcher.Invoke(UpdateTimer);
-        _recorder.OnMaxReached += () => Dispatcher.Invoke(FinishRecording);
+
+        _audioEnabled = AppSettings.Instance.RecordAudio;
+        UpdateAudioUI();
 
         _border = new RecordingBorder(dipX, dipY, dipW, dipH);
 
         Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
         Top = 10;
 
-        Loaded += (s, e) =>
+        Loaded += async (s, e) =>
         {
             var h = new WindowInteropHelper(this).Handle;
             NativeMethods.SetWindowDisplayAffinity(h, NativeMethods.WDA_EXCLUDEFROMCAPTURE);
@@ -43,6 +47,26 @@ public partial class RecordingOverlay : Window
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 _border.Close();
                 Close();
+                return;
+            }
+
+            if (_audioEnabled)
+            {
+                BtnAudio.IsEnabled = false;
+                bool audioOk = await _recorder.StartAudioAsync();
+                BtnAudio.IsEnabled = true;
+
+                if (!audioOk)
+                {
+                    _audioEnabled = false;
+                    UpdateAudioUI();
+                    TxtAudioStatus.Text = "No audio device";
+                    TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+                }
+                else
+                {
+                    UpdateAudioUI();
+                }
             }
         };
     }
@@ -50,7 +74,74 @@ public partial class RecordingOverlay : Window
     private void UpdateTimer()
     {
         var elapsed = _recorder.Elapsed;
-        TxtTimer.Text = $"{(int)elapsed.TotalMinutes:00}:{elapsed.Seconds:00}";
+        TxtTimer.Text = elapsed.TotalHours >= 1
+            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
+            : $"{(int)elapsed.TotalMinutes:00}:{elapsed.Seconds:00}";
+    }
+
+    private void UpdateAudioUI()
+    {
+        var color = _audioEnabled
+            ? Color.FromRgb(0x4C, 0xAF, 0x50)  // green
+            : Color.FromRgb(0x66, 0x66, 0x66);  // gray
+
+        var brush = new SolidColorBrush(color);
+        MicBody.Fill = brush;
+        MicArc.Stroke = brush;
+        MicStand.Stroke = brush;
+        MicSlash.Visibility = _audioEnabled ? Visibility.Collapsed : Visibility.Visible;
+
+        if (_audioEnabled)
+        {
+            // Show what sources are active
+            string sources = (_recorder.HasMic, _recorder.HasSystemAudio) switch
+            {
+                (true, true) => "Mic + System",
+                (true, false) => "Mic",
+                (false, true) => "System",
+                _ => "Audio ON"
+            };
+            TxtAudioStatus.Text = sources;
+            TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50));
+        }
+        else
+        {
+            TxtAudioStatus.Text = "";
+            TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
+        }
+    }
+
+    private async void Audio_Click(object sender, RoutedEventArgs e)
+    {
+        BtnAudio.IsEnabled = false;
+        try
+        {
+            if (_audioEnabled)
+            {
+                await _recorder.StopAudioAsync();
+                _audioEnabled = false;
+            }
+            else
+            {
+                bool ok = await _recorder.StartAudioAsync();
+                if (ok)
+                {
+                    _audioEnabled = true;
+                }
+                else
+                {
+                    TxtAudioStatus.Text = "No audio device";
+                    TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+                    BtnAudio.IsEnabled = true;
+                    return;
+                }
+            }
+            UpdateAudioUI();
+        }
+        finally
+        {
+            BtnAudio.IsEnabled = true;
+        }
     }
 
     private void Pause_Click(object sender, RoutedEventArgs e)
@@ -107,6 +198,7 @@ public partial class RecordingOverlay : Window
             RecDot.Fill = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
             BtnStop.IsEnabled = false;
             BtnPause.IsEnabled = false;
+            BtnAudio.IsEnabled = false;
 
             bool success = await _recorder.SaveAsMp4Async(dialog.FileName);
             Hide();

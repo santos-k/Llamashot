@@ -148,6 +148,24 @@ public static class HistoryManager
         catch { }
     }
 
+    public static void DeleteRecords(IEnumerable<string> filePaths)
+    {
+        var pathSet = new HashSet<string>(filePaths, StringComparer.OrdinalIgnoreCase);
+        var toRemove = _records.Where(r => pathSet.Contains(r.FilePath)).ToList();
+
+        foreach (var r in toRemove)
+        {
+            try { if (!string.IsNullOrEmpty(r.ThumbnailPath)) File.Delete(r.ThumbnailPath); } catch { }
+            // Delete clip files (clipboard captures stored by us)
+            if (r.Type == RecordType.Clipboard)
+            {
+                try { File.Delete(r.FilePath); } catch { }
+            }
+            _records.Remove(r);
+        }
+        Save();
+    }
+
     public static void Clear()
     {
         foreach (var r in _records)

@@ -149,6 +149,13 @@
                                 <Line X1="11.5" Y1="4.5" X2="4.5" Y2="11.5" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Button>
+                        <Button x:Name="BtnObjectEraser" ToolTip="Eraser (G)" Click="Tool_Click" Tag="Eraser" Style="{StaticResource TBtn}">
+                            <Canvas Width="16" Height="16">
+                                <Path Fill="White" Data="M14,4 L8,10 L5,13 L2,13 L2,10 L6,6 L12,0 Z" />
+                                <Path Fill="#EF5350" Data="M2,10 L5,13 L2,13 Z" />
+                                <Line X1="1" Y1="15" X2="15" Y2="15" Stroke="#888" StrokeThickness="1.5" />
+                            </Canvas>
+                        </Button>
                         <Button x:Name="BtnEraser" ToolTip="Undo (X)" Click="Eraser_Click" Style="{StaticResource TBtn}">
                             <Canvas Width="16" Height="16">
                                 <Path Stroke="White" StrokeThickness="2" Data="M6,4 L2,8 L6,12" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
