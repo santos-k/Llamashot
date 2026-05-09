@@ -17,7 +17,6 @@ public partial class RecordingOverlay : Window
     private readonly RecordingBorder _border;
     private RecordingAnnotation? _annotationOverlay;
     private bool _finished;
-    private bool _audioEnabled;
     private bool _micEnabled;
     private bool _systemAudioEnabled;
     private readonly double _dipX, _dipY, _dipW, _dipH;
@@ -34,9 +33,8 @@ public partial class RecordingOverlay : Window
         _recorder = new ScreenRecorder(fps: 10);
         _recorder.OnTick += () => Dispatcher.Invoke(UpdateTimer);
 
-        _audioEnabled = AppSettings.Instance.RecordAudio;
-        _micEnabled = _audioEnabled;
-        _systemAudioEnabled = _audioEnabled;
+        _micEnabled = false;
+        _systemAudioEnabled = false;
         UpdateMicUI();
         UpdateSystemAudioUI();
 
@@ -64,28 +62,16 @@ public partial class RecordingOverlay : Window
                 return;
             }
 
-            if (_audioEnabled)
+            // Init audio if enabled in settings
+            if (AppSettings.Instance.RecordAudio)
             {
-                BtnMic.IsEnabled = false;
-                BtnSystemAudio.IsEnabled = false;
-                _recorder.SetMicEnabled(_micEnabled);
-                _recorder.SetSystemAudioEnabled(_systemAudioEnabled);
-                bool audioOk = await _recorder.StartAudioAsync();
-                BtnMic.IsEnabled = true;
-                BtnSystemAudio.IsEnabled = true;
-
-                if (!audioOk)
+                bool audioOk = await _recorder.InitAudioAsync(true, true);
+                if (audioOk)
                 {
-                    _audioEnabled = false;
-                    _micEnabled = false;
-                    _systemAudioEnabled = false;
+                    _micEnabled = _recorder.MicActive;
+                    _systemAudioEnabled = _recorder.SystemAudioActive;
                     UpdateMicUI();
                     UpdateSystemAudioUI();
-                    TxtAudioStatus.Text = "No audio";
-                    TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
-                }
-                else
-                {
                     UpdateAudioStatusText();
                 }
             }
@@ -147,84 +133,70 @@ public partial class RecordingOverlay : Window
         }
     }
 
-    private async void Mic_Click(object sender, RoutedEventArgs e)
-    {
-        _micEnabled = !_micEnabled;
-        UpdateMicUI();
+    private async void Mic_Click(object sender, RoutedEventArgs e) => await ToggleMic(!_micEnabled);
+    private async void SystemAudio_Click(object sender, RoutedEventArgs e) => await ToggleSystemAudio(!_systemAudioEnabled);
 
-        if (!_audioEnabled && _micEnabled)
+    private async Task ToggleMic(bool enable)
+    {
+        BtnMic.IsEnabled = false;
+
+        // Init audio graph if not yet created
+        if (!_recorder.AudioGraphRunning && enable)
         {
-            // Start audio graph if not yet running
-            _audioEnabled = true;
-            _recorder.SetMicEnabled(true);
-            _recorder.SetSystemAudioEnabled(_systemAudioEnabled);
-            BtnMic.IsEnabled = false;
-            BtnSystemAudio.IsEnabled = false;
-            bool ok = await _recorder.StartAudioAsync();
-            BtnMic.IsEnabled = true;
-            BtnSystemAudio.IsEnabled = true;
-            if (!ok)
+            bool ok = await _recorder.InitAudioAsync(true, _systemAudioEnabled);
+            _micEnabled = _recorder.MicActive;
+            _systemAudioEnabled = _recorder.SystemAudioActive;
+            UpdateMicUI();
+            UpdateSystemAudioUI();
+            if (!_recorder.HasMic)
             {
-                _micEnabled = false;
-                _audioEnabled = _systemAudioEnabled;
-                UpdateMicUI();
                 TxtAudioStatus.Text = "No mic";
                 TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
-                return;
+            }
+            else
+            {
+                UpdateAudioStatusText();
             }
         }
         else
         {
-            _recorder.SetMicEnabled(_micEnabled);
+            _recorder.SetMicActive(enable);
+            _micEnabled = _recorder.MicActive;
+            UpdateMicUI();
+            UpdateAudioStatusText();
         }
-
-        // If both off, stop audio
-        if (!_micEnabled && !_systemAudioEnabled && _audioEnabled)
-        {
-            await _recorder.StopAudioAsync();
-            _audioEnabled = false;
-        }
-
-        UpdateAudioStatusText();
+        BtnMic.IsEnabled = true;
     }
 
-    private async void SystemAudio_Click(object sender, RoutedEventArgs e)
+    private async Task ToggleSystemAudio(bool enable)
     {
-        _systemAudioEnabled = !_systemAudioEnabled;
-        UpdateSystemAudioUI();
+        BtnSystemAudio.IsEnabled = false;
 
-        if (!_audioEnabled && _systemAudioEnabled)
+        if (!_recorder.AudioGraphRunning && enable)
         {
-            _audioEnabled = true;
-            _recorder.SetMicEnabled(_micEnabled);
-            _recorder.SetSystemAudioEnabled(true);
-            BtnMic.IsEnabled = false;
-            BtnSystemAudio.IsEnabled = false;
-            bool ok = await _recorder.StartAudioAsync();
-            BtnMic.IsEnabled = true;
-            BtnSystemAudio.IsEnabled = true;
-            if (!ok)
+            bool ok = await _recorder.InitAudioAsync(_micEnabled, true);
+            _micEnabled = _recorder.MicActive;
+            _systemAudioEnabled = _recorder.SystemAudioActive;
+            UpdateMicUI();
+            UpdateSystemAudioUI();
+            if (!_recorder.HasSystemAudio)
             {
-                _systemAudioEnabled = false;
-                _audioEnabled = _micEnabled;
-                UpdateSystemAudioUI();
-                TxtAudioStatus.Text = "No audio";
+                TxtAudioStatus.Text = "No sys audio";
                 TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
-                return;
+            }
+            else
+            {
+                UpdateAudioStatusText();
             }
         }
         else
         {
-            _recorder.SetSystemAudioEnabled(_systemAudioEnabled);
+            _recorder.SetSystemAudioActive(enable);
+            _systemAudioEnabled = _recorder.SystemAudioActive;
+            UpdateSystemAudioUI();
+            UpdateAudioStatusText();
         }
-
-        if (!_micEnabled && !_systemAudioEnabled && _audioEnabled)
-        {
-            await _recorder.StopAudioAsync();
-            _audioEnabled = false;
-        }
-
-        UpdateAudioStatusText();
+        BtnSystemAudio.IsEnabled = true;
     }
 
     // ============ SHORTCUTS ============
@@ -238,8 +210,8 @@ public partial class RecordingOverlay : Window
             case 'A': SelectAnnotationTool("Arrow"); break;
             case 'R': SelectAnnotationTool("Rectangle"); break;
             case 'C': _annotationOverlay?.ClearAll(); break;
-            case 'M': Mic_Click(BtnMic, new RoutedEventArgs()); break;
-            case 'S': SystemAudio_Click(BtnSystemAudio, new RoutedEventArgs()); break;
+            case 'M': _ = ToggleMic(!_micEnabled); break;
+            case 'S': _ = ToggleSystemAudio(!_systemAudioEnabled); break;
             case ' ': Pause_Click(BtnPause, new RoutedEventArgs()); break;
             case 'Q': FinishRecording(); break;
         }
