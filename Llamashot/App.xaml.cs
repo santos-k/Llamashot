@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.IO;
-using System.Reflection;
 using System.Threading;
 using System.Windows;
 using System.Windows.Interop;
@@ -249,22 +248,15 @@ public partial class App : Application
         try
         {
             var result = await UpdateChecker.CheckForUpdateAsync();
-            if (result != null)
+            if (result != null && !_silentStart)
             {
-                if (silent && _silentStart)
-                {
-                    // Background check on silent startup — don't show anything
-                    return;
-                }
-
-                // Show dialog asking to download (works for both manual and background checks)
                 Dispatcher.Invoke(() =>
                 {
-                    var answer = MessageBox.Show(
-                        $"Llamashot {result.Version} is available (you have {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}).\n\nDownload and install now?",
-                        "Llamashot Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
-                    if (answer == MessageBoxResult.Yes)
-                        _ = DownloadAndInstallUpdateAsync(result);
+                    _trayIcon?.ShowBalloonTip(5000, "Llamashot Update Available",
+                        $"Version {result.Version} is available. Right-click tray icon > Check for Updates to download.",
+                        WinForms.ToolTipIcon.Info);
+
+                    _trayIcon!.BalloonTipClicked += (s, e) => _ = DownloadAndInstallUpdateAsync(result);
                 });
             }
             else if (!silent)
