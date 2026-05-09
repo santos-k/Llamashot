@@ -2,7 +2,7 @@
 
 A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text with a single hotkey.
 
-**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.6.0.exe)**
+**[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/releases/latest)**
 
 Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
@@ -32,10 +32,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Custom cursors** - Each tool shows a matching cursor icon
 
 ### Screen Recording
-- Record any selected region as MP4 video
+- Record any selected region as MP4 video (H.264 compressed)
 - **Unlimited duration**, 10fps
-- **Audio recording** - Microphone + system audio (loopback)
-- Toggle audio on/off during recording with mic button
+- **Separate mic and system audio toggles** - Independent on/off mid-recording
+- **Live annotations** - Draw pen, arrow, rectangle on screen during recording (P/A/R keys)
+- Keyboard shortcuts for all controls (M=mic, S=system audio, Space=pause, Q=stop)
 - Audio source status shown on recording bar (Mic / System / both)
 - Pause/resume with visual indicators
 - Red pulsing border shows recorded area
@@ -50,9 +51,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### Screenshot History
 - Thumbnails for all saved and copied screenshots
+- Responsive grid layout (3 columns default, adapts to window width)
 - Type badges: green "Saved", blue "Copied"
 - **Multi-select** with checkboxes and "Select All"
 - **Bulk copy** - Single image as clipboard, multiple as file drop list
+- **Save to file** - Per-item save button and bulk "Save Selected" to folder
 - **Delete** - Single or bulk delete with confirmation
 - One-click re-copy from history
 - Configurable storage location and max items
@@ -65,6 +68,9 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### Additional Features
 - **System tray** - Single click captures, double click opens settings
+- **Silent auto-start** - Launches with Windows without popups (`--silent` flag)
+- **Double-Esc emergency exit** - Global hard kill for any stuck overlay/recording
+- **Selection clamping** - Selection region can't extend beyond screen bounds
 - **Move tool (V)** - Drag selection and annotations together
 - **Space+drag** - Photoshop-style temporary pan
 - **Undo/Redo** - Ctrl+Z / Ctrl+Y
@@ -115,11 +121,25 @@ All 22 shortcuts are customizable in Settings.
 | Pan (temporary) | Space+drag |
 | Double-click | Toggle full region |
 | Close overlay | Escape |
+| **Double-Esc** | **Force close all overlays** |
+
+### Recording Shortcuts (global during recording)
+
+| Action | Default |
+|--------|---------|
+| Pen annotation | P |
+| Arrow annotation | A |
+| Rectangle annotation | R |
+| Clear annotations | C |
+| Toggle microphone | M |
+| Toggle system audio | S |
+| Pause / Resume | Space |
+| Stop recording | Q |
 
 ## Installation
 
 ### Installer
-Download and run `LlamashotSetup_v2.6.0.exe` from the [Releases](https://github.com/santos-k/Llamashot/raw/main/LlamashotSetup_v2.6.0.exe) page.
+Download and run the latest installer from the [Releases](https://github.com/santos-k/Llamashot/releases/latest) page.
 
 ### Build from Source
 ```bash

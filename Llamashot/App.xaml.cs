@@ -17,9 +17,19 @@ public partial class App : Application
     private HotkeyManager? _hotkeyManager;
     private Window? _hiddenWindow;
 
+    private bool _silentStart;
+
+    // Global keyboard hook (double-Esc kill + recording shortcuts)
+    private IntPtr _keyboardHook;
+    private NativeMethods.LowLevelKeyboardProc? _keyboardProc;
+    private DateTime _lastEscTime = DateTime.MinValue;
+    internal static Views.RecordingOverlay? ActiveRecordingOverlay { get; set; }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        _silentStart = e.Args.Contains("--silent");
 
         // Global exception handler - log to file, never show modal dialogs
         // (modal MessageBox behind a fullscreen overlay = system deadlock)
@@ -42,7 +52,8 @@ public partial class App : Application
         _mutex = new Mutex(true, "LlamashotAppMutex", out bool isNew);
         if (!isNew)
         {
-            MessageBox.Show("Llamashot is already running.", "Llamashot", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!_silentStart)
+                MessageBox.Show("Llamashot is already running.", "Llamashot", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -72,6 +83,9 @@ public partial class App : Application
             // System tray
             SetupTrayIcon();
 
+            // Global double-Esc kill switch
+            InstallEscapeHook();
+
             // Check for updates in background
             if (AppSettings.Instance.AutoCheckUpdates)
                 _ = CheckForUpdatesAsync(silent: true);
@@ -92,6 +106,79 @@ public partial class App : Application
         RegisterFromString(s.CaptureHotkey, StartRegionCapture);
         RegisterFromString(s.FullscreenSaveHotkey, FullscreenSave);
         RegisterFromString(s.FullscreenClipboardHotkey, FullscreenClipboard);
+    }
+
+    private void InstallEscapeHook()
+    {
+        _keyboardProc = EscapeHookCallback;
+        var module = NativeMethods.GetModuleHandle(null);
+        _keyboardHook = NativeMethods.SetWindowsHookEx(
+            NativeMethods.WH_KEYBOARD_LL, _keyboardProc, module, 0);
+    }
+
+    private IntPtr EscapeHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && (int)wParam == NativeMethods.WM_KEYDOWN)
+        {
+            uint vkCode = (uint)System.Runtime.InteropServices.Marshal.ReadInt32(lParam);
+
+            // Double-Esc: dismiss all overlays
+            if (vkCode == NativeMethods.VK_ESCAPE)
+            {
+                var now = DateTime.Now;
+                if ((now - _lastEscTime).TotalMilliseconds < 500)
+                {
+                    _lastEscTime = DateTime.MinValue;
+                    Dispatcher.BeginInvoke(DismissAllOverlays);
+                }
+                else
+                {
+                    _lastEscTime = now;
+                }
+            }
+
+            // Recording shortcuts (only when a Llamashot window is in foreground)
+            if (ActiveRecordingOverlay != null && IsOurWindowInForeground())
+            {
+                char key = vkCode switch
+                {
+                    0x50 => 'P', // P - Pen
+                    0x41 => 'A', // A - Arrow
+                    0x52 => 'R', // R - Rectangle
+                    0x43 => 'C', // C - Clear
+                    0x4D => 'M', // M - Mic toggle
+                    0x53 => 'S', // S - System audio toggle
+                    0x20 => ' ', // Space - Pause/Resume
+                    0x51 => 'Q', // Q - Stop
+                    _ => '\0'
+                };
+                if (key != '\0')
+                    Dispatcher.BeginInvoke(() => ActiveRecordingOverlay?.HandleShortcut(key));
+            }
+        }
+        return NativeMethods.CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
+    }
+
+    private static bool IsOurWindowInForeground()
+    {
+        var fg = NativeMethods.GetForegroundWindow();
+        if (fg == IntPtr.Zero) return false;
+        NativeMethods.GetWindowThreadProcessId(fg, out uint pid);
+        return pid == (uint)Environment.ProcessId;
+    }
+
+    private void DismissAllOverlays()
+    {
+        // Close all overlay windows (screenshot, recording, annotation, borders)
+        var windows = Windows.Cast<Window>().ToList();
+        foreach (var w in windows)
+        {
+            if (w is Views.OverlayWindow or Views.RecordingOverlay
+                or Views.RecordingAnnotation or Views.RecordingBorder)
+            {
+                try { w.Close(); } catch { }
+            }
+        }
     }
 
     private void RegisterFromString(string shortcut, Action callback)
@@ -161,7 +248,7 @@ public partial class App : Application
         try
         {
             var result = await UpdateChecker.CheckForUpdateAsync();
-            if (result != null)
+            if (result != null && !_silentStart)
             {
                 Dispatcher.Invoke(() =>
                 {
@@ -348,6 +435,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_keyboardHook != IntPtr.Zero)
+            NativeMethods.UnhookWindowsHookEx(_keyboardHook);
         _hotkeyManager?.Dispose();
         if (_trayIcon != null)
         {

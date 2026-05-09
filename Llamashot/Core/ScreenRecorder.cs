@@ -18,20 +18,22 @@ public class ScreenRecorder : IDisposable
     private string? _framesDir;
     private int _frameCount;
 
-    // Audio recording via AudioGraph
+    // Audio
     private Windows.Media.Audio.AudioGraph? _audioGraph;
     private Windows.Media.Audio.AudioDeviceInputNode? _audioMicNode;
     private Windows.Media.Audio.AudioDeviceInputNode? _audioLoopbackNode;
     private Windows.Media.Audio.AudioFileOutputNode? _audioOutputNode;
     private string? _audioFilePath;
-    private bool _audioActive;
 
     public bool IsRecording => _recording;
     public bool IsPaused => _paused;
-    public bool AudioActive => _audioActive;
     public bool HasMic { get; private set; }
     public bool HasSystemAudio { get; private set; }
+    public bool MicActive { get; private set; }
+    public bool SystemAudioActive { get; private set; }
+    public bool AudioGraphRunning => _audioGraph != null;
     public int FramesCaptured => _frameCount;
+    public string? LastError { get; private set; }
 
     public TimeSpan Elapsed
     {
@@ -58,7 +60,6 @@ public class ScreenRecorder : IDisposable
 
         _regionX = x;
         _regionY = y;
-        // H.264 requires even dimensions
         _regionW = width % 2 == 0 ? width : width - 1;
         _regionH = height % 2 == 0 ? height : height - 1;
         _frameCount = 0;
@@ -74,9 +75,15 @@ public class ScreenRecorder : IDisposable
         return true;
     }
 
-    public async Task<bool> StartAudioAsync()
+    // ============ AUDIO ============
+
+    /// <summary>
+    /// Creates audio graph with mic and system audio nodes. Both are created but
+    /// individually started/stopped. Call once, then use SetMic/SetSystemAudio to toggle.
+    /// </summary>
+    public async Task<bool> InitAudioAsync(bool enableMic, bool enableSystemAudio)
     {
-        if (_framesDir == null || !_recording) return false;
+        if (_framesDir == null || !_recording || _audioGraph != null) return false;
 
         try
         {
@@ -88,33 +95,30 @@ public class ScreenRecorder : IDisposable
 
             var graphResult = await Windows.Media.Audio.AudioGraph.CreateAsync(settings);
             if (graphResult.Status != Windows.Media.Audio.AudioGraphCreationStatus.Success)
-                return false;
-
-            _audioGraph = graphResult.Graph;
-
-            // Create file output node
-            var folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(_framesDir);
-            var audioFile = await folder.CreateFileAsync("audio.wav",
-                Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-            var wavProfile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateWav(
-                Windows.Media.MediaProperties.AudioEncodingQuality.Medium);
-
-            var outputResult = await _audioGraph.CreateFileOutputNodeAsync(audioFile, wavProfile);
-            if (outputResult.Status != Windows.Media.Audio.AudioFileNodeCreationStatus.Success)
             {
-                _audioGraph.Dispose();
-                _audioGraph = null;
+                LastError = $"AudioGraph creation failed: {graphResult.Status}";
                 return false;
             }
 
+            _audioGraph = graphResult.Graph;
+
+            // Create output file
+            var folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(_framesDir);
+            var audioFile = await folder.CreateFileAsync("audio.wav",
+                Windows.Storage.CreationCollisionOption.ReplaceExisting);
+            var wavProfile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateWav(
+                Windows.Media.MediaProperties.AudioEncodingQuality.Medium);
+            var outputResult = await _audioGraph.CreateFileOutputNodeAsync(audioFile, wavProfile);
+            if (outputResult.Status != Windows.Media.Audio.AudioFileNodeCreationStatus.Success)
+            {
+                LastError = $"Audio output node failed: {outputResult.Status}";
+                _audioGraph.Dispose(); _audioGraph = null;
+                return false;
+            }
             _audioOutputNode = outputResult.FileOutputNode;
             _audioFilePath = Path.Combine(_framesDir, "audio.wav");
 
-            bool hasMic = false;
-            bool hasLoopback = false;
-
-            // Try microphone input
+            // Try creating mic node
             try
             {
                 var micResult = await _audioGraph.CreateDeviceInputNodeAsync(
@@ -123,20 +127,51 @@ public class ScreenRecorder : IDisposable
                 {
                     _audioMicNode = micResult.DeviceInputNode;
                     _audioMicNode.AddOutgoingConnection(_audioOutputNode);
-                    hasMic = true;
+                    HasMic = true;
+                    if (!enableMic)
+                    {
+                        _audioMicNode.OutgoingGain = 0;
+                        MicActive = false;
+                    }
+                    else
+                    {
+                        MicActive = true;
+                    }
                 }
             }
             catch { }
 
-            // Try system audio (loopback from render device)
+            // Try creating loopback node — try multiple methods
             try
             {
-                var renderId = Windows.Media.Devices.MediaDevice.GetDefaultAudioRenderId(
-                    Windows.Media.Devices.AudioDeviceRole.Default);
-                if (!string.IsNullOrEmpty(renderId))
+                Windows.Devices.Enumeration.DeviceInformation? renderDevice = null;
+
+                // Method 1: Use audio render selector
+                try
                 {
-                    var renderDevice = await Windows.Devices.Enumeration.DeviceInformation
-                        .CreateFromIdAsync(renderId);
+                    var selector = Windows.Media.Devices.MediaDevice.GetAudioRenderSelector();
+                    var devices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
+                    if (devices.Count > 0)
+                        renderDevice = devices[0];
+                }
+                catch { }
+
+                // Method 2: Use default render device ID
+                if (renderDevice == null)
+                {
+                    try
+                    {
+                        var renderId = Windows.Media.Devices.MediaDevice.GetDefaultAudioRenderId(
+                            Windows.Media.Devices.AudioDeviceRole.Default);
+                        if (!string.IsNullOrEmpty(renderId))
+                            renderDevice = await Windows.Devices.Enumeration.DeviceInformation
+                                .CreateFromIdAsync(renderId);
+                    }
+                    catch { }
+                }
+
+                if (renderDevice != null)
+                {
                     var loopbackResult = await _audioGraph.CreateDeviceInputNodeAsync(
                         Windows.Media.Capture.MediaCategory.Media,
                         _audioGraph.EncodingProperties,
@@ -145,46 +180,61 @@ public class ScreenRecorder : IDisposable
                     {
                         _audioLoopbackNode = loopbackResult.DeviceInputNode;
                         _audioLoopbackNode.AddOutgoingConnection(_audioOutputNode);
-                        hasLoopback = true;
+                        HasSystemAudio = true;
+                        if (!enableSystemAudio)
+                        {
+                            _audioLoopbackNode.OutgoingGain = 0;
+                            SystemAudioActive = false;
+                        }
+                        else
+                        {
+                            SystemAudioActive = true;
+                        }
                     }
                 }
             }
             catch { }
 
-            if (!hasMic && !hasLoopback)
+            if (!HasMic && !HasSystemAudio)
             {
-                // Neither worked — clean up
                 _audioOutputNode = null;
-                _audioGraph.Dispose();
-                _audioGraph = null;
+                _audioGraph.Dispose(); _audioGraph = null;
                 _audioFilePath = null;
+                LastError = "No audio devices available";
                 return false;
             }
 
-            HasMic = hasMic;
-            HasSystemAudio = hasLoopback;
             _audioGraph.Start();
-            _audioActive = true;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
-            await StopAudioAsync();
+            LastError = ex.Message;
+            try { _audioGraph?.Dispose(); } catch { }
+            _audioGraph = null;
             return false;
         }
     }
 
+    /// <summary>Toggle mic on/off via gain (no node creation/destruction).</summary>
+    public void SetMicActive(bool active)
+    {
+        MicActive = active && HasMic;
+        if (_audioMicNode != null)
+            _audioMicNode.OutgoingGain = active ? 1.0 : 0.0;
+    }
+
+    /// <summary>Toggle system audio on/off via gain (no node creation/destruction).</summary>
+    public void SetSystemAudioActive(bool active)
+    {
+        SystemAudioActive = active && HasSystemAudio;
+        if (_audioLoopbackNode != null)
+            _audioLoopbackNode.OutgoingGain = active ? 1.0 : 0.0;
+    }
+
     public async Task StopAudioAsync()
     {
-        if (_audioGraph == null && _audioOutputNode == null)
-        {
-            _audioActive = false;
-            HasMic = false;
-            HasSystemAudio = false;
-            return;
-        }
-
-        _audioGraph?.Stop();
+        try { _audioGraph?.Stop(); } catch { }
 
         if (_audioOutputNode != null)
         {
@@ -192,16 +242,16 @@ public class ScreenRecorder : IDisposable
             _audioOutputNode = null;
         }
 
-        _audioMicNode?.Dispose();
-        _audioMicNode = null;
-        _audioLoopbackNode?.Dispose();
-        _audioLoopbackNode = null;
-        _audioGraph?.Dispose();
-        _audioGraph = null;
-        _audioActive = false;
+        try { _audioMicNode?.Dispose(); } catch { } _audioMicNode = null;
+        try { _audioLoopbackNode?.Dispose(); } catch { } _audioLoopbackNode = null;
+        try { _audioGraph?.Dispose(); } catch { } _audioGraph = null;
         HasMic = false;
         HasSystemAudio = false;
+        MicActive = false;
+        SystemAudioActive = false;
     }
+
+    // ============ RECORDING CONTROLS ============
 
     public void Pause()
     {
@@ -209,7 +259,7 @@ public class ScreenRecorder : IDisposable
         _paused = true;
         _pausedElapsed += DateTime.Now - _startTime;
         _timer.Stop();
-        _audioGraph?.Stop();
+        try { _audioGraph?.Stop(); } catch { }
     }
 
     public void Resume()
@@ -218,7 +268,8 @@ public class ScreenRecorder : IDisposable
         _paused = false;
         _startTime = DateTime.Now;
         _timer.Start();
-        if (_audioActive) _audioGraph?.Start();
+        if (_audioGraph != null)
+            try { _audioGraph.Start(); } catch { }
     }
 
     public void Stop()
@@ -226,34 +277,29 @@ public class ScreenRecorder : IDisposable
         if (!_recording) return;
         if (!_paused)
             _pausedElapsed += DateTime.Now - _startTime;
-
         _recording = false;
         _paused = false;
         _timer.Stop();
-        _audioGraph?.Stop();
+        try { _audioGraph?.Stop(); } catch { }
     }
 
-    public async Task<bool> SaveAsMp4Async(string outputPath)
+    // ============ SAVE ============
+
+    public async Task<bool> SaveAsync(string outputPath)
     {
         if (_framesDir == null || _frameCount == 0) return false;
 
         try
         {
-            // Finalize audio file before composing
+            // Finalize audio
             if (_audioOutputNode != null)
             {
                 try { await _audioOutputNode.FinalizeAsync(); } catch { }
                 _audioOutputNode = null;
             }
-
-            // Dispose audio graph after finalizing
-            _audioMicNode?.Dispose();
-            _audioMicNode = null;
-            _audioLoopbackNode?.Dispose();
-            _audioLoopbackNode = null;
-            _audioGraph?.Dispose();
-            _audioGraph = null;
-            _audioActive = false;
+            try { _audioMicNode?.Dispose(); } catch { } _audioMicNode = null;
+            try { _audioLoopbackNode?.Dispose(); } catch { } _audioLoopbackNode = null;
+            try { _audioGraph?.Dispose(); } catch { } _audioGraph = null;
 
             var composition = new Windows.Media.Editing.MediaComposition();
             var frameDuration = TimeSpan.FromMilliseconds(1000.0 / _fps);
@@ -262,7 +308,6 @@ public class ScreenRecorder : IDisposable
             {
                 var framePath = Path.Combine(_framesDir, $"frame_{i:D6}.jpg");
                 if (!File.Exists(framePath)) continue;
-
                 var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(framePath);
                 var clip = await Windows.Media.Editing.MediaClip.CreateFromImageFileAsync(file, frameDuration);
                 composition.Clips.Add(clip);
@@ -270,12 +315,12 @@ public class ScreenRecorder : IDisposable
 
             if (composition.Clips.Count == 0) return false;
 
-            // Add audio track if available
-            if (_audioFilePath != null && File.Exists(_audioFilePath))
+            bool hasAudio = _audioFilePath != null && File.Exists(_audioFilePath);
+            if (hasAudio)
             {
                 try
                 {
-                    var audioFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(_audioFilePath);
+                    var audioFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(_audioFilePath!);
                     var audioTrack = await Windows.Media.Editing.BackgroundAudioTrack
                         .CreateFromFileAsync(audioFile);
                     composition.BackgroundAudioTracks.Add(audioTrack);
@@ -295,15 +340,12 @@ public class ScreenRecorder : IDisposable
 
             var dir = Path.GetDirectoryName(outputPath)!;
             Directory.CreateDirectory(dir);
-
             var outputFolder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(dir);
             var outputFile = await outputFolder.CreateFileAsync(
-                Path.GetFileName(outputPath),
-                Windows.Storage.CreationCollisionOption.ReplaceExisting);
+                Path.GetFileName(outputPath), Windows.Storage.CreationCollisionOption.ReplaceExisting);
 
             await composition.RenderToFileAsync(outputFile,
                 Windows.Media.Editing.MediaTrimmingPreference.Precise, profile);
-
             return true;
         }
         catch (Exception ex)
@@ -312,8 +354,6 @@ public class ScreenRecorder : IDisposable
             return false;
         }
     }
-
-    public string? LastError { get; private set; }
 
     public void CleanupFrames()
     {
@@ -324,6 +364,8 @@ public class ScreenRecorder : IDisposable
         }
         _audioFilePath = null;
     }
+
+    // ============ FRAME CAPTURE ============
 
     private void CaptureFrame(object? sender, EventArgs e)
     {
@@ -340,9 +382,7 @@ public class ScreenRecorder : IDisposable
                 _regionX, _regionY, NativeMethods.SRCCOPY | NativeMethods.CAPTUREBLT);
 
             NativeMethods.SelectObject(memDc, old);
-
             using var bmp = DrawBitmap.FromHbitmap(hBmp);
-
             NativeMethods.DeleteObject(hBmp);
             NativeMethods.DeleteDC(memDc);
             NativeMethods.ReleaseDC(IntPtr.Zero, hdc);
@@ -361,8 +401,8 @@ public class ScreenRecorder : IDisposable
         if (_disposed) return;
         _disposed = true;
         Stop();
-        _audioMicNode?.Dispose();
-        _audioLoopbackNode?.Dispose();
-        _audioGraph?.Dispose();
+        try { _audioMicNode?.Dispose(); } catch { }
+        try { _audioLoopbackNode?.Dispose(); } catch { }
+        try { _audioGraph?.Dispose(); } catch { }
     }
 }

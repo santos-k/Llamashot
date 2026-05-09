@@ -443,7 +443,7 @@ public partial class SettingsWindow : Window
         {
             var exePath = Environment.ProcessPath;
             if (exePath != null)
-                key.SetValue(valueName, $"\"{exePath}\"");
+                key.SetValue(valueName, $"\"{exePath}\" --silent");
         }
         else
         {
