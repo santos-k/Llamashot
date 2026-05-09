@@ -3,594 +3,1319 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Llamashot - Screenshot, Annotate, Record</title>
+    <title>Llamashot - Screenshot, Annotate, Record & OCR for Windows</title>
+    <meta name="description" content="Llamashot is a fast, lightweight screenshot and screen recording tool for Windows. Capture regions, annotate with 11 tools, record screen with audio, extract text with OCR, and more.">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="keywords" content="screenshot tool, screen recording, screen capture, annotation, OCR, Windows, WPF, open source, free">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Llamashot - Screenshot, Annotate, Record & OCR">
+    <meta property="og:description" content="A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text.">
+    <meta property="og:image" content="assets/icon-web.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Llamashot - Screenshot, Annotate, Record & OCR">
+    <meta name="twitter:description" content="A fast, lightweight screenshot and screen recording tool for Windows.">
+    <meta name="twitter:image" content="assets/icon-web.png">
+
     <link rel="icon" type="image/png" href="assets/favicon.png">
     <link rel="apple-touch-icon" href="assets/icon-web.png">
     <style>
         :root {
-            --bg: #0d1117;
-            --card: #161b22;
-            --border: #30363d;
+            --bg: #0a0e14;
+            --bg2: #0d1117;
+            --card: #151b23;
+            --card2: #1c2333;
+            --border: #2a3140;
             --text: #e6edf3;
-            --muted: #8b949e;
+            --muted: #9da5ae;
             --accent: #42a5f5;
             --accent2: #1e88e5;
+            --accent-glow: rgba(66,165,245,0.15);
             --green: #4caf50;
             --red: #f44336;
             --orange: #ffa726;
             --purple: #ab47bc;
             --cyan: #26c6da;
+            --yellow: #ffeb3b;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
-            line-height: 1.6;
+            line-height: 1.7;
+            overflow-x: hidden;
         }
         a { color: var(--accent); text-decoration: none; }
         a:hover { text-decoration: underline; }
 
+        /* Animations */
+        @keyframes float { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
+        @keyframes pulse-glow { 0%,100%{ box-shadow: 0 0 20px rgba(66,165,245,0.2); } 50%{ box-shadow: 0 0 40px rgba(66,165,245,0.4); } }
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
+        .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+        /* Skip to content */
+        .skip-link {
+            position: absolute; top: -100%; left: 16px;
+            background: var(--accent); color: #fff; padding: 8px 16px;
+            border-radius: 0 0 8px 8px; z-index: 1001; font-weight: 600;
+        }
+        .skip-link:focus { top: 0; text-decoration: none; }
+
+        /* Navigation */
+        .site-nav {
+            position: sticky; top: 0; z-index: 1000;
+            background: rgba(10, 14, 20, 0.88);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 20px;
+        }
+        .nav-inner {
+            max-width: 1200px; margin: 0 auto;
+            display: flex; align-items: center; justify-content: space-between; height: 60px;
+        }
+        .nav-brand {
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 800; font-size: 1.2rem; color: var(--text);
+        }
+        .nav-brand:hover { text-decoration: none; }
+        .nav-brand img { width: 32px; height: 32px; border-radius: 8px; }
+        .nav-brand span { color: var(--accent); }
+        .nav-links { display: flex; gap: 28px; align-items: center; }
+        .nav-links a { color: var(--muted); font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--text); text-decoration: none; }
+        .nav-links .btn { padding: 8px 20px; font-size: 0.85rem; }
+
+        /* Buttons */
+        .btn {
+            display: inline-block; padding: 14px 36px; border-radius: 10px;
+            font-size: 1rem; font-weight: 600; cursor: pointer;
+            border: none; transition: all 0.25s; text-decoration: none;
+        }
+        .btn:hover { text-decoration: none; }
+        .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff; box-shadow: 0 4px 20px rgba(66,165,245,0.3);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(66,165,245,0.45); }
+        .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sm { padding: 10px 24px; font-size: 0.9rem; }
+
         /* Hero */
         .hero {
             text-align: center;
-            padding: 80px 20px 60px;
-            background: linear-gradient(135deg, #0d1117 0%, #1a1f2e 50%, #0d1117 100%);
-            border-bottom: 1px solid var(--border);
+            padding: 100px 20px 80px;
+            background: radial-gradient(ellipse at 50% 0%, rgba(66,165,245,0.08) 0%, transparent 60%),
+                        linear-gradient(180deg, #0d1117 0%, #0a0e14 100%);
+            position: relative; overflow: hidden;
         }
-        .hero h1 { font-size: 3rem; font-weight: 800; margin-bottom: 8px; }
+        .hero::before {
+            content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+            width: 600px; height: 600px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(66,165,245,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-icon {
+            width: 110px; height: 110px; border-radius: 26px; margin-bottom: 28px;
+            box-shadow: 0 8px 40px rgba(66,165,245,0.3);
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+        .hero h1 { font-size: 3.5rem; font-weight: 800; margin-bottom: 12px; letter-spacing: -0.02em; }
         .hero h1 span { color: var(--accent); }
-        .hero p { font-size: 1.25rem; color: var(--muted); max-width: 600px; margin: 0 auto 32px; }
-        .hero-badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .hero .tagline {
+            font-size: 1.3rem; color: var(--muted); max-width: 650px;
+            margin: 0 auto 20px; line-height: 1.5;
+        }
+        .hero .sub-tagline {
+            font-size: 0.95rem; color: var(--muted); opacity: 0.7;
+            margin-bottom: 32px;
+        }
+        .hero-badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
         .badge {
-            display: inline-block;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
+            display: inline-block; padding: 6px 18px; border-radius: 20px;
+            font-size: 0.82rem; font-weight: 600;
         }
-        .badge-blue { background: rgba(66,165,245,0.15); color: var(--accent); border: 1px solid rgba(66,165,245,0.3); }
-        .badge-green { background: rgba(76,175,80,0.15); color: var(--green); border: 1px solid rgba(76,175,80,0.3); }
-        .badge-purple { background: rgba(171,71,188,0.15); color: var(--purple); border: 1px solid rgba(171,71,188,0.3); }
+        .badge-blue { background: rgba(66,165,245,0.12); color: var(--accent); border: 1px solid rgba(66,165,245,0.25); }
+        .badge-green { background: rgba(76,175,80,0.12); color: var(--green); border: 1px solid rgba(76,175,80,0.25); }
+        .badge-purple { background: rgba(171,71,188,0.12); color: var(--purple); border: 1px solid rgba(171,71,188,0.25); }
+        .cta-buttons { margin-top: 36px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 
-        .cta-buttons { margin-top: 32px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-        .btn {
-            padding: 12px 32px;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
+        /* Stats Bar */
+        .stats-bar {
+            display: flex; justify-content: center; gap: 48px; flex-wrap: wrap;
+            padding: 48px 20px; border-bottom: 1px solid var(--border);
+            background: var(--bg2);
         }
-        .btn-primary { background: var(--accent); color: #fff; }
-        .btn-primary:hover { background: var(--accent2); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(66,165,245,0.4); }
-        .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
-        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .stat { text-align: center; }
+        .stat .num { font-size: 2.2rem; font-weight: 800; color: var(--accent); line-height: 1; }
+        .stat .label { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
 
         /* Sections */
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
-        section { padding: 80px 0; }
-        section:nth-child(even) { background: var(--card); }
-        .section-title {
-            text-align: center;
-            margin-bottom: 48px;
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        section { padding: 100px 0; }
+        .section-alt { background: var(--bg2); }
+        .section-title { text-align: center; margin-bottom: 56px; }
+        .section-title h2 { font-size: 2.4rem; margin-bottom: 12px; font-weight: 800; letter-spacing: -0.01em; }
+        .section-title .accent { color: var(--accent); }
+        .section-title p { color: var(--muted); font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+        .section-label {
+            display: inline-block; padding: 4px 14px; border-radius: 16px;
+            font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+            margin-bottom: 16px;
         }
-        .section-title h2 { font-size: 2rem; margin-bottom: 8px; }
-        .section-title p { color: var(--muted); font-size: 1.1rem; }
+        .label-blue { background: rgba(66,165,245,0.12); color: var(--accent); }
+        .label-red { background: rgba(244,67,54,0.12); color: var(--red); }
+        .label-green { background: rgba(76,175,80,0.12); color: var(--green); }
+        .label-purple { background: rgba(171,71,188,0.12); color: var(--purple); }
+        .label-cyan { background: rgba(38,198,218,0.12); color: var(--cyan); }
+        .label-orange { background: rgba(255,167,38,0.12); color: var(--orange); }
+        .text-center { text-align: center; }
 
-        /* Feature Cards with Illustrations */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 24px;
+        /* Feature Detail Row (alternating layout) */
+        .feature-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+            align-items: center; margin-bottom: 100px;
         }
-        .feature-card {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            overflow: hidden;
-            transition: border-color 0.3s, transform 0.3s;
+        .feature-row:last-child { margin-bottom: 0; }
+        .feature-row.reverse .feature-text { order: 2; }
+        .feature-row.reverse .feature-visual { order: 1; }
+        .feature-text h3 { font-size: 1.8rem; font-weight: 700; margin-bottom: 16px; line-height: 1.3; }
+        .feature-text p { color: var(--muted); font-size: 1rem; margin-bottom: 20px; line-height: 1.7; }
+        .feature-list { list-style: none; padding: 0; }
+        .feature-list li {
+            padding: 8px 0; padding-left: 28px; position: relative;
+            color: var(--muted); font-size: 0.95rem;
         }
-        .feature-card:hover { border-color: var(--accent); transform: translateY(-6px); }
-        .feature-illust {
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
+        .feature-list li::before {
+            content: ''; position: absolute; left: 0; top: 15px;
+            width: 8px; height: 8px; border-radius: 50%;
         }
-        .feature-card .info {
-            padding: 20px 24px 24px;
-        }
-        .feature-card h3 { font-size: 1.1rem; margin-bottom: 6px; font-weight: 700; }
-        .feature-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+        .feature-list.blue li::before { background: var(--accent); }
+        .feature-list.red li::before { background: var(--red); }
+        .feature-list.green li::before { background: var(--green); }
+        .feature-list.purple li::before { background: var(--purple); }
+        .feature-list.cyan li::before { background: var(--cyan); }
+        .feature-list.orange li::before { background: var(--orange); }
+        .feature-list li strong { color: var(--text); }
 
-        /* Illustration backgrounds */
-        .illust-blue { background: linear-gradient(135deg, #1a2a4a, #1e3a5f); }
-        .illust-red { background: linear-gradient(135deg, #2a1a1a, #3f1e1e); }
-        .illust-green { background: linear-gradient(135deg, #1a2a1a, #1e3f2e); }
-        .illust-cyan { background: linear-gradient(135deg, #1a2a2a, #1e3f3f); }
-        .illust-orange { background: linear-gradient(135deg, #2a2a1a, #3f3520); }
-        .illust-purple { background: linear-gradient(135deg, #2a1a2a, #3f1e3f); }
-
-        /* Tools Showcase */
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-            gap: 14px;
-        }
-        .tool-item {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 16px 12px;
-            text-align: center;
-            transition: border-color 0.3s, transform 0.2s;
-        }
-        .tool-item:hover { border-color: var(--accent); transform: translateY(-2px); }
-        .tool-item .key {
-            display: inline-block;
+        /* Feature Visual (illustration container) */
+        .feature-visual {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 2px 10px;
-            font-family: 'Consolas', monospace;
-            font-size: 0.85rem;
-            color: var(--accent);
-            margin-top: 8px;
+            border-radius: 20px;
+            padding: 32px;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 360px;
+            position: relative; overflow: hidden;
         }
-        .tool-item .name { font-weight: 600; font-size: 0.9rem; }
+        .feature-visual::before {
+            content: ''; position: absolute; inset: 0;
+            border-radius: 20px; pointer-events: none;
+        }
+        .fv-blue::before { background: linear-gradient(135deg, rgba(66,165,245,0.05), transparent 60%); }
+        .fv-red::before { background: linear-gradient(135deg, rgba(244,67,54,0.05), transparent 60%); }
+        .fv-green::before { background: linear-gradient(135deg, rgba(76,175,80,0.05), transparent 60%); }
+        .fv-purple::before { background: linear-gradient(135deg, rgba(171,71,188,0.05), transparent 60%); }
+        .fv-cyan::before { background: linear-gradient(135deg, rgba(38,198,218,0.05), transparent 60%); }
+        .fv-orange::before { background: linear-gradient(135deg, rgba(255,167,38,0.05), transparent 60%); }
+
+        /* Quick Feature Cards (3-column) */
+        .features-grid-3 {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+        }
+        .qf-card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 32px 28px;
+            transition: border-color 0.3s, transform 0.3s;
+        }
+        .qf-card:hover { border-color: var(--accent); transform: translateY(-4px); }
+        .qf-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 16px; font-size: 1.3rem;
+        }
+        .qf-icon.blue { background: rgba(66,165,245,0.12); color: var(--accent); }
+        .qf-icon.green { background: rgba(76,175,80,0.12); color: var(--green); }
+        .qf-icon.red { background: rgba(244,67,54,0.12); color: var(--red); }
+        .qf-icon.purple { background: rgba(171,71,188,0.12); color: var(--purple); }
+        .qf-icon.cyan { background: rgba(38,198,218,0.12); color: var(--cyan); }
+        .qf-icon.orange { background: rgba(255,167,38,0.12); color: var(--orange); }
+        .qf-card h4 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+        .qf-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+
+        /* Tools Grid */
+        .tools-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;
+        }
+        .tool-item {
+            background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px 14px; text-align: center;
+            transition: border-color 0.3s, transform 0.2s, box-shadow 0.3s;
+        }
+        .tool-item:hover {
+            border-color: var(--accent); transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(66,165,245,0.1);
+        }
+        .tool-item .tool-icon { font-size: 1.4rem; margin-bottom: 8px; }
+        .tool-item .name { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+        .tool-item .desc { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; line-height: 1.3; }
+        .tool-item kbd {
+            display: inline-block; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 6px;
+            padding: 2px 10px; font-family: 'Consolas', 'SF Mono', monospace;
+            font-size: 0.8rem; color: var(--accent);
+        }
 
         /* Shortcuts Table */
-        .shortcuts-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 24px;
+        .shortcuts-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+        .shortcut-group { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+        .shortcut-group h4 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+        .shortcut-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid rgba(42,49,64,0.5);
         }
-        .shortcuts-table th, .shortcuts-table td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
+        .shortcut-row:last-child { border-bottom: none; }
+        .shortcut-row .action { color: var(--muted); font-size: 0.88rem; }
+        .shortcut-row kbd {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 3px 10px; font-family: 'Consolas', monospace;
+            font-size: 0.82rem; color: var(--accent);
         }
-        .shortcuts-table th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
-        .shortcuts-table td:last-child { font-family: 'Consolas', monospace; color: var(--accent); }
-        .shortcuts-table tr:hover { background: rgba(66,165,245,0.05); }
+
+        /* Settings Feature Grid */
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+        .setting-card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px;
+        }
+        .setting-card h4 { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+        .setting-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+        .setting-items { list-style: none; padding: 0; margin-top: 12px; }
+        .setting-items li {
+            padding: 6px 0; padding-left: 20px; position: relative;
+            color: var(--muted); font-size: 0.85rem;
+        }
+        .setting-items li::before {
+            content: ''; position: absolute; left: 0; top: 12px;
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+        }
 
         /* Tech Stack */
-        .tech-stack {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            justify-content: center;
-            margin-top: 24px;
-        }
+        .tech-stack { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 24px; }
         .tech-tag {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 8px 20px;
-            font-size: 0.9rem;
+            background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+            padding: 10px 22px; font-size: 0.9rem; transition: border-color 0.3s;
         }
+        .tech-tag:hover { border-color: var(--accent); }
+
+        /* System Requirements */
+        .req-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 32px; }
+        .req-item {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 24px; text-align: center;
+        }
+        .req-item .req-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+        .req-item .req-value { font-size: 1.1rem; font-weight: 700; }
+
+        /* CTA Section */
+        .cta-section {
+            text-align: center; padding: 100px 20px;
+            background: radial-gradient(ellipse at 50% 100%, rgba(66,165,245,0.06) 0%, transparent 60%),
+                        var(--bg);
+        }
+        .cta-section h2 { font-size: 2.4rem; font-weight: 800; margin-bottom: 12px; }
+        .cta-section p { color: var(--muted); font-size: 1.1rem; margin-bottom: 36px; }
+        .version-note { margin-top: 24px; color: var(--muted); font-size: 0.88rem; }
 
         /* Footer */
         footer {
-            text-align: center;
-            padding: 40px 20px;
-            border-top: 1px solid var(--border);
-            color: var(--muted);
+            text-align: center; padding: 48px 20px;
+            border-top: 1px solid var(--border); color: var(--muted);
         }
         footer .heart { color: var(--red); }
+        .footer-links { display: flex; justify-content: center; gap: 24px; margin-top: 12px; }
+        .footer-links a { color: var(--muted); font-size: 0.85rem; }
+        .footer-links a:hover { color: var(--accent); }
+        .footer-sub { margin-top: 16px; font-size: 0.82rem; opacity: 0.6; }
+
+        /* Back to top */
+        .back-to-top {
+            position: fixed; bottom: 32px; right: 32px;
+            width: 46px; height: 46px; border-radius: 50%;
+            background: var(--card); border: 1px solid var(--border);
+            color: var(--text); font-size: 1.2rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s, transform 0.2s, background 0.2s;
+            z-index: 999;
+        }
+        .back-to-top.visible { opacity: 1; pointer-events: auto; }
+        .back-to-top:hover { background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
+        .back-to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         /* Responsive */
         @media (max-width: 1024px) {
-            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .feature-row { grid-template-columns: 1fr; gap: 40px; }
+            .feature-row.reverse .feature-text { order: 1; }
+            .feature-row.reverse .feature-visual { order: 2; }
+            .features-grid-3 { grid-template-columns: repeat(2, 1fr); }
+            .shortcuts-section { grid-template-columns: 1fr; }
+            .settings-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.4rem; }
+            .hero .tagline { font-size: 1.1rem; }
+            .section-title h2 { font-size: 1.8rem; }
+            .feature-text h3 { font-size: 1.4rem; }
+            .features-grid-3 { grid-template-columns: 1fr; }
+            .stats-bar { gap: 32px; }
+            .req-grid { grid-template-columns: 1fr; }
+            .tools-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
         }
         @media (max-width: 640px) {
             .hero h1 { font-size: 2rem; }
-            .features-grid { grid-template-columns: 1fr; }
+            .hero-icon { width: 80px; height: 80px; border-radius: 18px; }
+            .nav-links a:not(.btn) { display: none; }
+            .nav-inner { height: 50px; }
+            section { padding: 64px 0; }
+            .feature-visual { min-height: 260px; padding: 20px; }
         }
     </style>
 </head>
 <body>
 
+<a href="#main" class="skip-link">Skip to content</a>
+
+<!-- Navigation -->
+<nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+        <a href="#" class="nav-brand">
+            <img src="assets/favicon.png" alt="">
+            <span>Llama</span>shot
+        </a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#tools">Tools</a>
+            <a href="#shortcuts">Shortcuts</a>
+            <a href="#settings">Settings</a>
+            <a href="#download" class="btn btn-primary btn-sm">Download</a>
+        </div>
+    </div>
+</nav>
+
 <!-- Hero -->
-<div class="hero">
-    <img src="assets/icon-web.png" alt="Llamashot" style="width:100px;height:100px;border-radius:22px;margin-bottom:24px;box-shadow:0 8px 32px rgba(66,165,245,0.3);" />
+<header class="hero">
+    <img src="assets/icon-web.png" alt="Llamashot icon" class="hero-icon" />
     <h1><span>Llama</span>shot</h1>
-    <p>A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text.</p>
+    <p class="tagline">The all-in-one screenshot, screen recording, and annotation tool for Windows.</p>
+    <p class="sub-tagline">Capture. Annotate. Record. Extract text. All in one lightweight app.</p>
     <div class="hero-badges">
         <span class="badge badge-blue">WPF / .NET 10</span>
-        <span class="badge badge-green">Open Source</span>
+        <span class="badge badge-green">Free &amp; Open Source</span>
         <span class="badge badge-purple">Windows 10/11</span>
     </div>
     <div class="cta-buttons">
         <a href="https://github.com/santos-k/Llamashot/releases/latest" class="btn btn-primary">Download Installer</a>
-        <a href="#features" class="btn btn-outline">Explore Features</a>
+        <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View on GitHub</a>
     </div>
+</header>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+    <div class="stat"><div class="num">11</div><div class="label">Annotation Tools</div></div>
+    <div class="stat"><div class="num">22+</div><div class="label">Keyboard Shortcuts</div></div>
+    <div class="stat"><div class="num">~28</div><div class="label">MB RAM Usage</div></div>
+    <div class="stat"><div class="num">3</div><div class="label">Capture Modes</div></div>
+    <div class="stat"><div class="num">3</div><div class="label">Export Formats</div></div>
 </div>
 
-<!-- Core Features with Illustrations -->
+<main id="main">
+
+<!-- ========== DETAILED FEATURE SECTIONS ========== -->
+
+<!-- 1. Region Capture -->
 <section id="features">
     <div class="container">
         <div class="section-title">
-            <h2>Everything You Need</h2>
-            <p>Screenshot, annotate, record, and extract text &mdash; all in one lightweight tool</p>
+            <h2>Powerful <span class="accent">Features</span>, Zero Bloat</h2>
+            <p>Every feature designed with speed and simplicity in mind</p>
         </div>
-        <div class="features-grid">
 
-            <!-- Screenshot -->
-            <div class="feature-card">
-                <div class="feature-illust illust-blue">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Screen -->
-                        <rect x="30" y="20" width="180" height="120" rx="8" fill="#1e3a5f" stroke="#42a5f5" stroke-width="1.5"/>
-                        <rect x="38" y="28" width="164" height="96" rx="4" fill="#0d1117"/>
-                        <!-- Content lines -->
-                        <rect x="48" y="42" width="80" height="6" rx="3" fill="#30363d"/>
-                        <rect x="48" y="56" width="60" height="6" rx="3" fill="#30363d"/>
-                        <rect x="48" y="70" width="90" height="6" rx="3" fill="#30363d"/>
-                        <rect x="48" y="84" width="50" height="6" rx="3" fill="#30363d"/>
-                        <!-- Selection region with dashed border -->
-                        <rect x="60" y="46" width="100" height="60" rx="2" stroke="#42a5f5" stroke-width="2" stroke-dasharray="6 3" fill="rgba(66,165,245,0.08)"/>
-                        <!-- Corner handles -->
-                        <rect x="56" y="42" width="8" height="8" rx="2" fill="#42a5f5"/>
-                        <rect x="156" y="42" width="8" height="8" rx="2" fill="#42a5f5"/>
-                        <rect x="56" y="102" width="8" height="8" rx="2" fill="#42a5f5"/>
-                        <rect x="156" y="102" width="8" height="8" rx="2" fill="#42a5f5"/>
-                        <!-- Crosshair -->
-                        <line x1="110" y1="66" x2="110" y2="86" stroke="#fff" stroke-width="1" opacity="0.5"/>
-                        <line x1="100" y1="76" x2="120" y2="76" stroke="#fff" stroke-width="1" opacity="0.5"/>
-                        <!-- Dimension label -->
-                        <rect x="85" y="112" width="56" height="18" rx="4" fill="#42a5f5"/>
-                        <text x="113" y="125" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" font-family="sans-serif">640 x 480</text>
-                        <!-- Camera icon -->
-                        <rect x="160" y="130" width="36" height="30" rx="8" fill="#42a5f5"/>
-                        <circle cx="178" cy="145" r="7" stroke="#fff" stroke-width="2" fill="none"/>
-                        <rect x="172" y="132" width="12" height="4" rx="2" fill="#1e88e5"/>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>Region Capture</h3>
-                    <p>Capture full screen, window, or custom region instantly. Drag to select with live dimensions and resize handles.</p>
-                </div>
+        <div class="feature-row fade-in">
+            <div class="feature-text">
+                <span class="section-label label-blue">Capture</span>
+                <h3>Precision Region Capture</h3>
+                <p>Press PrintScreen and drag to select any area of your screen. The interactive overlay shows a crosshair cursor with live dimension display, so you always know the exact pixel size of your selection.</p>
+                <ul class="feature-list blue">
+                    <li><strong>Custom region selection</strong> &mdash; drag to select any area with live width x height display</li>
+                    <li><strong>8 resize handles</strong> &mdash; fine-tune your selection from any corner or edge</li>
+                    <li><strong>Full-screen toggle</strong> &mdash; double-click to expand selection to entire screen</li>
+                    <li><strong>Multi-monitor support</strong> &mdash; captures across all connected displays seamlessly</li>
+                    <li><strong>Pan mode</strong> &mdash; hold Space to drag and reposition your selection (Photoshop-style)</li>
+                    <li><strong>Capture mouse cursor</strong> &mdash; optional setting to include cursor in screenshots</li>
+                </ul>
             </div>
-
-            <!-- Screen Recording -->
-            <div class="feature-card">
-                <div class="feature-illust illust-red">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Recording window -->
-                        <rect x="35" y="20" width="170" height="115" rx="10" fill="#1a1a1e" stroke="#f44336" stroke-width="2"/>
-                        <!-- Window chrome -->
-                        <rect x="35" y="20" width="170" height="28" rx="10" fill="#222"/>
-                        <rect x="35" y="38" width="170" height="10" fill="#222"/>
-                        <circle cx="52" cy="34" r="5" fill="#f44336"/>
-                        <circle cx="66" cy="34" r="5" fill="#ffa726"/>
-                        <circle cx="80" cy="34" r="5" fill="#4caf50"/>
-                        <!-- REC indicator -->
-                        <circle cx="170" cy="34" r="4" fill="#f44336">
-                            <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
-                        </circle>
-                        <text x="180" y="38" fill="#f44336" font-size="10" font-weight="700" font-family="sans-serif">REC</text>
-                        <!-- Chart/content -->
-                        <polyline points="50,95 70,80 90,100 110,70 130,90 150,60 170,75 190,65" stroke="#42a5f5" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                        <rect x="50" y="108" width="80" height="5" rx="2.5" fill="#30363d"/>
-                        <rect x="50" y="118" width="50" height="5" rx="2.5" fill="#30363d"/>
-                        <!-- Recording toolbar -->
-                        <rect x="65" y="142" width="110" height="30" rx="10" fill="#1a1a1e" stroke="#444" stroke-width="1"/>
-                        <polygon points="82,152 82,164 92,158" fill="#4caf50"/>
-                        <circle cx="120" cy="158" r="9" fill="#f44336"/>
-                        <circle cx="120" cy="158" r="5" fill="#c62828"/>
-                        <!-- Mic icon -->
-                        <rect x="146" y="151" width="8" height="12" rx="4" fill="#8b949e"/>
-                        <path d="M148,165 C148,168 156,168 156,165" stroke="#8b949e" stroke-width="1.5" fill="none"/>
-                        <line x1="152" y1="168" x2="152" y2="172" stroke="#8b949e" stroke-width="1.5"/>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>Screen Recording + Audio</h3>
-                    <p>Record any region as MP4 with unlimited duration. Capture microphone audio. Pause and resume anytime.</p>
-                </div>
+            <div class="feature-visual fv-blue">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="Region capture with selection handles and dimension display">
+                    <!-- Monitor frame -->
+                    <rect x="20" y="10" width="380" height="240" rx="12" fill="#1a2a4a" stroke="#42a5f5" stroke-width="1.5"/>
+                    <rect x="30" y="20" width="360" height="210" rx="6" fill="#0d1117"/>
+                    <!-- Content lines -->
+                    <rect x="45" y="40" width="140" height="8" rx="4" fill="#1e2a3a"/>
+                    <rect x="45" y="58" width="100" height="8" rx="4" fill="#1e2a3a"/>
+                    <rect x="45" y="76" width="160" height="8" rx="4" fill="#1e2a3a"/>
+                    <rect x="45" y="94" width="80" height="8" rx="4" fill="#1e2a3a"/>
+                    <rect x="240" y="40" width="130" height="80" rx="6" fill="#1a2035"/>
+                    <rect x="45" y="120" width="325" height="6" rx="3" fill="#1e2a3a"/>
+                    <rect x="45" y="136" width="280" height="6" rx="3" fill="#1e2a3a"/>
+                    <rect x="45" y="152" width="200" height="6" rx="3" fill="#1e2a3a"/>
+                    <!-- Dim overlay top -->
+                    <rect x="30" y="20" width="360" height="35" fill="rgba(0,0,0,0.45)"/>
+                    <!-- Dim overlay bottom -->
+                    <rect x="30" y="175" width="360" height="55" fill="rgba(0,0,0,0.45)"/>
+                    <!-- Dim overlay left -->
+                    <rect x="30" y="55" width="50" height="120" fill="rgba(0,0,0,0.45)"/>
+                    <!-- Dim overlay right -->
+                    <rect x="310" y="55" width="80" height="120" fill="rgba(0,0,0,0.45)"/>
+                    <!-- Selection region -->
+                    <rect x="80" y="55" width="230" height="120" rx="2" stroke="#42a5f5" stroke-width="2.5" fill="none"/>
+                    <!-- Corner handles -->
+                    <rect x="74" y="49" width="12" height="12" rx="3" fill="#42a5f5"/>
+                    <rect x="304" y="49" width="12" height="12" rx="3" fill="#42a5f5"/>
+                    <rect x="74" y="169" width="12" height="12" rx="3" fill="#42a5f5"/>
+                    <rect x="304" y="169" width="12" height="12" rx="3" fill="#42a5f5"/>
+                    <!-- Edge handles -->
+                    <rect x="189" y="49" width="12" height="12" rx="3" fill="#42a5f5" opacity="0.7"/>
+                    <rect x="189" y="169" width="12" height="12" rx="3" fill="#42a5f5" opacity="0.7"/>
+                    <rect x="74" y="109" width="12" height="12" rx="3" fill="#42a5f5" opacity="0.7"/>
+                    <rect x="304" y="109" width="12" height="12" rx="3" fill="#42a5f5" opacity="0.7"/>
+                    <!-- Crosshair -->
+                    <line x1="195" y1="95" x2="195" y2="135" stroke="#fff" stroke-width="1" opacity="0.4"/>
+                    <line x1="175" y1="115" x2="215" y2="115" stroke="#fff" stroke-width="1" opacity="0.4"/>
+                    <!-- Dimension badge -->
+                    <rect x="140" y="182" width="110" height="26" rx="6" fill="#42a5f5"/>
+                    <text x="195" y="200" text-anchor="middle" fill="#fff" font-size="13" font-weight="700" font-family="sans-serif">1280 x 720</text>
+                    <!-- Toolbar below selection -->
+                    <rect x="100" y="258" width="220" height="34" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                    <circle cx="125" cy="275" r="8" fill="#42a5f5" opacity="0.8"/>
+                    <circle cx="150" cy="275" r="8" fill="#4caf50" opacity="0.8"/>
+                    <circle cx="175" cy="275" r="8" fill="#f44336" opacity="0.8"/>
+                    <circle cx="200" cy="275" r="8" fill="#ffa726" opacity="0.8"/>
+                    <rect x="220" y="268" width="1" height="14" fill="#30363d"/>
+                    <rect x="232" y="266" width="40" height="18" rx="4" fill="#42a5f5"/>
+                    <text x="252" y="279" text-anchor="middle" fill="#fff" font-size="9" font-weight="600" font-family="sans-serif">Save</text>
+                    <rect x="278" y="266" width="34" height="18" rx="4" fill="transparent" stroke="#30363d" stroke-width="1"/>
+                    <text x="295" y="279" text-anchor="middle" fill="#9da5ae" font-size="9" font-family="sans-serif">Copy</text>
+                </svg>
             </div>
+        </div>
 
-            <!-- Annotations -->
-            <div class="feature-card">
-                <div class="feature-illust illust-purple">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Canvas area -->
-                        <rect x="25" y="20" width="160" height="140" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <!-- Drawing content -->
-                        <line x1="45" y1="55" x2="120" y2="55" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
-                        <line x1="105" y1="45" x2="120" y2="55" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
-                        <line x1="105" y1="65" x2="120" y2="55" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
-                        <rect x="40" y="75" width="70" height="40" rx="2" stroke="#ffa726" stroke-width="2.5" fill="none"/>
-                        <ellipse cx="145" cy="110" rx="22" ry="16" stroke="#42a5f5" stroke-width="2.5" fill="none"/>
-                        <text x="48" y="100" fill="#4caf50" font-size="14" font-weight="700" font-family="sans-serif">Hello!</text>
-                        <!-- Marker highlight -->
-                        <rect x="40" y="128" width="65" height="12" rx="2" fill="rgba(255,235,59,0.3)"/>
-                        <rect x="40" y="128" width="65" height="12" rx="2" stroke="#ffeb3b" stroke-width="1"/>
-                        <!-- Tool sidebar -->
-                        <rect x="195" y="25" width="30" height="130" rx="6" fill="#111" stroke="#444" stroke-width="1"/>
-                        <rect x="200" y="33" width="20" height="20" rx="3" fill="#333"/>
-                        <path d="M205,38 L215,48" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-                        <rect x="200" y="58" width="20" height="20" rx="3" fill="#333"/>
-                        <rect x="205" y="63" width="10" height="10" rx="1" stroke="#fff" stroke-width="1.5" fill="none"/>
-                        <rect x="200" y="83" width="20" height="20" rx="3" fill="#333"/>
-                        <ellipse cx="210" cy="93" rx="6" ry="5" stroke="#fff" stroke-width="1.5" fill="none"/>
-                        <rect x="200" y="108" width="20" height="20" rx="3" fill="#333"/>
-                        <text x="205" y="123" fill="#fff" font-size="13" font-weight="700" font-family="sans-serif">T</text>
-                        <rect x="200" y="133" width="20" height="20" rx="3" fill="#333"/>
-                        <circle cx="210" cy="143" r="6" fill="#f44336" opacity="0.9"/>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>11 Annotation Tools</h3>
-                    <p>Pencil, arrow, rectangle, ellipse, text, marker, blur, stamps, and eraser. Configurable color and thickness.</p>
-                </div>
+        <!-- 2. Screen Recording -->
+        <div class="feature-row reverse fade-in">
+            <div class="feature-text">
+                <span class="section-label label-red">Recording</span>
+                <h3>Screen Recording with Audio</h3>
+                <p>Record any region of your screen as high-quality MP4 video. Capture microphone and system audio simultaneously with independent toggle controls. Pause and resume anytime without losing a frame.</p>
+                <ul class="feature-list red">
+                    <li><strong>Region-based recording</strong> &mdash; select exactly what you want to record</li>
+                    <li><strong>MP4 output</strong> &mdash; auto-selects HD1080p, HD720p, or VGA based on region size</li>
+                    <li><strong>Microphone capture</strong> &mdash; toggle with M key during recording</li>
+                    <li><strong>System audio capture</strong> &mdash; toggle with S key, records desktop sounds</li>
+                    <li><strong>Pause &amp; resume</strong> &mdash; press Space to pause, press again to continue</li>
+                    <li><strong>Live annotations</strong> &mdash; draw with pen, arrow, or rectangle while recording</li>
+                    <li><strong>Recording border</strong> &mdash; visible boundary shows exact capture area</li>
+                    <li><strong>Timer display</strong> &mdash; live elapsed time in the floating toolbar</li>
+                </ul>
             </div>
-
-            <!-- OCR -->
-            <div class="feature-card">
-                <div class="feature-illust illust-cyan">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Document -->
-                        <rect x="50" y="15" width="140" height="120" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <!-- Text lines being scanned -->
-                        <rect x="65" y="32" width="110" height="8" rx="3" fill="#30363d"/>
-                        <rect x="65" y="48" width="90" height="8" rx="3" fill="#30363d"/>
-                        <rect x="65" y="64" width="100" height="8" rx="3" fill="#30363d"/>
-                        <rect x="65" y="80" width="70" height="8" rx="3" fill="#30363d"/>
-                        <rect x="65" y="96" width="95" height="8" rx="3" fill="#30363d"/>
-                        <rect x="65" y="112" width="60" height="8" rx="3" fill="#30363d"/>
-                        <!-- OCR selection box -->
-                        <rect x="60" y="42" width="105" height="55" rx="2" stroke="#26c6da" stroke-width="2" stroke-dasharray="5 3" fill="rgba(38,198,218,0.06)"/>
-                        <!-- Scan line animation -->
-                        <line x1="62" y1="60" x2="163" y2="60" stroke="#26c6da" stroke-width="1.5" opacity="0.6">
-                            <animate attributeName="y1" values="44;95;44" dur="2s" repeatCount="indefinite"/>
-                            <animate attributeName="y2" values="44;95;44" dur="2s" repeatCount="indefinite"/>
-                        </line>
-                        <!-- Result popup -->
-                        <rect x="55" y="138" width="130" height="32" rx="8" fill="#111" stroke="#26c6da" stroke-width="1.5"/>
-                        <text x="68" y="152" fill="#26c6da" font-size="9" font-weight="600" font-family="monospace">T</text>
-                        <rect x="80" y="145" width="4" height="14" rx="1" fill="#26c6da" opacity="0.3"/>
-                        <text x="90" y="158" fill="#e6edf3" font-size="11" font-weight="500" font-family="sans-serif">Llamashot</text>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>Text Extraction (OCR)</h3>
-                    <p>Extract text from any area of the screen with one click. Auto-inverts dark backgrounds for better recognition.</p>
-                </div>
+            <div class="feature-visual fv-red">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="Screen recording toolbar with controls">
+                    <!-- Recording window -->
+                    <rect x="30" y="15" width="360" height="210" rx="12" fill="#1a1a1e" stroke="#f44336" stroke-width="2.5"/>
+                    <!-- Window chrome -->
+                    <rect x="30" y="15" width="360" height="32" rx="12" fill="#222"/>
+                    <rect x="30" y="35" width="360" height="12" fill="#222"/>
+                    <circle cx="52" cy="31" r="6" fill="#f44336"/>
+                    <circle cx="70" cy="31" r="6" fill="#ffa726"/>
+                    <circle cx="88" cy="31" r="6" fill="#4caf50"/>
+                    <!-- REC indicator -->
+                    <circle cx="350" cy="31" r="5" fill="#f44336">
+                        <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
+                    <text x="360" y="35" fill="#f44336" font-size="11" font-weight="700" font-family="sans-serif">REC</text>
+                    <!-- Content area -->
+                    <polyline points="60,130 100,100 140,140 180,80 220,120 260,70 300,100 340,85 370,95" stroke="#42a5f5" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect x="60" y="160" width="180" height="7" rx="3.5" fill="#30363d"/>
+                    <rect x="60" y="177" width="120" height="7" rx="3.5" fill="#30363d"/>
+                    <rect x="60" y="194" width="150" height="7" rx="3.5" fill="#30363d"/>
+                    <!-- Arrow annotation on recording -->
+                    <line x1="270" y1="160" x2="320" y2="130" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
+                    <polygon points="320,130 310,130 316,140" fill="#f44336"/>
+                    <!-- Recording toolbar -->
+                    <rect x="60" y="242" width="300" height="46" rx="14" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+                    <!-- Blinking dot -->
+                    <circle cx="85" cy="265" r="6" fill="#f44336">
+                        <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- Timer -->
+                    <text x="100" y="270" fill="#e6edf3" font-size="14" font-weight="700" font-family="'Consolas', monospace">02:34</text>
+                    <!-- Divider -->
+                    <rect x="155" y="252" width="1" height="26" fill="#30363d"/>
+                    <!-- Mic button -->
+                    <rect x="165" y="252" width="28" height="26" rx="6" fill="rgba(76,175,80,0.15)" stroke="rgba(76,175,80,0.3)" stroke-width="1"/>
+                    <rect x="175" y="255" width="8" height="12" rx="4" fill="#4caf50"/>
+                    <path d="M176,269 C176,273 186,273 186,269" stroke="#4caf50" stroke-width="1.5" fill="none"/>
+                    <!-- System audio -->
+                    <rect x="200" y="252" width="28" height="26" rx="6" fill="rgba(66,165,245,0.15)" stroke="rgba(66,165,245,0.3)" stroke-width="1"/>
+                    <text x="214" y="269" text-anchor="middle" fill="#42a5f5" font-size="12" font-family="sans-serif">S</text>
+                    <!-- Audio status -->
+                    <text x="236" y="269" fill="#9da5ae" font-size="9" font-family="sans-serif">Mic+Sys</text>
+                    <!-- Divider -->
+                    <rect x="275" y="252" width="1" height="26" fill="#30363d"/>
+                    <!-- Pause -->
+                    <rect x="285" y="256" width="6" height="18" rx="1" fill="#ffa726"/>
+                    <rect x="295" y="256" width="6" height="18" rx="1" fill="#ffa726"/>
+                    <!-- Stop -->
+                    <rect x="315" y="252" width="28" height="26" rx="6" fill="#f44336"/>
+                    <rect x="323" y="259" width="12" height="12" rx="2" fill="#fff"/>
+                </svg>
             </div>
+        </div>
 
-            <!-- History -->
-            <div class="feature-card">
-                <div class="feature-illust illust-orange">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- History window -->
-                        <rect x="30" y="15" width="180" height="130" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <rect x="30" y="15" width="180" height="24" rx="8" fill="#222"/>
-                        <rect x="30" y="31" width="180" height="8" fill="#222"/>
-                        <text x="45" y="32" fill="#ffa726" font-size="10" font-weight="600" font-family="sans-serif">History</text>
-                        <!-- Thumbnail grid -->
-                        <rect x="40" y="46" width="46" height="36" rx="4" fill="#1e3a5f"/>
-                        <rect x="40" y="46" width="46" height="36" rx="4" stroke="#42a5f5" stroke-width="1.5"/>
-                        <rect x="92" y="46" width="46" height="36" rx="4" fill="#2a1a2a"/>
-                        <rect x="144" y="46" width="46" height="36" rx="4" fill="#1a2a1a"/>
-                        <rect x="40" y="90" width="46" height="36" rx="4" fill="#2a2a1a"/>
-                        <rect x="92" y="90" width="46" height="36" rx="4" fill="#1a2a2a"/>
-                        <rect x="144" y="90" width="46" height="36" rx="4" fill="#1e3a5f"/>
-                        <!-- Badges -->
-                        <rect x="42" y="73" width="30" height="10" rx="5" fill="#4caf50"/>
-                        <text x="50" y="81" fill="#fff" font-size="6" font-family="sans-serif">Saved</text>
-                        <rect x="94" y="73" width="30" height="10" rx="5" fill="#42a5f5"/>
-                        <text x="101" y="81" fill="#fff" font-size="6" font-family="sans-serif">Copied</text>
-                        <!-- Checkboxes -->
-                        <rect x="149" y="48" width="10" height="10" rx="2" fill="#42a5f5"/>
-                        <polyline points="151,53 154,56 158,50" stroke="#fff" stroke-width="1.5" fill="none"/>
-                        <!-- Select all -->
-                        <rect x="40" y="135" width="10" height="10" rx="2" fill="#42a5f5"/>
-                        <polyline points="42,140 45,143 49,137" stroke="#fff" stroke-width="1.5" fill="none"/>
-                        <text x="56" y="145" fill="#8b949e" font-size="9" font-family="sans-serif">Select All</text>
-                        <rect x="130" y="133" width="50" height="16" rx="4" fill="#f44336" opacity="0.9"/>
-                        <text x="140" y="144" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Delete</text>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>Screenshot History</h3>
-                    <p>Thumbnail gallery with multi-select, bulk copy, and delete. Green &ldquo;Saved&rdquo; and blue &ldquo;Copied&rdquo; badges.</p>
-                </div>
+        <!-- 3. Annotation Tools -->
+        <div class="feature-row fade-in">
+            <div class="feature-text">
+                <span class="section-label label-purple">Annotate</span>
+                <h3>11 Professional Annotation Tools</h3>
+                <p>Mark up your screenshots with a comprehensive set of drawing tools. Each tool is accessible with a single keypress. Choose from 24 preset colors and 10 thickness levels to make your annotations stand out.</p>
+                <ul class="feature-list purple">
+                    <li><strong>Pen</strong> &mdash; freehand drawing with smooth round caps</li>
+                    <li><strong>Arrow &amp; Line</strong> &mdash; straight lines with optional arrowhead</li>
+                    <li><strong>Rectangle &amp; Ellipse</strong> &mdash; shape outlines for highlighting areas</li>
+                    <li><strong>Text</strong> &mdash; add multi-line text labels with customizable font size</li>
+                    <li><strong>Marker</strong> &mdash; semi-transparent highlighter effect</li>
+                    <li><strong>Blur / Pixelate</strong> &mdash; redact sensitive information with mosaic effect</li>
+                    <li><strong>Stamps</strong> &mdash; green checkmark and red cross for approvals/rejections</li>
+                    <li><strong>Eraser</strong> &mdash; click any annotation to remove it individually</li>
+                    <li><strong>Undo / Redo</strong> &mdash; full action history with Ctrl+Z / Ctrl+Y</li>
+                </ul>
             </div>
+            <div class="feature-visual fv-purple">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="Annotation tools with canvas and tool sidebar">
+                    <!-- Canvas -->
+                    <rect x="20" y="10" width="310" height="280" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                    <!-- Freehand pen stroke -->
+                    <path d="M50,60 Q70,40 90,55 T130,45 T170,60" stroke="#f44336" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <!-- Arrow -->
+                    <line x1="50" y1="100" x2="160" y2="100" stroke="#42a5f5" stroke-width="3" stroke-linecap="round"/>
+                    <polygon points="160,100 148,93 148,107" fill="#42a5f5"/>
+                    <!-- Rectangle -->
+                    <rect x="45" y="130" width="120" height="60" rx="3" stroke="#ffa726" stroke-width="3" fill="none"/>
+                    <!-- Ellipse -->
+                    <ellipse cx="250" cy="80" rx="45" ry="30" stroke="#ab47bc" stroke-width="3" fill="none"/>
+                    <!-- Text -->
+                    <text x="200" y="148" fill="#4caf50" font-size="18" font-weight="700" font-family="sans-serif">Bug here!</text>
+                    <!-- Marker highlight -->
+                    <rect x="190" y="170" width="120" height="18" rx="3" fill="rgba(255,235,59,0.25)" stroke="rgba(255,235,59,0.5)" stroke-width="1"/>
+                    <rect x="190" y="170" width="120" height="2" fill="rgba(255,235,59,0.4)"/>
+                    <!-- Blur block -->
+                    <rect x="50" y="210" width="80" height="40" rx="3" fill="url(#blurPattern)" stroke="#9da5ae" stroke-width="1" stroke-dasharray="4 2"/>
+                    <defs>
+                        <pattern id="blurPattern" width="8" height="8" patternUnits="userSpaceOnUse">
+                            <rect width="4" height="4" fill="#2a3040"/>
+                            <rect x="4" width="4" height="4" fill="#1e2830"/>
+                            <rect y="4" width="4" height="4" fill="#1e2830"/>
+                            <rect x="4" y="4" width="4" height="4" fill="#2a3040"/>
+                        </pattern>
+                    </defs>
+                    <!-- Check stamp -->
+                    <circle cx="175" cy="230" r="16" fill="rgba(76,175,80,0.2)" stroke="#4caf50" stroke-width="2"/>
+                    <polyline points="166,230 173,237 186,222" stroke="#4caf50" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Cross stamp -->
+                    <circle cx="230" cy="230" r="16" fill="rgba(244,67,54,0.2)" stroke="#f44336" stroke-width="2"/>
+                    <line x1="222" y1="222" x2="238" y2="238" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="238" y1="222" x2="222" y2="238" stroke="#f44336" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Tool sidebar -->
+                    <rect x="345" y="15" width="60" height="270" rx="10" fill="#111" stroke="#30363d" stroke-width="1"/>
+                    <!-- Tool buttons -->
+                    <rect x="352" y="22" width="46" height="28" rx="5" fill="#222"/>
+                    <path d="M365,30 L380,44" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                    <text x="375" y="46" text-anchor="middle" fill="#9da5ae" font-size="7" font-family="sans-serif">Pen</text>
 
-            <!-- Quick Sharing -->
-            <div class="feature-card">
-                <div class="feature-illust illust-green">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Success popup -->
-                        <rect x="50" y="15" width="140" height="100" rx="12" fill="#161b22" stroke="#4caf50" stroke-width="1.5"/>
-                        <!-- Checkmark circle -->
-                        <circle cx="120" cy="50" r="20" fill="rgba(76,175,80,0.15)" stroke="#4caf50" stroke-width="2"/>
-                        <polyline points="110,50 117,57 132,42" stroke="#4caf50" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                        <text x="120" y="86" text-anchor="middle" fill="#e6edf3" font-size="12" font-weight="600" font-family="sans-serif">Capture saved!</text>
-                        <text x="120" y="104" text-anchor="middle" fill="#8b949e" font-size="9" font-family="sans-serif">screenshot_20250428.png</text>
-                        <!-- Action buttons -->
-                        <rect x="38" y="125" width="52" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <rect x="94" y="125" width="52" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <rect x="150" y="125" width="52" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <!-- Copy icon -->
-                        <rect x="56" y="132" width="14" height="14" rx="2" stroke="#42a5f5" stroke-width="1.5" fill="none"/>
-                        <rect x="60" y="136" width="14" height="14" rx="2" stroke="#42a5f5" stroke-width="1.5" fill="#161b22"/>
-                        <text x="64" y="157" text-anchor="middle" fill="#8b949e" font-size="8" font-family="sans-serif">Copy</text>
-                        <!-- Save icon -->
-                        <path d="M112,133 L124,133 L127,136 L127,147 L112,147 Z" fill="#4caf50"/>
-                        <rect x="115" y="133" width="6" height="5" rx="0" fill="#2e7d32"/>
-                        <rect x="115" y="141" width="8" height="5" rx="1" fill="#fff"/>
-                        <text x="120" y="157" text-anchor="middle" fill="#8b949e" font-size="8" font-family="sans-serif">Save</text>
-                        <!-- Pin icon -->
-                        <path d="M176,147 L176,143 M173,143 L179,143 M174,135 L174,141 L173,143 L179,143 L178,141 L178,135 Z" fill="#ab47bc"/>
-                        <rect x="173" y="133" width="6" height="2" rx="1" fill="#ce93d8"/>
-                        <text x="176" y="157" text-anchor="middle" fill="#8b949e" font-size="8" font-family="sans-serif">Pin</text>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>Quick Sharing</h3>
-                    <p>Copy, save, or pin your capture in seconds. Multiple output formats: PNG, JPG, BMP with quality control.</p>
-                </div>
+                    <rect x="352" y="55" width="46" height="28" rx="5" fill="#222"/>
+                    <line x1="362" y1="69" x2="388" y2="69" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                    <polygon points="388,69 381,65 381,73" fill="#fff"/>
+
+                    <rect x="352" y="88" width="46" height="28" rx="5" fill="#333" stroke="#42a5f5" stroke-width="1"/>
+                    <rect x="362" y="95" width="26" height="14" rx="2" stroke="#fff" stroke-width="1.5" fill="none"/>
+
+                    <rect x="352" y="121" width="46" height="28" rx="5" fill="#222"/>
+                    <ellipse cx="375" cy="135" rx="14" ry="9" stroke="#fff" stroke-width="1.5" fill="none"/>
+
+                    <rect x="352" y="154" width="46" height="28" rx="5" fill="#222"/>
+                    <text x="375" y="173" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="sans-serif">T</text>
+
+                    <rect x="352" y="187" width="46" height="28" rx="5" fill="#222"/>
+                    <rect x="362" y="196" width="26" height="10" rx="2" fill="rgba(255,235,59,0.3)" stroke="rgba(255,235,59,0.6)" stroke-width="1"/>
+
+                    <rect x="352" y="220" width="46" height="28" rx="5" fill="#222"/>
+                    <rect x="365" y="226" width="20" height="16" rx="2" fill="url(#blurPattern2)"/>
+                    <defs>
+                        <pattern id="blurPattern2" width="5" height="5" patternUnits="userSpaceOnUse">
+                            <rect width="2.5" height="2.5" fill="#555"/>
+                            <rect x="2.5" width="2.5" height="2.5" fill="#333"/>
+                            <rect y="2.5" width="2.5" height="2.5" fill="#333"/>
+                            <rect x="2.5" y="2.5" width="2.5" height="2.5" fill="#555"/>
+                        </pattern>
+                    </defs>
+
+                    <!-- Color indicator -->
+                    <rect x="352" y="253" width="46" height="28" rx="5" fill="#222"/>
+                    <circle cx="365" cy="267" r="7" fill="#f44336"/>
+                    <circle cx="380" cy="267" r="7" fill="#42a5f5"/>
+                    <circle cx="372" cy="260" r="7" fill="#4caf50"/>
+                </svg>
             </div>
+        </div>
 
-            <!-- Keyboard Shortcuts -->
-            <div class="feature-card">
-                <div class="feature-illust illust-blue">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Key: PrintScreen -->
-                        <rect x="60" y="18" width="120" height="32" rx="8" fill="#222" stroke="#444" stroke-width="1.5"/>
-                        <text x="120" y="39" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="700" font-family="sans-serif">Print Screen</text>
-                        <!-- Row 1: Ctrl + Shift + 1 -->
-                        <rect x="30" y="60" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
-                        <text x="51" y="78" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">Ctrl</text>
-                        <text x="80" y="78" fill="#444" font-size="14" font-weight="700">+</text>
-                        <rect x="89" y="60" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
-                        <text x="110" y="78" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">S</text>
-                        <text x="142" y="78" fill="#8b949e" font-size="9" font-family="sans-serif">Save</text>
-                        <!-- Row 2 -->
-                        <rect x="30" y="96" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
-                        <text x="51" y="114" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">Ctrl</text>
-                        <text x="80" y="114" fill="#444" font-size="14" font-weight="700">+</text>
-                        <rect x="89" y="96" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
-                        <text x="110" y="114" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">C</text>
-                        <text x="142" y="114" fill="#8b949e" font-size="9" font-family="sans-serif">Copy</text>
-                        <!-- Row 3 -->
-                        <rect x="30" y="132" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
-                        <text x="51" y="150" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">Ctrl</text>
-                        <text x="80" y="150" fill="#444" font-size="14" font-weight="700">+</text>
-                        <rect x="89" y="132" width="42" height="28" rx="6" fill="#222" stroke="#444" stroke-width="1"/>
-                        <text x="110" y="150" text-anchor="middle" fill="#42a5f5" font-size="10" font-weight="600" font-family="sans-serif">R</text>
-                        <text x="142" y="150" fill="#8b949e" font-size="9" font-family="sans-serif">Record</text>
-                        <!-- Customizable badge -->
-                        <rect x="142" y="60" width="72" height="18" rx="9" fill="rgba(66,165,245,0.15)" stroke="rgba(66,165,245,0.3)" stroke-width="1"/>
-                        <text x="178" y="72" text-anchor="middle" fill="#42a5f5" font-size="8" font-weight="600" font-family="sans-serif">Customizable</text>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>22 Keyboard Shortcuts</h3>
-                    <p>Every tool and action has a shortcut. Click-to-record in Settings. Duplicate detection prevents conflicts.</p>
-                </div>
+        <!-- 4. OCR -->
+        <div class="feature-row reverse fade-in">
+            <div class="feature-text">
+                <span class="section-label label-cyan">OCR</span>
+                <h3>Text Extraction (OCR)</h3>
+                <p>Extract text from any area of your screen with a single click. Powered by Windows built-in OCR engine with intelligent image preprocessing for maximum accuracy, even on dark backgrounds.</p>
+                <ul class="feature-list cyan">
+                    <li><strong>Sub-region selection</strong> &mdash; drag to select the exact text area after capture</li>
+                    <li><strong>Multi-language support</strong> &mdash; detects your system languages automatically</li>
+                    <li><strong>Dark background inversion</strong> &mdash; auto-detects and inverts dark images for better recognition</li>
+                    <li><strong>Contrast enhancement</strong> &mdash; 1.5x contrast boost for clearer character edges</li>
+                    <li><strong>Smart upscaling</strong> &mdash; scales small text up to 4x for improved accuracy</li>
+                    <li><strong>Result window</strong> &mdash; shows extracted text with word and character count</li>
+                    <li><strong>One-click copy</strong> &mdash; select all and copy buttons for quick use</li>
+                </ul>
             </div>
-
-            <!-- Lightweight -->
-            <div class="feature-card">
-                <div class="feature-illust illust-green">
-                    <svg viewBox="0 0 240 180" width="220" fill="none">
-                        <!-- Speed gauge -->
-                        <path d="M70,130 A65,65 0 0,1 200,130" stroke="#30363d" stroke-width="10" fill="none" stroke-linecap="round"/>
-                        <path d="M70,130 A65,65 0 0,1 185,78" stroke="url(#gaugeGrad)" stroke-width="10" fill="none" stroke-linecap="round"/>
-                        <defs>
-                            <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stop-color="#4caf50"/>
-                                <stop offset="50%" stop-color="#42a5f5"/>
-                                <stop offset="100%" stop-color="#1e88e5"/>
-                            </linearGradient>
-                        </defs>
-                        <!-- Needle -->
-                        <line x1="135" y1="130" x2="178" y2="88" stroke="#e6edf3" stroke-width="3" stroke-linecap="round"/>
-                        <circle cx="135" cy="130" r="6" fill="#e6edf3"/>
-                        <circle cx="135" cy="130" r="3" fill="#0d1117"/>
-                        <!-- Speed lines -->
-                        <line x1="10" y1="88" x2="40" y2="88" stroke="#42a5f5" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
-                        <line x1="15" y1="100" x2="38" y2="100" stroke="#42a5f5" stroke-width="1.5" opacity="0.2" stroke-linecap="round"/>
-                        <line x1="10" y1="112" x2="35" y2="112" stroke="#42a5f5" stroke-width="1" opacity="0.15" stroke-linecap="round"/>
-                        <!-- RAM badge -->
-                        <rect x="95" y="140" width="80" height="30" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-                        <text x="110" y="154" fill="#8b949e" font-size="8" font-family="sans-serif">RAM</text>
-                        <text x="140" y="161" fill="#e6edf3" font-size="16" font-weight="800" font-family="sans-serif">28</text>
-                        <text x="162" y="157" fill="#8b949e" font-size="9" font-family="sans-serif">MB</text>
-                        <!-- Fast label -->
-                        <text x="135" y="30" text-anchor="middle" fill="#4caf50" font-size="11" font-weight="700" font-family="sans-serif">INSTANT STARTUP</text>
-                    </svg>
-                </div>
-                <div class="info">
-                    <h3>Lightweight &amp; Fast</h3>
-                    <p>Tiny memory footprint. Instant startup. No background services. Self-contained single-file executable.</p>
-                </div>
+            <div class="feature-visual fv-cyan">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="OCR text extraction with scan line animation">
+                    <!-- Document -->
+                    <rect x="40" y="10" width="240" height="200" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                    <!-- Text lines -->
+                    <rect x="60" y="30" width="200" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="50" width="160" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="70" width="185" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="90" width="140" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="110" width="175" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="130" width="120" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="150" width="190" height="10" rx="4" fill="#2a3040"/>
+                    <rect x="60" y="170" width="100" height="10" rx="4" fill="#2a3040"/>
+                    <!-- OCR selection -->
+                    <rect x="52" y="44" width="210" height="86" rx="3" stroke="#26c6da" stroke-width="2.5" stroke-dasharray="6 3" fill="rgba(38,198,218,0.05)"/>
+                    <!-- Scan line -->
+                    <line x1="55" y1="60" x2="259" y2="60" stroke="#26c6da" stroke-width="2" opacity="0.5">
+                        <animate attributeName="y1" values="47;127;47" dur="2.5s" repeatCount="indefinite"/>
+                        <animate attributeName="y2" values="47;127;47" dur="2.5s" repeatCount="indefinite"/>
+                    </line>
+                    <!-- Corner brackets -->
+                    <path d="M52,54 L52,44 L62,44" stroke="#26c6da" stroke-width="2.5" fill="none"/>
+                    <path d="M252,44 L262,44 L262,54" stroke="#26c6da" stroke-width="2.5" fill="none"/>
+                    <path d="M52,120 L52,130 L62,130" stroke="#26c6da" stroke-width="2.5" fill="none"/>
+                    <path d="M252,130 L262,130 L262,120" stroke="#26c6da" stroke-width="2.5" fill="none"/>
+                    <!-- Result window -->
+                    <rect x="140" y="222" width="260" height="70" rx="10" fill="#161b22" stroke="#26c6da" stroke-width="1.5"/>
+                    <rect x="140" y="222" width="260" height="28" rx="10" fill="#1c2333"/>
+                    <rect x="140" y="240" width="260" height="10" fill="#1c2333"/>
+                    <text x="156" y="241" fill="#26c6da" font-size="11" font-weight="600" font-family="sans-serif">Extracted Text</text>
+                    <!-- Word count -->
+                    <text x="340" y="241" fill="#9da5ae" font-size="9" font-family="sans-serif">24 words</text>
+                    <!-- Text content -->
+                    <text x="156" y="266" fill="#e6edf3" font-size="11" font-family="'Consolas', monospace">Llamashot is a fast, lightweight</text>
+                    <text x="156" y="282" fill="#e6edf3" font-size="11" font-family="'Consolas', monospace">screenshot tool for Windows...</text>
+                    <!-- Copy button -->
+                    <rect x="298" y="222" width="50" height="20" rx="5" fill="rgba(38,198,218,0.15)"/>
+                    <text x="323" y="236" text-anchor="middle" fill="#26c6da" font-size="9" font-weight="600" font-family="sans-serif">Copy</text>
+                    <!-- Select all -->
+                    <rect x="352" y="222" width="44" height="20" rx="5" fill="rgba(38,198,218,0.15)"/>
+                    <text x="374" y="236" text-anchor="middle" fill="#26c6da" font-size="9" font-weight="600" font-family="sans-serif">Select</text>
+                </svg>
             </div>
+        </div>
 
+        <!-- 5. History -->
+        <div class="feature-row fade-in">
+            <div class="feature-text">
+                <span class="section-label label-orange">History</span>
+                <h3>Screenshot History &amp; Management</h3>
+                <p>Every capture is saved to a searchable thumbnail gallery. Quickly find, copy, save, or delete past screenshots. Bulk operations let you manage dozens of captures at once.</p>
+                <ul class="feature-list orange">
+                    <li><strong>Thumbnail gallery</strong> &mdash; visual grid of all captures with preview images</li>
+                    <li><strong>Status badges</strong> &mdash; green "Saved" and blue "Copied" labels on each item</li>
+                    <li><strong>Per-item actions</strong> &mdash; copy, save as, or delete individual captures</li>
+                    <li><strong>Bulk selection</strong> &mdash; select all checkbox and multi-select for batch operations</li>
+                    <li><strong>Bulk copy &amp; save</strong> &mdash; copy multiple to clipboard or save to a folder</li>
+                    <li><strong>Metadata display</strong> &mdash; timestamps, dimensions, file path, and size on hover</li>
+                    <li><strong>Click to open</strong> &mdash; click any thumbnail to open the file directly</li>
+                    <li><strong>Configurable limit</strong> &mdash; set max history items (default: 100)</li>
+                </ul>
+            </div>
+            <div class="feature-visual fv-orange">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="Screenshot history gallery with thumbnails">
+                    <!-- Window -->
+                    <rect x="20" y="10" width="380" height="280" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                    <!-- Title bar -->
+                    <rect x="20" y="10" width="380" height="32" rx="12" fill="#1c2333"/>
+                    <rect x="20" y="30" width="380" height="12" fill="#1c2333"/>
+                    <text x="40" y="32" fill="#ffa726" font-size="13" font-weight="700" font-family="sans-serif">History</text>
+                    <text x="360" y="32" fill="#9da5ae" font-size="10" font-family="sans-serif">12 items</text>
+                    <!-- Thumbnail row 1 -->
+                    <rect x="35" y="52" width="105" height="72" rx="6" fill="#1a2a4a"/>
+                    <rect x="35" y="52" width="105" height="72" rx="6" stroke="#42a5f5" stroke-width="2"/>
+                    <rect x="40" y="110" width="40" height="14" rx="7" fill="#4caf50"/>
+                    <text x="49" y="121" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Saved</text>
+                    <text x="85" y="121" fill="#9da5ae" font-size="8" font-family="sans-serif">1280x720</text>
+
+                    <rect x="155" y="52" width="105" height="72" rx="6" fill="#2a1a2a"/>
+                    <rect x="160" y="110" width="46" height="14" rx="7" fill="#42a5f5"/>
+                    <text x="170" y="121" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Copied</text>
+                    <text x="210" y="121" fill="#9da5ae" font-size="8" font-family="sans-serif">800x600</text>
+
+                    <rect x="275" y="52" width="105" height="72" rx="6" fill="#1a2a1a"/>
+                    <rect x="275" y="52" width="105" height="72" rx="6" stroke="transparent"/>
+                    <rect x="280" y="110" width="40" height="14" rx="7" fill="#4caf50"/>
+                    <text x="289" y="121" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Saved</text>
+                    <text x="325" y="121" fill="#9da5ae" font-size="8" font-family="sans-serif">1920x1080</text>
+                    <!-- Checkbox on selected -->
+                    <rect x="350" y="55" width="16" height="16" rx="3" fill="#42a5f5"/>
+                    <polyline points="354,63 358,67 364,59" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+                    <!-- Thumbnail row 2 -->
+                    <rect x="35" y="140" width="105" height="72" rx="6" fill="#2a2a1a"/>
+                    <rect x="40" y="198" width="46" height="14" rx="7" fill="#42a5f5"/>
+                    <text x="50" y="209" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Copied</text>
+
+                    <rect x="155" y="140" width="105" height="72" rx="6" fill="#1a2a2a"/>
+                    <rect x="160" y="198" width="40" height="14" rx="7" fill="#4caf50"/>
+                    <text x="169" y="209" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Saved</text>
+
+                    <rect x="275" y="140" width="105" height="72" rx="6" fill="#1e2a3a"/>
+                    <rect x="280" y="198" width="46" height="14" rx="7" fill="#42a5f5"/>
+                    <text x="290" y="209" fill="#fff" font-size="8" font-weight="600" font-family="sans-serif">Copied</text>
+
+                    <!-- Timestamps -->
+                    <text x="40" y="131" fill="#9da5ae" font-size="8" font-family="sans-serif">May 09, 14:32</text>
+                    <text x="160" y="131" fill="#9da5ae" font-size="8" font-family="sans-serif">May 09, 14:28</text>
+                    <text x="280" y="131" fill="#9da5ae" font-size="8" font-family="sans-serif">May 09, 13:15</text>
+
+                    <!-- Bottom bar -->
+                    <rect x="20" y="258" width="380" height="32" rx="0" fill="#1c2333"/>
+                    <rect x="20" y="278" width="380" height="12" rx="12" fill="#1c2333"/>
+                    <rect x="38" y="264" width="14" height="14" rx="3" fill="#42a5f5"/>
+                    <polyline points="41,271 45,275 50,267" stroke="#fff" stroke-width="1.5" fill="none"/>
+                    <text x="58" y="276" fill="#9da5ae" font-size="10" font-family="sans-serif">Select All</text>
+                    <!-- Action buttons -->
+                    <rect x="240" y="263" width="60" height="20" rx="5" fill="rgba(66,165,245,0.15)"/>
+                    <text x="270" y="277" text-anchor="middle" fill="#42a5f5" font-size="9" font-weight="600" font-family="sans-serif">Copy</text>
+                    <rect x="308" y="263" width="60" height="20" rx="5" fill="rgba(244,67,54,0.15)"/>
+                    <text x="338" y="277" text-anchor="middle" fill="#f44336" font-size="9" font-weight="600" font-family="sans-serif">Delete</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 6. Pin & Share -->
+        <div class="feature-row reverse fade-in">
+            <div class="feature-text">
+                <span class="section-label label-green">Output</span>
+                <h3>Pin, Share &amp; Export</h3>
+                <p>After capturing, instantly choose what to do with your screenshot. Pin it as a floating reference window, copy to clipboard, or save in your preferred format. The pin window stays on top of all other windows for easy reference.</p>
+                <ul class="feature-list green">
+                    <li><strong>Pin on screen</strong> &mdash; floating borderless window positioned at capture location</li>
+                    <li><strong>Adjustable opacity</strong> &mdash; mouse wheel to set 10%&ndash;100% transparency</li>
+                    <li><strong>Quick copy</strong> &mdash; double-click pinned image to copy to clipboard</li>
+                    <li><strong>Draggable</strong> &mdash; left-click and drag to reposition anywhere</li>
+                    <li><strong>Save dialog</strong> &mdash; choose format (PNG, JPG, BMP) and location</li>
+                    <li><strong>JPEG quality control</strong> &mdash; slider from 10&ndash;100 for fine-tuning file size</li>
+                    <li><strong>Auto-naming</strong> &mdash; screenshots named with timestamp: screenshot_yyyyMMdd_HHmmss</li>
+                    <li><strong>Remembers directory</strong> &mdash; defaults to your last save location</li>
+                </ul>
+            </div>
+            <div class="feature-visual fv-green">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="Pin window and export options">
+                    <!-- Main desktop area -->
+                    <rect x="10" y="10" width="400" height="280" rx="8" fill="#0d1117"/>
+                    <!-- Background app windows -->
+                    <rect x="20" y="20" width="200" height="140" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+                    <rect x="20" y="20" width="200" height="20" rx="6" fill="#1c2333"/>
+                    <rect x="20" y="34" width="200" height="6" fill="#1c2333"/>
+                    <rect x="30" y="50" width="120" height="6" rx="3" fill="#2a3040"/>
+                    <rect x="30" y="64" width="90" height="6" rx="3" fill="#2a3040"/>
+                    <rect x="30" y="78" width="150" height="6" rx="3" fill="#2a3040"/>
+
+                    <!-- Pinned window (floating, with glow) -->
+                    <rect x="160" y="60" width="200" height="130" rx="8" fill="#1e3a5f" stroke="#42a5f5" stroke-width="2" filter="url(#pinGlow)"/>
+                    <defs>
+                        <filter id="pinGlow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur"/>
+                            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                        </filter>
+                    </defs>
+                    <!-- Pin content (image placeholder) -->
+                    <rect x="168" y="68" width="184" height="100" rx="4" fill="#1a2a4a"/>
+                    <rect x="180" y="80" width="80" height="8" rx="4" fill="#30405a"/>
+                    <rect x="180" y="96" width="60" height="8" rx="4" fill="#30405a"/>
+                    <rect x="180" y="112" width="100" height="8" rx="4" fill="#30405a"/>
+                    <rect x="300" y="80" width="40" height="36" rx="4" fill="#2a4060"/>
+                    <!-- Close button -->
+                    <circle cx="348" cy="72" r="8" fill="rgba(244,67,54,0.8)"/>
+                    <line x1="344" y1="68" x2="352" y2="76" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="352" y1="68" x2="344" y2="76" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+                    <!-- Opacity indicator -->
+                    <rect x="168" y="172" width="60" height="16" rx="4" fill="rgba(0,0,0,0.6)"/>
+                    <text x="198" y="184" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" font-family="sans-serif">85%</text>
+
+                    <!-- Save dialog popup -->
+                    <rect x="50" y="200" width="320" height="80" rx="10" fill="#161b22" stroke="#4caf50" stroke-width="1.5"/>
+                    <circle cx="100" cy="230" r="18" fill="rgba(76,175,80,0.15)" stroke="#4caf50" stroke-width="2"/>
+                    <polyline points="92,230 98,236 110,224" stroke="#4caf50" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="130" y="228" fill="#e6edf3" font-size="13" font-weight="600" font-family="sans-serif">Screenshot saved!</text>
+                    <text x="130" y="246" fill="#9da5ae" font-size="10" font-family="sans-serif">screenshot_20250509_143215.png</text>
+                    <!-- Format badges -->
+                    <rect x="130" y="256" width="36" height="16" rx="4" fill="rgba(66,165,245,0.15)"/>
+                    <text x="148" y="268" text-anchor="middle" fill="#42a5f5" font-size="9" font-weight="600" font-family="sans-serif">PNG</text>
+                    <rect x="172" y="256" width="36" height="16" rx="4" fill="rgba(255,167,38,0.1)"/>
+                    <text x="190" y="268" text-anchor="middle" fill="#ffa726" font-size="9" font-family="sans-serif">JPG</text>
+                    <rect x="214" y="256" width="40" height="16" rx="4" fill="rgba(171,71,188,0.1)"/>
+                    <text x="234" y="268" text-anchor="middle" fill="#ab47bc" font-size="9" font-family="sans-serif">BMP</text>
+                </svg>
+            </div>
         </div>
     </div>
 </section>
 
-<!-- Annotation Tools -->
-<section>
+<!-- ========== MORE FEATURES (Quick Cards) ========== -->
+<section class="section-alt">
     <div class="container">
         <div class="section-title">
-            <h2>Annotation Tools</h2>
-            <p>Every tool you need, one keypress away</p>
+            <h2>And <span class="accent">Much More</span></h2>
+            <p>Every detail considered for a seamless experience</p>
         </div>
-        <div class="tools-grid">
-            <div class="tool-item"><div class="name">Pencil</div><div class="key">P</div></div>
-            <div class="tool-item"><div class="name">Line</div><div class="key">L</div></div>
-            <div class="tool-item"><div class="name">Arrow</div><div class="key">A</div></div>
-            <div class="tool-item"><div class="name">Rectangle</div><div class="key">R</div></div>
-            <div class="tool-item"><div class="name">Ellipse</div><div class="key">E</div></div>
-            <div class="tool-item"><div class="name">Text</div><div class="key">T</div></div>
-            <div class="tool-item"><div class="name">Marker</div><div class="key">M</div></div>
-            <div class="tool-item"><div class="name">Blur</div><div class="key">B</div></div>
-            <div class="tool-item"><div class="name">Check</div><div class="key">K</div></div>
-            <div class="tool-item"><div class="name">Cross</div><div class="key">D</div></div>
-            <div class="tool-item"><div class="name">Eraser</div><div class="key">G</div></div>
-            <div class="tool-item"><div class="name">Undo</div><div class="key">X</div></div>
-            <div class="tool-item"><div class="name">Move</div><div class="key">V</div></div>
-            <div class="tool-item"><div class="name">Color</div><div class="key">C</div></div>
-            <div class="tool-item"><div class="name">Thickness</div><div class="key">W</div></div>
-            <div class="tool-item"><div class="name">History</div><div class="key">H</div></div>
-            <div class="tool-item"><div class="name">Record</div><div class="key">Ctrl+R</div></div>
-            <div class="tool-item"><div class="name">OCR</div><div class="key">O</div></div>
-            <div class="tool-item"><div class="name">Pin</div><div class="key">F</div></div>
+        <div class="features-grid-3 fade-in">
+            <div class="qf-card">
+                <div class="qf-icon blue">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <h4>Multi-Monitor Support</h4>
+                <p>Captures across all connected displays. The selection overlay spans your entire virtual desktop, so you can grab content from any monitor.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon red">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <h4>Delayed Capture</h4>
+                <p>Set a countdown timer (1s, 3s, 5s, or 10s) before capture starts. Perfect for capturing tooltips, dropdown menus, or context menus.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon green">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h4>Fullscreen Shortcuts</h4>
+                <p>Instantly save or copy the entire screen with a single hotkey. Shift+PrtSc saves to file, Ctrl+PrtSc copies to clipboard. No UI, no delay.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon purple">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="10" r="1" fill="currentColor"/><circle cx="16" cy="10" r="1" fill="currentColor"/><path d="M8 14c0 0 1.5 3 4 3s4-3 4-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <h4>Cursor Capture</h4>
+                <p>Optionally include the mouse cursor in your screenshots and recordings. Enable in settings &mdash; great for tutorials and documentation.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon cyan">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" stroke="currentColor" stroke-width="2"/><polyline points="16 6 12 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="2" x2="12" y2="15" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <h4>Auto Update Checker</h4>
+                <p>Automatically checks GitHub for new releases on startup. One-click download and install when updates are available. Can be disabled.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon orange">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <h4>System Tray Integration</h4>
+                <p>Lives in your system tray. Right-click for quick access to all capture modes, history, settings, and more. Left-click to start a capture.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon blue">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <h4>Single Instance</h4>
+                <p>Enforces only one running instance via mutex. Start with --silent flag for auto-launch at Windows startup without any visible UI.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon green">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <h4>Crash Logging</h4>
+                <p>Unhandled exceptions are logged to %APPDATA%/Llamashot/crash.log with timestamps and full stack traces. App continues running after logging.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon red">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <h4>Recording Exclusion</h4>
+                <p>The recording toolbar and border are automatically excluded from the capture using WDA_EXCLUDEFROMCAPTURE, so your controls never appear in the video.</p>
+            </div>
         </div>
     </div>
 </section>
 
-<!-- Tech Stack -->
-<section>
+<!-- ========== ANNOTATION TOOLS DETAIL ========== -->
+<section id="tools">
     <div class="container">
         <div class="section-title">
-            <h2>Built With</h2>
+            <h2>Annotation <span class="accent">Toolkit</span></h2>
+            <p>11 drawing tools + color picker, thickness control, undo/redo, and move tool</p>
         </div>
-        <div class="tech-stack">
+        <div class="tools-grid fade-in">
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="#f44336" stroke-width="2"/></svg>
+                </div>
+                <div class="name">Pencil</div>
+                <div class="desc">Freehand drawing with smooth round caps</div>
+                <kbd>P</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="#42a5f5" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="name">Line</div>
+                <div class="desc">Straight line between two points</div>
+                <kbd>L</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="#ffa726" stroke-width="2"/><polyline points="15,8 19,12 15,16" stroke="#ffa726" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="name">Arrow</div>
+                <div class="desc">Directional arrow with filled head</div>
+                <kbd>A</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#26c6da" stroke-width="2"/></svg>
+                </div>
+                <div class="name">Rectangle</div>
+                <div class="desc">Rectangular outline for highlighting</div>
+                <kbd>R</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="12" rx="9" ry="7" stroke="#ab47bc" stroke-width="2"/></svg>
+                </div>
+                <div class="name">Ellipse</div>
+                <div class="desc">Circle or oval shape outline</div>
+                <kbd>E</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><text x="5" y="18" fill="#4caf50" font-size="18" font-weight="700" font-family="sans-serif">T</text></svg>
+                </div>
+                <div class="name">Text</div>
+                <div class="desc">Multi-line text with adjustable size</div>
+                <kbd>T</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="18" height="8" rx="2" fill="rgba(255,235,59,0.3)" stroke="rgba(255,235,59,0.6)" stroke-width="1.5"/></svg>
+                </div>
+                <div class="name">Marker</div>
+                <div class="desc">Semi-transparent highlighter effect</div>
+                <kbd>M</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="8" height="8" fill="#555"/><rect x="12" y="4" width="8" height="8" fill="#333"/><rect x="4" y="12" width="8" height="8" fill="#333"/><rect x="12" y="12" width="8" height="8" fill="#555"/></svg>
+                </div>
+                <div class="name">Blur</div>
+                <div class="desc">Pixelate sensitive areas for privacy</div>
+                <kbd>B</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#4caf50" stroke-width="2"/><polyline points="8,12 11,15 16,9" stroke="#4caf50" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="name">Check</div>
+                <div class="desc">Green checkmark approval stamp</div>
+                <kbd>K</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#f44336" stroke-width="2"/><line x1="8" y1="8" x2="16" y2="16" stroke="#f44336" stroke-width="2.5" stroke-linecap="round"/><line x1="16" y1="8" x2="8" y2="16" stroke="#f44336" stroke-width="2.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="name">Cross</div>
+                <div class="desc">Red X rejection stamp</div>
+                <kbd>D</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 5H9l-7 7 7 7h11a2 2 0 002-2V7a2 2 0 00-2-2z" stroke="#9da5ae" stroke-width="2"/><line x1="18" y1="9" x2="12" y2="15" stroke="#9da5ae" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="9" x2="18" y2="15" stroke="#9da5ae" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="name">Eraser</div>
+                <div class="desc">Click any annotation to remove it</div>
+                <kbd>G</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><polyline points="1,4 1,10 7,10" stroke="#42a5f5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="#42a5f5" stroke-width="2"/></svg>
+                </div>
+                <div class="name">Undo</div>
+                <div class="desc">Undo last drawing action</div>
+                <kbd>X</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 9l4-4 4 4M5 15l4 4 4-4" stroke="#ffa726" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="name">Move</div>
+                <div class="desc">Pan and reposition selection</div>
+                <kbd>V</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="5" fill="#f44336"/><circle cx="16" cy="8" r="5" fill="#42a5f5"/><circle cx="12" cy="14" r="5" fill="#4caf50"/></svg>
+                </div>
+                <div class="name">Color</div>
+                <div class="desc">24-color palette picker</div>
+                <kbd>C</kbd>
+            </div>
+            <div class="tool-item">
+                <div class="tool-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="6" r="2" fill="#9da5ae"/><circle cx="12" cy="12" r="4" fill="#9da5ae"/><circle cx="12" cy="19" r="3" fill="#9da5ae" opacity="0.5"/></svg>
+                </div>
+                <div class="name">Thickness</div>
+                <div class="desc">10 preset sizes, scroll to adjust</div>
+                <kbd>W</kbd>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== KEYBOARD SHORTCUTS ========== -->
+<section id="shortcuts" class="section-alt">
+    <div class="container">
+        <div class="section-title">
+            <h2>Keyboard <span class="accent">Shortcuts</span></h2>
+            <p>Every action mapped to your keyboard. All shortcuts are customizable in Settings.</p>
+        </div>
+        <div class="shortcuts-section fade-in">
+            <div class="shortcut-group">
+                <h4>Global Hotkeys (System-wide)</h4>
+                <div class="shortcut-row"><span class="action">Region capture</span><kbd>PrintScreen</kbd></div>
+                <div class="shortcut-row"><span class="action">Fullscreen save to file</span><kbd>Shift+PrtSc</kbd></div>
+                <div class="shortcut-row"><span class="action">Fullscreen to clipboard</span><kbd>Ctrl+PrtSc</kbd></div>
+            </div>
+            <div class="shortcut-group">
+                <h4>Capture Actions</h4>
+                <div class="shortcut-row"><span class="action">Save screenshot</span><kbd>Ctrl+S</kbd></div>
+                <div class="shortcut-row"><span class="action">Copy to clipboard</span><kbd>Ctrl+C</kbd></div>
+                <div class="shortcut-row"><span class="action">Pin on screen</span><kbd>F</kbd></div>
+                <div class="shortcut-row"><span class="action">Start recording</span><kbd>Ctrl+R</kbd></div>
+                <div class="shortcut-row"><span class="action">OCR text extraction</span><kbd>O</kbd></div>
+                <div class="shortcut-row"><span class="action">Open history</span><kbd>H</kbd></div>
+            </div>
+            <div class="shortcut-group">
+                <h4>Drawing Tools</h4>
+                <div class="shortcut-row"><span class="action">Pencil</span><kbd>P</kbd></div>
+                <div class="shortcut-row"><span class="action">Line</span><kbd>L</kbd></div>
+                <div class="shortcut-row"><span class="action">Arrow</span><kbd>A</kbd></div>
+                <div class="shortcut-row"><span class="action">Rectangle</span><kbd>R</kbd></div>
+                <div class="shortcut-row"><span class="action">Ellipse</span><kbd>E</kbd></div>
+                <div class="shortcut-row"><span class="action">Text</span><kbd>T</kbd></div>
+                <div class="shortcut-row"><span class="action">Marker</span><kbd>M</kbd></div>
+                <div class="shortcut-row"><span class="action">Blur / Pixelate</span><kbd>B</kbd></div>
+                <div class="shortcut-row"><span class="action">Check stamp</span><kbd>K</kbd></div>
+                <div class="shortcut-row"><span class="action">Cross stamp</span><kbd>D</kbd></div>
+                <div class="shortcut-row"><span class="action">Eraser</span><kbd>G</kbd></div>
+            </div>
+            <div class="shortcut-group">
+                <h4>Controls &amp; Recording</h4>
+                <div class="shortcut-row"><span class="action">Undo</span><kbd>Ctrl+Z</kbd></div>
+                <div class="shortcut-row"><span class="action">Redo</span><kbd>Ctrl+Y</kbd></div>
+                <div class="shortcut-row"><span class="action">Move / Pan</span><kbd>V</kbd></div>
+                <div class="shortcut-row"><span class="action">Color picker</span><kbd>C</kbd></div>
+                <div class="shortcut-row"><span class="action">Thickness</span><kbd>W</kbd></div>
+                <div class="shortcut-row"><span class="action">Pan (hold)</span><kbd>Space</kbd></div>
+                <div class="shortcut-row"><span class="action">Full region toggle</span><kbd>Double-click</kbd></div>
+                <div class="shortcut-row"><span class="action">Adjust thickness</span><kbd>Scroll wheel</kbd></div>
+                <div class="shortcut-row"><span class="action">Dismiss / deselect</span><kbd>Esc</kbd></div>
+                <div class="shortcut-row"><span class="action">Force close</span><kbd>Esc &times; 2</kbd></div>
+                <div class="shortcut-row"><span class="action">Toggle mic (recording)</span><kbd>M</kbd></div>
+                <div class="shortcut-row"><span class="action">Toggle system audio</span><kbd>S</kbd></div>
+                <div class="shortcut-row"><span class="action">Pause / Resume</span><kbd>Space</kbd></div>
+                <div class="shortcut-row"><span class="action">Stop recording</span><kbd>Q</kbd></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== SETTINGS ========== -->
+<section id="settings">
+    <div class="container">
+        <div class="section-title">
+            <h2>Fully <span class="accent">Customizable</span></h2>
+            <p>Tailor Llamashot to your workflow with granular settings</p>
+        </div>
+        <div class="settings-grid fade-in">
+            <div class="setting-card">
+                <h4>General</h4>
+                <p>Core application behavior and startup preferences.</p>
+                <ul class="setting-items">
+                    <li>Auto start with Windows (--silent mode)</li>
+                    <li>Capture mouse cursor in screenshots</li>
+                    <li>Show notification balloons</li>
+                    <li>Minimize to system tray on close</li>
+                    <li>Auto check for updates on startup</li>
+                </ul>
+            </div>
+            <div class="setting-card">
+                <h4>Hotkey Configuration</h4>
+                <p>Click-to-record keyboard shortcut editor with conflict detection.</p>
+                <ul class="setting-items">
+                    <li>3 global hotkeys (capture, fullscreen save, fullscreen copy)</li>
+                    <li>19 tool shortcuts (all customizable)</li>
+                    <li>Duplicate detection with red highlight warning</li>
+                    <li>Per-shortcut reset button to restore defaults</li>
+                    <li>Support for Ctrl, Shift, Alt, Win modifiers</li>
+                </ul>
+            </div>
+            <div class="setting-card">
+                <h4>Output &amp; Format</h4>
+                <p>Control how screenshots are saved and their quality.</p>
+                <ul class="setting-items">
+                    <li>Default format: PNG, JPG, or BMP</li>
+                    <li>JPEG quality slider (10&ndash;100, default: 90)</li>
+                    <li>Default save directory with browse picker</li>
+                    <li>Auto-naming with timestamp pattern</li>
+                </ul>
+            </div>
+            <div class="setting-card">
+                <h4>Recording &amp; History</h4>
+                <p>Configure screen recording audio and screenshot history storage.</p>
+                <ul class="setting-items">
+                    <li>Enable/disable audio recording by default</li>
+                    <li>Toggle screenshot history on/off</li>
+                    <li>Custom history folder location</li>
+                    <li>Max history items limit (default: 100)</li>
+                    <li>Auto video quality (1080p/720p/VGA)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== TECH & REQUIREMENTS ========== -->
+<section class="section-alt">
+    <div class="container">
+        <div class="section-title">
+            <h2>Built for <span class="accent">Performance</span></h2>
+            <p>Native Windows app with no Electron, no browser, no bloat</p>
+        </div>
+
+        <div class="tech-stack fade-in">
             <span class="tech-tag">.NET 10</span>
             <span class="tech-tag">WPF</span>
             <span class="tech-tag">C#</span>
             <span class="tech-tag">GDI BitBlt</span>
             <span class="tech-tag">WinRT OCR</span>
             <span class="tech-tag">MediaComposition</span>
+            <span class="tech-tag">Win32 Interop</span>
             <span class="tech-tag">Inno Setup</span>
-            <span class="tech-tag">Windows 10/11</span>
+        </div>
+
+        <div class="req-grid fade-in" style="margin-top:48px">
+            <div class="req-item">
+                <div class="req-label">Operating System</div>
+                <div class="req-value">Windows 10 (1903+) or 11</div>
+            </div>
+            <div class="req-item">
+                <div class="req-label">Memory Usage</div>
+                <div class="req-value">~28 MB RAM</div>
+            </div>
+            <div class="req-item">
+                <div class="req-label">Runtime</div>
+                <div class="req-value">Self-contained (none needed)</div>
+            </div>
+        </div>
+
+        <div class="features-grid-3 fade-in" style="margin-top:48px">
+            <div class="qf-card">
+                <h4>Instant Startup</h4>
+                <p>No loading screens, no splash. Press the hotkey and start capturing immediately.</p>
+            </div>
+            <div class="qf-card">
+                <h4>No Background Services</h4>
+                <p>Sits quietly in the system tray. Uses zero CPU until you trigger a capture.</p>
+            </div>
+            <div class="qf-card">
+                <h4>Single-File Executable</h4>
+                <p>Self-contained deployment. The installer bundles everything &mdash; no separate runtime downloads.</p>
+            </div>
         </div>
     </div>
 </section>
 
-<!-- Download -->
-<section id="download">
-    <div class="container" style="text-align: center;">
-        <div class="section-title">
-            <h2>Get Llamashot</h2>
-            <p>Free and open source. Windows 10 (1903+) or later.</p>
-        </div>
+<!-- ========== DOWNLOAD CTA ========== -->
+<section id="download" class="cta-section">
+    <div class="container text-center">
+        <h2>Ready to Try <span class="accent">Llamashot</span>?</h2>
+        <p>Free, open source, and lightweight. Download the installer and get started in seconds.</p>
         <div class="cta-buttons">
             <a href="https://github.com/santos-k/Llamashot/releases/latest" class="btn btn-primary">Download Installer (.exe)</a>
-            <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View on GitHub</a>
+            <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View Source on GitHub</a>
         </div>
-        <p style="margin-top: 24px; color: var(--muted); font-size: 0.9rem;">
-            Version 2.8.1 &bull; Self-contained, no runtime needed
-        </p>
+        <!-- UPDATE THIS VERSION when releasing a new build -->
+        <p class="version-note">Version 2.8.1 &bull; Self-contained, no runtime needed</p>
     </div>
 </section>
+
+</main>
 
 <!-- Footer -->
 <footer>
     <p>Made with <span class="heart">&hearts;</span> by <strong>Santosh Kumar</strong></p>
-    <p style="margin-top: 8px; font-size: 0.85rem;">Llamashot &copy; 2025</p>
+    <div class="footer-links">
+        <a href="https://github.com/santos-k/Llamashot">GitHub</a>
+        <a href="https://github.com/santos-k/Llamashot/releases">Releases</a>
+        <a href="https://github.com/santos-k/Llamashot/issues">Issues</a>
+    </div>
+    <p class="footer-sub">Llamashot &copy; 2025</p>
 </footer>
+
+<!-- Back to top -->
+<button class="back-to-top" id="backToTop" aria-label="Back to top" title="Back to top">&#8593;</button>
+
+<script>
+    // Back to top
+    const btn = document.getElementById('backToTop');
+    window.addEventListener('scroll', () => {
+        btn.classList.toggle('visible', window.scrollY > 500);
+    }, { passive: true });
+    btn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
 
 </body>
 </html>
