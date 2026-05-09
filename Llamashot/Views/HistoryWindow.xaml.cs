@@ -89,6 +89,29 @@ public partial class HistoryWindow : Window
         }
     }
 
+    private void SaveItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.DataContext is not HistoryItemViewModel item) return;
+        if (!File.Exists(item.FilePath)) return;
+
+        var ext = Path.GetExtension(item.FilePath).ToLowerInvariant();
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "PNG Image|*.png|JPEG Image|*.jpg|Bitmap Image|*.bmp|All Files|*.*",
+            DefaultExt = string.IsNullOrEmpty(ext) ? ".png" : ext,
+            FileName = Path.GetFileName(item.FilePath)
+        };
+        dialog.FilterIndex = ext switch
+        {
+            ".jpg" or ".jpeg" => 2,
+            ".bmp" => 3,
+            _ => 1
+        };
+
+        if (dialog.ShowDialog() == true)
+            File.Copy(item.FilePath, dialog.FileName, overwrite: true);
+    }
+
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is HistoryItemViewModel item)
@@ -163,6 +186,36 @@ public partial class HistoryWindow : Window
         btn.Content = original;
         btn.Foreground = new System.Windows.Media.SolidColorBrush(
             System.Windows.Media.Color.FromRgb(0x66, 0xBB, 0x6A));
+    }
+
+    private async void SaveSelected_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        var selected = _items.Where(i => i.IsSelected && File.Exists(i.FilePath)).ToList();
+        if (selected.Count == 0) return;
+
+        var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = $"Save {selected.Count} screenshot{(selected.Count != 1 ? "s" : "")} to folder",
+            UseDescriptionForTitle = true
+        };
+
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        foreach (var item in selected)
+        {
+            var destPath = Path.Combine(dialog.SelectedPath, Path.GetFileName(item.FilePath));
+            File.Copy(item.FilePath, destPath, overwrite: true);
+        }
+
+        var original = btn.Content;
+        btn.Content = "Saved!";
+        btn.Foreground = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0x66, 0xBB, 0x6A));
+        await Task.Delay(2000);
+        btn.Content = original;
+        btn.Foreground = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0x42, 0xA5, 0xF5));
     }
 
     private void DeleteSelected_Click(object sender, RoutedEventArgs e)

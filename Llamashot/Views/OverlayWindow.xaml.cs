@@ -36,6 +36,7 @@ public partial class OverlayWindow : Window
     // Full-region toggle (double-click)
     private Rect _originalSelection;
     private bool _isFullRegion;
+    private DateTime _lastEscTime = DateTime.MinValue;
 
     // OCR sub-selection
     private bool _ocrMode;
@@ -322,10 +323,12 @@ public partial class OverlayWindow : Window
 
     private void UpdateSelectionVisuals()
     {
-        double x = Math.Min(_selStart.X, _selEnd.X);
-        double y = Math.Min(_selStart.Y, _selEnd.Y);
-        double w = Math.Abs(_selEnd.X - _selStart.X);
-        double h = Math.Abs(_selEnd.Y - _selStart.Y);
+        double x = Math.Clamp(Math.Min(_selStart.X, _selEnd.X), 0, ActualWidth);
+        double y = Math.Clamp(Math.Min(_selStart.Y, _selEnd.Y), 0, ActualHeight);
+        double x2 = Math.Clamp(Math.Max(_selStart.X, _selEnd.X), 0, ActualWidth);
+        double y2 = Math.Clamp(Math.Max(_selStart.Y, _selEnd.Y), 0, ActualHeight);
+        double w = x2 - x;
+        double h = y2 - y;
 
         _selection = new Rect(x, y, w, h);
 
@@ -416,25 +419,27 @@ public partial class OverlayWindow : Window
         var dy = pos.Y - _dragStart.Y;
         var r = _dragOrigSelection;
 
-        _selection = _activeHandle switch
+        double left = r.Left, top = r.Top, right = r.Right, bottom = r.Bottom;
+
+        switch (_activeHandle)
         {
-            Handle.TL => new Rect(r.Left + dx, r.Top + dy, r.Width - dx, r.Height - dy),
-            Handle.T  => new Rect(r.Left, r.Top + dy, r.Width, r.Height - dy),
-            Handle.TR => new Rect(r.Left, r.Top + dy, r.Width + dx, r.Height - dy),
-            Handle.R  => new Rect(r.Left, r.Top, r.Width + dx, r.Height),
-            Handle.BR => new Rect(r.Left, r.Top, r.Width + dx, r.Height + dy),
-            Handle.B  => new Rect(r.Left, r.Top, r.Width, r.Height + dy),
-            Handle.BL => new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height + dy),
-            Handle.L  => new Rect(r.Left + dx, r.Top, r.Width - dx, r.Height),
-            _ => _selection
-        };
+            case Handle.TL: left += dx; top += dy; break;
+            case Handle.T:  top += dy; break;
+            case Handle.TR: right += dx; top += dy; break;
+            case Handle.R:  right += dx; break;
+            case Handle.BR: right += dx; bottom += dy; break;
+            case Handle.B:  bottom += dy; break;
+            case Handle.BL: left += dx; bottom += dy; break;
+            case Handle.L:  left += dx; break;
+        }
 
-        // Enforce minimum
-        if (_selection.Width < 10)
-            _selection = new Rect(_selection.Left, _selection.Top, 10, _selection.Height);
-        if (_selection.Height < 10)
-            _selection = new Rect(_selection.Left, _selection.Top, _selection.Width, 10);
+        // Clamp to screen bounds and enforce minimum 10x10
+        left = Math.Clamp(left, 0, ActualWidth - 10);
+        top = Math.Clamp(top, 0, ActualHeight - 10);
+        right = Math.Clamp(right, left + 10, ActualWidth);
+        bottom = Math.Clamp(bottom, top + 10, ActualHeight);
 
+        _selection = new Rect(left, top, right - left, bottom - top);
         RefreshSelectionUI();
     }
 
@@ -443,9 +448,11 @@ public partial class OverlayWindow : Window
         var dx = pos.X - _dragStart.X;
         var dy = pos.Y - _dragStart.Y;
 
-        var newSel = new Rect(
-            _dragOrigSelection.Left + dx, _dragOrigSelection.Top + dy,
-            _dragOrigSelection.Width, _dragOrigSelection.Height);
+        // Clamp to screen bounds
+        double newLeft = Math.Clamp(_dragOrigSelection.Left + dx, 0, Math.Max(0, ActualWidth - _dragOrigSelection.Width));
+        double newTop = Math.Clamp(_dragOrigSelection.Top + dy, 0, Math.Max(0, ActualHeight - _dragOrigSelection.Height));
+
+        var newSel = new Rect(newLeft, newTop, _dragOrigSelection.Width, _dragOrigSelection.Height);
 
         // Move all annotations by the delta
         var moveDx = newSel.Left - _selection.Left;
@@ -699,6 +706,20 @@ public partial class OverlayWindow : Window
             Canvas.SetTop(_ocrRect, pos.Y);
             DrawingCanvas.Children.Add(_ocrRect);
             DrawingCanvas.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
+        // Check resize handle (handles sit on selection edge, inside the DrawingCanvas clip)
+        var handlePos = e.GetPosition(MainCanvas);
+        var handle = HitTestHandle(handlePos);
+        if (handle != Handle.None)
+        {
+            _interaction = Interaction.Resizing;
+            _activeHandle = handle;
+            _dragStart = handlePos;
+            _dragOrigSelection = _selection;
+            MainCanvas.CaptureMouse();
             e.Handled = true;
             return;
         }
@@ -1141,6 +1162,16 @@ public partial class OverlayWindow : Window
 
         if (e.Key == Key.Escape)
         {
+            // Double-Esc: force close immediately
+            var now = DateTime.Now;
+            if ((now - _lastEscTime).TotalMilliseconds < 500)
+            {
+                Close();
+                e.Handled = true;
+                return;
+            }
+            _lastEscTime = now;
+
             if (_ocrMode)
             {
                 _ocrMode = false;

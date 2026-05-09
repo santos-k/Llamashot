@@ -1,10 +1,12 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Llamashot.Core;
+using Llamashot.Tools;
 using Microsoft.Win32;
 
 namespace Llamashot.Views;
@@ -13,21 +15,33 @@ public partial class RecordingOverlay : Window
 {
     private readonly ScreenRecorder _recorder;
     private readonly RecordingBorder _border;
+    private RecordingAnnotation? _annotationOverlay;
     private bool _finished;
     private bool _audioEnabled;
+    private bool _micEnabled;
+    private bool _systemAudioEnabled;
+    private readonly double _dipX, _dipY, _dipW, _dipH;
+    private string? _activeAnnotationTool;
+    private DateTime _lastEscTime = DateTime.MinValue;
 
     public RecordingOverlay(int pixelX, int pixelY, int pixelW, int pixelH,
                             double dipX, double dipY, double dipW, double dipH)
     {
         InitializeComponent();
 
+        _dipX = dipX; _dipY = dipY; _dipW = dipW; _dipH = dipH;
+
         _recorder = new ScreenRecorder(fps: 10);
         _recorder.OnTick += () => Dispatcher.Invoke(UpdateTimer);
 
         _audioEnabled = AppSettings.Instance.RecordAudio;
-        UpdateAudioUI();
+        _micEnabled = _audioEnabled;
+        _systemAudioEnabled = _audioEnabled;
+        UpdateMicUI();
+        UpdateSystemAudioUI();
 
         _border = new RecordingBorder(dipX, dipY, dipW, dipH);
+        App.ActiveRecordingOverlay = this;
 
         Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
         Top = 10;
@@ -52,20 +66,27 @@ public partial class RecordingOverlay : Window
 
             if (_audioEnabled)
             {
-                BtnAudio.IsEnabled = false;
+                BtnMic.IsEnabled = false;
+                BtnSystemAudio.IsEnabled = false;
+                _recorder.SetMicEnabled(_micEnabled);
+                _recorder.SetSystemAudioEnabled(_systemAudioEnabled);
                 bool audioOk = await _recorder.StartAudioAsync();
-                BtnAudio.IsEnabled = true;
+                BtnMic.IsEnabled = true;
+                BtnSystemAudio.IsEnabled = true;
 
                 if (!audioOk)
                 {
                     _audioEnabled = false;
-                    UpdateAudioUI();
-                    TxtAudioStatus.Text = "No audio device";
+                    _micEnabled = false;
+                    _systemAudioEnabled = false;
+                    UpdateMicUI();
+                    UpdateSystemAudioUI();
+                    TxtAudioStatus.Text = "No audio";
                     TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
                 }
                 else
                 {
-                    UpdateAudioUI();
+                    UpdateAudioStatusText();
                 }
             }
         };
@@ -79,9 +100,9 @@ public partial class RecordingOverlay : Window
             : $"{(int)elapsed.TotalMinutes:00}:{elapsed.Seconds:00}";
     }
 
-    private void UpdateAudioUI()
+    private void UpdateMicUI()
     {
-        var color = _audioEnabled
+        var color = _micEnabled
             ? Color.FromRgb(0x4C, 0xAF, 0x50)  // green
             : Color.FromRgb(0x66, 0x66, 0x66);  // gray
 
@@ -89,17 +110,33 @@ public partial class RecordingOverlay : Window
         MicBody.Fill = brush;
         MicArc.Stroke = brush;
         MicStand.Stroke = brush;
-        MicSlash.Visibility = _audioEnabled ? Visibility.Collapsed : Visibility.Visible;
+        MicSlash.Visibility = _micEnabled ? Visibility.Collapsed : Visibility.Visible;
+    }
 
-        if (_audioEnabled)
+    private void UpdateSystemAudioUI()
+    {
+        var color = _systemAudioEnabled
+            ? Color.FromRgb(0x4C, 0xAF, 0x50)  // green
+            : Color.FromRgb(0x66, 0x66, 0x66);  // gray
+
+        var brush = new SolidColorBrush(color);
+        SpeakerBody.Fill = brush;
+        SpeakerWave1.Stroke = brush;
+        SpeakerWave2.Stroke = brush;
+        SpeakerSlash.Visibility = _systemAudioEnabled ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void UpdateAudioStatusText()
+    {
+        bool anyActive = _micEnabled || _systemAudioEnabled;
+        if (anyActive)
         {
-            // Show what sources are active
-            string sources = (_recorder.HasMic, _recorder.HasSystemAudio) switch
+            string sources = (_micEnabled && _recorder.HasMic, _systemAudioEnabled && _recorder.HasSystemAudio) switch
             {
-                (true, true) => "Mic + System",
+                (true, true) => "Mic+Sys",
                 (true, false) => "Mic",
                 (false, true) => "System",
-                _ => "Audio ON"
+                _ => ""
             };
             TxtAudioStatus.Text = sources;
             TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50));
@@ -107,42 +144,172 @@ public partial class RecordingOverlay : Window
         else
         {
             TxtAudioStatus.Text = "";
-            TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
         }
     }
 
-    private async void Audio_Click(object sender, RoutedEventArgs e)
+    private async void Mic_Click(object sender, RoutedEventArgs e)
     {
-        BtnAudio.IsEnabled = false;
-        try
+        _micEnabled = !_micEnabled;
+        UpdateMicUI();
+
+        if (!_audioEnabled && _micEnabled)
         {
-            if (_audioEnabled)
+            // Start audio graph if not yet running
+            _audioEnabled = true;
+            _recorder.SetMicEnabled(true);
+            _recorder.SetSystemAudioEnabled(_systemAudioEnabled);
+            BtnMic.IsEnabled = false;
+            BtnSystemAudio.IsEnabled = false;
+            bool ok = await _recorder.StartAudioAsync();
+            BtnMic.IsEnabled = true;
+            BtnSystemAudio.IsEnabled = true;
+            if (!ok)
             {
-                await _recorder.StopAudioAsync();
-                _audioEnabled = false;
+                _micEnabled = false;
+                _audioEnabled = _systemAudioEnabled;
+                UpdateMicUI();
+                TxtAudioStatus.Text = "No mic";
+                TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+                return;
             }
-            else
-            {
-                bool ok = await _recorder.StartAudioAsync();
-                if (ok)
-                {
-                    _audioEnabled = true;
-                }
-                else
-                {
-                    TxtAudioStatus.Text = "No audio device";
-                    TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
-                    BtnAudio.IsEnabled = true;
-                    return;
-                }
-            }
-            UpdateAudioUI();
         }
-        finally
+        else
         {
-            BtnAudio.IsEnabled = true;
+            _recorder.SetMicEnabled(_micEnabled);
+        }
+
+        // If both off, stop audio
+        if (!_micEnabled && !_systemAudioEnabled && _audioEnabled)
+        {
+            await _recorder.StopAudioAsync();
+            _audioEnabled = false;
+        }
+
+        UpdateAudioStatusText();
+    }
+
+    private async void SystemAudio_Click(object sender, RoutedEventArgs e)
+    {
+        _systemAudioEnabled = !_systemAudioEnabled;
+        UpdateSystemAudioUI();
+
+        if (!_audioEnabled && _systemAudioEnabled)
+        {
+            _audioEnabled = true;
+            _recorder.SetMicEnabled(_micEnabled);
+            _recorder.SetSystemAudioEnabled(true);
+            BtnMic.IsEnabled = false;
+            BtnSystemAudio.IsEnabled = false;
+            bool ok = await _recorder.StartAudioAsync();
+            BtnMic.IsEnabled = true;
+            BtnSystemAudio.IsEnabled = true;
+            if (!ok)
+            {
+                _systemAudioEnabled = false;
+                _audioEnabled = _micEnabled;
+                UpdateSystemAudioUI();
+                TxtAudioStatus.Text = "No audio";
+                TxtAudioStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+                return;
+            }
+        }
+        else
+        {
+            _recorder.SetSystemAudioEnabled(_systemAudioEnabled);
+        }
+
+        if (!_micEnabled && !_systemAudioEnabled && _audioEnabled)
+        {
+            await _recorder.StopAudioAsync();
+            _audioEnabled = false;
+        }
+
+        UpdateAudioStatusText();
+    }
+
+    // ============ SHORTCUTS ============
+
+    public void HandleShortcut(char key)
+    {
+        if (_finished) return;
+        switch (key)
+        {
+            case 'P': SelectAnnotationTool("Pen"); break;
+            case 'A': SelectAnnotationTool("Arrow"); break;
+            case 'R': SelectAnnotationTool("Rectangle"); break;
+            case 'C': _annotationOverlay?.ClearAll(); break;
+            case 'M': Mic_Click(BtnMic, new RoutedEventArgs()); break;
+            case 'S': SystemAudio_Click(BtnSystemAudio, new RoutedEventArgs()); break;
+            case ' ': Pause_Click(BtnPause, new RoutedEventArgs()); break;
+            case 'Q': FinishRecording(); break;
         }
     }
+
+    // ============ ANNOTATIONS ============
+
+    private void AnnotationTool_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string toolName) return;
+        SelectAnnotationTool(toolName);
+    }
+
+    private void SelectAnnotationTool(string toolName)
+    {
+        // Toggle off if same tool clicked again
+        if (_activeAnnotationTool == toolName)
+        {
+            _activeAnnotationTool = null;
+            _annotationOverlay?.SetTool(null);
+            UpdateAnnotationToolHighlights();
+            return;
+        }
+
+        _activeAnnotationTool = toolName;
+
+        // Create annotation overlay if not yet created
+        if (_annotationOverlay == null)
+        {
+            _annotationOverlay = new RecordingAnnotation(_dipX, _dipY, _dipW, _dipH);
+            _annotationOverlay.EscapePressed += HandleEscapePress;
+            _annotationOverlay.StrokeCompleted += () =>
+            {
+                _activeAnnotationTool = null;
+                _annotationOverlay?.SetTool(null);
+                UpdateAnnotationToolHighlights();
+            };
+            _annotationOverlay.Show();
+        }
+
+        IDrawingTool tool = toolName switch
+        {
+            "Pen" => new PenTool(),
+            "Arrow" => new ArrowTool(),
+            "Rectangle" => new RectangleTool(),
+            _ => new PenTool()
+        };
+        tool.StrokeColor = Color.FromRgb(0xFF, 0xA7, 0x26); // orange
+        tool.Thickness = 3;
+
+        _annotationOverlay.SetTool(tool);
+        UpdateAnnotationToolHighlights();
+    }
+
+    private void ClearAnnotations_Click(object sender, RoutedEventArgs e)
+    {
+        _annotationOverlay?.ClearAll();
+    }
+
+    private void UpdateAnnotationToolHighlights()
+    {
+        BtnPen.Background = _activeAnnotationTool == "Pen"
+            ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xA7, 0x26)) : Brushes.Transparent;
+        BtnArrow.Background = _activeAnnotationTool == "Arrow"
+            ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xA7, 0x26)) : Brushes.Transparent;
+        BtnRect.Background = _activeAnnotationTool == "Rectangle"
+            ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xA7, 0x26)) : Brushes.Transparent;
+    }
+
+    // ============ RECORDING CONTROLS ============
 
     private void Pause_Click(object sender, RoutedEventArgs e)
     {
@@ -175,6 +342,8 @@ public partial class RecordingOverlay : Window
         int frameCount = _recorder.FramesCaptured;
         _recorder.Stop();
         _border.Close();
+        _annotationOverlay?.Close();
+        _annotationOverlay = null;
 
         if (frameCount == 0)
         {
@@ -198,18 +367,52 @@ public partial class RecordingOverlay : Window
             RecDot.Fill = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
             BtnStop.IsEnabled = false;
             BtnPause.IsEnabled = false;
-            BtnAudio.IsEnabled = false;
+            BtnMic.IsEnabled = false;
+            BtnSystemAudio.IsEnabled = false;
 
-            bool success = await _recorder.SaveAsMp4Async(dialog.FileName);
+            bool success = await _recorder.SaveAsync(dialog.FileName);
             Hide();
 
             if (!success)
             {
-                MessageBox.Show($"Failed to encode MP4.\n{_recorder.LastError}", "Llamashot",
+                MessageBox.Show($"Failed to save recording.\n{_recorder.LastError}", "Llamashot",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        _recorder.CleanupFrames();
+        _recorder.Dispose();
+        Close();
+    }
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            HandleEscapePress();
+            e.Handled = true;
+        }
+    }
+
+    private void HandleEscapePress()
+    {
+        var now = DateTime.Now;
+        if ((now - _lastEscTime).TotalMilliseconds < 500)
+        {
+            // Double-Esc: force close everything
+            ForceClose();
+            return;
+        }
+        _lastEscTime = now;
+    }
+
+    private void ForceClose()
+    {
+        _finished = true;
+        _recorder.Stop();
+        _border.Close();
+        _annotationOverlay?.Close();
+        _annotationOverlay = null;
         _recorder.CleanupFrames();
         _recorder.Dispose();
         Close();
@@ -222,10 +425,12 @@ public partial class RecordingOverlay : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        App.ActiveRecordingOverlay = null;
         if (!_finished)
         {
             _recorder.Stop();
             _border.Close();
+            _annotationOverlay?.Close();
             _recorder.CleanupFrames();
         }
         _recorder.Dispose();
