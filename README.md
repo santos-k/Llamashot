@@ -35,8 +35,9 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - Record any selected region as MP4 video (H.264 compressed)
 - **Unlimited duration**, 10fps
 - **Separate mic and system audio toggles** - Independent on/off mid-recording
-- **Live annotations** - Draw pen, arrow, rectangle on screen during recording (P/A/R keys)
+- **Live annotations** - Draw pen, arrow, rectangle, text on screen during recording (P/A/R/T keys)
 - Keyboard shortcuts for all controls (M=mic, S=system audio, Space=pause, Q=stop)
+- **Quick fullscreen record** - Start recording full screen from system tray with resizable border
 - Audio source status shown on recording bar (Mic / System / both)
 - Pause/resume with visual indicators
 - Red pulsing border shows recorded area
@@ -77,6 +78,8 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Thickness control (W)** - Dropdown 1-10 with visual preview
 - **Color picker (C)** - 24-color palette
 - **Adaptive toolbar** - Auto-switches between 1 and 2 columns based on screen height
+- **Colorful tool icons** - Each tool has a distinct colored icon with matching active highlight
+- **Tool toggle** - Click or press shortcut again to deselect any tool
 - **Seamless auto-update** - Check for updates from About, downloads and installs silently in the background
 - **22 configurable shortcuts** - Every tool and action has a keyboard shortcut
 
@@ -131,6 +134,7 @@ All 22 shortcuts are customizable in Settings.
 | Pen annotation | P |
 | Arrow annotation | A |
 | Rectangle annotation | R |
+| Text annotation | T |
 | Clear annotations | C |
 | Toggle microphone | M |
 | Toggle system audio | S |

@@ -33,10 +33,20 @@ public partial class RecordingAnnotation : Window
 
     public void SetTool(IDrawingTool? tool)
     {
+        // Finalize any active text before switching
+        if (_currentTool is TextTool prevText)
+            prevText.FinalizeActiveTextBox();
+
         _currentTool = tool;
         Cursor = tool?.Cursor ?? Cursors.Arrow;
         // Win32 level: toggle click-through
         SetClickThrough(tool == null);
+
+        // TextTool: fire StrokeCompleted when text entry is finalized
+        if (tool is TextTool textTool)
+        {
+            textTool.Finalized = () => StrokeCompleted?.Invoke();
+        }
     }
 
     public void ClearAll()
@@ -87,6 +97,11 @@ public partial class RecordingAnnotation : Window
     {
         _drawing = false;
         _currentTool?.OnMouseUp(position, DrawingCanvas);
+
+        // TextTool: stay interactive for typing, StrokeCompleted fires on Finalized
+        if (_currentTool is TextTool)
+            return;
+
         StrokeCompleted?.Invoke();
     }
 
@@ -94,6 +109,13 @@ public partial class RecordingAnnotation : Window
     {
         if (e.Key == Key.Escape)
         {
+            // If text tool is active, just finalize the text instead of closing
+            if (_currentTool is TextTool textTool)
+            {
+                textTool.FinalizeActiveTextBox();
+                e.Handled = true;
+                return;
+            }
             if (_drawing) FinishDrawing(new Point(0, 0));
             EscapePressed?.Invoke();
             e.Handled = true;

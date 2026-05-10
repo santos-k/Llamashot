@@ -260,8 +260,18 @@ public partial class App : Application
     {
         Dispatcher.Invoke(() =>
         {
-            var overlay = new OverlayWindow();
-            overlay.StartCapture();
+            // Record full primary screen, allow resizing via border
+            var source = PresentationSource.FromVisual(_hiddenWindow!);
+            double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
+            double dipW = SystemParameters.PrimaryScreenWidth;
+            double dipH = SystemParameters.PrimaryScreenHeight;
+            int px = 0, py = 0;
+            int pw = (int)(dipW * dpiScale);
+            int ph = (int)(dipH * dpiScale);
+
+            var overlay = new RecordingOverlay(px, py, pw, ph, 0, 0, dipW, dipH);
+            overlay.Show();
         });
     }
 

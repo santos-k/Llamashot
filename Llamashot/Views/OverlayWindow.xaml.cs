@@ -45,10 +45,26 @@ public partial class OverlayWindow : Window
 
     // Drawing
     private IDrawingTool? _currentTool;
+    private string? _currentToolTag;
     private readonly Stack<DrawingAction> _undoStack = new();
     private readonly Stack<DrawingAction> _redoStack = new();
-    private Color _currentColor = Colors.Red;
+    private Color _currentColor = Colors.Yellow;
     private double _currentThickness = 2;
+
+    private static readonly Dictionary<string, Color> ToolColors = new()
+    {
+        { "Pen", Color.FromRgb(0xFF, 0xA7, 0x26) },       // orange
+        { "Line", Color.FromRgb(0x64, 0xB5, 0xF6) },      // light blue
+        { "Arrow", Color.FromRgb(0x26, 0xC6, 0xDA) },     // cyan
+        { "Rectangle", Color.FromRgb(0x42, 0xA5, 0xF5) }, // blue
+        { "Ellipse", Color.FromRgb(0xAB, 0x47, 0xBC) },   // purple
+        { "Text", Color.FromRgb(0xFF, 0xCA, 0x28) },      // yellow
+        { "Marker", Color.FromRgb(0xFF, 0xEE, 0x58) },    // yellow
+        { "Blur", Color.FromRgb(0x78, 0x90, 0x9C) },      // gray
+        { "Check", Color.FromRgb(0x4C, 0xAF, 0x50) },     // green
+        { "CrossMark", Color.FromRgb(0xF4, 0x43, 0x36) }, // red
+        { "Eraser", Color.FromRgb(0xEF, 0x53, 0x50) },    // pink
+    };
 
     private static readonly Color[] PaletteColors = {
         Colors.Red, Colors.OrangeRed, Colors.Orange, Colors.Gold,
@@ -84,6 +100,7 @@ public partial class OverlayWindow : Window
         _interaction = Interaction.None;
         _hasSelection = false;
         _currentTool = null;
+        _currentToolTag = null;
         SelectionBorder.Visibility = Visibility.Collapsed;
         DimensionBorder.Visibility = Visibility.Collapsed;
         ToolbarCanvas.Visibility = Visibility.Collapsed;
@@ -234,6 +251,7 @@ public partial class OverlayWindow : Window
             _hasSelection = false;
             _isFullRegion = false;
             _currentTool = null;
+            _currentToolTag = null;
         }
 
         // Start new selection
@@ -584,6 +602,9 @@ public partial class OverlayWindow : Window
         if (atLeft < 4) atLeft = _selection.Left;
         if (atTop + ActionToolbar.DesiredSize.Height > ActualHeight)
             atTop = _selection.Top - ActionToolbar.DesiredSize.Height - 8;
+        // Clamp inside screen (fullscreen: both above/below overflow)
+        if (atTop < 4)
+            atTop = ActualHeight - ActionToolbar.DesiredSize.Height - 4;
 
         Canvas.SetLeft(ActionToolbar, atLeft);
         Canvas.SetTop(ActionToolbar, atTop);
@@ -606,10 +627,21 @@ public partial class OverlayWindow : Window
         if (_currentTool is TextTool tt)
             tt.FinalizeActiveTextBox();
 
+        // Toggle: if same tool clicked again, deselect it
+        if (_currentToolTag == toolName)
+        {
+            DeselectTool();
+            return;
+        }
+
         // Reset all tool button highlights
         ClearToolHighlights();
-        btn.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243));
+        var highlightColor = ToolColors.TryGetValue(toolName, out var tc)
+            ? Color.FromArgb(80, tc.R, tc.G, tc.B)
+            : Color.FromArgb(80, 33, 150, 243);
+        btn.Background = new SolidColorBrush(highlightColor);
 
+        _currentToolTag = toolName;
         _currentTool = toolName switch
         {
             "Pen" => new PenTool(),
@@ -649,6 +681,7 @@ public partial class OverlayWindow : Window
         if (_currentTool is TextTool tt)
             tt.FinalizeActiveTextBox();
         _currentTool = null;
+        _currentToolTag = null;
         Cursor = Cursors.Cross;
         DrawingCanvas.Cursor = Cursors.Cross;
         ClearToolHighlights();
@@ -670,9 +703,9 @@ public partial class OverlayWindow : Window
     private void Move_Click(object sender, RoutedEventArgs e)
     {
         if (_hasSelection) ActivateMoveTool();
-        // Highlight the move button
+        // Highlight the move button with its icon color (light blue)
         if (sender is Button btn)
-            btn.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243));
+            btn.Background = new SolidColorBrush(Color.FromArgb(80, 0x42, 0xA5, 0xF5));
         Focus();
     }
 
@@ -1228,7 +1261,7 @@ public partial class OverlayWindow : Window
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser))
         { Eraser_Click(this, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutMove))
-        { if (_hasSelection) { ActivateMoveTool(); BtnMove.Background = new SolidColorBrush(Color.FromArgb(80, 33, 150, 243)); } e.Handled = true; }
+        { if (_hasSelection) { ActivateMoveTool(); BtnMove.Background = new SolidColorBrush(Color.FromArgb(80, 0x42, 0xA5, 0xF5)); } e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutColor))
         { if (_hasSelection) Color_Click(BtnColor, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutThickness))
