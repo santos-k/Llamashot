@@ -19,19 +19,22 @@ public static class UpdateChecker
 
     public record UpdateInfo(string Version, string DownloadUrl, string ReleaseNotes);
 
+    /// <summary>Cached result from the most recent update check (null = no update or not checked).</summary>
+    public static UpdateInfo? LatestUpdate { get; private set; }
+
     public static async Task<UpdateInfo?> CheckForUpdateAsync()
     {
         var response = await Http.GetAsync(GitHubApiUrl);
         response.EnsureSuccessStatusCode();
 
         var release = await response.Content.ReadFromJsonAsync<GitHubRelease>();
-        if (release == null) return null;
+        if (release == null) { LatestUpdate = null; return null; }
 
         var latestVersion = release.TagName.TrimStart('v');
         var currentVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
         if (!IsNewer(latestVersion, currentVersion))
-            return null;
+        { LatestUpdate = null; return null; }
 
         // Find the installer asset (setup exe)
         var installerAsset = release.Assets?.FirstOrDefault(a =>
@@ -44,10 +47,11 @@ public static class UpdateChecker
 
         var downloadUrl = installerAsset?.BrowserDownloadUrl ?? release.HtmlUrl;
 
-        return new UpdateInfo(latestVersion, downloadUrl, release.Body ?? "");
+        LatestUpdate = new UpdateInfo(latestVersion, downloadUrl, release.Body ?? "");
+        return LatestUpdate;
     }
 
-    public static async Task<string?> DownloadUpdateAsync(UpdateInfo update)
+    public static async Task<string?> DownloadUpdateAsync(UpdateInfo update, IProgress<double>? progress = null)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "Llamashot_Update");
         Directory.CreateDirectory(tempDir);
@@ -55,12 +59,29 @@ public static class UpdateChecker
         var fileName = $"LlamashotSetup_v{update.Version}.exe";
         var filePath = Path.Combine(tempDir, fileName);
 
-        // Download the installer
         using var response = await Http.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
 
+        var totalBytes = response.Content.Headers.ContentLength ?? -1;
         await using var fileStream = File.Create(filePath);
-        await response.Content.CopyToAsync(fileStream);
+
+        if (progress == null || totalBytes <= 0)
+        {
+            await response.Content.CopyToAsync(fileStream);
+        }
+        else
+        {
+            var buffer = new byte[81920];
+            long downloaded = 0;
+            using var contentStream = await response.Content.ReadAsStreamAsync();
+            int bytesRead;
+            while ((bytesRead = await contentStream.ReadAsync(buffer)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                downloaded += bytesRead;
+                progress.Report((double)downloaded / totalBytes * 100);
+            }
+        }
 
         return filePath;
     }
