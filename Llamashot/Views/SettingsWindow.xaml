@@ -63,12 +63,6 @@
                         <CheckBox x:Name="ChkCaptureCursor" Content="Capture mouse cursor" />
                         <CheckBox x:Name="ChkShowNotifications" Content="Show notifications" />
                         <CheckBox x:Name="ChkMinimizeToTray" Content="Minimize to system tray" />
-                        <CheckBox x:Name="ChkAutoCheckUpdates" Content="Automatically check for updates" />
-                        <Button x:Name="BtnCheckUpdates" Content="Check for Updates Now"
-                                Height="28" Margin="0,6,0,0" HorizontalAlignment="Left"
-                                Padding="12,0" Click="CheckUpdates_Click"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444"
-                                FontSize="12" Cursor="Hand" />
                     </StackPanel>
                 </Border>
 

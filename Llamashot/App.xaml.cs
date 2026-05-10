@@ -86,9 +86,8 @@ public partial class App : Application
             // Global double-Esc kill switch
             InstallEscapeHook();
 
-            // Check for updates in background
-            if (AppSettings.Instance.AutoCheckUpdates)
-                _ = CheckForUpdatesAsync(silent: true);
+            // Check for updates in background (result cached in UpdateChecker.LatestUpdate)
+            _ = CheckForUpdatesAsync();
         }
         catch (Exception ex)
         {
@@ -205,7 +204,6 @@ public partial class App : Application
         menu.Items.Add("-");
         menu.Items.Add("History", null, (s, e) => ShowHistory());
         menu.Items.Add("Settings", null, (s, e) => ShowSettings());
-        menu.Items.Add("Check for Updates", null, (s, e) => _ = CheckForUpdatesAsync(silent: false));
         menu.Items.Add("About", null, (s, e) => ShowAbout());
         menu.Items.Add("-");
         menu.Items.Add("Exit", null, (s, e) => ExitApp());
@@ -243,73 +241,10 @@ public partial class App : Application
         return System.Drawing.Icon.FromHandle(h);
     }
 
-    private async Task CheckForUpdatesAsync(bool silent)
+    private static async Task CheckForUpdatesAsync()
     {
-        try
-        {
-            var result = await UpdateChecker.CheckForUpdateAsync();
-            if (result != null && !_silentStart)
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    _trayIcon?.ShowBalloonTip(5000, "Llamashot Update Available",
-                        $"Version {result.Version} is available. Right-click tray icon > Check for Updates to download.",
-                        WinForms.ToolTipIcon.Info);
-
-                    _trayIcon!.BalloonTipClicked += (s, e) => _ = DownloadAndInstallUpdateAsync(result);
-                });
-            }
-            else if (!silent)
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    MessageBox.Show("You're running the latest version of Llamashot.",
-                        "Llamashot", MessageBoxButton.OK, MessageBoxImage.Information);
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            if (!silent)
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    MessageBox.Show($"Failed to check for updates:\n{ex.Message}",
-                        "Llamashot", MessageBoxButton.OK, MessageBoxImage.Warning);
-                });
-            }
-        }
-    }
-
-    private async Task DownloadAndInstallUpdateAsync(UpdateChecker.UpdateInfo update)
-    {
-        try
-        {
-            _trayIcon?.ShowBalloonTip(3000, "Llamashot", "Downloading update...", WinForms.ToolTipIcon.Info);
-
-            var installerPath = await UpdateChecker.DownloadUpdateAsync(update);
-            if (installerPath != null)
-            {
-                var result = MessageBox.Show(
-                    $"Llamashot {update.Version} has been downloaded.\n\nInstall now? The application will close.",
-                    "Llamashot Update", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = installerPath,
-                        UseShellExecute = true
-                    });
-                    ExitApp();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Failed to download update:\n{ex.Message}",
-                "Llamashot", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+        try { await UpdateChecker.CheckForUpdateAsync(); }
+        catch { /* silent background check */ }
     }
 
     private void StartRegionCapture()

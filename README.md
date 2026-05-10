@@ -77,6 +77,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Thickness control (W)** - Dropdown 1-10 with visual preview
 - **Color picker (C)** - 24-color palette
 - **Adaptive toolbar** - Auto-switches between 1 and 2 columns based on screen height
+- **Seamless auto-update** - Check for updates from About, downloads and installs silently in the background
 - **22 configurable shortcuts** - Every tool and action has a keyboard shortcut
 
 ## Keyboard Shortcuts

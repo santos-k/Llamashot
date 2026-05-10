@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Icon="/Resources/icon32.png"
         Title="About Llamashot"
-        Width="420" Height="480"
+        Width="420" Height="530"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#1A1A1E">
@@ -22,8 +22,24 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 2.8.1" Foreground="#666"
+                <TextBlock Text="Version 2.9.0" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
+
+                <!-- Update -->
+                <StackPanel Margin="0,10,0,0" HorizontalAlignment="Center">
+                    <Button x:Name="BtnUpdate" Content="Check for Update"
+                            Click="CheckUpdate_Click"
+                            Height="26" Padding="14,0"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444"
+                            FontSize="11" Cursor="Hand" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="TxtUpdateStatus" Foreground="#888"
+                               FontSize="11" HorizontalAlignment="Center" Margin="0,6,0,0"
+                               Visibility="Collapsed" />
+                    <ProgressBar x:Name="PrgUpdate" Height="3" Width="180"
+                                 Margin="0,5,0,0" Visibility="Collapsed"
+                                 Minimum="0" Maximum="100"
+                                 Background="#333" Foreground="#42A5F5" BorderThickness="0" />
+                </StackPanel>
             </StackPanel>
         </Border>
 
