@@ -12,6 +12,7 @@ public class TextTool : BaseDrawingTool
     public override DrawingToolType ToolType => DrawingToolType.Text;
     public override Cursor Cursor => CursorHelper.Get("Text");
     public double FontSize { get; set; } = 16;
+    public Action? Finalized { get; set; }
     private TextBox? _activeTextBox;
     private Canvas? _canvas;
 
@@ -91,6 +92,7 @@ public class TextTool : BaseDrawingTool
             canvas.Children.Remove(textBox);
             if (CurrentAction?.RenderedElement == textBox)
                 CurrentAction = null;
+            Finalized?.Invoke();
             return;
         }
 
@@ -121,6 +123,8 @@ public class TextTool : BaseDrawingTool
 
         if (_activeTextBox == textBox)
             _activeTextBox = null;
+
+        Finalized?.Invoke();
     }
 
     public override void OnMouseMove(Point position, Canvas canvas) { }

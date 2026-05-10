@@ -209,6 +209,7 @@ public partial class RecordingOverlay : Window
             case 'P': SelectAnnotationTool("Pen"); break;
             case 'A': SelectAnnotationTool("Arrow"); break;
             case 'R': SelectAnnotationTool("Rectangle"); break;
+            case 'T': SelectAnnotationTool("Text"); break;
             case 'C': _annotationOverlay?.ClearAll(); break;
             case 'M': _ = ToggleMic(!_micEnabled); break;
             case 'S': _ = ToggleSystemAudio(!_systemAudioEnabled); break;
@@ -257,9 +258,10 @@ public partial class RecordingOverlay : Window
             "Pen" => new PenTool(),
             "Arrow" => new ArrowTool(),
             "Rectangle" => new RectangleTool(),
+            "Text" => new TextTool(),
             _ => new PenTool()
         };
-        tool.StrokeColor = Color.FromRgb(0xFF, 0xA7, 0x26); // orange
+        tool.StrokeColor = Color.FromRgb(0xFF, 0xFF, 0x00); // yellow
         tool.Thickness = 3;
 
         _annotationOverlay.SetTool(tool);
@@ -273,12 +275,11 @@ public partial class RecordingOverlay : Window
 
     private void UpdateAnnotationToolHighlights()
     {
-        BtnPen.Background = _activeAnnotationTool == "Pen"
-            ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xA7, 0x26)) : Brushes.Transparent;
-        BtnArrow.Background = _activeAnnotationTool == "Arrow"
-            ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xA7, 0x26)) : Brushes.Transparent;
-        BtnRect.Background = _activeAnnotationTool == "Rectangle"
-            ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xA7, 0x26)) : Brushes.Transparent;
+        var highlight = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0x00));
+        BtnPen.Background = _activeAnnotationTool == "Pen" ? highlight : Brushes.Transparent;
+        BtnArrow.Background = _activeAnnotationTool == "Arrow" ? highlight : Brushes.Transparent;
+        BtnRect.Background = _activeAnnotationTool == "Rectangle" ? highlight : Brushes.Transparent;
+        BtnText.Background = _activeAnnotationTool == "Text" ? highlight : Brushes.Transparent;
     }
 
     // ============ RECORDING CONTROLS ============
