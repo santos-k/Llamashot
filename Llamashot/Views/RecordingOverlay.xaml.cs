@@ -261,7 +261,8 @@ public partial class RecordingOverlay : Window
             "Text" => new TextTool(),
             _ => new PenTool()
         };
-        tool.StrokeColor = Color.FromRgb(0xFF, 0xFF, 0x00); // yellow
+        try { tool.StrokeColor = (Color)System.Windows.Media.ColorConverter.ConvertFromString(AppSettings.Instance.DefaultColor); }
+        catch { tool.StrokeColor = Color.FromRgb(0xFF, 0xFF, 0x00); }
         tool.Thickness = 3;
 
         _annotationOverlay.SetTool(tool);

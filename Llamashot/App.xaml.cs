@@ -144,6 +144,7 @@ public partial class App : Application
                     0x50 => 'P', // P - Pen
                     0x41 => 'A', // A - Arrow
                     0x52 => 'R', // R - Rectangle
+                    0x54 => 'T', // T - Text
                     0x43 => 'C', // C - Clear
                     0x4D => 'M', // M - Mic toggle
                     0x53 => 'S', // S - System audio toggle
@@ -260,18 +261,8 @@ public partial class App : Application
     {
         Dispatcher.Invoke(() =>
         {
-            // Record full primary screen, allow resizing via border
-            var source = PresentationSource.FromVisual(_hiddenWindow!);
-            double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
-
-            double dipW = SystemParameters.PrimaryScreenWidth;
-            double dipH = SystemParameters.PrimaryScreenHeight;
-            int px = 0, py = 0;
-            int pw = (int)(dipW * dpiScale);
-            int ph = (int)(dipH * dpiScale);
-
-            var overlay = new RecordingOverlay(px, py, pw, ph, 0, 0, dipW, dipH);
-            overlay.Show();
+            var overlay = new OverlayWindow();
+            overlay.StartCapture(OverlayWindow.CaptureMode.Video);
         });
     }
 

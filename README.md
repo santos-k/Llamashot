@@ -8,6 +8,15 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ## Features
 
+### Snipping Toolbar
+- **Windows Snipping Tool-style toolbar** - Press PrintScreen to open a top-center toolbar over dimmed screen
+- **Three capture modes** - Screenshot (default), Video, OCR with labeled icon buttons
+- **Three capture types** - Region (draw to select), Window (hover + click), Fullscreen (instant)
+- **Window capture** - Hover over any window to highlight with blue border, click to capture
+- **Delay timer** - Dropdown: No delay, 1s, 3s, 5s, 10s countdown before capture
+- **Toolbar keyboard shortcuts** - 1/2/3 for modes, R/W/F for capture types
+- **Seamless default** - Drawing a region immediately works like before, toolbar auto-hides
+
 ### Screenshot Capture
 - **Region capture** - Press PrintScreen, drag to select any area
 - **Fullscreen save** - Shift+PrintScreen saves entire screen to file
@@ -45,7 +54,10 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### OCR Text Extraction
 - Extract text from any area of the screen
-- Sub-region selection within the captured screenshot
+- **Direct OCR from toolbar** - Select OCR mode, draw region, text copied to clipboard instantly
+- **Dashed selection border** - Cyan dashed outline distinguishes OCR selection
+- **"Copied" notification** - Visual confirmation when text is copied
+- Sub-region selection within captured screenshots
 - Dark theme support (auto-inverts for better recognition)
 - Scales up small text for accuracy
 - Uses Windows built-in OCR (no external dependencies)
@@ -76,7 +88,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Space+drag** - Photoshop-style temporary pan
 - **Undo/Redo** - Ctrl+Z / Ctrl+Y
 - **Thickness control (W)** - Dropdown 1-10 with visual preview
-- **Color picker (C)** - 24-color palette
+- **Color picker (C)** - 24-color palette with persistent color memory
 - **Adaptive toolbar** - Auto-switches between 1 and 2 columns based on screen height
 - **Colorful tool icons** - Each tool has a distinct colored icon with matching active highlight
 - **Tool toggle** - Click or press shortcut again to deselect any tool
@@ -94,6 +106,18 @@ All 22 shortcuts are customizable in Settings.
 | Capture region | PrintScreen |
 | Fullscreen save | Shift+PrintScreen |
 | Fullscreen copy | Ctrl+PrintScreen |
+
+### Snipping Toolbar Shortcuts (before region selection)
+
+| Action | Default |
+|--------|---------|
+| Screenshot mode | 1 |
+| Video mode | 2 |
+| OCR mode | 3 |
+| Region capture | R |
+| Window capture | W |
+| Fullscreen capture | F |
+| Close | Escape |
 
 ### Overlay Shortcuts
 
