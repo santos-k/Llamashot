@@ -436,7 +436,7 @@
     <div class="stat"><div class="num">11</div><div class="label">Annotation Tools</div></div>
     <div class="stat"><div class="num">22+</div><div class="label">Keyboard Shortcuts</div></div>
     <div class="stat"><div class="num">~28</div><div class="label">MB RAM Usage</div></div>
-    <div class="stat"><div class="num">3</div><div class="label">Capture Modes</div></div>
+    <div class="stat"><div class="num">9</div><div class="label">Capture Combos</div></div>
     <div class="stat"><div class="num">3</div><div class="label">Export Formats</div></div>
 </div>
 
@@ -452,7 +452,89 @@
             <p>Every feature designed with speed and simplicity in mind</p>
         </div>
 
+        <!-- NEW: Snipping Toolbar -->
         <div class="feature-row fade-in">
+            <div class="feature-text">
+                <span class="section-label label-cyan">New in v4.0</span>
+                <h3>Snipping Toolbar</h3>
+                <p>Press PrintScreen and a sleek toolbar appears at the top of your dimmed screen &mdash; just like Windows Snipping Tool, but more powerful. Switch between Screenshot, Video, and OCR modes, choose your capture type, set a delay, and go.</p>
+                <ul class="feature-list cyan">
+                    <li><strong>Three capture modes</strong> &mdash; Screenshot (default), Video recording, OCR text extraction</li>
+                    <li><strong>Three capture types</strong> &mdash; Region (draw), Window (hover &amp; click), Fullscreen (instant)</li>
+                    <li><strong>Window capture</strong> &mdash; hover over any window to highlight with blue border, click to capture</li>
+                    <li><strong>Delay timer</strong> &mdash; no delay, 1s, 3s, 5s, or 10s countdown before capture</li>
+                    <li><strong>Keyboard shortcuts</strong> &mdash; 1/2/3 for modes, R/W/F for capture types</li>
+                    <li><strong>Seamless default</strong> &mdash; start drawing immediately, toolbar auto-hides</li>
+                </ul>
+            </div>
+            <div class="feature-visual fv-cyan">
+                <svg viewBox="0 0 420 300" width="100%" fill="none" role="img" aria-label="Snipping toolbar with mode buttons over dimmed screen">
+                    <!-- Monitor frame -->
+                    <rect x="20" y="10" width="380" height="240" rx="12" fill="#1a2a4a" stroke="#26c6da" stroke-width="1.5"/>
+                    <rect x="30" y="20" width="360" height="210" rx="6" fill="#0d1117"/>
+                    <!-- Dimmed content -->
+                    <rect x="30" y="20" width="360" height="210" rx="6" fill="rgba(0,0,0,0.45)"/>
+                    <!-- Snipping toolbar -->
+                    <rect x="90" y="40" width="240" height="36" rx="10" fill="#111111" stroke="#333" stroke-width="1"/>
+                    <!-- Screenshot icon (camera) - active -->
+                    <rect x="100" y="48" width="20" height="20" rx="4" fill="rgba(66,165,245,0.15)"/>
+                    <rect x="104" y="53" width="12" height="8" rx="2" stroke="#64B5F6" stroke-width="1.2" fill="none"/>
+                    <circle cx="110" cy="57" r="2.5" stroke="#64B5F6" stroke-width="1" fill="none"/>
+                    <text x="110" y="72" text-anchor="middle" fill="#64B5F6" font-size="5" font-family="sans-serif">Screenshot</text>
+                    <!-- Blue underline -->
+                    <rect x="103" y="68" width="14" height="2" rx="1" fill="#2196F3"/>
+                    <!-- Video icon -->
+                    <rect x="128" y="48" width="20" height="20" rx="4" fill="transparent"/>
+                    <rect x="131" y="53" width="9" height="8" rx="1.5" stroke="#888" stroke-width="1.2" fill="none"/>
+                    <path d="M141,54 L146,52 L146,62 L141,60 Z" fill="#888"/>
+                    <text x="137" y="72" text-anchor="middle" fill="#888" font-size="5" font-family="sans-serif">Video</text>
+                    <!-- Separator -->
+                    <line x1="155" y1="48" x2="155" y2="68" stroke="#333" stroke-width="1"/>
+                    <!-- Capture type -->
+                    <rect x="162" y="50" width="12" height="10" rx="1" stroke="#ccc" stroke-width="1" stroke-dasharray="2 1" fill="none"/>
+                    <text x="180" y="59" fill="#ccc" font-size="6" font-family="sans-serif">Region</text>
+                    <path d="M198,55 L201,58 L204,55" stroke="#888" stroke-width="1" fill="none"/>
+                    <!-- Separator -->
+                    <line x1="212" y1="48" x2="212" y2="68" stroke="#333" stroke-width="1"/>
+                    <!-- OCR icon -->
+                    <circle cx="225" cy="55" r="5" stroke="#26c6da" stroke-width="1.2" fill="none"/>
+                    <text x="224" y="58" fill="#26c6da" font-size="5" font-weight="bold">T</text>
+                    <line x1="229" y1="59" x2="233" y2="63" stroke="#00ACC1" stroke-width="1.5" stroke-linecap="round"/>
+                    <text x="228" y="72" text-anchor="middle" fill="#888" font-size="5" font-family="sans-serif">OCR</text>
+                    <!-- Delay -->
+                    <circle cx="252" cy="56" r="5" stroke="#888" stroke-width="1" fill="none"/>
+                    <line x1="252" y1="53" x2="252" y2="56" stroke="#888" stroke-width="1" stroke-linecap="round"/>
+                    <line x1="252" y1="56" x2="254" y2="58" stroke="#888" stroke-width="1" stroke-linecap="round"/>
+                    <text x="265" y="59" fill="#aaa" font-size="5.5" font-family="sans-serif">No delay</text>
+                    <!-- Separator -->
+                    <line x1="295" y1="48" x2="295" y2="68" stroke="#333" stroke-width="1"/>
+                    <!-- Close X -->
+                    <line x1="305" y1="52" x2="313" y2="60" stroke="#EF5350" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="313" y1="52" x2="305" y2="60" stroke="#EF5350" stroke-width="1.5" stroke-linecap="round"/>
+
+                    <!-- Window highlight on a sample window -->
+                    <rect x="60" y="100" width="180" height="100" rx="6" fill="transparent" stroke="#2196F3" stroke-width="2.5" stroke-dasharray="0">
+                        <animate attributeName="opacity" values="0;1;1" dur="2s" repeatCount="indefinite"/>
+                    </rect>
+                    <rect x="60" y="100" width="180" height="100" rx="6" fill="rgba(33,150,243,0.08)"/>
+                    <!-- Window title bar -->
+                    <rect x="60" y="100" width="180" height="18" rx="6" fill="#1c2333"/>
+                    <circle cx="72" cy="109" r="3" fill="#f44336"/>
+                    <circle cx="82" cy="109" r="3" fill="#ffa726"/>
+                    <circle cx="92" cy="109" r="3" fill="#4caf50"/>
+                    <text x="110" y="113" fill="#888" font-size="7" font-family="sans-serif">Notepad</text>
+                    <!-- Window content -->
+                    <rect x="68" y="124" width="120" height="5" rx="2" fill="#2a3040"/>
+                    <rect x="68" y="134" width="90" height="5" rx="2" fill="#2a3040"/>
+                    <rect x="68" y="144" width="140" height="5" rx="2" fill="#2a3040"/>
+
+                    <!-- Cursor arrow near window -->
+                    <path d="M230,155 L230,170 L236,166 L240,174 L243,172 L239,164 L246,164 Z" fill="white" stroke="#333" stroke-width="0.5"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="feature-row reverse fade-in">
             <div class="feature-text">
                 <span class="section-label label-blue">Capture</span>
                 <h3>Precision Region Capture</h3>
@@ -693,7 +775,7 @@
             <div class="feature-text">
                 <span class="section-label label-cyan">OCR</span>
                 <h3>Text Extraction (OCR)</h3>
-                <p>Extract text from any area of your screen with a single click. Powered by Windows built-in OCR engine with intelligent image preprocessing for maximum accuracy, even on dark backgrounds.</p>
+                <p>Extract text from any area of your screen &mdash; select OCR mode in the toolbar, draw a dashed region, and text is instantly copied to your clipboard. Powered by Windows built-in OCR engine with intelligent preprocessing for maximum accuracy.</p>
                 <ul class="feature-list cyan">
                     <li><strong>Sub-region selection</strong> &mdash; drag to select the exact text area after capture</li>
                     <li><strong>Multi-language support</strong> &mdash; detects your system languages automatically</li>
@@ -943,11 +1025,25 @@
                 <p>Check for updates from the About window. Downloads and installs silently in the background &mdash; no dialogs, no interruptions. App restarts automatically with the new version.</p>
             </div>
             <div class="qf-card">
+                <div class="qf-icon cyan">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><rect x="8" y="7" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 1"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <h4>Window Capture</h4>
+                <p>Select Window mode in the snipping toolbar, then hover over any window to see it highlighted with a blue border. Click to capture just that window &mdash; works for screenshots, video, and OCR.</p>
+            </div>
+            <div class="qf-card">
+                <div class="qf-icon orange">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                </div>
+                <h4>Color Memory</h4>
+                <p>Your selected annotation color is remembered across sessions. Pick a color once and it stays &mdash; no need to re-select every time you capture.</p>
+            </div>
+            <div class="qf-card">
                 <div class="qf-icon orange">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/></svg>
                 </div>
                 <h4>System Tray Integration</h4>
-                <p>Lives in your system tray. Right-click for quick access to all capture modes, history, settings, and more. Left-click to start a capture. Record Screen starts fullscreen recording with a resizable border.</p>
+                <p>Lives in your system tray. Right-click for quick access to all capture modes, history, settings, and more. Left-click to start a capture. Record Screen opens the snipping toolbar with video mode pre-selected.</p>
             </div>
             <div class="qf-card">
                 <div class="qf-icon blue">
