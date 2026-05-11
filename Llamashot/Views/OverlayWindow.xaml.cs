@@ -18,7 +18,9 @@ public partial class OverlayWindow : Window
     private Rect _virtualBounds;
 
     // Interaction state
-    private enum Interaction { None, Selecting, Resizing, Moving, Drawing, OcrSelecting }
+    private enum Interaction { None, ToolbarIdle, Selecting, WindowSelecting, Resizing, Moving, Drawing, OcrSelecting }
+    internal enum CaptureMode { Screenshot, Video, Ocr }
+    private enum CaptureType { Region, Window, Fullscreen }
     private Interaction _interaction = Interaction.None;
     private bool _hasSelection;
     private Point _selStart, _selEnd;
@@ -51,6 +53,13 @@ public partial class OverlayWindow : Window
     private Color _currentColor = Colors.Yellow;
     private double _currentThickness = 2;
 
+    // Snipping toolbar state
+    private CaptureMode _captureMode = CaptureMode.Screenshot;
+    private CaptureType _captureType = CaptureType.Region;
+    private int _delaySeconds = 0;
+    private IntPtr _highlightedWindow = IntPtr.Zero;
+    private System.Windows.Shapes.Rectangle? _windowHighlight;
+
     private static readonly Dictionary<string, Color> ToolColors = new()
     {
         { "Pen", Color.FromRgb(0xFF, 0xA7, 0x26) },       // orange
@@ -82,9 +91,19 @@ public partial class OverlayWindow : Window
         InitializeThicknessPopup();
         _currentThickness = 3;
         ThicknessLabel.Text = "3";
+        InitializeDelayPopup();
+
+        // Load persisted color
+        try
+        {
+            var cc = (Color)System.Windows.Media.ColorConverter.ConvertFromString(AppSettings.Instance.DefaultColor);
+            _currentColor = cc;
+            ColorIndicator.Fill = new SolidColorBrush(_currentColor);
+        }
+        catch { /* keep default yellow */ }
     }
 
-    public void StartCapture()
+    internal void StartCapture(CaptureMode initialMode = CaptureMode.Screenshot)
     {
         _virtualBounds = ScreenCapture.GetVirtualScreenBounds();
         _screenshot = ScreenCapture.CaptureFullScreen();
@@ -97,24 +116,37 @@ public partial class OverlayWindow : Window
 
         UpdateDimming(Rect.Empty);
 
-        _interaction = Interaction.None;
+        _interaction = Interaction.ToolbarIdle;
+        _captureMode = initialMode;
+        _captureType = CaptureType.Region;
         _hasSelection = false;
         _currentTool = null;
         _currentToolTag = null;
+        _highlightedWindow = IntPtr.Zero;
+        ClearWindowHighlight();
         SelectionBorder.Visibility = Visibility.Collapsed;
+        OcrDashBorder.Visibility = Visibility.Collapsed;
         DimensionBorder.Visibility = Visibility.Collapsed;
         ToolbarCanvas.Visibility = Visibility.Collapsed;
         HandleCanvas.Visibility = Visibility.Collapsed;
         DrawingCanvas.Visibility = Visibility.Collapsed;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        DelayPopupCanvas.Visibility = Visibility.Collapsed;
         DrawingCanvas.Children.Clear();
         _undoStack.Clear();
         _redoStack.Clear();
 
+        // Show snipping toolbar
+        SnippingToolbarCanvas.Visibility = Visibility.Visible;
+        Cursor = Cursors.Cross;
+
         Show();
         Activate();
         Focus();
+
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, PositionSnippingToolbar);
     }
 
     private void InitializeColorPalette()
@@ -137,6 +169,9 @@ public partial class OverlayWindow : Window
                 ColorIndicator.Fill = new SolidColorBrush(color);
                 if (_currentTool != null) _currentTool.StrokeColor = color;
                 ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+                // Persist color choice
+                AppSettings.Instance.DefaultColor = color.ToString();
+                AppSettings.Save();
                 e.Handled = true;
             };
             ColorSwatches.Children.Add(swatch);
@@ -190,12 +225,540 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private void InitializeDelayPopup()
+    {
+        foreach (var (label, seconds) in new[] { ("No delay", 0), ("1 second", 1), ("3 seconds", 3), ("5 seconds", 5), ("10 seconds", 10) })
+        {
+            int val = seconds;
+            string text = label;
+            var btn = new Button
+            {
+                Width = 100, Height = 26,
+                Content = new TextBlock { Text = text, Foreground = Brushes.White, FontSize = 12 },
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                Focusable = false,
+                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
+                Padding = new Thickness(8, 0, 0, 0)
+            };
+            btn.Click += (s, e) =>
+            {
+                _delaySeconds = val;
+                DelayLabel.Text = val > 0 ? $"{val}s" : "No delay";
+                DelayPopupCanvas.Visibility = Visibility.Collapsed;
+            };
+            DelayOptions.Children.Add(btn);
+        }
+    }
+
+    private void PositionSnippingToolbar()
+    {
+        SnippingToolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var w = SnippingToolbar.DesiredSize.Width;
+        double left = (ActualWidth - w) / 2;
+        double top = 40;
+        Canvas.SetLeft(SnippingToolbar, left);
+        Canvas.SetTop(SnippingToolbar, top);
+        UpdateModeIndicator();
+    }
+
+    private void UpdateModeIndicator()
+    {
+        Button activeBtn = _captureMode switch
+        {
+            CaptureMode.Video => BtnModeVideo,
+            CaptureMode.Ocr => BtnModeOcr,
+            _ => BtnModeScreenshot
+        };
+        var color = _captureMode switch
+        {
+            CaptureMode.Video => Color.FromRgb(0xF4, 0x43, 0x36),
+            CaptureMode.Ocr => Color.FromRgb(0x26, 0xC6, 0xDA),
+            _ => Color.FromRgb(0x21, 0x96, 0xF3)
+        };
+        ModeIndicator.Background = new SolidColorBrush(color);
+
+        var btnPos = activeBtn.TranslatePoint(new Point(0, 0), RootGrid);
+        Canvas.SetLeft(ModeIndicator, btnPos.X + (activeBtn.ActualWidth - 22) / 2);
+        Canvas.SetTop(ModeIndicator, btnPos.Y + activeBtn.ActualHeight + 2);
+
+        UpdateModeButtonColors();
+    }
+
+    private void UpdateModeButtonColors()
+    {
+        var screenshotBrush = new SolidColorBrush(_captureMode == CaptureMode.Screenshot ? Color.FromRgb(0x64, 0xB5, 0xF6) : Color.FromRgb(0x88, 0x88, 0x88));
+        var videoBrush = new SolidColorBrush(_captureMode == CaptureMode.Video ? Color.FromRgb(0xF4, 0x43, 0x36) : Color.FromRgb(0x88, 0x88, 0x88));
+        var ocrBrush = new SolidColorBrush(_captureMode == CaptureMode.Ocr ? Color.FromRgb(0x26, 0xC6, 0xDA) : Color.FromRgb(0x88, 0x88, 0x88));
+
+        // Update icon colors in the StackPanel > Canvas
+        var ssPanel = (StackPanel)BtnModeScreenshot.Content;
+        foreach (var child in ((Canvas)ssPanel.Children[0]).Children)
+        {
+            if (child is System.Windows.Shapes.Rectangle r) r.Stroke = screenshotBrush;
+            if (child is Ellipse el) el.Stroke = screenshotBrush;
+        }
+        LblScreenshot.Foreground = screenshotBrush;
+
+        var vidPanel = (StackPanel)BtnModeVideo.Content;
+        foreach (var child in ((Canvas)vidPanel.Children[0]).Children)
+        {
+            if (child is System.Windows.Shapes.Rectangle r) r.Stroke = videoBrush;
+            if (child is System.Windows.Shapes.Path p) p.Fill = videoBrush;
+        }
+        LblVideo.Foreground = videoBrush;
+
+        // OCR icon colors stay distinct but label color changes
+        LblOcr.Foreground = ocrBrush;
+    }
+
+    // ============ SNIPPING TOOLBAR HANDLERS ============
+
+    private void ModeScreenshot_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = CaptureMode.Screenshot;
+        OnModeChanged();
+    }
+
+    private void ModeVideo_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = CaptureMode.Video;
+        OnModeChanged();
+    }
+
+    private void ModeOcr_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = CaptureMode.Ocr;
+        OnModeChanged();
+    }
+
+    private void OnModeChanged()
+    {
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        DelayPopupCanvas.Visibility = Visibility.Collapsed;
+        UpdateModeIndicator();
+
+        if (_captureType == CaptureType.Fullscreen)
+            ExecuteFullscreenCapture();
+        else if (_captureType == CaptureType.Window)
+            EnterWindowSelecting();
+        else
+            Cursor = Cursors.Cross;
+    }
+
+    private void CaptureType_Click(object sender, RoutedEventArgs e)
+    {
+        DelayPopupCanvas.Visibility = Visibility.Collapsed;
+        if (CaptureTypePopupCanvas.Visibility == Visibility.Visible)
+        {
+            CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var btnPos = BtnCaptureType.TranslatePoint(new Point(0, 0), RootGrid);
+        Canvas.SetLeft(CaptureTypePopup, btnPos.X);
+        Canvas.SetTop(CaptureTypePopup, btnPos.Y + BtnCaptureType.ActualHeight + 4);
+        CaptureTypePopupCanvas.Visibility = Visibility.Visible;
+    }
+
+    private void TypeRegion_Click(object sender, RoutedEventArgs e)
+    {
+        _captureType = CaptureType.Region;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        UpdateCaptureTypeIcon();
+        ClearWindowHighlight();
+        _interaction = Interaction.ToolbarIdle;
+        Cursor = Cursors.Cross;
+    }
+
+    private void TypeWindow_Click(object sender, RoutedEventArgs e)
+    {
+        _captureType = CaptureType.Window;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        UpdateCaptureTypeIcon();
+        EnterWindowSelecting();
+    }
+
+    private void TypeFullscreen_Click(object sender, RoutedEventArgs e)
+    {
+        _captureType = CaptureType.Fullscreen;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        UpdateCaptureTypeIcon();
+        ExecuteFullscreenCapture();
+    }
+
+    private void UpdateCaptureTypeIcon()
+    {
+        var canvas = CaptureTypeIcon;
+        canvas.Children.Clear();
+        var strokeBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC));
+        switch (_captureType)
+        {
+            case CaptureType.Region:
+                var dr = new System.Windows.Shapes.Rectangle { Width = 14, Height = 12, Stroke = strokeBrush, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 3, 1.5 } };
+                Canvas.SetLeft(dr, 1); Canvas.SetTop(dr, 1);
+                canvas.Children.Add(dr);
+                CaptureTypeLabel.Text = "Region";
+                break;
+            case CaptureType.Window:
+                var wr1 = new System.Windows.Shapes.Rectangle { Width = 14, Height = 12, Stroke = strokeBrush, StrokeThickness = 1.5 };
+                Canvas.SetLeft(wr1, 1); Canvas.SetTop(wr1, 1);
+                var wr2 = new System.Windows.Shapes.Rectangle { Width = 14, Height = 3, Fill = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)) };
+                Canvas.SetLeft(wr2, 1); Canvas.SetTop(wr2, 1);
+                canvas.Children.Add(wr1); canvas.Children.Add(wr2);
+                CaptureTypeLabel.Text = "Window";
+                break;
+            case CaptureType.Fullscreen:
+                var fr = new System.Windows.Shapes.Rectangle { Width = 14, Height = 12, Stroke = strokeBrush, StrokeThickness = 1.5 };
+                Canvas.SetLeft(fr, 1); Canvas.SetTop(fr, 1);
+                var fe = new Ellipse { Width = 6, Height = 6, Fill = strokeBrush };
+                Canvas.SetLeft(fe, 5); Canvas.SetTop(fe, 4);
+                canvas.Children.Add(fr); canvas.Children.Add(fe);
+                CaptureTypeLabel.Text = "Full Screen";
+                break;
+        }
+    }
+
+    private void Delay_Click(object sender, RoutedEventArgs e)
+    {
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        if (DelayPopupCanvas.Visibility == Visibility.Visible)
+        {
+            DelayPopupCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var btnPos = BtnDelay.TranslatePoint(new Point(0, 0), RootGrid);
+        Canvas.SetLeft(DelayPopup, btnPos.X);
+        Canvas.SetTop(DelayPopup, btnPos.Y + BtnDelay.ActualHeight + 4);
+        DelayPopupCanvas.Visibility = Visibility.Visible;
+    }
+
+    // ============ FULLSCREEN / VIDEO / OCR EXECUTION ============
+
+    private void ExecuteFullscreenCapture()
+    {
+        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        DelayPopupCanvas.Visibility = Visibility.Collapsed;
+
+        if (_delaySeconds > 0)
+        {
+            ExecuteWithDelay(() => ExecuteFullscreenCapture_Inner());
+            return;
+        }
+
+        ExecuteFullscreenCapture_Inner();
+    }
+
+    private void ExecuteFullscreenCapture_Inner()
+    {
+        if (_captureMode == CaptureMode.Video)
+        {
+            LaunchVideoRecording(new Rect(0, 0, ActualWidth, ActualHeight));
+        }
+        else if (_captureMode == CaptureMode.Ocr)
+        {
+            PerformDirectOcr(new Rect(0, 0, ActualWidth, ActualHeight));
+        }
+        else
+        {
+            _selStart = new Point(0, 0);
+            _selEnd = new Point(ActualWidth, ActualHeight);
+            _selection = new Rect(0, 0, ActualWidth, ActualHeight);
+            _hasSelection = true;
+            _isFullRegion = true;
+            _interaction = Interaction.None;
+
+            SelectionBorder.Visibility = Visibility.Visible;
+            Canvas.SetLeft(SelectionBorder, 0);
+            Canvas.SetTop(SelectionBorder, 0);
+            SelectionBorder.Width = ActualWidth;
+            SelectionBorder.Height = ActualHeight;
+
+            DimensionText.Text = $"{(int)ActualWidth} x {(int)ActualHeight}";
+            Canvas.SetLeft(DimensionBorder, 0);
+            Canvas.SetTop(DimensionBorder, 0);
+            DimensionBorder.Visibility = Visibility.Visible;
+
+            UpdateDimming(_selection);
+            ShowToolbars();
+            ShowResizeHandles();
+            Focus();
+        }
+    }
+
+    private void LaunchVideoRecording(Rect dipRegion)
+    {
+        var dpi = GetDpiScale();
+        int px = (int)(dipRegion.X * dpi);
+        int py = (int)(dipRegion.Y * dpi);
+        int pw = (int)(dipRegion.Width * dpi);
+        int ph = (int)(dipRegion.Height * dpi);
+
+        double dx = dipRegion.X + Left;
+        double dy = dipRegion.Y + Top;
+
+        Hide();
+
+        var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, dipRegion.Width, dipRegion.Height);
+        overlay.Show();
+        Close();
+    }
+
+    private async void ExecuteWithDelay(Action afterDelay)
+    {
+        Hide();
+
+        for (int i = _delaySeconds; i > 0; i--)
+            await Task.Delay(1000);
+
+        _screenshot = ScreenCapture.CaptureFullScreen();
+        ScreenshotImage.Source = _screenshot;
+
+        Show();
+        Activate();
+        Focus();
+
+        afterDelay();
+    }
+
+    private async void PerformDirectOcr(Rect dipRegion)
+    {
+        if (_screenshot == null) return;
+
+        double dpi = GetDpiScale();
+        int x = Math.Max(0, (int)(dipRegion.X * dpi));
+        int y = Math.Max(0, (int)(dipRegion.Y * dpi));
+        int w = (int)(dipRegion.Width * dpi);
+        int h = (int)(dipRegion.Height * dpi);
+
+        w = Math.Min(w, _screenshot.PixelWidth - x);
+        h = Math.Min(h, _screenshot.PixelHeight - y);
+
+        if (w < 5 || h < 5) { Close(); return; }
+
+        var region = new Int32Rect(x, y, w, h);
+        var cropped = ScreenCapture.CropBitmap(_screenshot, region);
+
+        try
+        {
+            var text = await Core.OcrHelper.ExtractTextAsync(cropped);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                Clipboard.SetText(text);
+                // Show brief "Copied" overlay before closing
+                ShowCopiedOverlay();
+                await Task.Delay(800);
+            }
+        }
+        catch { }
+
+        Close();
+    }
+
+    // ============ WINDOW CAPTURE ============
+
+    private void EnterWindowSelecting()
+    {
+        _interaction = Interaction.WindowSelecting;
+        Cursor = Cursors.Arrow;
+        ClearWindowHighlight();
+    }
+
+    private void ClearWindowHighlight()
+    {
+        if (_windowHighlight != null)
+        {
+            MainCanvas.Children.Remove(_windowHighlight);
+            _windowHighlight = null;
+        }
+        _highlightedWindow = IntPtr.Zero;
+    }
+
+    private void UpdateWindowHighlight(Point dipPos)
+    {
+        double dpi = GetDpiScale();
+        var screenPt = new NativeMethods.POINT
+        {
+            X = (int)((dipPos.X + _virtualBounds.X) * dpi),
+            Y = (int)((dipPos.Y + _virtualBounds.Y) * dpi)
+        };
+
+        var hwnd = NativeMethods.WindowFromPoint(screenPt);
+        if (hwnd == IntPtr.Zero) return;
+
+        var root = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOTOWNER);
+        if (root != IntPtr.Zero) hwnd = root;
+
+        var ourHwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd == ourHwnd) return;
+
+        if (hwnd == _highlightedWindow) return;
+        _highlightedWindow = hwnd;
+
+        NativeMethods.GetWindowRect(hwnd, out var rect);
+
+        double x = rect.Left / dpi - _virtualBounds.X;
+        double y = rect.Top / dpi - _virtualBounds.Y;
+        double w = (rect.Right - rect.Left) / dpi;
+        double h = (rect.Bottom - rect.Top) / dpi;
+
+        x = Math.Max(0, x);
+        y = Math.Max(0, y);
+        w = Math.Min(w, ActualWidth - x);
+        h = Math.Min(h, ActualHeight - y);
+
+        if (w < 10 || h < 10) return;
+
+        if (_windowHighlight == null)
+        {
+            _windowHighlight = new System.Windows.Shapes.Rectangle
+            {
+                Stroke = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+                StrokeThickness = 3,
+                Fill = new SolidColorBrush(Color.FromArgb(0x20, 0x21, 0x96, 0xF3)),
+                IsHitTestVisible = false
+            };
+            MainCanvas.Children.Add(_windowHighlight);
+        }
+
+        Canvas.SetLeft(_windowHighlight, x);
+        Canvas.SetTop(_windowHighlight, y);
+        _windowHighlight.Width = w;
+        _windowHighlight.Height = h;
+    }
+
+    private void SelectHighlightedWindow()
+    {
+        if (_windowHighlight == null) return;
+
+        double x = Canvas.GetLeft(_windowHighlight);
+        double y = Canvas.GetTop(_windowHighlight);
+        double w = _windowHighlight.Width;
+        double h = _windowHighlight.Height;
+
+        ClearWindowHighlight();
+        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+
+        if (_captureMode == CaptureMode.Video)
+        {
+            LaunchVideoRecording(new Rect(x, y, w, h));
+        }
+        else if (_captureMode == CaptureMode.Ocr)
+        {
+            PerformDirectOcr(new Rect(x, y, w, h));
+        }
+        else
+        {
+            _selStart = new Point(x, y);
+            _selEnd = new Point(x + w, y + h);
+            _selection = new Rect(x, y, w, h);
+            _hasSelection = true;
+            _interaction = Interaction.None;
+
+            SelectionBorder.Visibility = Visibility.Visible;
+            Canvas.SetLeft(SelectionBorder, x);
+            Canvas.SetTop(SelectionBorder, y);
+            SelectionBorder.Width = w;
+            SelectionBorder.Height = h;
+
+            DimensionText.Text = $"{(int)w} x {(int)h}";
+            Canvas.SetLeft(DimensionBorder, x);
+            Canvas.SetTop(DimensionBorder, Math.Max(0, y - 28));
+            DimensionBorder.Visibility = Visibility.Visible;
+
+            UpdateDimming(_selection);
+            ShowToolbars();
+            ShowResizeHandles();
+            Focus();
+        }
+    }
+
+    private void ShowCopiedOverlay()
+    {
+        var border = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x11, 0x11, 0x11)),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(20, 10, 20, 10),
+            IsHitTestVisible = false
+        };
+        border.Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 10, Opacity = 0.5, ShadowDepth = 2 };
+        var panel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "\u2714",
+            Foreground = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50)),
+            FontSize = 18, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Copied to clipboard",
+            Foreground = Brushes.White,
+            FontSize = 14, VerticalAlignment = VerticalAlignment.Center
+        });
+        border.Child = panel;
+
+        Canvas.SetLeft(border, (ActualWidth - 200) / 2);
+        Canvas.SetTop(border, (ActualHeight - 40) / 2);
+        MainCanvas.Children.Add(border);
+    }
+
     // ============ UNIFIED MOUSE HANDLING ON MainCanvas ============
 
     private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         var pos = e.GetPosition(MainCanvas);
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        DelayPopupCanvas.Visibility = Visibility.Collapsed;
+
+        // Window capture: click selects the highlighted window
+        if (_interaction == Interaction.WindowSelecting && _highlightedWindow != IntPtr.Zero)
+        {
+            SelectHighlightedWindow();
+            e.Handled = true;
+            return;
+        }
+
+        // ToolbarIdle: clicking on dimmed area starts region selection
+        if (_interaction == Interaction.ToolbarIdle)
+        {
+            if (_captureType == CaptureType.Region)
+            {
+                if (_delaySeconds > 0)
+                {
+                    ExecuteWithDelay(() =>
+                    {
+                        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+                        _interaction = Interaction.ToolbarIdle;
+                        Cursor = Cursors.Cross;
+                    });
+                    e.Handled = true;
+                    return;
+                }
+
+                SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+
+                if (_captureMode == CaptureMode.Video)
+                {
+                    DimmingPath.Data = Geometry.Empty;
+                    ScreenshotImage.Source = null;
+                }
+
+                _interaction = Interaction.Selecting;
+                _selStart = pos;
+                _selEnd = pos;
+                MainCanvas.CaptureMouse();
+                SelectionBorder.Visibility = Visibility.Visible;
+                DimensionBorder.Visibility = Visibility.Visible;
+                UpdateSelectionVisuals();
+                e.Handled = true;
+                return;
+            }
+            e.Handled = true;
+            return;
+        }
 
         if (_hasSelection)
         {
@@ -271,6 +834,13 @@ public partial class OverlayWindow : Window
 
         switch (_interaction)
         {
+            case Interaction.ToolbarIdle:
+                break;
+
+            case Interaction.WindowSelecting:
+                UpdateWindowHighlight(pos);
+                break;
+
             case Interaction.Selecting:
                 _selEnd = pos;
                 UpdateSelectionVisuals();
@@ -323,6 +893,16 @@ public partial class OverlayWindow : Window
                 UpdateSelectionVisuals();
                 if (_selection.Width > 5 && _selection.Height > 5)
                 {
+                    if (_captureMode == CaptureMode.Video)
+                    {
+                        LaunchVideoRecording(_selection);
+                        return;
+                    }
+                    else if (_captureMode == CaptureMode.Ocr)
+                    {
+                        PerformDirectOcr(_selection);
+                        return;
+                    }
                     _hasSelection = true;
                     ShowToolbars();
                     ShowResizeHandles();
@@ -354,7 +934,22 @@ public partial class OverlayWindow : Window
         Canvas.SetTop(SelectionBorder, y);
         SelectionBorder.Width = w;
         SelectionBorder.Height = h;
-        SelectionBorder.Visibility = Visibility.Visible;
+
+        // OCR mode: show dashed border instead of solid
+        if (_captureMode == CaptureMode.Ocr)
+        {
+            SelectionBorder.Visibility = Visibility.Collapsed;
+            Canvas.SetLeft(OcrDashBorder, x);
+            Canvas.SetTop(OcrDashBorder, y);
+            OcrDashBorder.Width = w;
+            OcrDashBorder.Height = h;
+            OcrDashBorder.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SelectionBorder.Visibility = Visibility.Visible;
+            OcrDashBorder.Visibility = Visibility.Collapsed;
+        }
 
         DimensionText.Text = $"{(int)w} x {(int)h}";
         Canvas.SetLeft(DimensionBorder, x);
@@ -542,6 +1137,9 @@ public partial class OverlayWindow : Window
 
     private void ShowToolbars()
     {
+        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+        CaptureTypePopupCanvas.Visibility = Visibility.Collapsed;
+        DelayPopupCanvas.Visibility = Visibility.Collapsed;
         ToolbarCanvas.Visibility = Visibility.Visible;
         DrawingCanvas.Visibility = Visibility.Visible;
         UpdateToolbarPositions();
@@ -1181,6 +1779,19 @@ public partial class OverlayWindow : Window
                 e.Handled = true;
             }
             return;
+        }
+
+        // Snipping toolbar shortcuts (only when toolbar is visible, before selection)
+        if (_interaction == Interaction.ToolbarIdle || _interaction == Interaction.WindowSelecting)
+        {
+            if (e.Key == Key.Escape) { Close(); e.Handled = true; return; }
+            if (e.Key == Key.D1) { ModeScreenshot_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.D2) { ModeVideo_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.D3) { ModeOcr_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.R) { TypeRegion_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.W) { TypeWindow_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.F) { TypeFullscreen_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            return; // Don't process annotation shortcuts while toolbar is active
         }
 
         // Space = pan mode (Photoshop-style)

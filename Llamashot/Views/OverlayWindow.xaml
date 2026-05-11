@@ -41,6 +41,34 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Flexible button style for toolbar items with text labels -->
+        <Style x:Key="TBtnFlex" TargetType="Button">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="4" Padding="6,0">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#333333" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#444444" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="RootGrid">
@@ -59,6 +87,11 @@
             <Border x:Name="SelectionBorder"
                     BorderBrush="#2196F3" BorderThickness="2"
                     Visibility="Collapsed" IsHitTestVisible="False" />
+            <!-- Dashed selection for OCR mode -->
+            <Rectangle x:Name="OcrDashBorder"
+                       Stroke="#26C6DA" StrokeThickness="2"
+                       StrokeDashArray="4 2" Fill="#1026C6DA"
+                       Visibility="Collapsed" IsHitTestVisible="False" />
             <Border x:Name="DimensionBorder"
                     Background="#DD000000" CornerRadius="3" Padding="8,3"
                     Visibility="Collapsed" IsHitTestVisible="False">
@@ -75,6 +108,148 @@
                 Visibility="Collapsed" />
 
         <Canvas x:Name="HandleCanvas" IsHitTestVisible="False" Visibility="Collapsed" />
+
+        <!-- Snipping Toolbar (top center, shown before region selection) -->
+        <Canvas x:Name="SnippingToolbarCanvas" Visibility="Collapsed">
+            <Border x:Name="SnippingToolbar"
+                    Background="#FF111111" CornerRadius="8" Padding="4"
+                    BorderBrush="#333" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="12" Opacity="0.7" ShadowDepth="3" />
+                </Border.Effect>
+                <StackPanel Orientation="Horizontal">
+                    <!-- Screenshot mode -->
+                    <Button x:Name="BtnModeScreenshot" ToolTip="Screenshot (1)" Click="ModeScreenshot_Click" Style="{StaticResource TBtnFlex}">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="3" Width="14" Height="10" RadiusX="2" RadiusY="2"
+                                           Stroke="#64B5F6" StrokeThickness="1.5" />
+                                <Ellipse Canvas.Left="5" Canvas.Top="5" Width="6" Height="6"
+                                         Stroke="#64B5F6" StrokeThickness="1.5" />
+                            </Canvas>
+                            <TextBlock x:Name="LblScreenshot" Text="Screenshot" Foreground="#64B5F6" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <!-- Video mode -->
+                    <Button x:Name="BtnModeVideo" ToolTip="Video (2)" Click="ModeVideo_Click" Style="{StaticResource TBtnFlex}">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="3" Width="10" Height="10" RadiusX="2" RadiusY="2"
+                                           Stroke="#888" StrokeThickness="1.5" />
+                                <Path Data="M12,5 L16,3 L16,13 L12,11 Z" Fill="#888" />
+                            </Canvas>
+                            <TextBlock x:Name="LblVideo" Text="Video" Foreground="#888" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
+                    <!-- Capture type dropdown -->
+                    <Button x:Name="BtnCaptureType" ToolTip="Capture type" Click="CaptureType_Click" Style="{StaticResource TBtnFlex}">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16" x:Name="CaptureTypeIcon">
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
+                                           Stroke="#CCC" StrokeThickness="1.5" StrokeDashArray="3 1.5" />
+                            </Canvas>
+                            <TextBlock x:Name="CaptureTypeLabel" Text="Region" Foreground="#CCC" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
+                            <Path Data="M0,0 L4,4 L8,0" Stroke="#888" StrokeThickness="1.5" Margin="4,6,0,0" Width="8" Height="5" />
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
+                    <!-- OCR mode -->
+                    <Button x:Name="BtnModeOcr" ToolTip="Text Extract (3)" Click="ModeOcr_Click" Style="{StaticResource TBtnFlex}">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16">
+                                <Ellipse Canvas.Left="1" Canvas.Top="0" Width="10" Height="10"
+                                         Stroke="#26C6DA" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="3.5" Canvas.Top="-1" Text="T" Foreground="#26C6DA"
+                                           FontSize="8" FontWeight="Bold" />
+                                <Line X1="9.5" Y1="9" X2="14" Y2="13.5" Stroke="#00ACC1" StrokeThickness="2"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                            <TextBlock x:Name="LblOcr" Text="OCR" Foreground="#26C6DA" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <!-- Delay dropdown -->
+                    <Button x:Name="BtnDelay" ToolTip="Delay timer" Click="Delay_Click" Style="{StaticResource TBtnFlex}">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="14" Height="14">
+                                <Ellipse Width="14" Height="14" Stroke="#888" StrokeThickness="1.5" />
+                                <Line X1="7" Y1="3" X2="7" Y2="7" Stroke="#888" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="7" Y1="7" X2="10" Y2="9" Stroke="#888" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                            <TextBlock x:Name="DelayLabel" Text="No delay" Foreground="#AAA" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
+                            <Path Data="M0,0 L4,4 L8,0" Stroke="#888" StrokeThickness="1.5" Margin="4,6,0,0" Width="8" Height="5" />
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
+                    <!-- Close -->
+                    <Button x:Name="BtnSnippingClose" ToolTip="Close (Esc)" Click="Close_Click" Style="{StaticResource TBtn}">
+                        <Canvas Width="14" Height="14">
+                            <Line X1="2" Y1="2" X2="12" Y2="12" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="12" Y1="2" X2="2" Y2="12" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Canvas>
+                    </Button>
+                </StackPanel>
+            </Border>
+            <!-- Mode underline indicator -->
+            <Border x:Name="ModeIndicator" Height="3" Width="22" CornerRadius="1.5" Background="#2196F3"
+                    IsHitTestVisible="False" />
+        </Canvas>
+
+        <!-- Capture type dropdown popup -->
+        <Canvas x:Name="CaptureTypePopupCanvas" Visibility="Collapsed">
+            <Border x:Name="CaptureTypePopup"
+                    Background="#FF111111" CornerRadius="6" Padding="4"
+                    BorderBrush="#333" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" Opacity="0.5" ShadowDepth="2" />
+                </Border.Effect>
+                <StackPanel>
+                    <Button x:Name="BtnTypeRegion" Click="TypeRegion_Click" Style="{StaticResource TBtnFlex}" Width="130" Height="28">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
+                                           Stroke="#CCC" StrokeThickness="1.5" StrokeDashArray="3 1.5" />
+                            </Canvas>
+                            <TextBlock Text="Region" Foreground="#CCC" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="BtnTypeWindow" Click="TypeWindow_Click" Style="{StaticResource TBtnFlex}" Width="130" Height="28">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
+                                           Stroke="#CCC" StrokeThickness="1.5" />
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="3"
+                                           Fill="#555" />
+                            </Canvas>
+                            <TextBlock Text="Window" Foreground="#CCC" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="BtnTypeFullscreen" Click="TypeFullscreen_Click" Style="{StaticResource TBtnFlex}" Width="130" Height="28">
+                        <StackPanel Orientation="Horizontal">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
+                                           Stroke="#CCC" StrokeThickness="1.5" />
+                                <Ellipse Canvas.Left="5" Canvas.Top="4" Width="6" Height="6"
+                                         Fill="#CCC" />
+                            </Canvas>
+                            <TextBlock Text="Full Screen" Foreground="#CCC" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Canvas>
+
+        <!-- Delay dropdown popup -->
+        <Canvas x:Name="DelayPopupCanvas" Visibility="Collapsed">
+            <Border x:Name="DelayPopup"
+                    Background="#FF111111" CornerRadius="6" Padding="4"
+                    BorderBrush="#333" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" Opacity="0.5" ShadowDepth="2" />
+                </Border.Effect>
+                <StackPanel x:Name="DelayOptions" />
+            </Border>
+        </Canvas>
 
         <!-- Toolbars -->
         <Canvas x:Name="ToolbarCanvas" Visibility="Collapsed">

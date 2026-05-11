@@ -53,7 +53,7 @@ public class AppSettings
     public bool MinimizeToTray { get; set; } = true;
 
     // Drawing defaults
-    public string DefaultColor { get; set; } = "#FF0000";
+    public string DefaultColor { get; set; } = "#FFFF00";
     public int DefaultThickness { get; set; } = 3;
 
     // Updates
