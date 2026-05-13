@@ -41,12 +41,18 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Custom cursors** - Each tool shows a matching cursor icon
 
 ### Screen Recording
+- **Pre-start flow** - Select region with resize handles, toggle mic/sys audio, then click Start with 3-2-1 countdown
+- **Same selection as screenshot** - 8 resize handles, move by dragging, double-click for fullscreen toggle
+- **Resizable recording border** - Blue L-shaped corner brackets, white midpoint bars, dimension label
 - Record any selected region as MP4 video (H.264 compressed)
 - **Unlimited duration**, 10fps
-- **Separate mic and system audio toggles** - Independent on/off mid-recording
-- **Live annotations** - Draw pen, arrow, rectangle, text on screen during recording (P/A/R/T keys)
+- **Separate mic and system audio toggles** - Independent on/off before and during recording
+- **Full annotation toolkit** - All 11 screenshot tools available during recording (Pen, Line, Arrow, Rectangle, Ellipse, Text, Marker, Check, Cross, Eraser, Undo, Clear)
+- **Color picker + Thickness** - Change annotation color and stroke width during recording
+- **Tool toggle** - Click or shortcut again to deselect, tools stay active between strokes
+- **Text input isolation** - Keyboard shortcuts suppressed while typing text annotations, Enter/Esc to dismiss
 - Keyboard shortcuts for all controls (M=mic, S=system audio, Space=pause, Q=stop)
-- **Quick fullscreen record** - Start recording full screen from system tray with resizable border
+- **Clean saving UI** - All tools hidden during save, showing only "Saving..." message
 - Audio source status shown on recording bar (Mic / System / both)
 - Pause/resume with visual indicators
 - Red pulsing border shows recorded area
@@ -155,11 +161,18 @@ All 22 shortcuts are customizable in Settings.
 
 | Action | Default |
 |--------|---------|
-| Pen annotation | P |
-| Arrow annotation | A |
-| Rectangle annotation | R |
-| Text annotation | T |
-| Clear annotations | C |
+| Pen | P |
+| Line | L |
+| Arrow | A |
+| Rectangle | R |
+| Ellipse | E |
+| Text | T |
+| Marker | H |
+| Check stamp | K |
+| Cross stamp | D |
+| Eraser | G |
+| Undo | X |
+| Clear all | C |
 | Toggle microphone | M |
 | Toggle system audio | S |
 | Pause / Resume | Space |

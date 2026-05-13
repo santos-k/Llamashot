@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Llamashot.Core;
 using Llamashot.Tools;
 
@@ -10,7 +11,11 @@ public partial class RecordingAnnotation : Window
 {
     private IDrawingTool? _currentTool;
     private bool _drawing;
+    private bool _eraserMode;
     private IntPtr _hwnd;
+
+    /// <summary>True when a TextBox in the annotation overlay has keyboard focus.</summary>
+    internal static bool IsTextInputActive { get; set; }
 
     public event Action? EscapePressed;
     public event Action? StrokeCompleted;
@@ -29,6 +34,16 @@ public partial class RecordingAnnotation : Window
             // Start as click-through so it doesn't block other apps
             SetClickThrough(true);
         };
+
+        // Track TextBox focus to suppress global shortcuts during text input
+        DrawingCanvas.AddHandler(UIElement.GotKeyboardFocusEvent, new System.Windows.Input.KeyboardFocusChangedEventHandler((s, e) =>
+        {
+            if (e.NewFocus is System.Windows.Controls.TextBox) IsTextInputActive = true;
+        }), true);
+        DrawingCanvas.AddHandler(UIElement.LostKeyboardFocusEvent, new System.Windows.Input.KeyboardFocusChangedEventHandler((s, e) =>
+        {
+            if (e.OldFocus is System.Windows.Controls.TextBox) IsTextInputActive = false;
+        }), true);
     }
 
     public void SetTool(IDrawingTool? tool)
@@ -49,9 +64,64 @@ public partial class RecordingAnnotation : Window
         }
     }
 
+    public void FinalizeText()
+    {
+        if (_currentTool is TextTool tt)
+            tt.FinalizeActiveTextBox();
+        IsTextInputActive = false;
+    }
+
+    public void Undo()
+    {
+        if (DrawingCanvas.Children.Count > 0)
+            DrawingCanvas.Children.RemoveAt(DrawingCanvas.Children.Count - 1);
+    }
+
     public void ClearAll()
     {
         DrawingCanvas.Children.Clear();
+    }
+
+    public void SetEraserMode(bool enabled)
+    {
+        _eraserMode = enabled;
+        if (enabled)
+        {
+            _currentTool = null;
+            Cursor = Cursors.Hand;
+            SetClickThrough(false);
+        }
+        else
+        {
+            SetClickThrough(_currentTool == null);
+        }
+    }
+
+    private void EraseElementAt(Point pos)
+    {
+        UIElement? hit = null;
+        var hitArea = new EllipseGeometry(pos, 6, 6);
+        var hitParams = new GeometryHitTestParameters(hitArea);
+
+        VisualTreeHelper.HitTest(DrawingCanvas, null,
+            result =>
+            {
+                var visual = result.VisualHit;
+                while (visual != null && visual != DrawingCanvas)
+                {
+                    var parent = VisualTreeHelper.GetParent(visual);
+                    if (parent == DrawingCanvas) { hit = visual as UIElement; return HitTestResultBehavior.Stop; }
+                    visual = parent as DependencyObject;
+                }
+                return HitTestResultBehavior.Continue;
+            },
+            hitParams);
+
+        if (hit != null)
+        {
+            DrawingCanvas.Children.Remove(hit);
+            StrokeCompleted?.Invoke();
+        }
     }
 
     private void SetClickThrough(bool passThrough)
@@ -66,6 +136,12 @@ public partial class RecordingAnnotation : Window
 
     private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (_eraserMode)
+        {
+            EraseElementAt(e.GetPosition(DrawingCanvas));
+            e.Handled = true;
+            return;
+        }
         if (_currentTool == null) return;
         _drawing = true;
         _currentTool.OnMouseDown(e.GetPosition(DrawingCanvas), DrawingCanvas);
@@ -107,15 +183,17 @@ public partial class RecordingAnnotation : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Enter or Escape while typing: finalize text and dismiss
+        if ((e.Key == Key.Enter || e.Key == Key.Escape) && _currentTool is TextTool textTool && IsTextInputActive)
+        {
+            textTool.FinalizeActiveTextBox();
+            IsTextInputActive = false;
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
-            // If text tool is active, just finalize the text instead of closing
-            if (_currentTool is TextTool textTool)
-            {
-                textTool.FinalizeActiveTextBox();
-                e.Handled = true;
-                return;
-            }
             if (_drawing) FinishDrawing(new Point(0, 0));
             EscapePressed?.Invoke();
             e.Handled = true;

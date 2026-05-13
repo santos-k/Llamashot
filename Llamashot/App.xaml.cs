@@ -136,15 +136,23 @@ public partial class App : Application
                 }
             }
 
-            // Recording shortcuts (only when a Llamashot window is in foreground)
-            if (ActiveRecordingOverlay != null && IsOurWindowInForeground())
+            // Recording shortcuts (only when a Llamashot window is in foreground, not typing in TextBox)
+            if (ActiveRecordingOverlay != null && IsOurWindowInForeground()
+                && !Views.RecordingAnnotation.IsTextInputActive)
             {
                 char key = vkCode switch
                 {
                     0x50 => 'P', // P - Pen
+                    0x4C => 'L', // L - Line
                     0x41 => 'A', // A - Arrow
                     0x52 => 'R', // R - Rectangle
+                    0x45 => 'E', // E - Ellipse
                     0x54 => 'T', // T - Text
+                    0x48 => 'H', // H - Marker
+                    0x4B => 'K', // K - Check
+                    0x44 => 'D', // D - Cross
+                    0x47 => 'G', // G - Eraser
+                    0x58 => 'X', // X - Undo
                     0x43 => 'C', // C - Clear
                     0x4D => 'M', // M - Mic toggle
                     0x53 => 'S', // S - System audio toggle
