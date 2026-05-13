@@ -7,34 +7,70 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        Width="460" Height="50"
+        Width="680" Height="50"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
         PreviewKeyDown="Window_PreviewKeyDown">
-    <Border Background="#EE111111" CornerRadius="8" Padding="12,6"
+    <Window.Resources>
+        <Style x:Key="RBtn" TargetType="Button">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="4" Width="26" Height="26">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#333333" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#444444" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Border Background="#EE111111" CornerRadius="8" Padding="8,4"
             BorderBrush="#333" BorderThickness="1">
         <Border.Effect>
             <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" />
         </Border.Effect>
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Start button (pre-recording) -->
+            <Button x:Name="BtnStart" Click="Start_Click" Cursor="Hand" Focusable="False" Margin="0,0,6,0">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#2196F3" CornerRadius="14" Padding="12,4">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="10" Height="10" Stroke="White" StrokeThickness="2" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Start" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#42A5F5" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E88E5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
 
             <!-- Recording dot (blinks) -->
-            <Ellipse x:Name="RecDot" Width="12" Height="12" Fill="#F44336" Margin="0,0,8,0"
-                     VerticalAlignment="Center">
+            <Ellipse x:Name="RecDot" Width="12" Height="12" Fill="#F44336" Margin="0,0,6,0"
+                     VerticalAlignment="Center" Visibility="Collapsed">
                 <Ellipse.Triggers>
                     <EventTrigger RoutedEvent="Loaded">
                         <BeginStoryboard>
@@ -49,104 +85,149 @@
             </Ellipse>
 
             <!-- Timer -->
-            <TextBlock x:Name="TxtTimer" Grid.Column="1" Text="00:00"
-                       Foreground="White" FontSize="16" FontWeight="SemiBold" FontFamily="Consolas"
+            <TextBlock x:Name="TxtTimer" Text="00:00:00"
+                       Foreground="White" FontSize="15" FontWeight="SemiBold" FontFamily="Consolas"
                        VerticalAlignment="Center" Margin="0,0,6,0" />
 
-            <!-- Separator -->
-            <Rectangle Grid.Column="2" Width="1" Fill="#444" Margin="4,4" />
+            <Rectangle Width="1" Fill="#444" Margin="3,4" />
 
             <!-- Mic toggle -->
-            <Button x:Name="BtnMic" Grid.Column="3" Click="Mic_Click"
-                    Width="28" Height="28" Margin="4,0,2,0" Cursor="Hand" ToolTip="Toggle microphone (M)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
-                <Canvas Width="16" Height="16">
-                    <Rectangle x:Name="MicBody" Canvas.Left="5.5" Canvas.Top="1" Width="5" Height="9"
+            <Button x:Name="BtnMic" Click="Mic_Click" Style="{StaticResource RBtn}" ToolTip="Mic (M)">
+                <Canvas Width="14" Height="14">
+                    <Rectangle x:Name="MicBody" Canvas.Left="4.5" Canvas.Top="1" Width="5" Height="8"
                                RadiusX="2.5" RadiusY="2.5" Fill="#666" />
-                    <Path x:Name="MicArc" Data="M3,8 A5,5 0 0,0 13,8" Stroke="#666" StrokeThickness="1.5"
-                          Canvas.Top="2" Fill="Transparent" />
-                    <Line x:Name="MicStand" X1="8" Y1="13" X2="8" Y2="15" Stroke="#666" StrokeThickness="1.5" />
-                    <Line x:Name="MicSlash" X1="2" Y1="14" X2="14" Y2="2" Stroke="#EF5350"
+                    <Path x:Name="MicArc" Data="M3,7 A4,4 0 0,0 11,7" Stroke="#666" StrokeThickness="1.5"
+                          Canvas.Top="1" Fill="Transparent" />
+                    <Line x:Name="MicStand" X1="7" Y1="12" X2="7" Y2="14" Stroke="#666" StrokeThickness="1.5" />
+                    <Line x:Name="MicSlash" X1="2" Y1="12" X2="12" Y2="2" Stroke="#EF5350"
                           StrokeThickness="2" Visibility="Visible" />
                 </Canvas>
             </Button>
 
             <!-- System audio toggle -->
-            <Button x:Name="BtnSystemAudio" Grid.Column="4" Click="SystemAudio_Click"
-                    Width="28" Height="28" Margin="0,0,2,0" Cursor="Hand" ToolTip="Toggle system audio (S)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
-                <Canvas Width="16" Height="16">
-                    <Path x:Name="SpeakerBody" Data="M2,6 L5,6 L9,3 L9,13 L5,10 L2,10 Z" Fill="#666" />
-                    <Path x:Name="SpeakerWave1" Data="M11,6 A3,3 0 0,1 11,10" Stroke="#666"
+            <Button x:Name="BtnSystemAudio" Click="SystemAudio_Click" Style="{StaticResource RBtn}" ToolTip="System Audio (S)">
+                <Canvas Width="14" Height="14">
+                    <Path x:Name="SpeakerBody" Data="M2,5 L4,5 L8,2 L8,12 L4,9 L2,9 Z" Fill="#666" />
+                    <Path x:Name="SpeakerWave1" Data="M10,5 A3,3 0 0,1 10,9" Stroke="#666"
                           StrokeThickness="1.5" Fill="Transparent" />
-                    <Path x:Name="SpeakerWave2" Data="M12.5,4 A5,5 0 0,1 12.5,12" Stroke="#666"
+                    <Path x:Name="SpeakerWave2" Data="M11.5,3 A5,5 0 0,1 11.5,11" Stroke="#666"
                           StrokeThickness="1.5" Fill="Transparent" />
-                    <Line x:Name="SpeakerSlash" X1="2" Y1="14" X2="14" Y2="2" Stroke="#EF5350"
+                    <Line x:Name="SpeakerSlash" X1="2" Y1="12" X2="12" Y2="2" Stroke="#EF5350"
                           StrokeThickness="2" Visibility="Visible" />
                 </Canvas>
             </Button>
 
-            <!-- Audio status text -->
-            <TextBlock x:Name="TxtAudioStatus" Grid.Column="5" Text="" Foreground="#666" FontSize="10"
-                       VerticalAlignment="Center" Margin="2,0,4,0" MaxWidth="60" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="TxtAudioStatus" Text="" Foreground="#666" FontSize="9"
+                       VerticalAlignment="Center" Margin="2,0,2,0" MaxWidth="50" TextTrimming="CharacterEllipsis" />
 
-            <!-- Separator -->
-            <Rectangle Grid.Column="6" Width="1" Fill="#444" Margin="4,4" />
+            <Rectangle x:Name="SepAnnotations" Width="1" Fill="#444" Margin="3,4" />
 
-            <!-- Annotation tools -->
-            <!-- Pen: orange pencil -->
-            <Button x:Name="BtnPen" Grid.Column="7" Click="AnnotationTool_Click" Tag="Pen"
-                    Width="28" Height="28" Margin="2,0" Cursor="Hand" ToolTip="Pen (P)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
+            <!-- All annotation tools (same as screenshot) -->
+            <Button x:Name="BtnPen" Click="AnnotationTool_Click" Tag="Pen" Style="{StaticResource RBtn}" ToolTip="Pen (P)">
                 <Canvas Width="14" Height="14">
                     <Path Fill="#FFA726" Data="M11,0.5 L13.5,3 L4.5,12 L1,13 L2,9.5 Z" />
-                    <Path Fill="#FFE082" Data="M11,0.5 L13.5,3 L12.5,4 L10,1.5 Z" />
                     <Path Fill="#5D4037" Data="M1,13 L2,9.5 L4.5,12 Z" />
                 </Canvas>
             </Button>
-            <!-- Arrow: cyan -->
-            <Button x:Name="BtnArrow" Grid.Column="8" Click="AnnotationTool_Click" Tag="Arrow"
-                    Width="28" Height="28" Margin="0,0,2,0" Cursor="Hand" ToolTip="Arrow (A)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
+            <Button x:Name="BtnLine" Click="AnnotationTool_Click" Tag="Line" Style="{StaticResource RBtn}" ToolTip="Line (L)">
                 <Canvas Width="14" Height="14">
-                    <Line X1="1" Y1="13" X2="10" Y2="4" Stroke="#26C6DA" StrokeThickness="2"
-                          StrokeStartLineCap="Round" />
+                    <Line X1="2" Y1="12" X2="12" Y2="2" Stroke="#64B5F6" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnArrow" Click="AnnotationTool_Click" Tag="Arrow" Style="{StaticResource RBtn}" ToolTip="Arrow (A)">
+                <Canvas Width="14" Height="14">
+                    <Line X1="1" Y1="13" X2="10" Y2="4" Stroke="#26C6DA" StrokeThickness="2" StrokeStartLineCap="Round" />
                     <Path Fill="#26C6DA" Data="M13,1 L8,4 L11,7 Z" />
                 </Canvas>
             </Button>
-            <!-- Rectangle: blue -->
-            <Button x:Name="BtnRect" Grid.Column="9" Click="AnnotationTool_Click" Tag="Rectangle"
-                    Width="28" Height="28" Margin="0,0,2,0" Cursor="Hand" ToolTip="Rectangle (R)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
+            <Button x:Name="BtnRect" Click="AnnotationTool_Click" Tag="Rectangle" Style="{StaticResource RBtn}" ToolTip="Rectangle (R)">
                 <Canvas Width="14" Height="14">
-                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="12" Height="10"
-                               Stroke="#42A5F5" StrokeThickness="2" />
+                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="12" Height="10" Stroke="#42A5F5" StrokeThickness="2" />
                 </Canvas>
             </Button>
-            <!-- Text: yellow "A" -->
-            <Button x:Name="BtnText" Grid.Column="10" Click="AnnotationTool_Click" Tag="Text"
-                    Width="28" Height="28" Margin="0,0,2,0" Cursor="Hand" ToolTip="Text (T)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
+            <Button x:Name="BtnEllipse" Click="AnnotationTool_Click" Tag="Ellipse" Style="{StaticResource RBtn}" ToolTip="Ellipse (E)">
+                <Canvas Width="14" Height="14">
+                    <Ellipse Canvas.Left="1" Canvas.Top="2" Width="12" Height="10" Stroke="#AB47BC" StrokeThickness="2" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnText" Click="AnnotationTool_Click" Tag="Text" Style="{StaticResource RBtn}" ToolTip="Text (T)">
                 <TextBlock Text="A" Foreground="#FFCA28" FontSize="12" FontWeight="Bold"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Button>
-            <Button x:Name="BtnClearAnnotations" Grid.Column="11" Click="ClearAnnotations_Click"
-                    Width="28" Height="28" Margin="0,0,2,0" Cursor="Hand" ToolTip="Clear drawings (C)"
-                    Background="Transparent" BorderBrush="Transparent" Focusable="False">
+            <Button x:Name="BtnMarker" Click="AnnotationTool_Click" Tag="Marker" Style="{StaticResource RBtn}" ToolTip="Marker (H)">
                 <Canvas Width="14" Height="14">
-                    <Line X1="3" Y1="3" X2="11" Y2="11" Stroke="#EF5350" StrokeThickness="2" />
-                    <Line X1="11" Y1="3" X2="3" Y2="11" Stroke="#EF5350" StrokeThickness="2" />
+                    <Rectangle Canvas.Left="3" Canvas.Top="1" Width="8" Height="10" Fill="#FFEE58" RadiusX="2" RadiusY="2" />
+                    <Rectangle Canvas.Left="4" Canvas.Top="11" Width="6" Height="2" Fill="#F9A825" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnCheck" Click="AnnotationTool_Click" Tag="Check" Style="{StaticResource RBtn}" ToolTip="Check (K)">
+                <Canvas Width="14" Height="14">
+                    <Ellipse Width="14" Height="14" Stroke="#4CAF50" StrokeThickness="1.5" Fill="#304CAF50" />
+                    <Path Stroke="#4CAF50" StrokeThickness="2" Data="M3.5,7.5 L6,10 L10.5,4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnCross" Click="AnnotationTool_Click" Tag="CrossMark" Style="{StaticResource RBtn}" ToolTip="Cross (D)">
+                <Canvas Width="14" Height="14">
+                    <Ellipse Width="14" Height="14" Stroke="#F44336" StrokeThickness="1.5" Fill="#30F44336" />
+                    <Line X1="4" Y1="4" X2="10" Y2="10" Stroke="#F44336" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                    <Line X1="10" Y1="4" X2="4" Y2="10" Stroke="#F44336" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnEraser" Click="AnnotationTool_Click" Tag="Eraser" Style="{StaticResource RBtn}" ToolTip="Eraser (G)">
+                <Canvas Width="14" Height="14">
+                    <Path Fill="#B0BEC5" Data="M12,3 L7,8 L4.5,11 L2,11 L2,8 L5,5 L10,0 Z" />
+                    <Path Fill="#EF5350" Data="M2,8 L4.5,11 L2,11 Z" />
+                    <Line X1="1" Y1="13" X2="13" Y2="13" Stroke="#607D8B" StrokeThickness="1.5" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnUndo" Click="Undo_Click" Style="{StaticResource RBtn}" ToolTip="Undo (X)">
+                <Canvas Width="14" Height="14">
+                    <Path Stroke="#FFA726" StrokeThickness="2" Data="M5,3 L2,6 L5,9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                    <Path Stroke="#FFA726" StrokeThickness="2" Data="M2,6 L9,6 A3,3 0 0,1 9,12 L7,12" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                </Canvas>
+            </Button>
+            <Button x:Name="BtnClearAnnotations" Click="ClearAnnotations_Click" Style="{StaticResource RBtn}" ToolTip="Clear All (C)">
+                <Canvas Width="14" Height="14">
+                    <Line X1="3" Y1="3" X2="11" Y2="11" Stroke="#EF5350" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                    <Line X1="11" Y1="3" X2="3" Y2="11" Stroke="#EF5350" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                 </Canvas>
             </Button>
 
-            <!-- Separator -->
-            <StackPanel Grid.Column="12" Orientation="Horizontal">
-                <Rectangle Width="1" Fill="#444" Margin="4,4" />
+            <Rectangle Width="1" Fill="#444" Margin="3,4" />
 
-                <!-- Pause/Resume -->
-                <Button x:Name="BtnPause" Click="Pause_Click"
-                        Width="28" Height="28" Margin="4,0,2,0" Cursor="Hand"
-                        Background="Transparent" BorderBrush="Transparent" Focusable="False">
+            <!-- Color picker -->
+            <Button x:Name="BtnRecColor" Click="RecColor_Click" Style="{StaticResource RBtn}" ToolTip="Color">
+                <Ellipse x:Name="RecColorIndicator" Width="16" Height="16" Fill="Yellow" Stroke="White" StrokeThickness="1.5" />
+            </Button>
+            <!-- Thickness -->
+            <Button x:Name="BtnRecThickness" Click="RecThickness_Click" Style="{StaticResource RBtn}" ToolTip="Thickness">
+                <Grid Width="18" Height="18">
+                    <Ellipse Width="18" Height="18" Fill="#444" Stroke="#666" StrokeThickness="1" />
+                    <TextBlock x:Name="RecThicknessLabel" Text="3" Foreground="White"
+                               FontSize="11" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <Rectangle Width="1" Fill="#444" Margin="3,4" />
+
+            <!-- Saving message (hidden until saving) -->
+            <StackPanel x:Name="SavingPanel" Orientation="Horizontal" Visibility="Collapsed">
+                <Ellipse Width="12" Height="12" Fill="#42A5F5" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <TextBlock Text="Saving..." Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Close (pre-recording) -->
+            <Button x:Name="BtnPreClose" Click="PreClose_Click" Style="{StaticResource RBtn}" ToolTip="Close (Esc)">
+                <Canvas Width="14" Height="14">
+                    <Line X1="2" Y1="2" X2="12" Y2="12" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                    <Line X1="12" Y1="2" X2="2" Y2="12" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                </Canvas>
+            </Button>
+
+            <!-- Pause/Stop (recording) -->
+            <StackPanel x:Name="PanelRecControls" Orientation="Horizontal" Visibility="Collapsed">
+                <Button x:Name="BtnPause" Click="Pause_Click" Style="{StaticResource RBtn}" ToolTip="Pause (Space)">
                     <Grid Width="14" Height="14">
                         <Canvas x:Name="PauseIcon" Visibility="Visible">
                             <Rectangle Canvas.Left="2" Width="4" Height="14" Fill="White" />
@@ -157,16 +238,12 @@
                         </Canvas>
                     </Grid>
                 </Button>
-
-                <!-- Stop -->
-                <Button x:Name="BtnStop" Click="Stop_Click"
-                        Width="28" Height="28" Cursor="Hand"
-                        Background="Transparent" BorderBrush="Transparent" Focusable="False">
+                <Button x:Name="BtnStop" Click="Stop_Click" Style="{StaticResource RBtn}" ToolTip="Stop (Q)">
                     <Canvas Width="14" Height="14">
                         <Rectangle Width="14" Height="14" Fill="#F44336" RadiusX="2" RadiusY="2" />
                     </Canvas>
                 </Button>
             </StackPanel>
-        </Grid>
+        </StackPanel>
     </Border>
 </Window>

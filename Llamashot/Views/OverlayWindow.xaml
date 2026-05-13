@@ -142,18 +142,6 @@
                         </StackPanel>
                     </Button>
                     <Rectangle Width="1" Fill="#333" Margin="3,5" />
-                    <!-- Capture type dropdown -->
-                    <Button x:Name="BtnCaptureType" ToolTip="Capture type" Click="CaptureType_Click" Style="{StaticResource TBtnFlex}">
-                        <StackPanel Orientation="Horizontal">
-                            <Canvas Width="16" Height="16" x:Name="CaptureTypeIcon">
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
-                                           Stroke="#CCC" StrokeThickness="1.5" StrokeDashArray="3 1.5" />
-                            </Canvas>
-                            <TextBlock x:Name="CaptureTypeLabel" Text="Region" Foreground="#CCC" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
-                            <Path Data="M0,0 L4,4 L8,0" Stroke="#888" StrokeThickness="1.5" Margin="4,6,0,0" Width="8" Height="5" />
-                        </StackPanel>
-                    </Button>
-                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
                     <!-- OCR mode -->
                     <Button x:Name="BtnModeOcr" ToolTip="Text Extract (3)" Click="ModeOcr_Click" Style="{StaticResource TBtnFlex}">
                         <StackPanel Orientation="Horizontal">
@@ -193,50 +181,6 @@
             <!-- Mode underline indicator -->
             <Border x:Name="ModeIndicator" Height="3" Width="22" CornerRadius="1.5" Background="#2196F3"
                     IsHitTestVisible="False" />
-        </Canvas>
-
-        <!-- Capture type dropdown popup -->
-        <Canvas x:Name="CaptureTypePopupCanvas" Visibility="Collapsed">
-            <Border x:Name="CaptureTypePopup"
-                    Background="#FF111111" CornerRadius="6" Padding="4"
-                    BorderBrush="#333" BorderThickness="1">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="8" Opacity="0.5" ShadowDepth="2" />
-                </Border.Effect>
-                <StackPanel>
-                    <Button x:Name="BtnTypeRegion" Click="TypeRegion_Click" Style="{StaticResource TBtnFlex}" Width="130" Height="28">
-                        <StackPanel Orientation="Horizontal">
-                            <Canvas Width="16" Height="16">
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
-                                           Stroke="#CCC" StrokeThickness="1.5" StrokeDashArray="3 1.5" />
-                            </Canvas>
-                            <TextBlock Text="Region" Foreground="#CCC" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="BtnTypeWindow" Click="TypeWindow_Click" Style="{StaticResource TBtnFlex}" Width="130" Height="28">
-                        <StackPanel Orientation="Horizontal">
-                            <Canvas Width="16" Height="16">
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
-                                           Stroke="#CCC" StrokeThickness="1.5" />
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="3"
-                                           Fill="#555" />
-                            </Canvas>
-                            <TextBlock Text="Window" Foreground="#CCC" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="BtnTypeFullscreen" Click="TypeFullscreen_Click" Style="{StaticResource TBtnFlex}" Width="130" Height="28">
-                        <StackPanel Orientation="Horizontal">
-                            <Canvas Width="16" Height="16">
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="14" Height="12"
-                                           Stroke="#CCC" StrokeThickness="1.5" />
-                                <Ellipse Canvas.Left="5" Canvas.Top="4" Width="6" Height="6"
-                                         Fill="#CCC" />
-                            </Canvas>
-                            <TextBlock Text="Full Screen" Foreground="#CCC" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Border>
         </Canvas>
 
         <!-- Delay dropdown popup -->
@@ -460,6 +404,80 @@
                         <Canvas Width="16" Height="16">
                             <Line X1="3" Y1="3" X2="13" Y2="13" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             <Line X1="13" Y1="3" X2="3" Y2="13" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Canvas>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Canvas>
+
+        <!-- Video pre-start toolbar (shown instead of annotation tools for video mode) -->
+        <Canvas x:Name="VideoToolbarCanvas" Visibility="Collapsed">
+            <Border x:Name="VideoToolbar"
+                    Background="#EE111111" CornerRadius="8" Padding="6,4"
+                    BorderBrush="#333" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="12" Opacity="0.6" ShadowDepth="3" />
+                </Border.Effect>
+                <StackPanel Orientation="Horizontal">
+                    <!-- Start button -->
+                    <Button x:Name="BtnVideoStart" Click="VideoStart_Click" Cursor="Hand" Focusable="False" Margin="0,0,8,0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="#2196F3" CornerRadius="14" Padding="14,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="10" Height="10" Stroke="White" StrokeThickness="2" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="Start" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#42A5F5" />
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#1E88E5" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <!-- Timer -->
+                    <TextBlock x:Name="VideoTimer" Text="00:00:00" Foreground="White" FontSize="15"
+                               FontWeight="SemiBold" FontFamily="Consolas" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                    <!-- Mic toggle -->
+                    <Button x:Name="BtnVideoMic" Click="VideoMic_Click" Width="28" Height="28" Margin="4,0,2,0"
+                            Cursor="Hand" ToolTip="Toggle microphone (M)"
+                            Background="Transparent" BorderBrush="Transparent" Focusable="False">
+                        <Canvas Width="16" Height="16">
+                            <Rectangle x:Name="VideoMicBody" Canvas.Left="5.5" Canvas.Top="1" Width="5" Height="9"
+                                       RadiusX="2.5" RadiusY="2.5" Fill="#666" />
+                            <Path x:Name="VideoMicArc" Data="M3,8 A5,5 0 0,0 13,8" Stroke="#666" StrokeThickness="1.5"
+                                  Canvas.Top="2" Fill="Transparent" />
+                            <Line x:Name="VideoMicStand" X1="8" Y1="13" X2="8" Y2="15" Stroke="#666" StrokeThickness="1.5" />
+                            <Line x:Name="VideoMicSlash" X1="2" Y1="14" X2="14" Y2="2" Stroke="#EF5350"
+                                  StrokeThickness="2" Visibility="Visible" />
+                        </Canvas>
+                    </Button>
+                    <!-- System audio toggle -->
+                    <Button x:Name="BtnVideoSysAudio" Click="VideoSysAudio_Click" Width="28" Height="28" Margin="0,0,2,0"
+                            Cursor="Hand" ToolTip="Toggle system audio (S)"
+                            Background="Transparent" BorderBrush="Transparent" Focusable="False">
+                        <Canvas Width="16" Height="16">
+                            <Path x:Name="VideoSpeakerBody" Data="M2,6 L5,6 L9,3 L9,13 L5,10 L2,10 Z" Fill="#666" />
+                            <Path x:Name="VideoSpeakerWave1" Data="M11,6 A3,3 0 0,1 11,10" Stroke="#666"
+                                  StrokeThickness="1.5" Fill="Transparent" />
+                            <Path x:Name="VideoSpeakerWave2" Data="M12.5,4 A5,5 0 0,1 12.5,12" Stroke="#666"
+                                  StrokeThickness="1.5" Fill="Transparent" />
+                            <Line x:Name="VideoSpeakerSlash" X1="2" Y1="14" X2="14" Y2="2" Stroke="#EF5350"
+                                  StrokeThickness="2" Visibility="Visible" />
+                        </Canvas>
+                    </Button>
+                    <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                    <!-- Close -->
+                    <Button Click="Close_Click" Style="{StaticResource TBtn}">
+                        <Canvas Width="14" Height="14">
+                            <Line X1="2" Y1="2" X2="12" Y2="12" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="12" Y1="2" X2="2" Y2="12" Stroke="#EF5350" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
                 </StackPanel>

@@ -7,22 +7,40 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        IsHitTestVisible="False">
-    <Border BorderThickness="3" CornerRadius="1">
-        <Border.BorderBrush>
-            <SolidColorBrush x:Name="BorderColor" Color="#F44336" />
-        </Border.BorderBrush>
-        <Border.Triggers>
-            <EventTrigger RoutedEvent="Loaded">
-                <BeginStoryboard>
-                    <Storyboard RepeatBehavior="Forever">
-                        <ColorAnimation Storyboard.TargetName="BorderColor"
-                                        Storyboard.TargetProperty="Color"
-                                        From="#F44336" To="#FF8A80" Duration="0:0:0.8"
-                                        AutoReverse="True" />
-                    </Storyboard>
-                </BeginStoryboard>
-            </EventTrigger>
-        </Border.Triggers>
-    </Border>
+        IsHitTestVisible="False"
+        ForceCursor="True"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseMove="Window_MouseMove"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp">
+    <Grid>
+        <!-- Dashed border with transparent fill for hit-testing (pre-recording) -->
+        <Rectangle x:Name="DashedBorder" Stroke="White" StrokeThickness="2"
+                   StrokeDashArray="6 3" Fill="Transparent" Visibility="Collapsed" />
+        <!-- Resize handles canvas (pre-recording) -->
+        <Canvas x:Name="HandleCanvas" Visibility="Collapsed" />
+        <!-- Dimension label -->
+        <Border x:Name="DimensionLabel" Background="#DD000000" CornerRadius="3" Padding="8,2"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,-24,0,0"
+                Visibility="Collapsed" IsHitTestVisible="False">
+            <TextBlock x:Name="DimensionText" Foreground="White" FontSize="11" FontFamily="Segoe UI" />
+        </Border>
+        <!-- Solid pulsing border (recording) -->
+        <Border x:Name="SolidBorder" BorderThickness="3" CornerRadius="1">
+            <Border.BorderBrush>
+                <SolidColorBrush x:Name="BorderColor" Color="#F44336" />
+            </Border.BorderBrush>
+            <Border.Triggers>
+                <EventTrigger RoutedEvent="Loaded">
+                    <BeginStoryboard>
+                        <Storyboard RepeatBehavior="Forever">
+                            <ColorAnimation Storyboard.TargetName="BorderColor"
+                                            Storyboard.TargetProperty="Color"
+                                            From="#F44336" To="#FF8A80" Duration="0:0:0.8"
+                                            AutoReverse="True" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Border.Triggers>
+        </Border>
+    </Grid>
 </Window>
