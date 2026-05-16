@@ -105,6 +105,7 @@ public partial class App : Application
         RegisterFromString(s.CaptureHotkey, StartRegionCapture);
         RegisterFromString(s.FullscreenSaveHotkey, FullscreenSave);
         RegisterFromString(s.FullscreenClipboardHotkey, FullscreenClipboard);
+        RegisterFromString(s.HistoryHotkey, ShowHistory);
     }
 
     private void InstallEscapeHook()
@@ -140,28 +141,30 @@ public partial class App : Application
             if (ActiveRecordingOverlay != null && IsOurWindowInForeground()
                 && !Views.RecordingAnnotation.IsTextInputActive)
             {
-                char key = vkCode switch
-                {
-                    0x50 => 'P', // P - Pen
-                    0x4C => 'L', // L - Line
-                    0x41 => 'A', // A - Arrow
-                    0x52 => 'R', // R - Rectangle
-                    0x45 => 'E', // E - Ellipse
-                    0x54 => 'T', // T - Text
-                    0x48 => 'H', // H - Marker
-                    0x4B => 'K', // K - Check
-                    0x44 => 'D', // D - Cross
-                    0x47 => 'G', // G - Eraser
-                    0x58 => 'X', // X - Undo
-                    0x43 => 'C', // C - Clear
-                    0x4D => 'M', // M - Mic toggle
-                    0x53 => 'S', // S - System audio toggle
-                    0x20 => ' ', // Space - Pause/Resume
-                    0x51 => 'Q', // Q - Stop
-                    _ => '\0'
-                };
-                if (key != '\0')
-                    Dispatcher.BeginInvoke(() => ActiveRecordingOverlay?.HandleShortcut(key));
+                var s = AppSettings.Instance;
+                string? action = null;
+
+                // Tool shortcuts (shared with screenshot overlay)
+                if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutPen)) action = "Pen";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutLine)) action = "Line";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutArrow)) action = "Arrow";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRectangle)) action = "Rectangle";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutEllipse)) action = "Ellipse";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutText)) action = "Text";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutMarker)) action = "Marker";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutCheck)) action = "Check";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutCross)) action = "CrossMark";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutObjectEraser)) action = "Eraser";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutEraser)) action = "Undo";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRecClearAll)) action = "ClearAll";
+                // Recording-only shortcuts
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRecMic)) action = "Mic";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRecSystemAudio)) action = "SystemAudio";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRecPause)) action = "Pause";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRecStop)) action = "Stop";
+
+                if (action != null)
+                    Dispatcher.BeginInvoke(() => ActiveRecordingOverlay?.HandleShortcut(action));
             }
         }
         return NativeMethods.CallNextHookEx(_keyboardHook, nCode, wParam, lParam);

@@ -1667,10 +1667,11 @@ public partial class OverlayWindow : Window
         // Snipping toolbar shortcuts (only when toolbar is visible, before selection)
         if (_interaction == Interaction.ToolbarIdle)
         {
+            var st = AppSettings.Instance;
             if (e.Key == Key.Escape) { Close(); e.Handled = true; return; }
-            if (e.Key == Key.D1) { ModeScreenshot_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
-            if (e.Key == Key.D2) { ModeVideo_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
-            if (e.Key == Key.D3) { ModeOcr_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (ShortcutHelper.Matches(e, st.ShortcutModeScreenshot)) { ModeScreenshot_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (ShortcutHelper.Matches(e, st.ShortcutModeVideo)) { ModeVideo_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (ShortcutHelper.Matches(e, st.ShortcutModeOcr)) { ModeOcr_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             return;
         }
 

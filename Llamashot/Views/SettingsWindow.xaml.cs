@@ -12,7 +12,8 @@ public partial class SettingsWindow : Window
     {
         { "CaptureHotkey", "PrintScreen" },
         { "FullscreenSaveHotkey", "Shift+PrintScreen" },
-        { "FullscreenClipHotkey", "Ctrl+PrintScreen" }
+        { "FullscreenClipHotkey", "Ctrl+PrintScreen" },
+        { "HistoryHotkey", "Alt+PrintScreen" }
     };
 
     private static readonly (string Key, string Label, string Default)[] ToolShortcuts =
@@ -42,18 +43,44 @@ public partial class SettingsWindow : Window
         ("ShortcutPin", "Pin", "F"),
     };
 
+    private static readonly (string Key, string Label, string Default)[] RecordingShortcuts =
+    {
+        ("ShortcutRecMic", "Mic toggle", "M"),
+        ("ShortcutRecSystemAudio", "System audio", "S"),
+        ("ShortcutRecPause", "Pause/Resume", "Space"),
+        ("ShortcutRecStop", "Stop recording", "Q"),
+        ("ShortcutRecClearAll", "Clear all", "C"),
+    };
+
+    private static readonly (string Key, string Label, string Default)[] ToolbarShortcuts =
+    {
+        ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
+        ("ShortcutModeVideo", "Video mode", "D2"),
+        ("ShortcutModeOcr", "OCR mode", "D3"),
+        ("ShortcutToolbarRegion", "Region capture", "R"),
+        ("ShortcutToolbarWindow", "Window capture", "W"),
+        ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
+    };
+
     private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();
 
     public SettingsWindow()
     {
         InitializeComponent();
         BuildToolShortcutFields();
+        BuildShortcutSection(RecordingShortcuts, RecordingShortcutsPanel);
+        BuildShortcutSection(ToolbarShortcuts, ToolbarShortcutsPanel);
         LoadSettings();
     }
 
     private void BuildToolShortcutFields()
     {
-        foreach (var (key, label, def) in ToolShortcuts)
+        BuildShortcutSection(ToolShortcuts, ToolShortcutsPanel);
+    }
+
+    private void BuildShortcutSection((string Key, string Label, string Default)[] shortcuts, StackPanel panel)
+    {
+        foreach (var (key, label, def) in shortcuts)
         {
             var grid = new Grid { Margin = new Thickness(0, 0, 0, 6) };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
@@ -110,7 +137,7 @@ public partial class SettingsWindow : Window
             grid.Children.Add(tb);
             grid.Children.Add(resetBtn);
 
-            ToolShortcutsPanel.Children.Add(grid);
+            panel.Children.Add(grid);
             _toolShortcutBoxes[key] = tb;
         }
     }
@@ -127,31 +154,19 @@ public partial class SettingsWindow : Window
         TxtCaptureHotkey.Text = s.CaptureHotkey;
         TxtFullscreenSaveHotkey.Text = s.FullscreenSaveHotkey;
         TxtFullscreenClipHotkey.Text = s.FullscreenClipboardHotkey;
+        TxtHistoryHotkey.Text = s.HistoryHotkey;
 
-        // Load tool shortcuts
-        _toolShortcutBoxes["ShortcutSave"].Text = s.ShortcutSave;
-        _toolShortcutBoxes["ShortcutCopy"].Text = s.ShortcutCopy;
-        _toolShortcutBoxes["ShortcutUndo"].Text = s.ShortcutUndo;
-        _toolShortcutBoxes["ShortcutRedo"].Text = s.ShortcutRedo;
-        _toolShortcutBoxes["ShortcutPen"].Text = s.ShortcutPen;
-        _toolShortcutBoxes["ShortcutLine"].Text = s.ShortcutLine;
-        _toolShortcutBoxes["ShortcutArrow"].Text = s.ShortcutArrow;
-        _toolShortcutBoxes["ShortcutRectangle"].Text = s.ShortcutRectangle;
-        _toolShortcutBoxes["ShortcutEllipse"].Text = s.ShortcutEllipse;
-        _toolShortcutBoxes["ShortcutText"].Text = s.ShortcutText;
-        _toolShortcutBoxes["ShortcutMarker"].Text = s.ShortcutMarker;
-        _toolShortcutBoxes["ShortcutBlur"].Text = s.ShortcutBlur;
-        _toolShortcutBoxes["ShortcutEraser"].Text = s.ShortcutEraser;
-        _toolShortcutBoxes["ShortcutObjectEraser"].Text = s.ShortcutObjectEraser;
-        _toolShortcutBoxes["ShortcutMove"].Text = s.ShortcutMove;
-        _toolShortcutBoxes["ShortcutCheck"].Text = s.ShortcutCheck;
-        _toolShortcutBoxes["ShortcutCross"].Text = s.ShortcutCross;
-        _toolShortcutBoxes["ShortcutColor"].Text = s.ShortcutColor;
-        _toolShortcutBoxes["ShortcutThickness"].Text = s.ShortcutThickness;
-        _toolShortcutBoxes["ShortcutHistory"].Text = s.ShortcutHistory;
-        _toolShortcutBoxes["ShortcutRecord"].Text = s.ShortcutRecord;
-        _toolShortcutBoxes["ShortcutOcr"].Text = s.ShortcutOcr;
-        _toolShortcutBoxes["ShortcutPin"].Text = s.ShortcutPin;
+        // Load all shortcut values from settings using reflection
+        var settingsType = s.GetType();
+        foreach (var (key, _, _) in ToolShortcuts.Concat(RecordingShortcuts).Concat(ToolbarShortcuts))
+        {
+            if (_toolShortcutBoxes.TryGetValue(key, out var tb))
+            {
+                var prop = settingsType.GetProperty(key);
+                if (prop != null)
+                    tb.Text = prop.GetValue(s) as string ?? "";
+            }
+        }
 
         foreach (ComboBoxItem item in CmbFormat.Items)
         {
@@ -237,6 +252,7 @@ public partial class SettingsWindow : Window
                 "CaptureHotkey" => TxtCaptureHotkey,
                 "FullscreenSaveHotkey" => TxtFullscreenSaveHotkey,
                 "FullscreenClipHotkey" => TxtFullscreenClipHotkey,
+                "HistoryHotkey" => TxtHistoryHotkey,
                 _ => null
             };
             if (tb != null) tb.Text = defaultVal;
@@ -246,26 +262,43 @@ public partial class SettingsWindow : Window
 
     private void ValidateAllShortcuts()
     {
-        // Collect all shortcut values with labels
-        var all = new Dictionary<string, string>
+        // Validate within context groups that can actually overlap at runtime:
+        // Group 1: Global hotkeys (system-wide, always active)
+        // Group 2: Tool shortcuts + Recording shortcuts (both active during recording)
+        // Group 3: Toolbar shortcuts (only active on snipping toolbar, before selection)
+
+        var globalGroup = new Dictionary<string, string>
         {
             { "Capture region", TxtCaptureHotkey.Text },
             { "Fullscreen save", TxtFullscreenSaveHotkey.Text },
-            { "Fullscreen copy", TxtFullscreenClipHotkey.Text }
+            { "Fullscreen copy", TxtFullscreenClipHotkey.Text },
+            { "History hotkey", TxtHistoryHotkey.Text }
         };
 
-        foreach (var (key, label, _) in ToolShortcuts)
+        var toolRecGroup = new Dictionary<string, string>();
+        foreach (var (key, label, _) in ToolShortcuts.Concat(RecordingShortcuts))
         {
             if (_toolShortcutBoxes.TryGetValue(key, out var tb))
-                all[label] = tb.Text;
+                toolRecGroup[label] = tb.Text;
         }
 
-        var duplicates = all
-            .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
-            .GroupBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1)
-            .SelectMany(g => g.Select(kv => kv.Key))
-            .ToHashSet();
+        var toolbarGroup = new Dictionary<string, string>();
+        foreach (var (key, label, _) in ToolbarShortcuts)
+        {
+            if (_toolShortcutBoxes.TryGetValue(key, out var tb))
+                toolbarGroup[label] = tb.Text;
+        }
+
+        static HashSet<string> FindDuplicates(Dictionary<string, string> group) =>
+            group.Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                 .GroupBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+                 .Where(g => g.Count() > 1)
+                 .SelectMany(g => g.Select(kv => kv.Key))
+                 .ToHashSet();
+
+        var duplicates = FindDuplicates(globalGroup);
+        duplicates.UnionWith(FindDuplicates(toolRecGroup));
+        duplicates.UnionWith(FindDuplicates(toolbarGroup));
 
         if (duplicates.Count > 0)
         {
@@ -281,9 +314,10 @@ public partial class SettingsWindow : Window
         SetBorder(TxtCaptureHotkey, duplicates.Contains("Capture region"));
         SetBorder(TxtFullscreenSaveHotkey, duplicates.Contains("Fullscreen save"));
         SetBorder(TxtFullscreenClipHotkey, duplicates.Contains("Fullscreen copy"));
+        SetBorder(TxtHistoryHotkey, duplicates.Contains("History hotkey"));
 
-        // Highlight tool shortcut duplicates
-        foreach (var (key, label, _) in ToolShortcuts)
+        // Highlight all shortcut duplicates
+        foreach (var (key, label, _) in ToolShortcuts.Concat(RecordingShortcuts).Concat(ToolbarShortcuts))
         {
             if (_toolShortcutBoxes.TryGetValue(key, out var tb))
                 SetBorder(tb, duplicates.Contains(label));
@@ -322,31 +356,18 @@ public partial class SettingsWindow : Window
         s.CaptureHotkey = TxtCaptureHotkey.Text;
         s.FullscreenSaveHotkey = TxtFullscreenSaveHotkey.Text;
         s.FullscreenClipboardHotkey = TxtFullscreenClipHotkey.Text;
+        s.HistoryHotkey = TxtHistoryHotkey.Text;
 
-        // Save tool shortcuts
-        s.ShortcutSave = _toolShortcutBoxes["ShortcutSave"].Text;
-        s.ShortcutCopy = _toolShortcutBoxes["ShortcutCopy"].Text;
-        s.ShortcutUndo = _toolShortcutBoxes["ShortcutUndo"].Text;
-        s.ShortcutRedo = _toolShortcutBoxes["ShortcutRedo"].Text;
-        s.ShortcutPen = _toolShortcutBoxes["ShortcutPen"].Text;
-        s.ShortcutLine = _toolShortcutBoxes["ShortcutLine"].Text;
-        s.ShortcutArrow = _toolShortcutBoxes["ShortcutArrow"].Text;
-        s.ShortcutRectangle = _toolShortcutBoxes["ShortcutRectangle"].Text;
-        s.ShortcutEllipse = _toolShortcutBoxes["ShortcutEllipse"].Text;
-        s.ShortcutText = _toolShortcutBoxes["ShortcutText"].Text;
-        s.ShortcutMarker = _toolShortcutBoxes["ShortcutMarker"].Text;
-        s.ShortcutBlur = _toolShortcutBoxes["ShortcutBlur"].Text;
-        s.ShortcutEraser = _toolShortcutBoxes["ShortcutEraser"].Text;
-        s.ShortcutObjectEraser = _toolShortcutBoxes["ShortcutObjectEraser"].Text;
-        s.ShortcutMove = _toolShortcutBoxes["ShortcutMove"].Text;
-        s.ShortcutCheck = _toolShortcutBoxes["ShortcutCheck"].Text;
-        s.ShortcutCross = _toolShortcutBoxes["ShortcutCross"].Text;
-        s.ShortcutColor = _toolShortcutBoxes["ShortcutColor"].Text;
-        s.ShortcutThickness = _toolShortcutBoxes["ShortcutThickness"].Text;
-        s.ShortcutHistory = _toolShortcutBoxes["ShortcutHistory"].Text;
-        s.ShortcutRecord = _toolShortcutBoxes["ShortcutRecord"].Text;
-        s.ShortcutOcr = _toolShortcutBoxes["ShortcutOcr"].Text;
-        s.ShortcutPin = _toolShortcutBoxes["ShortcutPin"].Text;
+        // Save all shortcut values to settings using reflection
+        var settingsType = s.GetType();
+        foreach (var (key, _, _) in ToolShortcuts.Concat(RecordingShortcuts).Concat(ToolbarShortcuts))
+        {
+            if (_toolShortcutBoxes.TryGetValue(key, out var tb))
+            {
+                var prop = settingsType.GetProperty(key);
+                prop?.SetValue(s, tb.Text);
+            }
+        }
 
         s.DefaultSaveFormat = (CmbFormat.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "PNG";
         s.JpegQuality = (int)SldJpegQuality.Value;

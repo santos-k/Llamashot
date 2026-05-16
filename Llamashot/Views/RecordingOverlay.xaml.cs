@@ -325,37 +325,38 @@ public partial class RecordingOverlay : Window
 
     // ============ SHORTCUTS ============
 
-    public void HandleShortcut(char key)
+    public void HandleShortcut(string action)
     {
         if (_finished) return;
         if (_preRecording)
         {
-            // Only allow audio toggles and close during pre-recording
-            switch (key)
+            // Only allow audio toggles during pre-recording
+            switch (action)
             {
-                case 'M': _ = ToggleMic(!_micEnabled); break;
-                case 'S': _ = ToggleSystemAudio(!_systemAudioEnabled); break;
+                case "Mic": _ = ToggleMic(!_micEnabled); break;
+                case "SystemAudio": _ = ToggleSystemAudio(!_systemAudioEnabled); break;
             }
             return;
         }
-        switch (key)
+        switch (action)
         {
-            case 'P': SelectAnnotationTool("Pen"); break;
-            case 'L': SelectAnnotationTool("Line"); break;
-            case 'A': SelectAnnotationTool("Arrow"); break;
-            case 'R': SelectAnnotationTool("Rectangle"); break;
-            case 'E': SelectAnnotationTool("Ellipse"); break;
-            case 'T': SelectAnnotationTool("Text"); break;
-            case 'H': SelectAnnotationTool("Marker"); break;
-            case 'K': SelectAnnotationTool("Check"); break;
-            case 'D': SelectAnnotationTool("CrossMark"); break;
-            case 'G': SelectAnnotationTool("Eraser"); break;
-            case 'X': _annotationOverlay?.Undo(); break;
-            case 'C': _annotationOverlay?.ClearAll(); break;
-            case 'M': _ = ToggleMic(!_micEnabled); break;
-            case 'S': _ = ToggleSystemAudio(!_systemAudioEnabled); break;
-            case ' ': Pause_Click(BtnPause, new RoutedEventArgs()); break;
-            case 'Q': FinishRecording(); break;
+            case "Pen":
+            case "Line":
+            case "Arrow":
+            case "Rectangle":
+            case "Ellipse":
+            case "Text":
+            case "Marker":
+            case "Check":
+            case "CrossMark":
+            case "Eraser":
+                SelectAnnotationTool(action); break;
+            case "Undo": _annotationOverlay?.Undo(); break;
+            case "ClearAll": _annotationOverlay?.ClearAll(); break;
+            case "Mic": _ = ToggleMic(!_micEnabled); break;
+            case "SystemAudio": _ = ToggleSystemAudio(!_systemAudioEnabled); break;
+            case "Pause": Pause_Click(BtnPause, new RoutedEventArgs()); break;
+            case "Stop": FinishRecording(); break;
         }
     }
 
