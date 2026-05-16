@@ -44,25 +44,13 @@ public class ScrollCapture
             NativeMethods.SetForegroundWindow(_targetHwnd);
             await Task.Delay(300);
 
-            // Get fresh window rect and position cursor in the lower half (targets scrollable content)
-            NativeMethods.GetWindowRect(_targetHwnd, out var rect);
-            int cx = (rect.Left + rect.Right) / 2;
-            int cy = rect.Top + (rect.Bottom - rect.Top) * 2 / 3;
-            NativeMethods.SetCursorPos(cx, cy);
-            await Task.Delay(100);
-
-            // Click to ensure the window/panel under cursor has focus
-            ClickAt(cx, cy);
-            await Task.Delay(200);
+            // Bring target window to foreground (no click — just focus for keyboard input)
+            NativeMethods.SetForegroundWindow(_targetHwnd);
+            await Task.Delay(300);
 
             // Scroll to top
             await ScrollToTop(ct);
             await Task.Delay(ScrollDelayMs);
-
-            // Re-position cursor (Ctrl+Home may have moved focus)
-            NativeMethods.SetCursorPos(cx, cy);
-            ClickAt(cx, cy);
-            await Task.Delay(200);
 
             // Capture loop
             BitmapSource? prevFrame = null;
@@ -132,6 +120,17 @@ public class ScrollCapture
         UnhookMouse();
         CaptureComplete?.Invoke();
         return ImageStitcher.Stitch(_frames);
+    }
+
+    public void CaptureManualFrame()
+    {
+        if (!_capturing) return;
+        var frame = CaptureWindow();
+        if (frame != null)
+        {
+            _frames.Add(frame);
+            FrameCaptured?.Invoke(_frames.Count);
+        }
     }
 
     public void Cancel()
@@ -232,6 +231,8 @@ public class ScrollCapture
         inputs[1].u.mi.dwFlags = 0x0004; // MOUSEEVENTF_LEFTUP
         NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeMethods.INPUT>());
     }
+
+    public static void SendPageDownPublic() => SendPageDown();
 
     private static void SendPageDown()
     {

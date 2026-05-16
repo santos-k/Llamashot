@@ -259,10 +259,16 @@ public partial class App : Application
         catch { /* silent background check */ }
     }
 
+    private bool HasActiveOverlay()
+    {
+        return Windows.Cast<Window>().Any(w => w is Views.OverlayWindow or Views.RecordingOverlay);
+    }
+
     private void StartRegionCapture()
     {
         Dispatcher.Invoke(() =>
         {
+            if (HasActiveOverlay()) return;
             var overlay = new OverlayWindow();
             overlay.StartCapture();
         });
@@ -272,6 +278,7 @@ public partial class App : Application
     {
         Dispatcher.Invoke(() =>
         {
+            if (HasActiveOverlay()) return;
             var overlay = new OverlayWindow();
             overlay.StartCapture(OverlayWindow.CaptureMode.Video);
         });

@@ -76,13 +76,14 @@ public static class ImageStitcher
             }
             else if (lastGoodOverlap > 0)
             {
+                // Reuse last known good overlap
                 overlap = lastGoodOverlap;
             }
             else
             {
-                // No overlap found at all — append content with small margin trim
-                // to avoid total loss (better slight duplication than losing content)
-                overlap = Math.Min(20, cHeight / 4);
+                // No overlap found at all — skip this frame rather than blindly appending
+                // which causes duplication of headers/sidebars
+                continue;
             }
 
             int newContentStart = contentTop + overlap;
@@ -166,7 +167,8 @@ public static class ImageStitcher
         int contentHeight = contentBottom - contentTop;
 
         // Try reference rows at different offsets from the bottom of the result
-        int[] refOffsets = { 10, 25, 5, 40, 60 };
+        // Include small offsets (0-8) for tiny overlaps when Page Down scrolls most of the viewport
+        int[] refOffsets = { 0, 2, 5, 8, 10, 15, 20, 25, 35, 50, 70 };
 
         foreach (int refOffset in refOffsets)
         {
@@ -190,7 +192,7 @@ public static class ImageStitcher
                 int verified = VerifyMatch(resultPixels, resultW, resultH,
                                             framePixels, frameW, frameH,
                                             refRowInResult, y, contentTop, contentBottom);
-                if (verified >= 5)
+                if (verified >= 4)
                 {
                     int overlap = y - contentTop + refOffset + 1;
                     if (overlap >= MinOverlap && overlap < contentHeight)
@@ -217,7 +219,7 @@ public static class ImageStitcher
         int contentHeight = contentBottom - contentTop;
 
         // Try reference rows near the top of the frame's content area
-        int[] refOffsets = { 5, 15, 30 };
+        int[] refOffsets = { 2, 5, 10, 15, 20, 30, 50 };
 
         foreach (int refOffset in refOffsets)
         {
@@ -226,8 +228,8 @@ public static class ImageStitcher
 
             long refHash = ComputeRowHash(framePixels, refRowInFrame, stride);
 
-            // Search in the bottom portion of the result
-            int searchStart = Math.Max(0, resultH - contentHeight - 50);
+            // Search in the bottom portion of the result (wider range for accumulated results)
+            int searchStart = Math.Max(0, resultH - contentHeight * 2);
             for (int y = resultH - 1; y >= searchStart; y--)
             {
                 long resultHash = ComputeRowHash(resultPixels, y, stride);

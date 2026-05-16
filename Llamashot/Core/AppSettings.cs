@@ -52,11 +52,11 @@ public class AppSettings
     // Snipping toolbar shortcuts
     public string ShortcutModeScreenshot { get; set; } = "D1";
     public string ShortcutModeVideo { get; set; } = "D2";
-    public string ShortcutModeOcr { get; set; } = "D3";
+    public string ShortcutModeScroll { get; set; } = "D3";
+    public string ShortcutModeOcr { get; set; } = "D4";
     public string ShortcutToolbarRegion { get; set; } = "R";
     public string ShortcutToolbarWindow { get; set; } = "W";
     public string ShortcutToolbarFullscreen { get; set; } = "F";
-    public string ShortcutModeScroll { get; set; } = "D4";
 
     // Scroll capture
     public bool ScrollAutoMode { get; set; } = true;
