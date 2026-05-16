@@ -19,7 +19,7 @@ public partial class OverlayWindow : Window
 
     // Interaction state
     private enum Interaction { None, ToolbarIdle, Selecting, Resizing, Moving, Drawing, OcrSelecting }
-    internal enum CaptureMode { Screenshot, Video, Ocr }
+    internal enum CaptureMode { Screenshot, Video, Ocr, Scroll }
     private Interaction _interaction = Interaction.None;
     private bool _hasSelection;
     private Point _selStart, _selEnd;
@@ -263,12 +263,14 @@ public partial class OverlayWindow : Window
         {
             CaptureMode.Video => BtnModeVideo,
             CaptureMode.Ocr => BtnModeOcr,
+            CaptureMode.Scroll => BtnModeScroll,
             _ => BtnModeScreenshot
         };
         var color = _captureMode switch
         {
             CaptureMode.Video => Color.FromRgb(0xF4, 0x43, 0x36),
             CaptureMode.Ocr => Color.FromRgb(0x26, 0xC6, 0xDA),
+            CaptureMode.Scroll => Color.FromRgb(0xFF, 0xA7, 0x26),
             _ => Color.FromRgb(0x21, 0x96, 0xF3)
         };
         ModeIndicator.Background = new SolidColorBrush(color);
@@ -305,6 +307,17 @@ public partial class OverlayWindow : Window
 
         // OCR icon colors stay distinct but label color changes
         LblOcr.Foreground = ocrBrush;
+
+        var scrollBrush = new SolidColorBrush(_captureMode == CaptureMode.Scroll ? Color.FromRgb(0xFF, 0xA7, 0x26) : Color.FromRgb(0x88, 0x88, 0x88));
+        LblScroll.Foreground = scrollBrush;
+        // Update scroll icon colors
+        var scrollPanel = (StackPanel)BtnModeScroll.Content;
+        foreach (var child in ((Canvas)scrollPanel.Children[0]).Children)
+        {
+            if (child is System.Windows.Shapes.Rectangle r) r.Stroke = scrollBrush;
+            if (child is Line ln) ln.Stroke = scrollBrush;
+            if (child is System.Windows.Shapes.Path p) p.Stroke = scrollBrush;
+        }
     }
 
     // ============ SNIPPING TOOLBAR HANDLERS ============
@@ -327,11 +340,38 @@ public partial class OverlayWindow : Window
         OnModeChanged();
     }
 
+    private void ModeScroll_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = CaptureMode.Scroll;
+        OnModeChanged();
+    }
+
+    private void ScrollToggle_Click(object sender, RoutedEventArgs e)
+    {
+        var s = AppSettings.Instance;
+        s.ScrollAutoMode = !s.ScrollAutoMode;
+        AppSettings.Save();
+        UpdateScrollToggleUI();
+    }
+
+    private void UpdateScrollToggleUI()
+    {
+        bool auto = AppSettings.Instance.ScrollAutoMode;
+        LblScrollToggle.Text = auto ? "Auto" : "Manual";
+        LblScrollToggle.Foreground = new SolidColorBrush(auto
+            ? Color.FromRgb(0xFF, 0xA7, 0x26)
+            : Color.FromRgb(0x26, 0xC6, 0xDA));
+    }
+
     private void OnModeChanged()
     {
-
         DelayPopupCanvas.Visibility = Visibility.Collapsed;
         UpdateModeIndicator();
+
+        // Show scroll toggle only in scroll mode
+        BtnScrollToggle.Visibility = _captureMode == CaptureMode.Scroll
+            ? Visibility.Visible : Visibility.Collapsed;
+        if (_captureMode == CaptureMode.Scroll) UpdateScrollToggleUI();
 
         Cursor = Cursors.Cross;
     }
@@ -453,6 +493,148 @@ public partial class OverlayWindow : Window
         afterDelay();
     }
 
+    private async void LaunchScrollCapture(Point clickPos)
+    {
+        // Get the window under the cursor (screen coordinates)
+        var dpi = GetDpiScale();
+        int screenX = (int)((clickPos.X + Left) * dpi);
+        int screenY = (int)((clickPos.Y + Top) * dpi);
+        var pt = new NativeMethods.POINT { X = screenX, Y = screenY };
+        IntPtr hwnd = NativeMethods.WindowFromPoint(pt);
+        if (hwnd == IntPtr.Zero) return;
+        hwnd = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOTOWNER);
+        if (hwnd == IntPtr.Zero) return;
+
+        Hide();
+
+        bool autoMode = AppSettings.Instance.ScrollAutoMode;
+        var scrollCapture = new ScrollCapture(hwnd);
+
+        if (autoMode)
+        {
+            var cts = new CancellationTokenSource();
+
+            // Show progress window with Cancel/Esc support
+            var progressWindow = new Window
+            {
+                Title = "Llamashot - Scroll Capture",
+                Width = 320, SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Topmost = true, ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1E)),
+                WindowStyle = WindowStyle.ToolWindow
+            };
+            var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(20) };
+            var txt = new TextBlock
+            {
+                Text = "Auto scrolling... Frames: 0",
+                Foreground = Brushes.White, FontSize = 13, TextWrapping = TextWrapping.Wrap,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+            };
+            var cancelBtn = new Button
+            {
+                Content = "Stop (Esc)", Width = 100, Height = 28,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 8, 0, 0),
+                Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50)),
+                Cursor = Cursors.Hand
+            };
+            cancelBtn.Click += (s, ev) => { cts.Cancel(); progressWindow.Close(); };
+            panel.Children.Add(txt);
+            panel.Children.Add(cancelBtn);
+            progressWindow.Content = panel;
+            progressWindow.PreviewKeyDown += (s, ev) =>
+            {
+                if (ev.Key == Key.Escape) { cts.Cancel(); progressWindow.Close(); }
+            };
+
+            scrollCapture.FrameCaptured += count =>
+                Dispatcher.Invoke(() => { if (!cts.IsCancellationRequested) txt.Text = $"Auto scrolling... Frames: {count}"; });
+
+            progressWindow.Show();
+            // Exclude from capture immediately (handle exists after Show)
+            var pwh = new System.Windows.Interop.WindowInteropHelper(progressWindow).Handle;
+            NativeMethods.SetWindowDisplayAffinity(pwh, NativeMethods.WDA_EXCLUDEFROMCAPTURE);
+
+            BitmapSource? result = null;
+            try { result = await scrollCapture.AutoCaptureAsync(null, cts.Token); }
+            catch (OperationCanceledException) { /* user cancelled */ }
+
+            if (progressWindow.IsVisible) progressWindow.Close();
+
+            if (result != null)
+            {
+                var preview = new ScrollPreviewWindow(result);
+                preview.Show();
+            }
+        }
+        else
+        {
+            // Manual scroll capture
+            NativeMethods.SetForegroundWindow(hwnd);
+
+            scrollCapture.StartManualCapture();
+
+            // Show a small instruction window
+            var doneWindow = new Window
+            {
+                Title = "Llamashot - Scroll Capture",
+                Width = 320, Height = 120,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Topmost = true,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new System.Windows.Media.SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1E)),
+                WindowStyle = WindowStyle.ToolWindow,
+                SizeToContent = SizeToContent.Height
+            };
+            var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(20) };
+            var txt = new TextBlock
+            {
+                Text = $"Scroll the window now... Frames: {scrollCapture.FrameCount}",
+                Foreground = Brushes.White, FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+            };
+            scrollCapture.FrameCaptured += count =>
+                Dispatcher.Invoke(() => txt.Text = $"Scroll the window... Frames: {count}");
+
+            var doneBtn = new Button
+            {
+                Content = "Done", Width = 80, Height = 28,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 8, 0, 0),
+                Background = new System.Windows.Media.SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5)),
+                Foreground = Brushes.White, Cursor = Cursors.Hand
+            };
+            doneBtn.Click += (s, ev) => doneWindow.DialogResult = true;
+            panel.Children.Add(txt);
+            panel.Children.Add(doneBtn);
+            doneWindow.Content = panel;
+            doneWindow.PreviewKeyDown += (s, ev) =>
+            {
+                if (ev.Key == Key.Enter || ev.Key == Key.Escape)
+                    doneWindow.DialogResult = true;
+            };
+
+            doneWindow.Show();
+            // Exclude from capture immediately
+            var dwh = new System.Windows.Interop.WindowInteropHelper(doneWindow).Handle;
+            NativeMethods.SetWindowDisplayAffinity(dwh, NativeMethods.WDA_EXCLUDEFROMCAPTURE);
+            doneWindow.Hide();
+            doneWindow.ShowDialog();
+
+            var result = scrollCapture.FinishManualCapture();
+            if (result != null)
+            {
+                var preview = new ScrollPreviewWindow(result);
+                preview.Show();
+            }
+        }
+
+        Close();
+    }
+
     private async void PerformDirectOcr(Rect dipRegion)
     {
         if (_screenshot == null) return;
@@ -526,9 +708,17 @@ public partial class OverlayWindow : Window
 
         DelayPopupCanvas.Visibility = Visibility.Collapsed;
 
-        // ToolbarIdle: clicking on dimmed area starts region selection
+        // ToolbarIdle: clicking on dimmed area starts region selection (or window select for scroll mode)
         if (_interaction == Interaction.ToolbarIdle)
         {
+                // Scroll mode: click to select window, then launch scroll capture
+                if (_captureMode == CaptureMode.Scroll)
+                {
+                    LaunchScrollCapture(pos);
+                    e.Handled = true;
+                    return;
+                }
+
                 if (_delaySeconds > 0)
                 {
                     ExecuteWithDelay(() =>
@@ -1672,6 +1862,7 @@ public partial class OverlayWindow : Window
             if (ShortcutHelper.Matches(e, st.ShortcutModeScreenshot)) { ModeScreenshot_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (ShortcutHelper.Matches(e, st.ShortcutModeVideo)) { ModeVideo_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (ShortcutHelper.Matches(e, st.ShortcutModeOcr)) { ModeOcr_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (ShortcutHelper.Matches(e, st.ShortcutModeScroll)) { ModeScroll_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             return;
         }
 

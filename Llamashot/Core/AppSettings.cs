@@ -56,6 +56,10 @@ public class AppSettings
     public string ShortcutToolbarRegion { get; set; } = "R";
     public string ShortcutToolbarWindow { get; set; } = "W";
     public string ShortcutToolbarFullscreen { get; set; } = "F";
+    public string ShortcutModeScroll { get; set; } = "D4";
+
+    // Scroll capture
+    public bool ScrollAutoMode { get; set; } = true;
 
     // Save settings
     public string DefaultSaveFormat { get; set; } = "PNG";

@@ -60,6 +60,7 @@ public partial class SettingsWindow : Window
         ("ShortcutToolbarRegion", "Region capture", "R"),
         ("ShortcutToolbarWindow", "Window capture", "W"),
         ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
+        ("ShortcutModeScroll", "Scroll capture", "D4"),
     };
 
     private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();
