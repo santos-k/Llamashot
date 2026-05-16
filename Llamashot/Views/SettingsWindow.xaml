@@ -110,6 +110,19 @@
                                     Click="ResetHotkey_Click" Tag="FullscreenClipHotkey" FontSize="11"
                                     Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
                         </Grid>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="History" Style="{StaticResource Label}" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtHistoryHotkey" Grid.Column="1" Style="{StaticResource HotkeyBox}"
+                                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" />
+                            <Button Grid.Column="2" Content="Reset" Width="50" Height="26" Margin="6,0,0,0"
+                                    Click="ResetHotkey_Click" Tag="HistoryHotkey" FontSize="11"
+                                    Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                        </Grid>
                         <!-- Duplicate warning -->
                         <TextBlock x:Name="TxtHotkeyWarning" Foreground="#EF5350" FontSize="11"
                                    Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
@@ -121,6 +134,20 @@
                 <TextBlock Text="Click a field, then press your desired key or combination" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel x:Name="ToolShortcutsPanel" />
+                </Border>
+
+                <!-- Recording Shortcuts -->
+                <TextBlock Text="Recording Shortcuts" Style="{StaticResource SectionTitle}" />
+                <TextBlock Text="Active during screen recording" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel x:Name="RecordingShortcutsPanel" />
+                </Border>
+
+                <!-- Toolbar Shortcuts -->
+                <TextBlock Text="Toolbar Shortcuts" Style="{StaticResource SectionTitle}" />
+                <TextBlock Text="Active on the snipping toolbar before region selection" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel x:Name="ToolbarShortcutsPanel" />
                 </Border>
 
                 <!-- Save Settings -->

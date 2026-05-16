@@ -10,12 +10,28 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### Snipping Toolbar
 - **Windows Snipping Tool-style toolbar** - Press PrintScreen to open a top-center toolbar over dimmed screen
-- **Three capture modes** - Screenshot (default), Video, OCR with labeled icon buttons
+- **Four capture modes** - Screenshot (default), Video, OCR, Scroll with labeled icon buttons
 - **Three capture types** - Region (draw to select), Window (hover + click), Fullscreen (instant)
 - **Window capture** - Hover over any window to highlight with blue border, click to capture
 - **Delay timer** - Dropdown: No delay, 1s, 3s, 5s, 10s countdown before capture
 - **Toolbar keyboard shortcuts** - 1/2/3 for modes, R/W/F for capture types
 - **Seamless default** - Drawing a region immediately works like before, toolbar auto-hides
+
+- **Cursor tooltip** - Context-aware message follows cursor (e.g. "Drag to select capture area", "Click on a window to capture scroll")
+
+### Scrolling Screenshot
+- **Auto scroll mode** - Click a window, app scrolls via Page Down and captures frames automatically
+- **Manual scroll mode** - Scroll the window yourself, app captures on each scroll event
+- **Auto/Manual toggle** - Persisted toggle on toolbar, remembers preference across sessions
+- **Scroll Down button** - Manual mode includes button to trigger scroll + capture without mouse wheel
+- **Pixel-row stitching** - Intelligent overlap detection with hash-based row matching
+- **Fixed element detection** - Automatically detects and removes duplicate headers/footers
+- **Full annotation toolkit** - All 11 tools available in scroll preview (same as screenshot)
+- **Handle-based crop** - 8 handles (4 corners + 4 edge midpoints) for precise cropping
+- **Stop & Cancel** - Stop keeps stitched result, Cancel discards everything
+- **Progress excluded from capture** - Popup windows hidden from screenshots via SetWindowDisplayAffinity
+- **No content interaction** - Auto scroll uses keyboard-only (no clicks that open links/emails)
+- **Escape to stop** - Press Esc during auto scroll to stop and stitch what's captured so far
 
 ### Screenshot Capture
 - **Region capture** - Press PrintScreen, drag to select any area
@@ -99,11 +115,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Colorful tool icons** - Each tool has a distinct colored icon with matching active highlight
 - **Tool toggle** - Click or press shortcut again to deselect any tool
 - **Seamless auto-update** - Check for updates from About, downloads and installs silently in the background
-- **22 configurable shortcuts** - Every tool and action has a keyboard shortcut
+- **27+ configurable shortcuts** - Every tool and action has a keyboard shortcut
 
 ## Keyboard Shortcuts
 
-All 22 shortcuts are customizable in Settings.
+All shortcuts are customizable in Settings.
 
 ### Global Hotkeys
 
@@ -112,14 +128,16 @@ All 22 shortcuts are customizable in Settings.
 | Capture region | PrintScreen |
 | Fullscreen save | Shift+PrintScreen |
 | Fullscreen copy | Ctrl+PrintScreen |
+| History | Alt+PrintScreen |
 
 ### Snipping Toolbar Shortcuts (before region selection)
 
 | Action | Default |
 |--------|---------|
 | Screenshot mode | 1 |
-| Video mode | 2 |
-| OCR mode | 3 |
+| Recording mode | 2 |
+| Long Shot mode | 3 |
+| OCR mode | 4 |
 | Region capture | R |
 | Window capture | W |
 | Fullscreen capture | F |

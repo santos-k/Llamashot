@@ -66,6 +66,8 @@ public static class ShortcutHelper
             "DOWN" => Key.Down,
             "LEFT" => Key.Left,
             "RIGHT" => Key.Right,
+            "D0" => Key.D0, "D1" => Key.D1, "D2" => Key.D2, "D3" => Key.D3, "D4" => Key.D4,
+            "D5" => Key.D5, "D6" => Key.D6, "D7" => Key.D7, "D8" => Key.D8, "D9" => Key.D9,
             _ => Enum.TryParse<Key>(keyName, true, out var k) ? k : Key.None
         };
     }
@@ -97,6 +99,21 @@ public static class ShortcutHelper
         return (mods, vk);
     }
 
+    /// <summary>
+    /// Check if a virtual key code (from low-level keyboard hook) matches a shortcut string.
+    /// Only matches shortcuts with no modifiers (single key) since the hook doesn't track modifiers.
+    /// </summary>
+    public static bool MatchesVk(uint vkCode, string shortcut)
+    {
+        if (string.IsNullOrWhiteSpace(shortcut)) return false;
+
+        var parts = shortcut.Split('+');
+        // If shortcut has modifiers, we can't match from low-level hook vkCode alone
+        if (parts.Length > 1) return false;
+
+        return MapToVirtualKey(parts[0].Trim()) == vkCode;
+    }
+
     private static uint MapToVirtualKey(string keyName)
     {
         return keyName.ToUpperInvariant() switch
@@ -111,6 +128,8 @@ public static class ShortcutHelper
             "DELETE" or "DEL" => 0x2E, "INSERT" or "INS" => 0x2D,
             "HOME" => 0x24, "END" => 0x23,
             "PAGEUP" => 0x21, "PAGEDOWN" => 0x22,
+            "D0" => 0x30, "D1" => 0x31, "D2" => 0x32, "D3" => 0x33, "D4" => 0x34,
+            "D5" => 0x35, "D6" => 0x36, "D7" => 0x37, "D8" => 0x38, "D9" => 0x39,
             _ => keyName.Length == 1 ? (uint)char.ToUpper(keyName[0]) : 0
         };
     }

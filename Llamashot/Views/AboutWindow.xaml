@@ -22,7 +22,7 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 5.0.0" Foreground="#666"
+                <TextBlock Text="Version 6.0.0" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -54,6 +54,7 @@
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Annotation: pen, line, arrow, rectangle, ellipse, text, marker, blur" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Check and cross stamps for review" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screen recording to MP4 (max 2 min)" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Scrolling screenshot (auto/manual) with stitching" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; OCR text extraction from screenshots" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screenshot history with thumbnails" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin screenshot on top, copy, save" />
@@ -70,7 +71,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition /><RowDefinition /><RowDefinition />
+                            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Foreground="#AAA" FontSize="12" Text="Capture region" />
                         <TextBlock Grid.Row="0" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="PrintScreen" />
@@ -78,6 +79,8 @@
                         <TextBlock Grid.Row="1" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="Shift+PrintScreen" Margin="0,4,0,0" />
                         <TextBlock Grid.Row="2" Foreground="#AAA" FontSize="12" Text="Fullscreen copy" Margin="0,4,0,0" />
                         <TextBlock Grid.Row="2" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="Ctrl+PrintScreen" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="3" Foreground="#AAA" FontSize="12" Text="History" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="Alt+PrintScreen" Margin="0,4,0,0" />
                     </Grid>
                 </Border>
 

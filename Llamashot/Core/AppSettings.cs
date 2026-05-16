@@ -15,6 +15,7 @@ public class AppSettings
     public string CaptureHotkey { get; set; } = "PrintScreen";
     public string FullscreenSaveHotkey { get; set; } = "Shift+PrintScreen";
     public string FullscreenClipboardHotkey { get; set; } = "Ctrl+PrintScreen";
+    public string HistoryHotkey { get; set; } = "Alt+PrintScreen";
 
     // Tool shortcuts (active during overlay)
     public string ShortcutSave { get; set; } = "Ctrl+S";
@@ -40,6 +41,25 @@ public class AppSettings
     public string ShortcutRecord { get; set; } = "Ctrl+R";
     public string ShortcutOcr { get; set; } = "O";
     public string ShortcutPin { get; set; } = "F";
+
+    // Recording-only shortcuts
+    public string ShortcutRecMic { get; set; } = "M";
+    public string ShortcutRecSystemAudio { get; set; } = "S";
+    public string ShortcutRecPause { get; set; } = "Space";
+    public string ShortcutRecStop { get; set; } = "Q";
+    public string ShortcutRecClearAll { get; set; } = "C";
+
+    // Snipping toolbar shortcuts
+    public string ShortcutModeScreenshot { get; set; } = "D1";
+    public string ShortcutModeVideo { get; set; } = "D2";
+    public string ShortcutModeScroll { get; set; } = "D3";
+    public string ShortcutModeOcr { get; set; } = "D4";
+    public string ShortcutToolbarRegion { get; set; } = "R";
+    public string ShortcutToolbarWindow { get; set; } = "W";
+    public string ShortcutToolbarFullscreen { get; set; } = "F";
+
+    // Scroll capture
+    public bool ScrollAutoMode { get; set; } = true;
 
     // Save settings
     public string DefaultSaveFormat { get; set; } = "PNG";
