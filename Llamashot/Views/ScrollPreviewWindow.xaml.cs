@@ -46,6 +46,7 @@ public partial class ScrollPreviewWindow : Window
         { "Blur", Color.FromRgb(0x78, 0x90, 0x9C) },
         { "Check", Color.FromRgb(0x4C, 0xAF, 0x50) },
         { "CrossMark", Color.FromRgb(0xF4, 0x43, 0x36) },
+        { "Emoji", Color.FromRgb(0xFF, 0xC1, 0x07) },
         { "Eraser", Color.FromRgb(0xEF, 0x53, 0x50) },
     };
 
@@ -127,6 +128,7 @@ public partial class ScrollPreviewWindow : Window
             "Blur" => new BlurTool { ScreenshotSource = _image },
             "Check" => new StampTool(StampType.Check),
             "CrossMark" => new StampTool(StampType.Cross),
+            "Emoji" => new EmojiTool(),
             "Eraser" => new EraserTool(),
             _ => null
         };
@@ -644,6 +646,7 @@ public partial class ScrollPreviewWindow : Window
         else if (ShortcutHelper.Matches(e, s.ShortcutBlur)) { SelectToolByTag("Blur"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCheck)) { SelectToolByTag("Check"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCross)) { SelectToolByTag("CrossMark"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutEmoji)) { SelectToolByTag("Emoji"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutObjectEraser)) { SelectToolByTag("Eraser"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser)) { Undo_Click(this, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutColor)) { Color_Click(BtnColor, new RoutedEventArgs()); e.Handled = true; }

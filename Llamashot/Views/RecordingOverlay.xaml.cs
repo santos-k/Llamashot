@@ -349,6 +349,7 @@ public partial class RecordingOverlay : Window
             case "Marker":
             case "Check":
             case "CrossMark":
+            case "Emoji":
             case "Eraser":
                 SelectAnnotationTool(action); break;
             case "Undo": _annotationOverlay?.Undo(); break;
@@ -415,6 +416,7 @@ public partial class RecordingOverlay : Window
             "Marker" => new MarkerTool(),
             "Check" => new StampTool(StampType.Check),
             "CrossMark" => new StampTool(StampType.Cross),
+            "Emoji" => new EmojiTool(),
             _ => new PenTool()
         };
         tool.StrokeColor = _recColor;

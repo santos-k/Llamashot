@@ -36,6 +36,7 @@ public static class CursorHelper
                 "Blur" => BuildCursor(DrawBlurTool, 16, 16),
                 "Check" => BuildCursor(DrawCheckStamp, 16, 16),
                 "CrossMark" => BuildCursor(DrawCrossStamp, 16, 16),
+                "Emoji" => BuildCursor(DrawEmojiCursor, 16, 16),
                 "Eraser" => BuildCursor(DrawEraserTool, 16, 28),
                 _ => Cursors.Cross
             };
@@ -297,5 +298,30 @@ public static class CursorHelper
         var crossPen = new Pen(red, 3) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
         dc.DrawLine(crossPen, new Point(10, 10), new Point(22, 22));
         dc.DrawLine(crossPen, new Point(22, 10), new Point(10, 22));
+    }
+
+    private static void DrawEmojiCursor(DrawingContext dc)
+    {
+        DrawCrosshair(dc);
+        // Small smiley indicator bottom-right
+        var amber = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
+        dc.DrawEllipse(amber, new Pen(Brushes.Black, 0.8), new Point(26, 26), 5, 5);
+        // Eyes
+        dc.DrawEllipse(Brushes.Black, null, new Point(24.2, 24.8), 0.7, 0.7);
+        dc.DrawEllipse(Brushes.Black, null, new Point(27.8, 24.8), 0.7, 0.7);
+        // Smile
+        dc.DrawArc(new Pen(Brushes.Black, 0.8),
+            new Point(24, 27), new Point(28, 27), new Size(3, 2), 0, false, SweepDirection.Clockwise);
+    }
+
+    private static void DrawArc(this DrawingContext dc, Pen pen, Point start, Point end, Size size, double rotation, bool isLargeArc, SweepDirection direction)
+    {
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(start, false, false);
+            ctx.ArcTo(end, size, rotation, isLargeArc, direction, true, false);
+        }
+        dc.DrawGeometry(null, pen, geo);
     }
 }

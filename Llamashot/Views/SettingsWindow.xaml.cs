@@ -35,6 +35,7 @@ public partial class SettingsWindow : Window
         ("ShortcutMove", "Move", "V"),
         ("ShortcutCheck", "Check mark", "K"),
         ("ShortcutCross", "Cross mark", "D"),
+        ("ShortcutEmoji", "Emoji", "J"),
         ("ShortcutColor", "Color", "C"),
         ("ShortcutThickness", "Thickness", "W"),
         ("ShortcutHistory", "History", "H"),

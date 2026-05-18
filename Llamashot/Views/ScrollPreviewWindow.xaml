@@ -105,6 +105,10 @@
                         <Line X1="10" Y1="4" X2="4" Y2="10" Stroke="#F44336" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                     </Canvas>
                 </Button>
+                <Button x:Name="BtnEmoji" Click="Tool_Click" Tag="Emoji" Style="{StaticResource TBtn}" ToolTip="Emoji (J)">
+                    <TextBlock Text="😀" FontSize="12" FontFamily="Segoe UI Emoji"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
                 <Button x:Name="BtnEraser" Click="Tool_Click" Tag="Eraser" Style="{StaticResource TBtn}" ToolTip="Eraser">
                     <Canvas Width="14" Height="14">
                         <Path Fill="#B0BEC5" Data="M12,3 L7,8 L4.5,11 L2,11 L2,8 L5,5 L10,0 Z" />

@@ -51,6 +51,7 @@ public partial class OverlayWindow : Window
     private readonly Stack<DrawingAction> _redoStack = new();
     private Color _currentColor = Colors.Yellow;
     private double _currentThickness = 2;
+    private string _selectedEmoji = "👍";
 
     // Snipping toolbar state
     private CaptureMode _captureMode = CaptureMode.Screenshot;
@@ -68,6 +69,7 @@ public partial class OverlayWindow : Window
         { "Blur", Color.FromRgb(0x78, 0x90, 0x9C) },      // gray
         { "Check", Color.FromRgb(0x4C, 0xAF, 0x50) },     // green
         { "CrossMark", Color.FromRgb(0xF4, 0x43, 0x36) }, // red
+        { "Emoji", Color.FromRgb(0xFF, 0xC1, 0x07) },     // amber
         { "Eraser", Color.FromRgb(0xEF, 0x53, 0x50) },    // pink
     };
 
@@ -80,11 +82,107 @@ public partial class OverlayWindow : Window
         Colors.Black, Colors.Brown, Colors.SaddleBrown, Colors.Maroon
     };
 
+    private static readonly (string Icon, string Label)[] EmojiCats = {
+        ("⭐","All"), ("😀","Smileys"), ("👍","Gestures"), ("❤️","Hearts"),
+        ("✨","Symbols"), ("🎉","Celebrate"), ("💬","Objects"), ("🐱","Animals"),
+        ("🍕","Food"), ("🌸","Nature"), ("🚗","Travel")
+    };
+
+    private static readonly (string E, string N, int C)[] AllEmojis = {
+        // 0 Smileys
+        ("😀","grinning",0),("😃","smiley",0),("😄","smile",0),("😁","grin",0),
+        ("😂","joy tears",0),("🤣","rofl",0),("😊","blush",0),("😇","angel",0),
+        ("🙂","slight smile",0),("😉","wink",0),("😍","heart eyes",0),("🥰","love face",0),
+        ("😘","kiss",0),("😋","yummy",0),("😎","cool sunglasses",0),("🤔","thinking",0),
+        ("🤗","hug",0),("🤫","shush quiet",0),("🤭","oops giggle",0),("😏","smirk",0),
+        ("😐","neutral",0),("🙄","eye roll",0),("😮","surprised",0),("😱","scream",0),
+        ("😨","fearful",0),("😢","cry",0),("😭","sob crying",0),("😤","angry huff",0),
+        ("😡","angry red",0),("🥺","pleading",0),("😈","devil",0),("💀","skull dead",0),
+        ("👻","ghost",0),("🤡","clown",0),("💩","poop",0),("🤖","robot",0),("👽","alien",0),
+        // 1 Gestures
+        ("👍","thumbs up like good",1),("👎","thumbs down dislike bad",1),("👏","clap applause",1),
+        ("🙌","raised hands hooray",1),("🤝","handshake deal",1),("👊","fist bump",1),
+        ("✊","fist power",1),("🤞","crossed fingers luck",1),("🤟","love you gesture",1),
+        ("🤘","rock on",1),("👌","ok okay",1),("🤌","pinch italian",1),
+        ("👈","point left",1),("👉","point right",1),("👆","point up",1),("👇","point down",1),
+        ("☝️","index up",1),("👋","wave hello bye",1),("✋","high five stop",1),
+        ("💪","muscle strong flex",1),("🙏","pray please thanks",1),("✌️","peace victory",1),
+        // 2 Hearts
+        ("❤️","red heart love",2),("🧡","orange heart",2),("💛","yellow heart",2),
+        ("💚","green heart",2),("💙","blue heart",2),("💜","purple heart",2),
+        ("🖤","black heart",2),("🤍","white heart",2),("🤎","brown heart",2),
+        ("💔","broken heart",2),("💕","two hearts",2),("💞","revolving hearts",2),
+        ("💓","beating heart",2),("💗","growing heart",2),("💖","sparkling heart",2),
+        ("💘","cupid arrow heart",2),("💝","heart ribbon gift",2),
+        // 3 Symbols
+        ("⭐","star",3),("🌟","glowing star",3),("✨","sparkles magic",3),
+        ("⚡","lightning bolt zap",3),("🔥","fire hot",3),("💥","boom explosion",3),
+        ("💯","hundred perfect score",3),("✅","check mark done yes",3),("❌","cross wrong no",3),
+        ("⚠️","warning caution",3),("🚫","prohibited no",3),("⛔","stop no entry",3),
+        ("❓","question",3),("❗","exclamation important",3),("💡","lightbulb idea",3),
+        ("🔔","bell notification",3),("📌","pin",3),("🔗","link chain url",3),
+        ("🔴","red circle",3),("🟢","green circle",3),("🔵","blue circle",3),("🟡","yellow circle",3),
+        ("➕","plus add",3),("➖","minus",3),("➡️","right arrow",3),
+        ("⬆️","up arrow",3),("⬇️","down arrow",3),("⬅️","left arrow",3),
+        // 4 Celebrations
+        ("🎉","party tada celebrate",4),("🎊","confetti ball",4),("🎈","balloon",4),
+        ("🎁","gift present",4),("🎂","birthday cake",4),("🎄","christmas tree",4),
+        ("🎃","halloween pumpkin",4),("🎆","fireworks",4),
+        ("🏆","trophy winner champion",4),("🥇","gold medal first",4),("🥈","silver medal second",4),
+        ("🥉","bronze medal third",4),("🎯","target bullseye goal",4),
+        ("🎵","music note",4),("🎶","music notes",4),("🎸","guitar",4),
+        ("🎮","game controller",4),("🎲","dice random",4),("🎨","art palette paint",4),
+        // 5 Objects
+        ("💬","speech bubble chat message",5),("💭","thought bubble",5),("💰","money bag rich",5),
+        ("💎","gem diamond",5),("🔑","key",5),("🔒","lock locked secure",5),("🔓","unlock open",5),
+        ("📱","phone mobile",5),("💻","laptop computer",5),("🖥️","desktop monitor",5),
+        ("📷","camera photo",5),("📹","video camera record",5),("🔍","search magnify find",5),
+        ("📝","memo note write edit",5),("📋","clipboard",5),("📁","folder file",5),
+        ("🗑️","trash delete remove",5),("🔧","wrench tool fix",5),("🔨","hammer build",5),
+        ("⚙️","gear settings config",5),("📎","paperclip attach",5),("✏️","pencil edit",5),
+        ("📊","chart graph bar",5),("📈","chart up trending",5),("⏰","alarm clock time",5),
+        ("⏳","hourglass timer wait",5),("🔋","battery power",5),
+        // 6 Animals
+        ("🐱","cat",6),("🐶","dog",6),("🐭","mouse",6),("🐹","hamster",6),
+        ("🐰","rabbit bunny",6),("🦊","fox",6),("🐻","bear",6),("🐼","panda",6),
+        ("🐨","koala",6),("🐯","tiger",6),("🦁","lion",6),("🐮","cow",6),
+        ("🐷","pig",6),("🐸","frog",6),("🐵","monkey",6),("🐔","chicken",6),
+        ("🐧","penguin",6),("🐦","bird",6),("🦅","eagle",6),("🦉","owl",6),
+        ("🐝","bee",6),("🦋","butterfly",6),("🐞","ladybug",6),("🐙","octopus",6),
+        ("🦈","shark",6),("🦄","unicorn",6),("🐉","dragon",6),
+        // 7 Food
+        ("🍕","pizza",7),("🍔","burger hamburger",7),("🍟","fries",7),("🌭","hot dog",7),
+        ("🍿","popcorn",7),("🧁","cupcake",7),("🍩","donut",7),("🍪","cookie",7),
+        ("🍰","cake",7),("🍫","chocolate",7),("🍬","candy",7),("🍭","lollipop",7),
+        ("🍎","apple",7),("🍊","orange",7),("🍋","lemon",7),("🍌","banana",7),
+        ("🍉","watermelon",7),("🍇","grapes",7),("🍓","strawberry",7),("🍑","peach",7),
+        ("🥑","avocado",7),("🌶️","chili pepper hot",7),("☕","coffee",7),("🍵","tea",7),
+        ("🍺","beer",7),("🍷","wine",7),
+        // 8 Nature
+        ("🌸","cherry blossom flower",8),("🌹","rose",8),("🌻","sunflower",8),
+        ("🌺","hibiscus",8),("🌷","tulip",8),("🌼","daisy flower",8),
+        ("🍀","four leaf clover luck",8),("🍁","maple leaf fall",8),("🍂","fallen leaf autumn",8),
+        ("🌊","wave ocean sea",8),("🌈","rainbow",8),("☀️","sun sunny",8),
+        ("🌙","moon crescent night",8),("☁️","cloud",8),("🌧️","rain",8),
+        ("❄️","snow snowflake cold",8),("🌪️","tornado",8),
+        ("🌍","earth globe world",8),("⛰️","mountain",8),("🌋","volcano",8),
+        ("🏖️","beach",8),("🌅","sunrise",8),
+        // 9 Travel
+        ("🚗","car",9),("🚕","taxi cab",9),("🚌","bus",9),("🏎️","race car",9),
+        ("🚑","ambulance",9),("🚒","fire truck",9),("🚲","bicycle bike",9),
+        ("✈️","airplane plane fly",9),("🚀","rocket launch space",9),("🛸","ufo",9),
+        ("🚁","helicopter",9),("⛵","sailboat",9),("🚢","ship boat",9),
+        ("🏠","house home",9),("🏢","office building",9),("🏰","castle",9),
+        ("🗼","tower",9),("🗽","statue liberty",9),
+    };
+    private int _emojiCatIdx = -1; // -1 = All
+
     public OverlayWindow()
     {
         InitializeComponent();
         InitializeColorPalette();
         InitializeThicknessPopup();
+        InitializeEmojiPicker();
         _currentThickness = 3;
         ThicknessLabel.Text = "3";
         InitializeDelayPopup();
@@ -126,7 +224,7 @@ public partial class OverlayWindow : Window
         VideoToolbarCanvas.Visibility = Visibility.Collapsed;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
-
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         DelayPopupCanvas.Visibility = Visibility.Collapsed;
         DrawingCanvas.Children.Clear();
         _undoStack.Clear();
@@ -226,6 +324,91 @@ public partial class OverlayWindow : Window
             };
             ThicknessOptions.Children.Add(btn);
         }
+    }
+
+    private void InitializeEmojiPicker()
+    {
+        // Build category buttons
+        for (int i = 0; i < EmojiCats.Length; i++)
+        {
+            int catIdx = i == 0 ? -1 : i - 1; // "All" = -1, rest = 0..9
+            var (icon, label) = EmojiCats[i];
+            object content;
+            if (i == 0)
+                content = new TextBlock { Text = "All", Foreground = Brushes.White, FontSize = 10, FontWeight = FontWeights.Bold };
+            else
+            {
+                var img = EmojiTool.RenderEmoji(icon, 14);
+                content = img ?? (object)new TextBlock { Text = icon, FontSize = 12 };
+            }
+            var btn = new Button
+            {
+                Width = 26, Height = 24, Content = content, ToolTip = label,
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(0, 0, 1, 0)
+            };
+            int idx = catIdx;
+            btn.Click += (s, e) => { _emojiCatIdx = idx; HighlightEmojiCat(); RefreshEmojiGrid(); e.Handled = true; };
+            EmojiCategoryBar.Children.Add(btn);
+        }
+
+        // Set toolbar button to color emoji
+        var tbIcon = EmojiTool.RenderEmoji("😀", 16);
+        if (tbIcon != null) BtnEmoji.Content = tbIcon;
+
+        HighlightEmojiCat();
+        RefreshEmojiGrid();
+    }
+
+    private void HighlightEmojiCat()
+    {
+        int sel = _emojiCatIdx == -1 ? 0 : _emojiCatIdx + 1;
+        for (int i = 0; i < EmojiCategoryBar.Children.Count; i++)
+        {
+            if (EmojiCategoryBar.Children[i] is Button b)
+                b.Background = i == sel
+                    ? new SolidColorBrush(Color.FromArgb(80, 0xFF, 0xC1, 0x07))
+                    : Brushes.Transparent;
+        }
+    }
+
+    private void RefreshEmojiGrid()
+    {
+        EmojiGrid.Children.Clear();
+        var search = EmojiSearchBox?.Text?.Trim() ?? "";
+        foreach (var (em, name, cat) in AllEmojis)
+        {
+            if (_emojiCatIdx >= 0 && cat != _emojiCatIdx && string.IsNullOrEmpty(search)) continue;
+            if (!string.IsNullOrEmpty(search) && !name.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34, ToolTip = name,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                var icon = EmojiTool.RenderEmoji(emoji, 16);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_currentTool is EmojiTool et) et.Emoji = emoji;
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            };
+            EmojiGrid.Children.Add(btn);
+        }
+    }
+
+    private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (EmojiSearchPlaceholder != null)
+            EmojiSearchPlaceholder.Visibility = string.IsNullOrEmpty(EmojiSearchBox.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+        RefreshEmojiGrid();
     }
 
     private void InitializeDelayPopup()
@@ -1379,6 +1562,7 @@ public partial class OverlayWindow : Window
         if (sender is not Button btn || btn.Tag is not string toolName) return;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
 
         // Finalize any active text box before switching tools
         if (_currentTool is TextTool tt)
@@ -1423,6 +1607,67 @@ public partial class OverlayWindow : Window
         }
 
         Focus();
+    }
+
+    private void Emoji_Click(object sender, RoutedEventArgs e)
+    {
+        ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+
+        // If emoji picker is visible, just close it
+        if (EmojiPickerCanvas.Visibility == Visibility.Visible)
+        {
+            EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Finalize any active text box before switching tools
+        if (_currentTool is TextTool tt)
+            tt.FinalizeActiveTextBox();
+
+        // If emoji tool already active, just show picker to change emoji
+        if (_currentToolTag == "Emoji")
+        {
+            ShowEmojiPicker();
+            return;
+        }
+
+        // Select emoji tool
+        ClearToolHighlights();
+        var highlightColor = Color.FromArgb(80, 0xFF, 0xC1, 0x07);
+        BtnEmoji.Background = new SolidColorBrush(highlightColor);
+
+        _currentToolTag = "Emoji";
+        _currentTool = new EmojiTool(_selectedEmoji);
+        _currentTool.StrokeColor = _currentColor;
+        _currentTool.Thickness = _currentThickness;
+        DrawingCanvas.Cursor = _currentTool.Cursor;
+
+        ShowEmojiPicker();
+        Focus();
+    }
+
+    private void ShowEmojiPicker()
+    {
+        EmojiSearchBox.Text = "";
+        _emojiCatIdx = -1;
+        HighlightEmojiCat();
+        RefreshEmojiGrid();
+        EmojiPickerCanvas.Visibility = Visibility.Visible;
+
+        // Position popup, avoiding screen edge cutoff
+        var btnPos = BtnEmoji.TranslatePoint(new Point(0, 0), RootGrid);
+        double popupW = 300, popupH = 310;
+        double left = btnPos.X + 40;
+        double top = btnPos.Y;
+
+        if (left + popupW > ActualWidth)
+            left = btnPos.X - popupW - 8;
+        if (top + popupH > ActualHeight)
+            top = Math.Max(4, ActualHeight - popupH - 4);
+
+        Canvas.SetLeft(EmojiPickerPopup, left);
+        Canvas.SetTop(EmojiPickerPopup, top);
     }
 
     private void ClearToolHighlights()
@@ -1533,6 +1778,7 @@ public partial class OverlayWindow : Window
             return;
         }
 
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         _interaction = Interaction.Drawing;
         _currentTool.OnMouseDown(pos, DrawingCanvas);
         DrawingCanvas.CaptureMouse();
@@ -1609,6 +1855,7 @@ public partial class OverlayWindow : Window
     private void Color_Click(object sender, RoutedEventArgs e)
     {
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         if (ColorPaletteCanvas.Visibility == Visibility.Visible)
         {
             ColorPaletteCanvas.Visibility = Visibility.Collapsed;
@@ -1623,6 +1870,7 @@ public partial class OverlayWindow : Window
     private void Thickness_Click(object sender, RoutedEventArgs e)
     {
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         if (ThicknessPopupCanvas.Visibility == Visibility.Visible)
         {
             ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
@@ -1930,15 +2178,19 @@ public partial class OverlayWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        // Skip shortcuts only when actively typing in a text annotation on the canvas
-        if (Keyboard.FocusedElement is TextBox tb && DrawingCanvas.IsAncestorOf(tb))
+        // Skip shortcuts when typing in a text annotation or the emoji search box
+        if (Keyboard.FocusedElement is TextBox tb)
         {
-            if (e.Key == Key.Escape)
+            if (DrawingCanvas.IsAncestorOf(tb))
             {
-                Focus();
-                e.Handled = true;
+                if (e.Key == Key.Escape) { Focus(); e.Handled = true; }
+                return;
             }
-            return;
+            if (tb == EmojiSearchBox)
+            {
+                if (e.Key == Key.Escape) { EmojiPickerCanvas.Visibility = Visibility.Collapsed; Focus(); e.Handled = true; }
+                return;
+            }
         }
 
         // Snipping toolbar shortcuts (only when toolbar is visible, before selection)
@@ -2026,6 +2278,8 @@ public partial class OverlayWindow : Window
         { SelectToolByTag("Check"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCross))
         { SelectToolByTag("CrossMark"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutEmoji))
+        { Emoji_Click(BtnEmoji, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutObjectEraser))
         { SelectToolByTag("Eraser"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser))
