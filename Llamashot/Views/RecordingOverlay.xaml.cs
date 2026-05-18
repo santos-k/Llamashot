@@ -585,15 +585,12 @@ public partial class RecordingOverlay : Window
 
     private void HideEmojiPicker()
     {
-        if (EmojiPickerCanvas.Visibility != Visibility.Visible) return;
-        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
-        Top += 330;
-        Height = 50;
+        EmojiPopup.IsOpen = false;
     }
 
     private void Emoji_Click(object sender, RoutedEventArgs e)
     {
-        if (EmojiPickerCanvas.Visibility == Visibility.Visible)
+        if (EmojiPopup.IsOpen)
         {
             HideEmojiPicker();
             return;
@@ -631,13 +628,7 @@ public partial class RecordingOverlay : Window
         HighlightEmojiCat();
         RefreshRecentEmojis();
         RefreshEmojiGrid();
-
-        // Expand window upward to fit the popup
-        Height = 380;
-        Top -= 330;
-        Canvas.SetLeft(EmojiPickerPopup, 0);
-        Canvas.SetTop(EmojiPickerPopup, 0);
-        EmojiPickerCanvas.Visibility = Visibility.Visible;
+        EmojiPopup.IsOpen = true;
     }
 
     private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)

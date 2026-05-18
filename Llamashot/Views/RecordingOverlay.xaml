@@ -249,9 +249,11 @@
         </StackPanel>
     </Border>
 
-    <!-- Emoji picker popup -->
-    <Canvas x:Name="EmojiPickerCanvas" Visibility="Collapsed" Panel.ZIndex="100">
-        <Border x:Name="EmojiPickerPopup" Background="#EE222222" CornerRadius="6" Padding="6">
+    <!-- Emoji picker as a Popup (floats in its own window, no parent resize needed) -->
+    <Popup x:Name="EmojiPopup" Placement="Top" StaysOpen="True"
+           AllowsTransparency="True" PlacementTarget="{Binding ElementName=BtnEmoji}">
+        <Border Background="#EE222222" CornerRadius="6" Padding="6"
+                BorderBrush="#333" BorderThickness="1">
             <StackPanel Width="284">
                 <Grid Margin="0,0,0,4">
                     <TextBox x:Name="EmojiSearchBox"
@@ -271,7 +273,7 @@
                 </ScrollViewer>
             </StackPanel>
         </Border>
-    </Canvas>
+    </Popup>
 
     </Grid>
 </Window>
