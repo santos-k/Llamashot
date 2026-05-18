@@ -24,12 +24,15 @@ public partial class RecordingOverlay : Window
     private double _dipX, _dipY, _dipW, _dipH;
     private string? _activeAnnotationTool;
     private DateTime _lastEscTime = DateTime.MinValue;
+    private string _selectedEmoji = "👍";
+    private int _emojiCatIdx = -1;
 
     public RecordingOverlay(int pixelX, int pixelY, int pixelW, int pixelH,
                             double dipX, double dipY, double dipW, double dipH,
                             bool startImmediately = false, bool micEnabled = false, bool sysAudioEnabled = false)
     {
         InitializeComponent();
+        InitializeEmojiPicker();
 
         _dipX = dipX; _dipY = dipY; _dipW = dipW; _dipH = dipH;
         _pixelX = pixelX; _pixelY = pixelY; _pixelW = pixelW; _pixelH = pixelH;
@@ -144,6 +147,7 @@ public partial class RecordingOverlay : Window
         BtnMarker.Visibility = rec;
         BtnCheck.Visibility = rec;
         BtnCross.Visibility = rec;
+        BtnEmoji.Visibility = rec;
         BtnEraser.Visibility = rec;
         BtnUndo.Visibility = rec;
         BtnClearAnnotations.Visibility = rec;
@@ -349,9 +353,10 @@ public partial class RecordingOverlay : Window
             case "Marker":
             case "Check":
             case "CrossMark":
-            case "Emoji":
             case "Eraser":
                 SelectAnnotationTool(action); break;
+            case "Emoji":
+                Emoji_Click(BtnEmoji, new RoutedEventArgs()); break;
             case "Undo": _annotationOverlay?.Undo(); break;
             case "ClearAll": _annotationOverlay?.ClearAll(); break;
             case "Mic": _ = ToggleMic(!_micEnabled); break;
@@ -416,7 +421,6 @@ public partial class RecordingOverlay : Window
             "Marker" => new MarkerTool(),
             "Check" => new StampTool(StampType.Check),
             "CrossMark" => new StampTool(StampType.Cross),
-            "Emoji" => new EmojiTool(),
             _ => new PenTool()
         };
         tool.StrokeColor = _recColor;
@@ -445,12 +449,190 @@ public partial class RecordingOverlay : Window
             (BtnMarker, "Marker", Color.FromRgb(0xFF, 0xEE, 0x58)),
             (BtnCheck, "Check", Color.FromRgb(0x4C, 0xAF, 0x50)),
             (BtnCross, "CrossMark", Color.FromRgb(0xF4, 0x43, 0x36)),
+            (BtnEmoji, "Emoji", Color.FromRgb(0xFF, 0xC1, 0x07)),
             (BtnEraser, "Eraser", Color.FromRgb(0xEF, 0x53, 0x50)),
         };
         foreach (var (btn, tag, c) in tools)
             btn.Background = _activeAnnotationTool == tag
                 ? new SolidColorBrush(Color.FromArgb(0x50, c.R, c.G, c.B))
                 : Brushes.Transparent;
+    }
+
+    // ============ EMOJI PICKER ============
+
+    private void InitializeEmojiPicker()
+    {
+        for (int i = 0; i < EmojiTool.Categories.Length; i++)
+        {
+            int catIdx = i == 0 ? -1 : i - 1;
+            var (icon, label) = EmojiTool.Categories[i];
+            object content;
+            if (i == 0)
+                content = new TextBlock { Text = "All", Foreground = Brushes.White, FontSize = 10, FontWeight = FontWeights.Bold };
+            else
+            {
+                var img = EmojiTool.RenderEmoji(icon, 14);
+                content = img ?? (object)new TextBlock { Text = icon, FontSize = 12 };
+            }
+            var btn = new Button
+            {
+                Width = 26, Height = 24, Content = content, ToolTip = label,
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(0, 0, 1, 0)
+            };
+            int idx = catIdx;
+            btn.Click += (s, e) => { _emojiCatIdx = idx; HighlightEmojiCat(); RefreshEmojiGrid(); e.Handled = true; };
+            EmojiCategoryBar.Children.Add(btn);
+        }
+        var tbIcon = EmojiTool.RenderEmoji("😀", 14);
+        if (tbIcon != null) BtnEmoji.Content = tbIcon;
+        HighlightEmojiCat();
+        RefreshEmojiGrid();
+    }
+
+    private void HighlightEmojiCat()
+    {
+        int sel = _emojiCatIdx == -1 ? 0 : _emojiCatIdx + 1;
+        for (int i = 0; i < EmojiCategoryBar.Children.Count; i++)
+            if (EmojiCategoryBar.Children[i] is Button b)
+                b.Background = i == sel ? new SolidColorBrush(Color.FromArgb(80, 0xFF, 0xC1, 0x07)) : Brushes.Transparent;
+    }
+
+    private void RefreshEmojiGrid()
+    {
+        EmojiGrid.Children.Clear();
+        var search = EmojiSearchBox?.Text?.Trim() ?? "";
+        foreach (var (em, name, cat) in EmojiTool.AllEmojis)
+        {
+            if (_emojiCatIdx >= 0 && cat != _emojiCatIdx && string.IsNullOrEmpty(search)) continue;
+            if (!string.IsNullOrEmpty(search) && !name.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34, ToolTip = name,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                EmojiTool.AddRecent(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 14);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_annotationOverlay != null)
+                {
+                    var tool = new EmojiTool(emoji);
+                    tool.StrokeColor = _recColor;
+                    tool.Thickness = _recThickness;
+                    _annotationOverlay.SetTool(tool);
+                }
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                Activate();
+                e.Handled = true;
+            };
+            EmojiGrid.Children.Add(btn);
+        }
+    }
+
+    private void RefreshRecentEmojis()
+    {
+        EmojiRecentBar.Children.Clear();
+        if (EmojiTool.RecentEmojis.Count == 0) return;
+        EmojiRecentBar.Children.Add(new TextBlock
+        {
+            Text = "Recent", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+            FontSize = 10, Width = 280, Margin = new Thickness(2, 0, 0, 2)
+        });
+        foreach (var em in EmojiTool.RecentEmojis)
+        {
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                EmojiTool.AddRecent(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 14);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_annotationOverlay != null)
+                {
+                    var tool = new EmojiTool(emoji);
+                    tool.StrokeColor = _recColor;
+                    tool.Thickness = _recThickness;
+                    _annotationOverlay.SetTool(tool);
+                }
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                Activate();
+                e.Handled = true;
+            };
+            EmojiRecentBar.Children.Add(btn);
+        }
+        EmojiRecentBar.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Height = 1, Width = 276, Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            Margin = new Thickness(2, 2, 2, 0)
+        });
+    }
+
+    private void Emoji_Click(object sender, RoutedEventArgs e)
+    {
+        if (EmojiPickerCanvas.Visibility == Visibility.Visible)
+        {
+            EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _annotationOverlay?.FinalizeText();
+
+        if (_activeAnnotationTool == "Emoji")
+        {
+            ShowEmojiPicker();
+            return;
+        }
+
+        _activeAnnotationTool = "Emoji";
+        if (_annotationOverlay == null)
+        {
+            _annotationOverlay = new RecordingAnnotation(_dipX, _dipY, _dipW, _dipH);
+            _annotationOverlay.EscapePressed += HandleEscapePress;
+            _annotationOverlay.Show();
+        }
+        _annotationOverlay.SetEraserMode(false);
+        var newTool = new EmojiTool(_selectedEmoji);
+        newTool.StrokeColor = _recColor;
+        newTool.Thickness = _recThickness;
+        _annotationOverlay.SetTool(newTool);
+        UpdateAnnotationToolHighlights();
+        ShowEmojiPicker();
+        Activate();
+    }
+
+    private void ShowEmojiPicker()
+    {
+        EmojiSearchBox.Text = "";
+        _emojiCatIdx = -1;
+        HighlightEmojiCat();
+        RefreshRecentEmojis();
+        RefreshEmojiGrid();
+        Canvas.SetLeft(EmojiPickerPopup, 0);
+        Canvas.SetTop(EmojiPickerPopup, -320);
+        EmojiPickerCanvas.Visibility = Visibility.Visible;
+    }
+
+    private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (EmojiSearchPlaceholder != null)
+            EmojiSearchPlaceholder.Visibility = string.IsNullOrEmpty(EmojiSearchBox.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+        RefreshEmojiGrid();
     }
 
     private void SetSavingUI()
@@ -472,6 +654,7 @@ public partial class RecordingOverlay : Window
         BtnMarker.Visibility = Visibility.Collapsed;
         BtnCheck.Visibility = Visibility.Collapsed;
         BtnCross.Visibility = Visibility.Collapsed;
+        BtnEmoji.Visibility = Visibility.Collapsed;
         BtnEraser.Visibility = Visibility.Collapsed;
         BtnUndo.Visibility = Visibility.Collapsed;
         BtnClearAnnotations.Visibility = Visibility.Collapsed;

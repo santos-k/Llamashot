@@ -40,6 +40,7 @@
             </Setter>
         </Style>
     </Window.Resources>
+    <Grid>
     <Border Background="#EE111111" CornerRadius="8" Padding="8,4"
             BorderBrush="#333" BorderThickness="1">
         <Border.Effect>
@@ -173,10 +174,7 @@
                     <Line X1="10" Y1="4" X2="4" Y2="10" Stroke="#F44336" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                 </Canvas>
             </Button>
-            <Button x:Name="BtnEmoji" Click="AnnotationTool_Click" Tag="Emoji" Style="{StaticResource RBtn}" ToolTip="Emoji (J)">
-                <TextBlock Text="😀" FontSize="12" FontFamily="Segoe UI Emoji"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Button>
+            <Button x:Name="BtnEmoji" Click="Emoji_Click" Tag="Emoji" Style="{StaticResource RBtn}" ToolTip="Emoji (J)" />
             <Button x:Name="BtnEraser" Click="AnnotationTool_Click" Tag="Eraser" Style="{StaticResource RBtn}" ToolTip="Eraser (G)">
                 <Canvas Width="14" Height="14">
                     <Path Fill="#B0BEC5" Data="M12,3 L7,8 L4.5,11 L2,11 L2,8 L5,5 L10,0 Z" />
@@ -250,4 +248,30 @@
             </StackPanel>
         </StackPanel>
     </Border>
+
+    <!-- Emoji picker popup -->
+    <Canvas x:Name="EmojiPickerCanvas" Visibility="Collapsed" Panel.ZIndex="100">
+        <Border x:Name="EmojiPickerPopup" Background="#EE222222" CornerRadius="6" Padding="6">
+            <StackPanel Width="284">
+                <Grid Margin="0,0,0,4">
+                    <TextBox x:Name="EmojiSearchBox"
+                             Background="#222" Foreground="White" CaretBrush="White"
+                             BorderBrush="#444" BorderThickness="1"
+                             Padding="4,3" FontSize="12"
+                             TextChanged="EmojiSearch_TextChanged" />
+                    <TextBlock x:Name="EmojiSearchPlaceholder"
+                               Text="Search emojis..." Foreground="#666" FontSize="12"
+                               Margin="6,5,0,0" IsHitTestVisible="False" />
+                </Grid>
+                <WrapPanel x:Name="EmojiRecentBar" Width="280" Margin="0,0,0,2" />
+                <WrapPanel x:Name="EmojiCategoryBar" Margin="0,0,0,4" />
+                <ScrollViewer Height="220" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <WrapPanel x:Name="EmojiGrid" Width="280" />
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+    </Canvas>
+
+    </Grid>
 </Window>

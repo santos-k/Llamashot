@@ -22,6 +22,8 @@ public partial class ScrollPreviewWindow : Window
     private Color _currentColor = Colors.Yellow;
     private double _currentThickness = 3;
     private bool _isDrawing;
+    private string _selectedEmoji = "👍";
+    private int _emojiCatIdx = -1;
 
     // Crop state
     private bool _cropMode;
@@ -86,6 +88,7 @@ public partial class ScrollPreviewWindow : Window
         ThicknessLabel.Text = "3";
         InitializeColorPalette();
         InitializeThicknessPopup();
+        InitializeEmojiPicker();
 
         // Set initial crop to full image
         _cropRect = new Rect(0, 0, image.PixelWidth, image.PixelHeight);
@@ -99,6 +102,7 @@ public partial class ScrollPreviewWindow : Window
         ExitCropMode();
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
 
         if (_currentTool is TextTool tt) tt.FinalizeActiveTextBox();
 
@@ -128,7 +132,6 @@ public partial class ScrollPreviewWindow : Window
             "Blur" => new BlurTool { ScreenshotSource = _image },
             "Check" => new StampTool(StampType.Check),
             "CrossMark" => new StampTool(StampType.Cross),
-            "Emoji" => new EmojiTool(),
             "Eraser" => new EraserTool(),
             _ => null
         };
@@ -341,6 +344,7 @@ public partial class ScrollPreviewWindow : Window
     private void Color_Click(object sender, RoutedEventArgs e)
     {
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         ColorPaletteCanvas.Visibility = ColorPaletteCanvas.Visibility == Visibility.Visible
             ? Visibility.Collapsed : Visibility.Visible;
         if (ColorPaletteCanvas.Visibility == Visibility.Visible)
@@ -353,6 +357,7 @@ public partial class ScrollPreviewWindow : Window
     private void Thickness_Click(object sender, RoutedEventArgs e)
     {
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = ThicknessPopupCanvas.Visibility == Visibility.Visible
             ? Visibility.Collapsed : Visibility.Visible;
         if (ThicknessPopupCanvas.Visibility == Visibility.Visible)
@@ -360,6 +365,165 @@ public partial class ScrollPreviewWindow : Window
             Canvas.SetLeft(ThicknessPopup, 10);
             Canvas.SetTop(ThicknessPopup, 10);
         }
+    }
+
+    // ============ EMOJI PICKER ============
+
+    private void InitializeEmojiPicker()
+    {
+        for (int i = 0; i < EmojiTool.Categories.Length; i++)
+        {
+            int catIdx = i == 0 ? -1 : i - 1;
+            var (icon, label) = EmojiTool.Categories[i];
+            object content;
+            if (i == 0)
+                content = new TextBlock { Text = "All", Foreground = Brushes.White, FontSize = 10, FontWeight = FontWeights.Bold };
+            else
+            {
+                var img = EmojiTool.RenderEmoji(icon, 14);
+                content = img ?? (object)new TextBlock { Text = icon, FontSize = 12 };
+            }
+            var btn = new Button
+            {
+                Width = 26, Height = 24, Content = content, ToolTip = label,
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(0, 0, 1, 0)
+            };
+            int idx = catIdx;
+            btn.Click += (s, e) => { _emojiCatIdx = idx; HighlightEmojiCat(); RefreshEmojiGrid(); e.Handled = true; };
+            EmojiCategoryBar.Children.Add(btn);
+        }
+        var tbIcon = EmojiTool.RenderEmoji("😀", 16);
+        if (tbIcon != null) BtnEmoji.Content = tbIcon;
+        HighlightEmojiCat();
+        RefreshEmojiGrid();
+    }
+
+    private void HighlightEmojiCat()
+    {
+        int sel = _emojiCatIdx == -1 ? 0 : _emojiCatIdx + 1;
+        for (int i = 0; i < EmojiCategoryBar.Children.Count; i++)
+            if (EmojiCategoryBar.Children[i] is Button b)
+                b.Background = i == sel ? new SolidColorBrush(Color.FromArgb(80, 0xFF, 0xC1, 0x07)) : Brushes.Transparent;
+    }
+
+    private void RefreshEmojiGrid()
+    {
+        EmojiGrid.Children.Clear();
+        var search = EmojiSearchBox?.Text?.Trim() ?? "";
+        foreach (var (em, name, cat) in EmojiTool.AllEmojis)
+        {
+            if (_emojiCatIdx >= 0 && cat != _emojiCatIdx && string.IsNullOrEmpty(search)) continue;
+            if (!string.IsNullOrEmpty(search) && !name.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34, ToolTip = name,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                EmojiTool.AddRecent(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 16);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_currentTool is EmojiTool et) et.Emoji = emoji;
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            };
+            EmojiGrid.Children.Add(btn);
+        }
+    }
+
+    private void RefreshRecentEmojis()
+    {
+        EmojiRecentBar.Children.Clear();
+        if (EmojiTool.RecentEmojis.Count == 0) return;
+        EmojiRecentBar.Children.Add(new TextBlock
+        {
+            Text = "Recent", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+            FontSize = 10, Width = 280, Margin = new Thickness(2, 0, 0, 2)
+        });
+        foreach (var em in EmojiTool.RecentEmojis)
+        {
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                EmojiTool.AddRecent(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 16);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_currentTool is EmojiTool et) et.Emoji = emoji;
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            };
+            EmojiRecentBar.Children.Add(btn);
+        }
+        EmojiRecentBar.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Height = 1, Width = 276, Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            Margin = new Thickness(2, 2, 2, 0)
+        });
+    }
+
+    private void Emoji_Click(object sender, RoutedEventArgs e)
+    {
+        ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+
+        if (EmojiPickerCanvas.Visibility == Visibility.Visible)
+        {
+            EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (_currentTool is TextTool tt) tt.FinalizeActiveTextBox();
+
+        if (_currentToolTag == "Emoji")
+        {
+            ShowEmojiPicker();
+            return;
+        }
+
+        ClearToolHighlights();
+        BtnEmoji.Background = new SolidColorBrush(Color.FromArgb(80, 0xFF, 0xC1, 0x07));
+        _currentToolTag = "Emoji";
+        _currentTool = new EmojiTool(_selectedEmoji);
+        _currentTool.StrokeColor = _currentColor;
+        _currentTool.Thickness = _currentThickness;
+        DrawingCanvas.Cursor = _currentTool.Cursor;
+        ShowEmojiPicker();
+    }
+
+    private void ShowEmojiPicker()
+    {
+        EmojiSearchBox.Text = "";
+        _emojiCatIdx = -1;
+        HighlightEmojiCat();
+        RefreshRecentEmojis();
+        RefreshEmojiGrid();
+        Canvas.SetLeft(EmojiPickerPopup, 10);
+        Canvas.SetTop(EmojiPickerPopup, 10);
+        EmojiPickerCanvas.Visibility = Visibility.Visible;
+    }
+
+    private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (EmojiSearchPlaceholder != null)
+            EmojiSearchPlaceholder.Visibility = string.IsNullOrEmpty(EmojiSearchBox.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+        RefreshEmojiGrid();
     }
 
     // ============ CROP ============
@@ -613,11 +777,20 @@ public partial class ScrollPreviewWindow : Window
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        // Skip shortcuts when typing in text annotation
-        if (Keyboard.FocusedElement is TextBox tb && DrawingCanvas.IsAncestorOf(tb))
+        // Skip shortcuts when typing in emoji search box
+        if (Keyboard.FocusedElement is TextBox tb)
         {
-            if (e.Key == Key.Escape) { Focus(); e.Handled = true; }
-            return;
+            if (tb == EmojiSearchBox)
+            {
+                if (e.Key == Key.Escape) { EmojiPickerCanvas.Visibility = Visibility.Collapsed; Focus(); e.Handled = true; }
+                return;
+            }
+            // Skip shortcuts when typing in text annotation
+            if (DrawingCanvas.IsAncestorOf(tb))
+            {
+                if (e.Key == Key.Escape) { Focus(); e.Handled = true; }
+                return;
+            }
         }
 
         if (e.Key == Key.Escape)
@@ -646,7 +819,7 @@ public partial class ScrollPreviewWindow : Window
         else if (ShortcutHelper.Matches(e, s.ShortcutBlur)) { SelectToolByTag("Blur"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCheck)) { SelectToolByTag("Check"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCross)) { SelectToolByTag("CrossMark"); e.Handled = true; }
-        else if (ShortcutHelper.Matches(e, s.ShortcutEmoji)) { SelectToolByTag("Emoji"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutEmoji)) { Emoji_Click(BtnEmoji, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutObjectEraser)) { SelectToolByTag("Eraser"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser)) { Undo_Click(this, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutColor)) { Color_Click(BtnColor, new RoutedEventArgs()); e.Handled = true; }

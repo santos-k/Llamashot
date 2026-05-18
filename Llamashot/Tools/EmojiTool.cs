@@ -21,6 +21,100 @@ public class EmojiTool : BaseDrawingTool
     public override Cursor Cursor => CursorHelper.Get("Emoji");
     public string Emoji { get; set; }
 
+    // Shared data for all emoji pickers
+    public static readonly (string Icon, string Label)[] Categories = {
+        ("⭐","All"), ("😀","Smileys"), ("👍","Gestures"), ("❤️","Hearts"),
+        ("✨","Symbols"), ("🎉","Celebrate"), ("💬","Objects"), ("🐱","Animals"),
+        ("🍕","Food"), ("🌸","Nature"), ("🚗","Travel")
+    };
+
+    public static readonly (string E, string N, int C)[] AllEmojis = {
+        ("😀","grinning",0),("😃","smiley",0),("😄","smile",0),("😁","grin",0),
+        ("😂","joy tears",0),("🤣","rofl",0),("😊","blush",0),("😇","angel",0),
+        ("🙂","slight smile",0),("😉","wink",0),("😍","heart eyes",0),("🥰","love face",0),
+        ("😘","kiss",0),("😋","yummy",0),("😎","cool sunglasses",0),("🤔","thinking",0),
+        ("🤗","hug",0),("🤫","shush quiet",0),("🤭","oops giggle",0),("😏","smirk",0),
+        ("😐","neutral",0),("🙄","eye roll",0),("😮","surprised",0),("😱","scream",0),
+        ("😨","fearful",0),("😢","cry",0),("😭","sob crying",0),("😤","angry huff",0),
+        ("😡","angry red",0),("🥺","pleading",0),("😈","devil",0),("💀","skull dead",0),
+        ("👻","ghost",0),("🤡","clown",0),("💩","poop",0),("🤖","robot",0),("👽","alien",0),
+        ("👍","thumbs up like good",1),("👎","thumbs down dislike bad",1),("👏","clap applause",1),
+        ("🙌","raised hands hooray",1),("🤝","handshake deal",1),("👊","fist bump",1),
+        ("✊","fist power",1),("🤞","crossed fingers luck",1),("🤟","love you gesture",1),
+        ("🤘","rock on",1),("👌","ok okay",1),("🤌","pinch italian",1),
+        ("👈","point left",1),("👉","point right",1),("👆","point up",1),("👇","point down",1),
+        ("☝️","index up",1),("👋","wave hello bye",1),("✋","high five stop",1),
+        ("💪","muscle strong flex",1),("🙏","pray please thanks",1),("✌️","peace victory",1),
+        ("❤️","red heart love",2),("🧡","orange heart",2),("💛","yellow heart",2),
+        ("💚","green heart",2),("💙","blue heart",2),("💜","purple heart",2),
+        ("🖤","black heart",2),("🤍","white heart",2),("🤎","brown heart",2),
+        ("💔","broken heart",2),("💕","two hearts",2),("💞","revolving hearts",2),
+        ("💓","beating heart",2),("💗","growing heart",2),("💖","sparkling heart",2),
+        ("💘","cupid arrow heart",2),("💝","heart ribbon gift",2),
+        ("⭐","star",3),("🌟","glowing star",3),("✨","sparkles magic",3),
+        ("⚡","lightning bolt zap",3),("🔥","fire hot",3),("💥","boom explosion",3),
+        ("💯","hundred perfect score",3),("✅","check mark done yes",3),("❌","cross wrong no",3),
+        ("⚠️","warning caution",3),("🚫","prohibited no",3),("⛔","stop no entry",3),
+        ("❓","question",3),("❗","exclamation important",3),("💡","lightbulb idea",3),
+        ("🔔","bell notification",3),("📌","pin",3),("🔗","link chain url",3),
+        ("🔴","red circle",3),("🟢","green circle",3),("🔵","blue circle",3),("🟡","yellow circle",3),
+        ("➕","plus add",3),("➖","minus",3),("➡️","right arrow",3),
+        ("⬆️","up arrow",3),("⬇️","down arrow",3),("⬅️","left arrow",3),
+        ("🎉","party tada celebrate",4),("🎊","confetti ball",4),("🎈","balloon",4),
+        ("🎁","gift present",4),("🎂","birthday cake",4),("🎄","christmas tree",4),
+        ("🎃","halloween pumpkin",4),("🎆","fireworks",4),
+        ("🏆","trophy winner champion",4),("🥇","gold medal first",4),("🥈","silver medal second",4),
+        ("🥉","bronze medal third",4),("🎯","target bullseye goal",4),
+        ("🎵","music note",4),("🎶","music notes",4),("🎸","guitar",4),
+        ("🎮","game controller",4),("🎲","dice random",4),("🎨","art palette paint",4),
+        ("💬","speech bubble chat message",5),("💭","thought bubble",5),("💰","money bag rich",5),
+        ("💎","gem diamond",5),("🔑","key",5),("🔒","lock locked secure",5),("🔓","unlock open",5),
+        ("📱","phone mobile",5),("💻","laptop computer",5),("🖥️","desktop monitor",5),
+        ("📷","camera photo",5),("📹","video camera record",5),("🔍","search magnify find",5),
+        ("📝","memo note write edit",5),("📋","clipboard",5),("📁","folder file",5),
+        ("🗑️","trash delete remove",5),("🔧","wrench tool fix",5),("🔨","hammer build",5),
+        ("⚙️","gear settings config",5),("📎","paperclip attach",5),("✏️","pencil edit",5),
+        ("📊","chart graph bar",5),("📈","chart up trending",5),("⏰","alarm clock time",5),
+        ("⏳","hourglass timer wait",5),("🔋","battery power",5),
+        ("🐱","cat",6),("🐶","dog",6),("🐭","mouse",6),("🐹","hamster",6),
+        ("🐰","rabbit bunny",6),("🦊","fox",6),("🐻","bear",6),("🐼","panda",6),
+        ("🐨","koala",6),("🐯","tiger",6),("🦁","lion",6),("🐮","cow",6),
+        ("🐷","pig",6),("🐸","frog",6),("🐵","monkey",6),("🐔","chicken",6),
+        ("🐧","penguin",6),("🐦","bird",6),("🦅","eagle",6),("🦉","owl",6),
+        ("🐝","bee",6),("🦋","butterfly",6),("🐞","ladybug",6),("🐙","octopus",6),
+        ("🦈","shark",6),("🦄","unicorn",6),("🐉","dragon",6),
+        ("🍕","pizza",7),("🍔","burger hamburger",7),("🍟","fries",7),("🌭","hot dog",7),
+        ("🍿","popcorn",7),("🧁","cupcake",7),("🍩","donut",7),("🍪","cookie",7),
+        ("🍰","cake",7),("🍫","chocolate",7),("🍬","candy",7),("🍭","lollipop",7),
+        ("🍎","apple",7),("🍊","orange",7),("🍋","lemon",7),("🍌","banana",7),
+        ("🍉","watermelon",7),("🍇","grapes",7),("🍓","strawberry",7),("🍑","peach",7),
+        ("🥑","avocado",7),("🌶️","chili pepper hot",7),("☕","coffee",7),("🍵","tea",7),
+        ("🍺","beer",7),("🍷","wine",7),
+        ("🌸","cherry blossom flower",8),("🌹","rose",8),("🌻","sunflower",8),
+        ("🌺","hibiscus",8),("🌷","tulip",8),("🌼","daisy flower",8),
+        ("🍀","four leaf clover luck",8),("🍁","maple leaf fall",8),("🍂","fallen leaf autumn",8),
+        ("🌊","wave ocean sea",8),("🌈","rainbow",8),("☀️","sun sunny",8),
+        ("🌙","moon crescent night",8),("☁️","cloud",8),("🌧️","rain",8),
+        ("❄️","snow snowflake cold",8),("🌪️","tornado",8),
+        ("🌍","earth globe world",8),("⛰️","mountain",8),("🌋","volcano",8),
+        ("🏖️","beach",8),("🌅","sunrise",8),
+        ("🚗","car",9),("🚕","taxi cab",9),("🚌","bus",9),("🏎️","race car",9),
+        ("🚑","ambulance",9),("🚒","fire truck",9),("🚲","bicycle bike",9),
+        ("✈️","airplane plane fly",9),("🚀","rocket launch space",9),("🛸","ufo",9),
+        ("🚁","helicopter",9),("⛵","sailboat",9),("🚢","ship boat",9),
+        ("🏠","house home",9),("🏢","office building",9),("🏰","castle",9),
+        ("🗼","tower",9),("🗽","statue liberty",9),
+    };
+
+    public static readonly List<string> RecentEmojis = new();
+
+    public static void AddRecent(string emoji)
+    {
+        RecentEmojis.Remove(emoji);
+        RecentEmojis.Insert(0, emoji);
+        if (RecentEmojis.Count > 8) RecentEmojis.RemoveAt(8);
+    }
+
     public EmojiTool(string emoji = "👍")
     {
         Emoji = emoji;
