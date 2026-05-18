@@ -376,6 +376,7 @@ public partial class RecordingOverlay : Window
 
     private void SelectAnnotationTool(string toolName)
     {
+        HideEmojiPicker();
         // Finalize any active text input first
         _annotationOverlay?.FinalizeText();
         RecordingAnnotation.IsTextInputActive = false;
@@ -528,7 +529,7 @@ public partial class RecordingOverlay : Window
                     tool.Thickness = _recThickness;
                     _annotationOverlay.SetTool(tool);
                 }
-                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                HideEmojiPicker();
                 Activate();
                 e.Handled = true;
             };
@@ -569,7 +570,7 @@ public partial class RecordingOverlay : Window
                     tool.Thickness = _recThickness;
                     _annotationOverlay.SetTool(tool);
                 }
-                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                HideEmojiPicker();
                 Activate();
                 e.Handled = true;
             };
@@ -582,11 +583,19 @@ public partial class RecordingOverlay : Window
         });
     }
 
+    private void HideEmojiPicker()
+    {
+        if (EmojiPickerCanvas.Visibility != Visibility.Visible) return;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+        Top += 330;
+        Height = 50;
+    }
+
     private void Emoji_Click(object sender, RoutedEventArgs e)
     {
         if (EmojiPickerCanvas.Visibility == Visibility.Visible)
         {
-            EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+            HideEmojiPicker();
             return;
         }
 
@@ -622,8 +631,12 @@ public partial class RecordingOverlay : Window
         HighlightEmojiCat();
         RefreshRecentEmojis();
         RefreshEmojiGrid();
+
+        // Expand window upward to fit the popup
+        Height = 380;
+        Top -= 330;
         Canvas.SetLeft(EmojiPickerPopup, 0);
-        Canvas.SetTop(EmojiPickerPopup, -320);
+        Canvas.SetTop(EmojiPickerPopup, 0);
         EmojiPickerCanvas.Visibility = Visibility.Visible;
     }
 
