@@ -15,6 +15,7 @@ public enum DrawingToolType
     Text,
     Marker,
     Blur,
+    Emoji,
     Eraser
 }
 

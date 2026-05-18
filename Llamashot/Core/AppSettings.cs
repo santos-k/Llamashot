@@ -35,6 +35,7 @@ public class AppSettings
     public string ShortcutMove { get; set; } = "V";
     public string ShortcutCheck { get; set; } = "K";
     public string ShortcutCross { get; set; } = "D";
+    public string ShortcutEmoji { get; set; } = "J";
     public string ShortcutColor { get; set; } = "C";
     public string ShortcutThickness { get; set; } = "W";
     public string ShortcutHistory { get; set; } = "H";

@@ -51,6 +51,7 @@ public partial class OverlayWindow : Window
     private readonly Stack<DrawingAction> _redoStack = new();
     private Color _currentColor = Colors.Yellow;
     private double _currentThickness = 2;
+    private string _selectedEmoji = "👍";
 
     // Snipping toolbar state
     private CaptureMode _captureMode = CaptureMode.Screenshot;
@@ -68,6 +69,7 @@ public partial class OverlayWindow : Window
         { "Blur", Color.FromRgb(0x78, 0x90, 0x9C) },      // gray
         { "Check", Color.FromRgb(0x4C, 0xAF, 0x50) },     // green
         { "CrossMark", Color.FromRgb(0xF4, 0x43, 0x36) }, // red
+        { "Emoji", Color.FromRgb(0xFF, 0xC1, 0x07) },     // amber
         { "Eraser", Color.FromRgb(0xEF, 0x53, 0x50) },    // pink
     };
 
@@ -80,11 +82,14 @@ public partial class OverlayWindow : Window
         Colors.Black, Colors.Brown, Colors.SaddleBrown, Colors.Maroon
     };
 
+    private int _emojiCatIdx = -1; // -1 = All
+
     public OverlayWindow()
     {
         InitializeComponent();
         InitializeColorPalette();
         InitializeThicknessPopup();
+        InitializeEmojiPicker();
         _currentThickness = 3;
         ThicknessLabel.Text = "3";
         InitializeDelayPopup();
@@ -126,7 +131,7 @@ public partial class OverlayWindow : Window
         VideoToolbarCanvas.Visibility = Visibility.Collapsed;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
-
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         DelayPopupCanvas.Visibility = Visibility.Collapsed;
         DrawingCanvas.Children.Clear();
         _undoStack.Clear();
@@ -226,6 +231,136 @@ public partial class OverlayWindow : Window
             };
             ThicknessOptions.Children.Add(btn);
         }
+    }
+
+    private void InitializeEmojiPicker()
+    {
+        // Build category buttons
+        for (int i = 0; i < EmojiTool.Categories.Length; i++)
+        {
+            int catIdx = i == 0 ? -1 : i - 1; // "All" = -1, rest = 0..9
+            var (icon, label) = EmojiTool.Categories[i];
+            object content;
+            if (i == 0)
+                content = new TextBlock { Text = "All", Foreground = Brushes.White, FontSize = 10, FontWeight = FontWeights.Bold };
+            else
+            {
+                var img = EmojiTool.RenderEmoji(icon, 14);
+                content = img ?? (object)new TextBlock { Text = icon, FontSize = 12 };
+            }
+            var btn = new Button
+            {
+                Width = 26, Height = 24, Content = content, ToolTip = label,
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(0, 0, 1, 0)
+            };
+            int idx = catIdx;
+            btn.Click += (s, e) => { _emojiCatIdx = idx; HighlightEmojiCat(); RefreshEmojiGrid(); e.Handled = true; };
+            EmojiCategoryBar.Children.Add(btn);
+        }
+
+        // Set toolbar button to color emoji
+        var tbIcon = EmojiTool.RenderEmoji("😀", 16);
+        if (tbIcon != null) BtnEmoji.Content = tbIcon;
+
+        HighlightEmojiCat();
+        RefreshEmojiGrid();
+    }
+
+    private void HighlightEmojiCat()
+    {
+        int sel = _emojiCatIdx == -1 ? 0 : _emojiCatIdx + 1;
+        for (int i = 0; i < EmojiCategoryBar.Children.Count; i++)
+        {
+            if (EmojiCategoryBar.Children[i] is Button b)
+                b.Background = i == sel
+                    ? new SolidColorBrush(Color.FromArgb(80, 0xFF, 0xC1, 0x07))
+                    : Brushes.Transparent;
+        }
+    }
+
+    private void RefreshEmojiGrid()
+    {
+        EmojiGrid.Children.Clear();
+        var search = EmojiSearchBox?.Text?.Trim() ?? "";
+        foreach (var (em, name, cat) in EmojiTool.AllEmojis)
+        {
+            if (_emojiCatIdx >= 0 && cat != _emojiCatIdx && string.IsNullOrEmpty(search)) continue;
+            if (!string.IsNullOrEmpty(search) && !name.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34, ToolTip = name,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                EmojiTool.AddRecent(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 16);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_currentTool is EmojiTool et) et.Emoji = emoji;
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            };
+            EmojiGrid.Children.Add(btn);
+        }
+    }
+
+    private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (EmojiSearchPlaceholder != null)
+            EmojiSearchPlaceholder.Visibility = string.IsNullOrEmpty(EmojiSearchBox.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+        RefreshEmojiGrid();
+    }
+
+    private void RefreshRecentEmojis()
+    {
+        EmojiRecentBar.Children.Clear();
+        if (EmojiTool.RecentEmojis.Count == 0) return;
+
+        // Label
+        EmojiRecentBar.Children.Add(new TextBlock
+        {
+            Text = "Recent", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+            FontSize = 10, Width = 280, Margin = new Thickness(2, 0, 0, 2)
+        });
+
+        foreach (var em in EmojiTool.RecentEmojis)
+        {
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                EmojiTool.AddRecent(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 16);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_currentTool is EmojiTool et) et.Emoji = emoji;
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            };
+            EmojiRecentBar.Children.Add(btn);
+        }
+
+        // Separator
+        EmojiRecentBar.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Height = 1, Width = 276, Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            Margin = new Thickness(2, 2, 2, 0)
+        });
     }
 
     private void InitializeDelayPopup()
@@ -1379,6 +1514,7 @@ public partial class OverlayWindow : Window
         if (sender is not Button btn || btn.Tag is not string toolName) return;
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
 
         // Finalize any active text box before switching tools
         if (_currentTool is TextTool tt)
@@ -1423,6 +1559,68 @@ public partial class OverlayWindow : Window
         }
 
         Focus();
+    }
+
+    private void Emoji_Click(object sender, RoutedEventArgs e)
+    {
+        ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+
+        // If emoji picker is visible, just close it
+        if (EmojiPickerCanvas.Visibility == Visibility.Visible)
+        {
+            EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Finalize any active text box before switching tools
+        if (_currentTool is TextTool tt)
+            tt.FinalizeActiveTextBox();
+
+        // If emoji tool already active, just show picker to change emoji
+        if (_currentToolTag == "Emoji")
+        {
+            ShowEmojiPicker();
+            return;
+        }
+
+        // Select emoji tool
+        ClearToolHighlights();
+        var highlightColor = Color.FromArgb(80, 0xFF, 0xC1, 0x07);
+        BtnEmoji.Background = new SolidColorBrush(highlightColor);
+
+        _currentToolTag = "Emoji";
+        _currentTool = new EmojiTool(_selectedEmoji);
+        _currentTool.StrokeColor = _currentColor;
+        _currentTool.Thickness = _currentThickness;
+        DrawingCanvas.Cursor = _currentTool.Cursor;
+
+        ShowEmojiPicker();
+        Focus();
+    }
+
+    private void ShowEmojiPicker()
+    {
+        EmojiSearchBox.Text = "";
+        _emojiCatIdx = -1;
+        HighlightEmojiCat();
+        RefreshRecentEmojis();
+        RefreshEmojiGrid();
+        EmojiPickerCanvas.Visibility = Visibility.Visible;
+
+        // Position popup, avoiding screen edge cutoff
+        var btnPos = BtnEmoji.TranslatePoint(new Point(0, 0), RootGrid);
+        double popupW = 300, popupH = 310;
+        double left = btnPos.X + 40;
+        double top = btnPos.Y;
+
+        if (left + popupW > ActualWidth)
+            left = btnPos.X - popupW - 8;
+        if (top + popupH > ActualHeight)
+            top = Math.Max(4, ActualHeight - popupH - 4);
+
+        Canvas.SetLeft(EmojiPickerPopup, left);
+        Canvas.SetTop(EmojiPickerPopup, top);
     }
 
     private void ClearToolHighlights()
@@ -1533,6 +1731,7 @@ public partial class OverlayWindow : Window
             return;
         }
 
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         _interaction = Interaction.Drawing;
         _currentTool.OnMouseDown(pos, DrawingCanvas);
         DrawingCanvas.CaptureMouse();
@@ -1609,28 +1808,40 @@ public partial class OverlayWindow : Window
     private void Color_Click(object sender, RoutedEventArgs e)
     {
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         if (ColorPaletteCanvas.Visibility == Visibility.Visible)
         {
             ColorPaletteCanvas.Visibility = Visibility.Collapsed;
             return;
         }
         var btnPos = BtnColor.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ColorPalette, btnPos.X + 40);
-        Canvas.SetTop(ColorPalette, btnPos.Y);
+        double popupW = 170, popupH = 120;
+        double left = btnPos.X + 40;
+        double top = btnPos.Y;
+        if (left + popupW > ActualWidth) left = btnPos.X - popupW - 8;
+        if (top + popupH > ActualHeight) top = Math.Max(4, ActualHeight - popupH - 4);
+        Canvas.SetLeft(ColorPalette, left);
+        Canvas.SetTop(ColorPalette, top);
         ColorPaletteCanvas.Visibility = Visibility.Visible;
     }
 
     private void Thickness_Click(object sender, RoutedEventArgs e)
     {
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
+        EmojiPickerCanvas.Visibility = Visibility.Collapsed;
         if (ThicknessPopupCanvas.Visibility == Visibility.Visible)
         {
             ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
             return;
         }
         var btnPos = BtnThickness.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ThicknessPopup, btnPos.X + 40);
-        Canvas.SetTop(ThicknessPopup, btnPos.Y);
+        double popupW = 50, popupH = 310;
+        double left = btnPos.X + 40;
+        double top = btnPos.Y;
+        if (left + popupW > ActualWidth) left = btnPos.X - popupW - 8;
+        if (top + popupH > ActualHeight) top = Math.Max(4, ActualHeight - popupH - 4);
+        Canvas.SetLeft(ThicknessPopup, left);
+        Canvas.SetTop(ThicknessPopup, top);
         ThicknessPopupCanvas.Visibility = Visibility.Visible;
     }
 
@@ -1930,15 +2141,19 @@ public partial class OverlayWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        // Skip shortcuts only when actively typing in a text annotation on the canvas
-        if (Keyboard.FocusedElement is TextBox tb && DrawingCanvas.IsAncestorOf(tb))
+        // Skip shortcuts when typing in a text annotation or the emoji search box
+        if (Keyboard.FocusedElement is TextBox tb)
         {
-            if (e.Key == Key.Escape)
+            if (DrawingCanvas.IsAncestorOf(tb))
             {
-                Focus();
-                e.Handled = true;
+                if (e.Key == Key.Escape) { Focus(); e.Handled = true; }
+                return;
             }
-            return;
+            if (tb == EmojiSearchBox)
+            {
+                if (e.Key == Key.Escape) { EmojiPickerCanvas.Visibility = Visibility.Collapsed; Focus(); e.Handled = true; }
+                return;
+            }
         }
 
         // Snipping toolbar shortcuts (only when toolbar is visible, before selection)
@@ -2026,6 +2241,8 @@ public partial class OverlayWindow : Window
         { SelectToolByTag("Check"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutCross))
         { SelectToolByTag("CrossMark"); e.Handled = true; }
+        else if (ShortcutHelper.Matches(e, s.ShortcutEmoji))
+        { Emoji_Click(BtnEmoji, new RoutedEventArgs()); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutObjectEraser))
         { SelectToolByTag("Eraser"); e.Handled = true; }
         else if (ShortcutHelper.Matches(e, s.ShortcutEraser))

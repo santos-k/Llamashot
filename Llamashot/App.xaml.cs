@@ -154,6 +154,7 @@ public partial class App : Application
                 else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutMarker)) action = "Marker";
                 else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutCheck)) action = "Check";
                 else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutCross)) action = "CrossMark";
+                else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutEmoji)) action = "Emoji";
                 else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutObjectEraser)) action = "Eraser";
                 else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutEraser)) action = "Undo";
                 else if (ShortcutHelper.MatchesVk(vkCode, s.ShortcutRecClearAll)) action = "ClearAll";

@@ -319,6 +319,8 @@
                                 <Line X1="11.5" Y1="4.5" X2="4.5" Y2="11.5" Stroke="#F44336" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Canvas>
                         </Button>
+                        <!-- Emoji: smiley face (content set programmatically with color D2D render) -->
+                        <Button x:Name="BtnEmoji" ToolTip="Emoji (J)" Click="Emoji_Click" Tag="Emoji" Style="{StaticResource TBtn}" />
                         <!-- Eraser: white body with pink rubber tip -->
                         <Button x:Name="BtnObjectEraser" ToolTip="Eraser (G)" Click="Tool_Click" Tag="Eraser" Style="{StaticResource TBtn}">
                             <Canvas Width="16" Height="16">
@@ -536,6 +538,39 @@
                     <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
                 </Border.Effect>
                 <StackPanel x:Name="ThicknessOptions" />
+            </Border>
+        </Canvas>
+
+        <!-- Emoji picker popup -->
+        <Canvas x:Name="EmojiPickerCanvas" Visibility="Collapsed">
+            <Border x:Name="EmojiPickerPopup"
+                    Background="#FF111111" CornerRadius="6" Padding="6"
+                    BorderBrush="#333" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
+                </Border.Effect>
+                <StackPanel Width="284">
+                    <!-- Search box -->
+                    <Grid Margin="0,0,0,4">
+                        <TextBox x:Name="EmojiSearchBox"
+                                 Background="#222" Foreground="White" CaretBrush="White"
+                                 BorderBrush="#444" BorderThickness="1"
+                                 Padding="4,3" FontSize="12"
+                                 TextChanged="EmojiSearch_TextChanged" />
+                        <TextBlock x:Name="EmojiSearchPlaceholder"
+                                   Text="Search emojis..." Foreground="#666" FontSize="12"
+                                   Margin="6,5,0,0" IsHitTestVisible="False" />
+                    </Grid>
+                    <!-- Recent emojis -->
+                    <WrapPanel x:Name="EmojiRecentBar" Width="280" Margin="0,0,0,2" />
+                    <!-- Category buttons -->
+                    <WrapPanel x:Name="EmojiCategoryBar" Margin="0,0,0,4" />
+                    <!-- Emoji grid -->
+                    <ScrollViewer Height="220" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <WrapPanel x:Name="EmojiGrid" Width="280" />
+                    </ScrollViewer>
+                </StackPanel>
             </Border>
         </Canvas>
     </Grid>
