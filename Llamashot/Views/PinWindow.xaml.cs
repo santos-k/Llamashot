@@ -37,6 +37,11 @@ public partial class PinWindow : Window
         };
     }
 
+    private void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape) { Close(); e.Handled = true; }
+    }
+
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)

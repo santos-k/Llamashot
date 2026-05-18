@@ -8,7 +8,8 @@
         ShowInTaskbar="False"
         ResizeMode="CanResizeWithGrip"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
-        MouseRightButtonDown="Window_MouseRightButtonDown">
+        MouseRightButtonDown="Window_MouseRightButtonDown"
+        KeyDown="Window_KeyDown">
     <Border BorderBrush="#2196F3" BorderThickness="2" CornerRadius="2">
         <Grid>
             <Image x:Name="PinnedImage" Stretch="Uniform"
