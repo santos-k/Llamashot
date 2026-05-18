@@ -87,15 +87,20 @@ public partial class AboutWindow : Window
 
     private static void LaunchSilentInstall(string installerPath)
     {
-        var appPath = Environment.ProcessPath ?? "";
+        // Prefer the standard install location over current process path (handles debug builds)
+        var installExe = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs", "Llamashot", "Llamashot.exe");
+        var appPath = File.Exists(installExe) ? installExe : (Environment.ProcessPath ?? installExe);
+
         var batchDir = Path.GetDirectoryName(installerPath)!;
         var batchPath = Path.Combine(batchDir, "update.cmd");
 
         File.WriteAllText(batchPath,
             $"@echo off\r\n" +
+            $"timeout /t 3 /nobreak >nul\r\n" +
+            $"\"{installerPath}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS\r\n" +
             $"timeout /t 2 /nobreak >nul\r\n" +
-            $"\"{installerPath}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS\r\n" +
-            $"timeout /t 1 /nobreak >nul\r\n" +
             $"start \"\" \"{appPath}\"\r\n" +
             $"del \"%~f0\"\r\n");
 
