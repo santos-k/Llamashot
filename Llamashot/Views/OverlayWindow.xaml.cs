@@ -1815,8 +1815,13 @@ public partial class OverlayWindow : Window
             return;
         }
         var btnPos = BtnColor.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ColorPalette, btnPos.X + 40);
-        Canvas.SetTop(ColorPalette, btnPos.Y);
+        double popupW = 170, popupH = 120;
+        double left = btnPos.X + 40;
+        double top = btnPos.Y;
+        if (left + popupW > ActualWidth) left = btnPos.X - popupW - 8;
+        if (top + popupH > ActualHeight) top = Math.Max(4, ActualHeight - popupH - 4);
+        Canvas.SetLeft(ColorPalette, left);
+        Canvas.SetTop(ColorPalette, top);
         ColorPaletteCanvas.Visibility = Visibility.Visible;
     }
 
@@ -1830,8 +1835,13 @@ public partial class OverlayWindow : Window
             return;
         }
         var btnPos = BtnThickness.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ThicknessPopup, btnPos.X + 40);
-        Canvas.SetTop(ThicknessPopup, btnPos.Y);
+        double popupW = 50, popupH = 310;
+        double left = btnPos.X + 40;
+        double top = btnPos.Y;
+        if (left + popupW > ActualWidth) left = btnPos.X - popupW - 8;
+        if (top + popupH > ActualHeight) top = Math.Max(4, ActualHeight - popupH - 4);
+        Canvas.SetLeft(ThicknessPopup, left);
+        Canvas.SetTop(ThicknessPopup, top);
         ThicknessPopupCanvas.Visibility = Visibility.Visible;
     }
 
