@@ -53,6 +53,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Blur (B)** - Pixelate/blur sensitive areas
 - **Check stamp (K)** - Green checkmark with circle (for reviews)
 - **Cross stamp (D)** - Red X with circle (for reviews)
+- **Emoji (J)** - Place colorful emojis as annotations (250+ emojis, 10 categories, search, recent history)
 - **Object eraser (G)** - Click any annotation to remove it entirely (undoable)
 - **Custom cursors** - Each tool shows a matching cursor icon
 
@@ -63,7 +64,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - Record any selected region as MP4 video (H.264 compressed)
 - **Unlimited duration**, 10fps
 - **Separate mic and system audio toggles** - Independent on/off before and during recording
-- **Full annotation toolkit** - All 11 screenshot tools available during recording (Pen, Line, Arrow, Rectangle, Ellipse, Text, Marker, Check, Cross, Eraser, Undo, Clear)
+- **Full annotation toolkit** - All 12 screenshot tools available during recording (Pen, Line, Arrow, Rectangle, Ellipse, Text, Marker, Check, Cross, Emoji, Eraser, Undo, Clear)
 - **Color picker + Thickness** - Change annotation color and stroke width during recording
 - **Tool toggle** - Click or shortcut again to deselect, tools stay active between strokes
 - **Text input isolation** - Keyboard shortcuts suppressed while typing text annotations, Enter/Esc to dismiss
@@ -115,7 +116,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Colorful tool icons** - Each tool has a distinct colored icon with matching active highlight
 - **Tool toggle** - Click or press shortcut again to deselect any tool
 - **Seamless auto-update** - Check for updates from About, downloads and installs silently in the background
-- **27+ configurable shortcuts** - Every tool and action has a keyboard shortcut
+- **28+ configurable shortcuts** - Every tool and action has a keyboard shortcut
 
 ## Keyboard Shortcuts
 
