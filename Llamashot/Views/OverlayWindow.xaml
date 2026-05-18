@@ -561,6 +561,8 @@
                                    Text="Search emojis..." Foreground="#666" FontSize="12"
                                    Margin="6,5,0,0" IsHitTestVisible="False" />
                     </Grid>
+                    <!-- Recent emojis -->
+                    <WrapPanel x:Name="EmojiRecentBar" Width="280" Margin="0,0,0,2" />
                     <!-- Category buttons -->
                     <WrapPanel x:Name="EmojiCategoryBar" Margin="0,0,0,4" />
                     <!-- Emoji grid -->

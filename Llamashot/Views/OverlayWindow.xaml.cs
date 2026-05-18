@@ -52,6 +52,7 @@ public partial class OverlayWindow : Window
     private Color _currentColor = Colors.Yellow;
     private double _currentThickness = 2;
     private string _selectedEmoji = "👍";
+    private static readonly List<string> _recentEmojis = new();
 
     // Snipping toolbar state
     private CaptureMode _captureMode = CaptureMode.Screenshot;
@@ -393,6 +394,7 @@ public partial class OverlayWindow : Window
             btn.Click += (s, e) =>
             {
                 _selectedEmoji = emoji;
+                AddRecentEmoji(emoji);
                 var icon = EmojiTool.RenderEmoji(emoji, 16);
                 if (icon != null) BtnEmoji.Content = icon;
                 if (_currentTool is EmojiTool et) et.Emoji = emoji;
@@ -409,6 +411,57 @@ public partial class OverlayWindow : Window
             EmojiSearchPlaceholder.Visibility = string.IsNullOrEmpty(EmojiSearchBox.Text)
                 ? Visibility.Visible : Visibility.Collapsed;
         RefreshEmojiGrid();
+    }
+
+    private void AddRecentEmoji(string emoji)
+    {
+        _recentEmojis.Remove(emoji);
+        _recentEmojis.Insert(0, emoji);
+        if (_recentEmojis.Count > 8) _recentEmojis.RemoveAt(8);
+    }
+
+    private void RefreshRecentEmojis()
+    {
+        EmojiRecentBar.Children.Clear();
+        if (_recentEmojis.Count == 0) return;
+
+        // Label
+        EmojiRecentBar.Children.Add(new TextBlock
+        {
+            Text = "Recent", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+            FontSize = 10, Width = 280, Margin = new Thickness(2, 0, 0, 2)
+        });
+
+        foreach (var em in _recentEmojis)
+        {
+            var emoji = em;
+            var img = EmojiTool.RenderEmoji(emoji, 22);
+            var btn = new Button
+            {
+                Width = 34, Height = 34,
+                Content = img ?? (object)new TextBlock { Text = emoji, FontSize = 18 },
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(1)
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedEmoji = emoji;
+                AddRecentEmoji(emoji);
+                var icon = EmojiTool.RenderEmoji(emoji, 16);
+                if (icon != null) BtnEmoji.Content = icon;
+                if (_currentTool is EmojiTool et) et.Emoji = emoji;
+                EmojiPickerCanvas.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            };
+            EmojiRecentBar.Children.Add(btn);
+        }
+
+        // Separator
+        EmojiRecentBar.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Height = 1, Width = 276, Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            Margin = new Thickness(2, 2, 2, 0)
+        });
     }
 
     private void InitializeDelayPopup()
@@ -1652,6 +1705,7 @@ public partial class OverlayWindow : Window
         EmojiSearchBox.Text = "";
         _emojiCatIdx = -1;
         HighlightEmojiCat();
+        RefreshRecentEmojis();
         RefreshEmojiGrid();
         EmojiPickerCanvas.Visibility = Visibility.Visible;
 
