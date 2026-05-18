@@ -18,7 +18,7 @@ WizardStyle=modern
 DisableProgramGroupPage=yes
 
 [Files]
-Source: "Llamashot\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\Llamashot"; Filename: "{app}\Llamashot.exe"
