@@ -16,39 +16,38 @@ public partial class SettingsWindow : Window
         { "HistoryHotkey", "Alt+PrintScreen" }
     };
 
-    // Annotation & recording shortcuts — shared across screenshot and recording contexts
+    // Annotation & recording shortcuts — sorted alphabetically, shared across contexts
     private static readonly (string Key, string Label, string Default)[] ToolShortcuts =
     {
-        ("ShortcutSave", "Save", "Ctrl+S"),
-        ("ShortcutCopy", "Copy", "Ctrl+C"),
-        ("ShortcutUndo", "Undo", "Ctrl+Z"),
-        ("ShortcutRedo", "Redo", "Ctrl+Y"),
-        ("ShortcutPen", "Pencil", "P"),
-        ("ShortcutLine", "Line", "L"),
         ("ShortcutArrow", "Arrow", "A"),
-        ("ShortcutRectangle", "Rectangle", "R"),
-        ("ShortcutEllipse", "Ellipse", "E"),
-        ("ShortcutText", "Text", "T"),
-        ("ShortcutMarker", "Marker", "M"),
         ("ShortcutBlur", "Blur", "B"),
-        ("ShortcutEraser", "Undo last", "X"),
-        ("ShortcutObjectEraser", "Eraser", "G"),
-        ("ShortcutMove", "Move", "V"),
         ("ShortcutCheck", "Check mark", "K"),
-        ("ShortcutCross", "Cross mark", "D"),
-        ("ShortcutEmoji", "Emoji", "J"),
-        ("ShortcutColor", "Color", "C"),
-        ("ShortcutThickness", "Thickness", "W"),
-        ("ShortcutHistory", "History", "H"),
-        ("ShortcutRecord", "Record", "Ctrl+R"),
-        ("ShortcutOcr", "OCR", "O"),
-        ("ShortcutPin", "Pin", "F"),
-        // Recording-specific (also active during annotation)
-        ("ShortcutRecMic", "Mic toggle", "N"),
-        ("ShortcutRecSystemAudio", "System audio", "S"),
-        ("ShortcutRecPause", "Pause/Resume", "Space"),
-        ("ShortcutRecStop", "Stop recording", "Q"),
         ("ShortcutRecClearAll", "Clear annotations", "Ctrl+Delete"),
+        ("ShortcutColor", "Color", "C"),
+        ("ShortcutCopy", "Copy", "Ctrl+C"),
+        ("ShortcutCross", "Cross mark", "D"),
+        ("ShortcutEllipse", "Ellipse", "E"),
+        ("ShortcutEmoji", "Emoji", "J"),
+        ("ShortcutObjectEraser", "Eraser", "G"),
+        ("ShortcutMarker", "Highlighter", "H"),
+        ("ShortcutHistory", "History", "Ctrl+H"),
+        ("ShortcutLine", "Line", "L"),
+        ("ShortcutRecMic", "Mic toggle", "N"),
+        ("ShortcutMove", "Move", "V"),
+        ("ShortcutOcr", "OCR", "O"),
+        ("ShortcutRecPause", "Pause/Resume", "Space"),
+        ("ShortcutPen", "Pencil", "P"),
+        ("ShortcutPin", "Pin", "F"),
+        ("ShortcutRectangle", "Rectangle", "R"),
+        ("ShortcutRecord", "Record", "Ctrl+R"),
+        ("ShortcutRedo", "Redo", "Ctrl+Y"),
+        ("ShortcutSave", "Save", "Ctrl+S"),
+        ("ShortcutRecStop", "Stop recording", "Q"),
+        ("ShortcutRecSystemAudio", "System audio", "S"),
+        ("ShortcutText", "Text", "T"),
+        ("ShortcutThickness", "Thickness", "W"),
+        ("ShortcutEraser", "Undo", "X"),
+        ("ShortcutUndo", "Undo (Ctrl)", "Ctrl+Z"),
     };
 
     // Kept for validation backward compat — now empty, all merged into ToolShortcuts
@@ -56,13 +55,13 @@ public partial class SettingsWindow : Window
 
     private static readonly (string Key, string Label, string Default)[] ToolbarShortcuts =
     {
-        ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
-        ("ShortcutModeVideo", "Video mode", "D2"),
+        ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
         ("ShortcutModeOcr", "OCR mode", "D3"),
         ("ShortcutToolbarRegion", "Region capture", "R"),
-        ("ShortcutToolbarWindow", "Window capture", "W"),
-        ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
+        ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
         ("ShortcutModeScroll", "Scroll capture", "D4"),
+        ("ShortcutModeVideo", "Video mode", "D2"),
+        ("ShortcutToolbarWindow", "Window capture", "W"),
     };
 
     private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();

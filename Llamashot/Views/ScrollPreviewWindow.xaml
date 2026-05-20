@@ -95,7 +95,7 @@
                     <TextBlock Text="A" Foreground="#FFCA28" FontSize="12" FontWeight="Bold"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button x:Name="BtnMarker" Click="Tool_Click" Tag="Marker" Style="{StaticResource TBtn}" ToolTip="Marker">
+                <Button x:Name="BtnMarker" Click="Tool_Click" Tag="Marker" Style="{StaticResource TBtn}" ToolTip="Highlighter (H)">
                     <Canvas Width="14" Height="14">
                         <Rectangle Canvas.Left="3" Canvas.Top="1" Width="8" Height="10" Fill="#FFEE58" RadiusX="2" RadiusY="2" />
                         <Rectangle Canvas.Left="4" Canvas.Top="11" Width="6" Height="2" Fill="#F9A825" />

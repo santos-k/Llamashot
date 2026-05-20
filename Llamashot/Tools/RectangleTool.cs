@@ -50,10 +50,18 @@ public class RectangleTool : BaseDrawingTool
     {
         if (!IsDrawing || _rectangle == null) return;
 
-        var x = Math.Min(StartPoint.X, position.X);
-        var y = Math.Min(StartPoint.Y, position.Y);
         var w = Math.Abs(position.X - StartPoint.X);
         var h = Math.Abs(position.Y - StartPoint.Y);
+
+        // Shift = square constraint
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            var side = Math.Max(w, h);
+            w = h = side;
+        }
+
+        var x = position.X >= StartPoint.X ? StartPoint.X : StartPoint.X - w;
+        var y = position.Y >= StartPoint.Y ? StartPoint.Y : StartPoint.Y - h;
 
         Canvas.SetLeft(_rectangle, x);
         Canvas.SetTop(_rectangle, y);

@@ -4,7 +4,7 @@ using System.Windows.Media.Imaging;
 
 namespace Llamashot.Core;
 
-public enum RecordType { Saved, Clipboard }
+public enum RecordType { Saved, Clipboard, Recording }
 
 public class ScreenshotRecord
 {
@@ -45,6 +45,75 @@ public static class HistoryManager
     public static void AddRecord(BitmapSource image, string savedPath)
     {
         AddEntry(image, savedPath, RecordType.Saved);
+    }
+
+    public static void AddVideoRecord(string videoPath, int width, int height)
+    {
+        try
+        {
+            string thumbPath = "";
+            if (AppSettings.Instance.SaveHistory)
+            {
+                var dir = AppSettings.Instance.HistoryDirectory;
+                var thumbDir = Path.Combine(dir, "thumbnails");
+                Directory.CreateDirectory(dir);
+                Directory.CreateDirectory(thumbDir);
+
+                // Create a simple video icon thumbnail
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                thumbPath = Path.Combine(thumbDir, $"thumb_{timestamp}.png");
+
+                var dv = new System.Windows.Media.DrawingVisual();
+                using (var dc = dv.RenderOpen())
+                {
+                    dc.DrawRectangle(
+                        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x2E)),
+                        null, new System.Windows.Rect(0, 0, 200, 120));
+                    // Play triangle
+                    var playBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF4, 0x43, 0x36));
+                    var geo = new System.Windows.Media.StreamGeometry();
+                    using (var ctx = geo.Open())
+                    {
+                        ctx.BeginFigure(new System.Windows.Point(80, 40), true, true);
+                        ctx.LineTo(new System.Windows.Point(80, 80), true, false);
+                        ctx.LineTo(new System.Windows.Point(120, 60), true, false);
+                    }
+                    dc.DrawGeometry(playBrush, null, geo);
+                }
+                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(200, 120, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                rtb.Render(dv);
+                rtb.Freeze();
+
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(rtb));
+                using (var fs = File.Create(thumbPath))
+                    enc.Save(fs);
+            }
+
+            var record = new ScreenshotRecord
+            {
+                FilePath = videoPath,
+                ThumbnailPath = thumbPath,
+                CapturedAt = DateTime.Now,
+                Width = width,
+                Height = height,
+                Type = RecordType.Recording
+            };
+
+            _records.Insert(0, record);
+
+            while (_records.Count > AppSettings.Instance.MaxHistoryItems)
+            {
+                var old = _records[^1];
+                if (!string.IsNullOrEmpty(old.ThumbnailPath))
+                    try { File.Delete(old.ThumbnailPath); } catch { }
+                _records.RemoveAt(_records.Count - 1);
+            }
+
+            if (AppSettings.Instance.SaveHistory)
+                Save();
+        }
+        catch { }
     }
 
     public static void AddClipRecord(BitmapSource image)

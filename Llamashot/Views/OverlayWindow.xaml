@@ -329,7 +329,7 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <!-- Marker: yellow highlighter pen -->
-                        <Button x:Name="BtnMarker" ToolTip="Marker (M)" Click="Tool_Click" Tag="Marker" Style="{StaticResource TBtn}">
+                        <Button x:Name="BtnMarker" ToolTip="Highlighter (H)" Click="Tool_Click" Tag="Marker" Style="{StaticResource TBtn}">
                             <Canvas Width="16" Height="16">
                                 <Rectangle Canvas.Left="4" Canvas.Top="1" Width="8" Height="11"
                                            Fill="#FFEE58" RadiusX="2" RadiusY="2" />

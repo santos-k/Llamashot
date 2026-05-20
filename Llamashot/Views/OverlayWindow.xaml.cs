@@ -650,8 +650,38 @@ public partial class OverlayWindow : Window
     {
         Hide();
 
+        // Show floating countdown
+        var countdown = new Window
+        {
+            WindowStyle = WindowStyle.None,
+            AllowsTransparency = true,
+            Background = Brushes.Transparent,
+            Topmost = true,
+            ShowInTaskbar = false,
+            Width = 120, Height = 120,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen
+        };
+        var countdownText = new TextBlock
+        {
+            FontSize = 56, FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 20, Opacity = 0.8, ShadowDepth = 0, Color = Colors.Black
+            }
+        };
+        countdown.Content = countdownText;
+        countdown.Show();
+
         for (int i = _delaySeconds; i > 0; i--)
+        {
+            countdownText.Text = i.ToString();
             await Task.Delay(1000);
+        }
+
+        countdown.Close();
 
         _screenshot = ScreenCapture.CaptureFullScreen();
         ScreenshotImage.Source = _screenshot;
@@ -938,7 +968,11 @@ public partial class OverlayWindow : Window
                 {
                     ExecuteWithDelay(() =>
                     {
-                        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+                        // After delay, show toolbar and reset delay so next click selects normally
+                        _delaySeconds = 0;
+                        DelayLabel.Text = "No delay";
+                        SnippingToolbarCanvas.Visibility = Visibility.Visible;
+                        PositionSnippingToolbar();
                         _interaction = Interaction.ToolbarIdle;
                         Cursor = Cursors.Cross;
                     });
