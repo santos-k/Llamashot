@@ -49,12 +49,13 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Rectangle (R)** - Outlined rectangles
 - **Ellipse (E)** - Outlined ellipses
 - **Text (T)** - Text annotations with configurable font size
-- **Marker (M)** - Semi-transparent highlighter
+- **Highlighter (H)** - Semi-transparent highlighter
 - **Blur (B)** - Pixelate/blur sensitive areas
 - **Check stamp (K)** - Green checkmark with circle (for reviews)
 - **Cross stamp (D)** - Red X with circle (for reviews)
 - **Emoji (J)** - Place colorful emojis as annotations (250+ emojis, 10 categories, search, recent history)
 - **Object eraser (G)** - Click any annotation to remove it entirely (undoable)
+- **Shift constraints** - Hold Shift for straight lines/arrows (0/45/90°), perfect squares, circles, horizontal/vertical highlights
 - **Custom cursors** - Each tool shows a matching cursor icon
 
 ### Screen Recording
@@ -75,9 +76,9 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - Red pulsing border shows recorded area
 - Recording toolbar excluded from capture
 
-### OCR Text Extraction
+### Text Extraction
 - Extract text from any area of the screen
-- **Direct OCR from toolbar** - Select OCR mode, draw region, text copied to clipboard instantly
+- **Direct extraction from toolbar** - Select Text Extract mode, draw region, text copied to clipboard instantly
 - **Dashed selection border** - Cyan dashed outline distinguishes OCR selection
 - **"Copied" notification** - Visual confirmation when text is copied
 - Sub-region selection within captured screenshots
@@ -85,10 +86,12 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - Scales up small text for accuracy
 - Uses Windows built-in OCR (no external dependencies)
 
-### Screenshot History
-- Thumbnails for all saved and copied screenshots
+### History
+- Thumbnails for all saved screenshots, clipboard captures, and video recordings
 - Responsive grid layout (3 columns default, adapts to window width)
-- Type badges: green "Saved", blue "Copied"
+- Type badges: green "Saved", blue "Copied", red "Video"
+- **Open in File Explorer** - One-click to reveal any file in Explorer
+- **Auto-refresh** - History updates when window gets focus after new captures
 - **Multi-select** with checkboxes and "Select All"
 - **Bulk copy** - Single image as clipboard, multiple as file drop list
 - **Save to file** - Per-item save button and bulk "Save Selected" to folder
@@ -113,8 +116,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Thickness control (W)** - Dropdown 1-10 with visual preview
 - **Color picker (C)** - 24-color palette with persistent color memory
 - **Adaptive toolbar** - Auto-switches between 1 and 2 columns based on screen height
+- **Glass morphism UI** - Gradient dark-navy toolbar backgrounds with subtle borders and shadows
+- **Pill-shaped mode buttons** - Active mode highlighted with filled background and color glow
 - **Colorful tool icons** - Each tool has a distinct colored icon with matching active highlight
 - **Tool toggle** - Click or press shortcut again to deselect any tool
+- **Floating delay countdown** - Big centered number counts down during delayed captures
 - **Seamless auto-update** - Check for updates from About, downloads and installs silently in the background
 - **28+ configurable shortcuts** - Every tool and action has a keyboard shortcut
 
@@ -138,7 +144,7 @@ All shortcuts are customizable in Settings.
 | Screenshot mode | 1 |
 | Recording mode | 2 |
 | Long Shot mode | 3 |
-| OCR mode | 4 |
+| Text Extract mode | 4 |
 | Region capture | R |
 | Window capture | W |
 | Fullscreen capture | F |
@@ -158,7 +164,7 @@ All shortcuts are customizable in Settings.
 | Rectangle | R |
 | Ellipse | E |
 | Text | T |
-| Marker | M |
+| Highlighter | H |
 | Blur | B |
 | Check stamp | K |
 | Cross stamp | D |
@@ -167,9 +173,9 @@ All shortcuts are customizable in Settings.
 | Move | V |
 | Color picker | C |
 | Thickness | W |
-| History | H |
+| History | Ctrl+H |
 | Record | Ctrl+R |
-| OCR | O |
+| Text Extract | O |
 | Pin | F |
 | Pan (temporary) | Space+drag |
 | Double-click | Toggle full region |
@@ -186,13 +192,13 @@ All shortcuts are customizable in Settings.
 | Rectangle | R |
 | Ellipse | E |
 | Text | T |
-| Marker | H |
+| Highlighter | H |
 | Check stamp | K |
 | Cross stamp | D |
 | Eraser | G |
 | Undo | X |
-| Clear all | C |
-| Toggle microphone | M |
+| Clear all | Ctrl+Delete |
+| Toggle microphone | N |
 | Toggle system audio | S |
 | Pause / Resume | Space |
 | Stop recording | Q |
