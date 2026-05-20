@@ -488,7 +488,6 @@ public partial class RecordingOverlay : Window
         var tbIcon = EmojiTool.RenderEmoji("😀", 14);
         if (tbIcon != null) BtnEmoji.Content = tbIcon;
         HighlightEmojiCat();
-        RefreshEmojiGrid();
     }
 
     private void HighlightEmojiCat()

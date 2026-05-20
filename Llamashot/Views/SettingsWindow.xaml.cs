@@ -34,7 +34,7 @@ public partial class SettingsWindow : Window
         ("ShortcutLine", "Line", "L"),
         ("ShortcutRecMic", "Mic toggle", "N"),
         ("ShortcutMove", "Move", "V"),
-        ("ShortcutOcr", "OCR", "O"),
+        ("ShortcutOcr", "Text Extract", "O"),
         ("ShortcutRecPause", "Pause/Resume", "Space"),
         ("ShortcutPen", "Pencil", "P"),
         ("ShortcutPin", "Pin", "F"),
@@ -56,7 +56,7 @@ public partial class SettingsWindow : Window
     private static readonly (string Key, string Label, string Default)[] ToolbarShortcuts =
     {
         ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
-        ("ShortcutModeOcr", "OCR mode", "D3"),
+        ("ShortcutModeOcr", "Text Extract mode", "D3"),
         ("ShortcutToolbarRegion", "Region capture", "R"),
         ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
         ("ShortcutModeScroll", "Scroll capture", "D4"),

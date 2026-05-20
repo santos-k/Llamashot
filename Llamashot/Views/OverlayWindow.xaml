@@ -196,18 +196,25 @@
                                        VerticalAlignment="Center" FontWeight="SemiBold" />
                         </StackPanel>
                     </Button>
-                    <!-- OCR mode (4) -->
-                    <Button x:Name="BtnModeOcr" ToolTip="OCR (4)" Click="ModeOcr_Click" Style="{StaticResource TBtnFlex}">
+                    <!-- Text Extract mode (4) -->
+                    <Button x:Name="BtnModeOcr" ToolTip="Text Extract (4)" Click="ModeOcr_Click" Style="{StaticResource TBtnFlex}">
                         <StackPanel Orientation="Horizontal">
                             <Canvas Width="16" Height="16">
-                                <Ellipse Canvas.Left="1" Canvas.Top="0" Width="10" Height="10"
-                                         Stroke="#26C6DA" StrokeThickness="1.5" />
-                                <TextBlock Canvas.Left="3.5" Canvas.Top="-1" Text="T" Foreground="#26C6DA"
-                                           FontSize="8" FontWeight="Bold" />
-                                <Line X1="9.5" Y1="9" X2="14" Y2="13.5" Stroke="#00ACC1" StrokeThickness="2"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <!-- Document with scan line -->
+                                <Rectangle Canvas.Left="2" Canvas.Top="0" Width="12" Height="15"
+                                           Stroke="#26C6DA" StrokeThickness="1.3" RadiusX="1.5" RadiusY="1.5" />
+                                <Rectangle Canvas.Left="2" Canvas.Top="0" Width="12" Height="15"
+                                           RadiusX="1.5" RadiusY="1.5"
+                                           Fill="#1826C6DA" />
+                                <!-- Text lines -->
+                                <Line X1="5" Y1="4" X2="11" Y2="4" Stroke="#26C6DA" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="5" Y1="7" X2="11" Y2="7" Stroke="#26C6DA" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="5" Y1="10" X2="9" Y2="10" Stroke="#26C6DA" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <!-- Scan highlight -->
+                                <Rectangle Canvas.Left="3" Canvas.Top="6" Width="10" Height="2.5"
+                                           Fill="#4026C6DA" />
                             </Canvas>
-                            <TextBlock x:Name="LblOcr" Text="OCR" Foreground="#26C6DA" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="LblOcr" Text="Text Extract" Foreground="#26C6DA" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,6" />
@@ -480,15 +487,20 @@
                                      Fill="#F44336" />
                         </Canvas>
                     </Button>
-                    <!-- OCR - cyan magnifying glass with T -->
+                    <!-- Text Extract - document with scan -->
                     <Button x:Name="BtnOcr" ToolTip="Extract Text (O)" Click="Ocr_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <Ellipse Canvas.Left="1" Canvas.Top="0" Width="11" Height="11"
-                                     Stroke="#26C6DA" StrokeThickness="2" />
-                            <TextBlock Canvas.Left="3.5" Canvas.Top="-1" Text="T" Foreground="#26C6DA"
-                                       FontSize="9" FontWeight="Bold" />
-                            <Line X1="10.5" Y1="10" X2="15" Y2="14.5" Stroke="#00ACC1" StrokeThickness="2.5"
-                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <!-- Document shadow (3D depth) -->
+                            <Rectangle Canvas.Left="4" Canvas.Top="2" Width="12" Height="14"
+                                       Fill="#0D26C6DA" RadiusX="1.5" RadiusY="1.5" />
+                            <!-- Document body -->
+                            <Rectangle Canvas.Left="2" Canvas.Top="0" Width="12" Height="14"
+                                       Stroke="#26C6DA" StrokeThickness="1.5" RadiusX="1.5" RadiusY="1.5"
+                                       Fill="#1826C6DA" />
+                            <!-- Text lines -->
+                            <Line X1="5" Y1="4" X2="11" Y2="4" Stroke="#26C6DA" StrokeThickness="1.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="5" Y1="7" X2="11" Y2="7" Stroke="#26C6DA" StrokeThickness="1.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="5" Y1="10" X2="9" Y2="10" Stroke="#26C6DA" StrokeThickness="1.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
                     <Rectangle Width="1" Fill="#25FFFFFF" Margin="3,5" />

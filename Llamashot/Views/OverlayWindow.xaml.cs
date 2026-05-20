@@ -84,15 +84,20 @@ public partial class OverlayWindow : Window
 
     private int _emojiCatIdx = -1; // -1 = All
 
+    private bool _emojiInitialized;
+
     public OverlayWindow()
     {
         InitializeComponent();
         InitializeColorPalette();
         InitializeThicknessPopup();
-        InitializeEmojiPicker();
         _currentThickness = 3;
         ThicknessLabel.Text = "3";
         InitializeDelayPopup();
+
+        // Render emoji toolbar icon eagerly (single D2D call), defer full picker init
+        var tbIcon = EmojiTool.RenderEmoji("😀", 16);
+        if (tbIcon != null) BtnEmoji.Content = tbIcon;
 
         // Load persisted color
         try
@@ -264,7 +269,7 @@ public partial class OverlayWindow : Window
         if (tbIcon != null) BtnEmoji.Content = tbIcon;
 
         HighlightEmojiCat();
-        RefreshEmojiGrid();
+        // Defer emoji grid rendering until picker is first opened (D2D rendering is slow)
     }
 
     private void HighlightEmojiCat()
@@ -1603,8 +1608,16 @@ public partial class OverlayWindow : Window
         Focus();
     }
 
+    private void EnsureEmojiInitialized()
+    {
+        if (_emojiInitialized) return;
+        _emojiInitialized = true;
+        InitializeEmojiPicker();
+    }
+
     private void Emoji_Click(object sender, RoutedEventArgs e)
     {
+        EnsureEmojiInitialized();
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
 
