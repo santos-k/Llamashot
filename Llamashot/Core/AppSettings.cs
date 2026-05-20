@@ -43,12 +43,12 @@ public class AppSettings
     public string ShortcutOcr { get; set; } = "O";
     public string ShortcutPin { get; set; } = "F";
 
-    // Recording-only shortcuts
-    public string ShortcutRecMic { get; set; } = "M";
+    // Recording-specific shortcuts (shared section with tool shortcuts)
+    public string ShortcutRecMic { get; set; } = "N";
     public string ShortcutRecSystemAudio { get; set; } = "S";
     public string ShortcutRecPause { get; set; } = "Space";
     public string ShortcutRecStop { get; set; } = "Q";
-    public string ShortcutRecClearAll { get; set; } = "C";
+    public string ShortcutRecClearAll { get; set; } = "Ctrl+Delete";
 
     // Snipping toolbar shortcuts
     public string ShortcutModeScreenshot { get; set; } = "D1";

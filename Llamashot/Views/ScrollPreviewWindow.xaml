@@ -5,7 +5,7 @@
         Width="800" Height="700"
         MinWidth="500" MinHeight="400"
         WindowStartupLocation="CenterScreen"
-        Background="#1A1A1E"
+        Background="#0E0E1A"
         Icon="/Resources/icon32.png">
     <Window.Resources>
         <Style x:Key="TBtn" TargetType="Button">
@@ -21,15 +21,18 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                CornerRadius="4" Width="30" Height="30">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                CornerRadius="6" Width="30" Height="30">
+                            <Grid>
+                                <Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="6" />
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#333" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#18FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#444" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#28FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -46,7 +49,19 @@
         </Grid.RowDefinitions>
 
         <!-- Top toolbar -->
-        <Border Grid.Row="0" Background="#252528" Padding="8,6" BorderBrush="#333" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Padding="8,6" BorderThickness="0,0,0,1">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#FF181830" Offset="0"/>
+                    <GradientStop Color="#FF141428" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,1" EndPoint="1,1">
+                    <GradientStop Color="#20FFFFFF" Offset="0"/>
+                    <GradientStop Color="#10FFFFFF" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.BorderBrush>
             <WrapPanel x:Name="ToolWrapPanel" Orientation="Horizontal">
                 <!-- Drawing tools -->
                 <Button x:Name="BtnPen" Click="Tool_Click" Tag="Pen" Style="{StaticResource TBtn}" ToolTip="Pen">
@@ -114,7 +129,7 @@
                     </Canvas>
                 </Button>
 
-                <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
 
                 <!-- Undo -->
                 <Button x:Name="BtnUndo" Click="Undo_Click" Style="{StaticResource TBtn}" ToolTip="Undo">
@@ -130,7 +145,7 @@
                     </Canvas>
                 </Button>
 
-                <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
 
                 <!-- Color -->
                 <Button x:Name="BtnColor" Click="Color_Click" Style="{StaticResource TBtn}" ToolTip="Color">
@@ -146,7 +161,7 @@
                     </Grid>
                 </Button>
 
-                <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
 
                 <!-- Crop toggle -->
                 <Button x:Name="BtnCrop" Click="Crop_Click" Style="{StaticResource TBtn}" ToolTip="Crop">
@@ -184,21 +199,24 @@
 
         <!-- Color palette popup -->
         <Canvas x:Name="ColorPaletteCanvas" Grid.Row="1" Visibility="Collapsed" IsHitTestVisible="True">
-            <Border x:Name="ColorPalette" Background="#EE222222" CornerRadius="6" Padding="6">
+            <Border x:Name="ColorPalette" Background="#F0141428" CornerRadius="10" Padding="6"
+                    BorderBrush="#20FFFFFF" BorderThickness="1">
                 <WrapPanel x:Name="ColorSwatches" Width="140" />
             </Border>
         </Canvas>
 
         <!-- Thickness popup -->
         <Canvas x:Name="ThicknessPopupCanvas" Grid.Row="1" Visibility="Collapsed" IsHitTestVisible="True">
-            <Border x:Name="ThicknessPopup" Background="#EE222222" CornerRadius="6" Padding="6">
+            <Border x:Name="ThicknessPopup" Background="#F0141428" CornerRadius="10" Padding="6"
+                    BorderBrush="#20FFFFFF" BorderThickness="1">
                 <StackPanel x:Name="ThicknessOptions" />
             </Border>
         </Canvas>
 
         <!-- Emoji picker popup -->
         <Canvas x:Name="EmojiPickerCanvas" Grid.Row="1" Visibility="Collapsed" IsHitTestVisible="True">
-            <Border x:Name="EmojiPickerPopup" Background="#EE222222" CornerRadius="6" Padding="6">
+            <Border x:Name="EmojiPickerPopup" Background="#F0141428" CornerRadius="10" Padding="6"
+                    BorderBrush="#20FFFFFF" BorderThickness="1">
                 <StackPanel Width="284">
                     <Grid Margin="0,0,0,4">
                         <TextBox x:Name="EmojiSearchBox"
@@ -221,7 +239,19 @@
         </Canvas>
 
         <!-- Bottom buttons -->
-        <Border Grid.Row="2" Background="#252528" Padding="12,8" BorderBrush="#333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="2" Padding="12,8" BorderThickness="0,1,0,0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#FF141428" Offset="0"/>
+                    <GradientStop Color="#FF181830" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,1" EndPoint="1,1">
+                    <GradientStop Color="#20FFFFFF" Offset="0"/>
+                    <GradientStop Color="#10FFFFFF" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.BorderBrush>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="TxtInfo" Foreground="#777" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" />
                 <Button Content="Save" Width="80" Height="30" Click="Save_Click"

@@ -135,24 +135,45 @@ public static class CursorHelper
 
     private static void DrawPencil(DrawingContext dc)
     {
-        // Pencil angled ~45°, tip at bottom-left
+        // Clean pencil icon: body at ~45°, tip at hotspot (1,30)
+        var outline = new Pen(new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)), 1.2);
+
+        // Pencil body (orange)
         var body = new StreamGeometry();
         using (var ctx = body.Open())
         {
-            ctx.BeginFigure(new Point(4, 28), true, true);
-            ctx.LineTo(new Point(2, 30), true, false);
-            ctx.LineTo(new Point(6, 26), true, false);
-            ctx.LineTo(new Point(24, 8), true, false);
-            ctx.LineTo(new Point(28, 12), true, false);
-            ctx.LineTo(new Point(10, 30), true, false);
+            ctx.BeginFigure(new Point(1, 31), true, true);
+            ctx.LineTo(new Point(5, 25), true, false);
+            ctx.LineTo(new Point(23, 7), true, false);
+            ctx.LineTo(new Point(27, 11), true, false);
+            ctx.LineTo(new Point(9, 29), true, false);
         }
-        dc.DrawGeometry(Brushes.White, new Pen(Brushes.Black, 1), body);
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0xA7, 0x26)), outline, body);
 
-        // Tip
-        dc.DrawLine(new Pen(Brushes.Gray, 1), new Point(2, 30), new Point(6, 26));
-        // Eraser end
-        dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xFF, 0x80, 0x80)),
-            new Pen(Brushes.Black, 0.5), new Rect(22, 6, 8, 8));
+        // Tip (dark graphite)
+        var tip = new StreamGeometry();
+        using (var ctx = tip.Open())
+        {
+            ctx.BeginFigure(new Point(1, 31), true, true);
+            ctx.LineTo(new Point(5, 25), true, false);
+            ctx.LineTo(new Point(9, 29), true, false);
+        }
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0x5D, 0x40, 0x37)), null, tip);
+
+        // Eraser cap (pink)
+        var cap = new StreamGeometry();
+        using (var ctx = cap.Open())
+        {
+            ctx.BeginFigure(new Point(23, 7), true, true);
+            ctx.LineTo(new Point(27, 11), true, false);
+            ctx.LineTo(new Point(30, 8), true, false);
+            ctx.LineTo(new Point(26, 4), true, false);
+        }
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0x80, 0x80)), outline, cap);
+
+        // White highlight line on body for depth
+        dc.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(100, 255, 255, 255)), 1),
+            new Point(7, 26), new Point(24, 9));
     }
 
     private static void DrawEraserTool(DrawingContext dc)
@@ -255,18 +276,36 @@ public static class CursorHelper
 
     private static void DrawMarkerTool(DrawingContext dc)
     {
-        // Marker/highlighter shape
+        // Clean highlighter marker: chisel tip, semi-transparent yellow
+        var outline = new Pen(new SolidColorBrush(Color.FromArgb(160, 0, 0, 0)), 1);
+
+        // Marker body
         var body = new StreamGeometry();
         using (var ctx = body.Open())
         {
-            ctx.BeginFigure(new Point(4, 26), true, true);
-            ctx.LineTo(new Point(2, 30), true, false);
-            ctx.LineTo(new Point(10, 30), true, false);
-            ctx.LineTo(new Point(28, 12), true, false);
-            ctx.LineTo(new Point(24, 6), true, false);
+            ctx.BeginFigure(new Point(2, 30), true, true);
+            ctx.LineTo(new Point(4, 24), true, false);
+            ctx.LineTo(new Point(22, 6), true, false);
+            ctx.LineTo(new Point(28, 10), true, false);
+            ctx.LineTo(new Point(10, 28), true, false);
+            ctx.LineTo(new Point(8, 30), true, false);
         }
-        dc.DrawGeometry(new SolidColorBrush(Color.FromArgb(180, 0xFF, 0xFF, 0x00)),
-            new Pen(Brushes.Black, 1), body);
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0xEE, 0x58)), outline, body);
+
+        // Chisel tip (darker)
+        var tip = new StreamGeometry();
+        using (var ctx = tip.Open())
+        {
+            ctx.BeginFigure(new Point(2, 30), true, true);
+            ctx.LineTo(new Point(4, 24), true, false);
+            ctx.LineTo(new Point(10, 28), true, false);
+            ctx.LineTo(new Point(8, 30), true, false);
+        }
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xF9, 0xA8, 0x25)), null, tip);
+
+        // Highlight stripe for depth
+        dc.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), 1.5),
+            new Point(7, 25), new Point(24, 8));
     }
 
     private static void DrawBlurTool(DrawingContext dc)

@@ -13,6 +13,7 @@
         MouseWheel="Window_MouseWheel"
         Focusable="True">
     <Window.Resources>
+        <!-- Tool button style with overlay hover (preserves selection highlight) -->
         <Style x:Key="TBtn" TargetType="Button">
             <Setter Property="Width" Value="30" />
             <Setter Property="Height" Value="30" />
@@ -26,43 +27,52 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                CornerRadius="4" Width="30" Height="30">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                CornerRadius="6" Width="30" Height="30">
+                            <Grid>
+                                <Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="6" />
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#333333" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#18FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#444444" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#28FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- Flexible button style for toolbar items with text labels -->
+        <!-- Pill-shaped button style for mode selectors and labeled buttons -->
         <Style x:Key="TBtnFlex" TargetType="Button">
-            <Setter Property="Height" Value="30" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Focusable" Value="False" />
-            <Setter Property="Margin" Value="1" />
+            <Setter Property="Margin" Value="2,0" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                CornerRadius="4" Padding="6,0">
-                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="17" Padding="10,0">
+                            <Grid>
+                                <Border x:Name="HoverOverlay" Background="Transparent"
+                                        CornerRadius="16" Margin="-10,0" />
+                                <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#333333" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#12FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#444444" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#22FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -93,17 +103,19 @@
                        StrokeDashArray="4 2" Fill="#1026C6DA"
                        Visibility="Collapsed" IsHitTestVisible="False" />
             <Border x:Name="DimensionBorder"
-                    Background="#DD000000" CornerRadius="3" Padding="8,3"
+                    Background="#DD101020" CornerRadius="6" Padding="8,4"
+                    BorderBrush="#25FFFFFF" BorderThickness="1"
                     Visibility="Collapsed" IsHitTestVisible="False">
                 <TextBlock x:Name="DimensionText"
-                           Foreground="White" FontSize="12" FontFamily="Segoe UI" />
+                           Foreground="#DDFFFFFF" FontSize="12" FontFamily="Segoe UI" />
             </Border>
             <!-- Mode tooltip that follows cursor -->
             <Border x:Name="CursorTooltip"
-                    Background="#EE1A1A1E" CornerRadius="6" Padding="10,6"
+                    Background="#EE101020" CornerRadius="8" Padding="10,6"
+                    BorderBrush="#25FFFFFF" BorderThickness="1"
                     Visibility="Collapsed" IsHitTestVisible="False">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="8" Opacity="0.5" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <TextBlock x:Name="CursorTooltipText"
                            Foreground="#2196F3" FontSize="12" FontFamily="Segoe UI" />
@@ -122,10 +134,22 @@
         <!-- Snipping Toolbar (top center, shown before region selection) -->
         <Canvas x:Name="SnippingToolbarCanvas" Visibility="Collapsed">
             <Border x:Name="SnippingToolbar"
-                    Background="#FF111111" CornerRadius="8" Padding="4"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="12" Padding="4,4"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#E8141428" Offset="0"/>
+                        <GradientStop Color="#F0101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#30FFFFFF" Offset="0"/>
+                        <GradientStop Color="#12FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="12" Opacity="0.7" ShadowDepth="3" />
+                    <DropShadowEffect BlurRadius="20" Opacity="0.6" ShadowDepth="4" Color="#000020" />
                 </Border.Effect>
                 <StackPanel Orientation="Horizontal">
                     <!-- Screenshot mode (1) -->
@@ -186,7 +210,7 @@
                             <TextBlock x:Name="LblOcr" Text="OCR" Foreground="#26C6DA" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
+                    <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,6" />
                     <!-- Delay dropdown -->
                     <Button x:Name="BtnDelay" ToolTip="Delay timer" Click="Delay_Click" Style="{StaticResource TBtnFlex}">
                         <StackPanel Orientation="Horizontal">
@@ -199,7 +223,7 @@
                             <Path Data="M0,0 L4,4 L8,0" Stroke="#888" StrokeThickness="1.5" Margin="4,6,0,0" Width="8" Height="5" />
                         </StackPanel>
                     </Button>
-                    <Rectangle Width="1" Fill="#333" Margin="3,5" />
+                    <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,6" />
                     <!-- Close -->
                     <Button x:Name="BtnSnippingClose" ToolTip="Close (Esc)" Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="14" Height="14">
@@ -217,10 +241,22 @@
         <!-- Delay dropdown popup -->
         <Canvas x:Name="DelayPopupCanvas" Visibility="Collapsed">
             <Border x:Name="DelayPopup"
-                    Background="#FF111111" CornerRadius="6" Padding="4"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="10" Padding="4"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#F0141428" Offset="0"/>
+                        <GradientStop Color="#F5101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#28FFFFFF" Offset="0"/>
+                        <GradientStop Color="#10FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="8" Opacity="0.5" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <StackPanel x:Name="DelayOptions" />
             </Border>
@@ -230,10 +266,22 @@
         <Canvas x:Name="ToolbarCanvas" Visibility="Collapsed">
             <!-- Drawing tools (right side) - adaptive 1 or 2 columns -->
             <Border x:Name="DrawingToolbar"
-                    Background="#FF111111" CornerRadius="6" Padding="3"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="10" Padding="3"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#E8141428" Offset="0"/>
+                        <GradientStop Color="#F0101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#30FFFFFF" Offset="0"/>
+                        <GradientStop Color="#12FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="16" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <StackPanel x:Name="DrawingToolsPanel">
                     <!-- Tool buttons in a WrapPanel (width controls columns) -->
@@ -348,7 +396,7 @@
                             </Canvas>
                         </Button>
                     </WrapPanel>
-                    <Rectangle Height="1" Fill="#333" Margin="2,3" />
+                    <Rectangle Height="1" Fill="#25FFFFFF" Margin="2,4" />
                     <!-- Color + Thickness row -->
                     <WrapPanel x:Name="BottomToolsPanel" Width="32">
                         <Button x:Name="BtnColor" ToolTip="Color (C)" Click="Color_Click" Style="{StaticResource TBtn}">
@@ -370,10 +418,22 @@
 
             <!-- Action toolbar (bottom) -->
             <Border x:Name="ActionToolbar"
-                    Background="#FF111111" CornerRadius="6" Padding="3"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="10" Padding="3"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#E8141428" Offset="0"/>
+                        <GradientStop Color="#F0101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#30FFFFFF" Offset="0"/>
+                        <GradientStop Color="#12FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="16" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <StackPanel x:Name="ActionToolsPanel" Orientation="Horizontal">
                     <!-- Save - blue floppy -->
@@ -431,7 +491,7 @@
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                     </Button>
-                    <Rectangle Width="1" Fill="#333" Margin="2,4" />
+                    <Rectangle Width="1" Fill="#25FFFFFF" Margin="3,5" />
                     <!-- Close - red X -->
                     <Button x:Name="BtnClose" ToolTip="Close (Esc)" Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
@@ -446,10 +506,22 @@
         <!-- Video pre-start toolbar (shown instead of annotation tools for video mode) -->
         <Canvas x:Name="VideoToolbarCanvas" Visibility="Collapsed">
             <Border x:Name="VideoToolbar"
-                    Background="#EE111111" CornerRadius="8" Padding="6,4"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="12" Padding="6,4"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#E8141428" Offset="0"/>
+                        <GradientStop Color="#F0101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#30FFFFFF" Offset="0"/>
+                        <GradientStop Color="#12FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="12" Opacity="0.6" ShadowDepth="3" />
+                    <DropShadowEffect BlurRadius="20" Opacity="0.6" ShadowDepth="4" Color="#000020" />
                 </Border.Effect>
                 <StackPanel Orientation="Horizontal">
                     <!-- Start button -->
@@ -476,7 +548,7 @@
                     <!-- Timer -->
                     <TextBlock x:Name="VideoTimer" Text="00:00:00" Foreground="White" FontSize="15"
                                FontWeight="SemiBold" FontFamily="Consolas" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                    <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
                     <!-- Mic toggle -->
                     <Button x:Name="BtnVideoMic" Click="VideoMic_Click" Width="28" Height="28" Margin="4,0,2,0"
                             Cursor="Hand" ToolTip="Toggle microphone (M)"
@@ -505,7 +577,7 @@
                                   StrokeThickness="2" Visibility="Visible" />
                         </Canvas>
                     </Button>
-                    <Rectangle Width="1" Fill="#444" Margin="4,4" />
+                    <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
                     <!-- Close -->
                     <Button Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="14" Height="14">
@@ -520,10 +592,22 @@
         <!-- Color palette popup -->
         <Canvas x:Name="ColorPaletteCanvas" Visibility="Collapsed">
             <Border x:Name="ColorPalette"
-                    Background="#FF111111" CornerRadius="6" Padding="6"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="10" Padding="6"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#F0141428" Offset="0"/>
+                        <GradientStop Color="#F5101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#28FFFFFF" Offset="0"/>
+                        <GradientStop Color="#10FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <WrapPanel x:Name="ColorSwatches" Width="156" />
             </Border>
@@ -532,10 +616,22 @@
         <!-- Thickness popup -->
         <Canvas x:Name="ThicknessPopupCanvas" Visibility="Collapsed">
             <Border x:Name="ThicknessPopup"
-                    Background="#FF111111" CornerRadius="6" Padding="4"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="10" Padding="4"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#F0141428" Offset="0"/>
+                        <GradientStop Color="#F5101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#28FFFFFF" Offset="0"/>
+                        <GradientStop Color="#10FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <StackPanel x:Name="ThicknessOptions" />
             </Border>
@@ -544,10 +640,22 @@
         <!-- Emoji picker popup -->
         <Canvas x:Name="EmojiPickerCanvas" Visibility="Collapsed">
             <Border x:Name="EmojiPickerPopup"
-                    Background="#FF111111" CornerRadius="6" Padding="6"
-                    BorderBrush="#333" BorderThickness="1">
+                    CornerRadius="10" Padding="6"
+                    BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#F0141428" Offset="0"/>
+                        <GradientStop Color="#F5101020" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#28FFFFFF" Offset="0"/>
+                        <GradientStop Color="#10FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="10" Opacity="0.6" ShadowDepth="2" />
+                    <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <StackPanel Width="284">
                     <!-- Search box -->

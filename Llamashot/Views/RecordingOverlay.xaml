@@ -24,15 +24,18 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                CornerRadius="4" Width="26" Height="26">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                CornerRadius="6" Width="26" Height="26">
+                            <Grid>
+                                <Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="6" />
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#333333" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#18FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#444444" />
+                                <Setter TargetName="HoverOverlay" Property="Background" Value="#28FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -41,10 +44,22 @@
         </Style>
     </Window.Resources>
     <Grid>
-    <Border Background="#EE111111" CornerRadius="8" Padding="8,4"
-            BorderBrush="#333" BorderThickness="1">
+    <Border CornerRadius="12" Padding="8,4"
+            BorderThickness="1">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#E8141428" Offset="0"/>
+                <GradientStop Color="#F0101020" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <Border.BorderBrush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#30FFFFFF" Offset="0"/>
+                <GradientStop Color="#12FFFFFF" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.BorderBrush>
         <Border.Effect>
-            <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" />
+            <DropShadowEffect BlurRadius="20" Opacity="0.6" ShadowDepth="4" Color="#000020" />
         </Border.Effect>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <!-- Start button (pre-recording) -->
@@ -90,7 +105,7 @@
                        Foreground="White" FontSize="15" FontWeight="SemiBold" FontFamily="Consolas"
                        VerticalAlignment="Center" Margin="0,0,6,0" />
 
-            <Rectangle Width="1" Fill="#444" Margin="3,4" />
+            <Rectangle Width="1" Fill="#25FFFFFF" Margin="3,5" />
 
             <!-- Mic toggle -->
             <Button x:Name="BtnMic" Click="Mic_Click" Style="{StaticResource RBtn}" ToolTip="Mic (M)">
@@ -195,7 +210,7 @@
                 </Canvas>
             </Button>
 
-            <Rectangle Width="1" Fill="#444" Margin="3,4" />
+            <Rectangle Width="1" Fill="#25FFFFFF" Margin="3,5" />
 
             <!-- Color picker -->
             <Button x:Name="BtnRecColor" Click="RecColor_Click" Style="{StaticResource RBtn}" ToolTip="Color">
@@ -211,7 +226,7 @@
                 </Grid>
             </Button>
 
-            <Rectangle Width="1" Fill="#444" Margin="3,4" />
+            <Rectangle Width="1" Fill="#25FFFFFF" Margin="3,5" />
 
             <!-- Saving message (hidden until saving) -->
             <StackPanel x:Name="SavingPanel" Orientation="Horizontal" Visibility="Collapsed">
@@ -252,8 +267,20 @@
     <!-- Emoji picker as a Popup (floats in its own window, no parent resize needed) -->
     <Popup x:Name="EmojiPopup" Placement="Top" StaysOpen="True"
            AllowsTransparency="True" PlacementTarget="{Binding ElementName=BtnEmoji}">
-        <Border Background="#EE222222" CornerRadius="6" Padding="6"
-                BorderBrush="#333" BorderThickness="1">
+        <Border CornerRadius="10" Padding="6"
+                BorderThickness="1">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#F0141428" Offset="0"/>
+                    <GradientStop Color="#F5101020" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#28FFFFFF" Offset="0"/>
+                    <GradientStop Color="#10FFFFFF" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.BorderBrush>
             <StackPanel Width="284">
                 <Grid Margin="0,0,0,4">
                     <TextBox x:Name="EmojiSearchBox"

@@ -16,6 +16,7 @@ public partial class SettingsWindow : Window
         { "HistoryHotkey", "Alt+PrintScreen" }
     };
 
+    // Annotation & recording shortcuts — shared across screenshot and recording contexts
     private static readonly (string Key, string Label, string Default)[] ToolShortcuts =
     {
         ("ShortcutSave", "Save", "Ctrl+S"),
@@ -42,16 +43,16 @@ public partial class SettingsWindow : Window
         ("ShortcutRecord", "Record", "Ctrl+R"),
         ("ShortcutOcr", "OCR", "O"),
         ("ShortcutPin", "Pin", "F"),
-    };
-
-    private static readonly (string Key, string Label, string Default)[] RecordingShortcuts =
-    {
-        ("ShortcutRecMic", "Mic toggle", "M"),
+        // Recording-specific (also active during annotation)
+        ("ShortcutRecMic", "Mic toggle", "N"),
         ("ShortcutRecSystemAudio", "System audio", "S"),
         ("ShortcutRecPause", "Pause/Resume", "Space"),
         ("ShortcutRecStop", "Stop recording", "Q"),
-        ("ShortcutRecClearAll", "Clear all", "C"),
+        ("ShortcutRecClearAll", "Clear annotations", "Ctrl+Delete"),
     };
+
+    // Kept for validation backward compat — now empty, all merged into ToolShortcuts
+    private static readonly (string Key, string Label, string Default)[] RecordingShortcuts = Array.Empty<(string, string, string)>();
 
     private static readonly (string Key, string Label, string Default)[] ToolbarShortcuts =
     {
@@ -70,7 +71,6 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         BuildToolShortcutFields();
-        BuildShortcutSection(RecordingShortcuts, RecordingShortcutsPanel);
         BuildShortcutSection(ToolbarShortcuts, ToolbarShortcutsPanel);
         LoadSettings();
     }
