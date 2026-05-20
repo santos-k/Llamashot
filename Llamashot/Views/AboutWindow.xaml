@@ -22,7 +22,7 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 6.1.0" Foreground="#666"
+                <TextBlock Text="Version 6.2.0" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -50,15 +50,16 @@
                 <TextBlock Text="Features" Foreground="#42A5F5" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <Border Background="#252528" CornerRadius="6" Padding="14,10" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Region, fullscreen, and delayed capture" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Annotation: pen, line, arrow, rectangle, ellipse, text, marker, blur" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Check and cross stamps for review" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screen recording to MP4 (max 2 min)" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Region, fullscreen, and delayed capture with countdown" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; 12 annotation tools: pen, line, arrow, rectangle, ellipse, text, highlighter, blur, stamps, emoji, eraser" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Shift+draw: straight lines, perfect squares, circles" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; 250+ colorful emoji annotations with search" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screen recording to MP4 with mic &amp; system audio" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Scrolling screenshot (auto/manual) with stitching" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; OCR text extraction from screenshots" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screenshot history with thumbnails" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin screenshot on top, copy, save" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Customizable shortcuts and settings" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Text extraction from any screen area" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, video records, open in Explorer" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
                     </StackPanel>
                 </Border>
 

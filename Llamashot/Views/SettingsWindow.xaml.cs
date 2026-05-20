@@ -16,52 +16,52 @@ public partial class SettingsWindow : Window
         { "HistoryHotkey", "Alt+PrintScreen" }
     };
 
+    // Annotation & recording shortcuts — sorted alphabetically, shared across contexts
     private static readonly (string Key, string Label, string Default)[] ToolShortcuts =
     {
-        ("ShortcutSave", "Save", "Ctrl+S"),
-        ("ShortcutCopy", "Copy", "Ctrl+C"),
-        ("ShortcutUndo", "Undo", "Ctrl+Z"),
-        ("ShortcutRedo", "Redo", "Ctrl+Y"),
-        ("ShortcutPen", "Pencil", "P"),
-        ("ShortcutLine", "Line", "L"),
         ("ShortcutArrow", "Arrow", "A"),
-        ("ShortcutRectangle", "Rectangle", "R"),
-        ("ShortcutEllipse", "Ellipse", "E"),
-        ("ShortcutText", "Text", "T"),
-        ("ShortcutMarker", "Marker", "M"),
         ("ShortcutBlur", "Blur", "B"),
-        ("ShortcutEraser", "Undo last", "X"),
-        ("ShortcutObjectEraser", "Eraser", "G"),
-        ("ShortcutMove", "Move", "V"),
         ("ShortcutCheck", "Check mark", "K"),
-        ("ShortcutCross", "Cross mark", "D"),
-        ("ShortcutEmoji", "Emoji", "J"),
+        ("ShortcutRecClearAll", "Clear annotations", "Ctrl+Delete"),
         ("ShortcutColor", "Color", "C"),
-        ("ShortcutThickness", "Thickness", "W"),
-        ("ShortcutHistory", "History", "H"),
-        ("ShortcutRecord", "Record", "Ctrl+R"),
-        ("ShortcutOcr", "OCR", "O"),
+        ("ShortcutCopy", "Copy", "Ctrl+C"),
+        ("ShortcutCross", "Cross mark", "D"),
+        ("ShortcutEllipse", "Ellipse", "E"),
+        ("ShortcutEmoji", "Emoji", "J"),
+        ("ShortcutObjectEraser", "Eraser", "G"),
+        ("ShortcutMarker", "Highlighter", "H"),
+        ("ShortcutHistory", "History", "Ctrl+H"),
+        ("ShortcutLine", "Line", "L"),
+        ("ShortcutRecMic", "Mic toggle", "N"),
+        ("ShortcutMove", "Move", "V"),
+        ("ShortcutOcr", "Text Extract", "O"),
+        ("ShortcutRecPause", "Pause/Resume", "Space"),
+        ("ShortcutPen", "Pencil", "P"),
         ("ShortcutPin", "Pin", "F"),
+        ("ShortcutRectangle", "Rectangle", "R"),
+        ("ShortcutRecord", "Record", "Ctrl+R"),
+        ("ShortcutRedo", "Redo", "Ctrl+Y"),
+        ("ShortcutSave", "Save", "Ctrl+S"),
+        ("ShortcutRecStop", "Stop recording", "Q"),
+        ("ShortcutRecSystemAudio", "System audio", "S"),
+        ("ShortcutText", "Text", "T"),
+        ("ShortcutThickness", "Thickness", "W"),
+        ("ShortcutEraser", "Undo", "X"),
+        ("ShortcutUndo", "Undo (Ctrl)", "Ctrl+Z"),
     };
 
-    private static readonly (string Key, string Label, string Default)[] RecordingShortcuts =
-    {
-        ("ShortcutRecMic", "Mic toggle", "M"),
-        ("ShortcutRecSystemAudio", "System audio", "S"),
-        ("ShortcutRecPause", "Pause/Resume", "Space"),
-        ("ShortcutRecStop", "Stop recording", "Q"),
-        ("ShortcutRecClearAll", "Clear all", "C"),
-    };
+    // Kept for validation backward compat — now empty, all merged into ToolShortcuts
+    private static readonly (string Key, string Label, string Default)[] RecordingShortcuts = Array.Empty<(string, string, string)>();
 
     private static readonly (string Key, string Label, string Default)[] ToolbarShortcuts =
     {
-        ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
-        ("ShortcutModeVideo", "Video mode", "D2"),
-        ("ShortcutModeOcr", "OCR mode", "D3"),
-        ("ShortcutToolbarRegion", "Region capture", "R"),
-        ("ShortcutToolbarWindow", "Window capture", "W"),
         ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
+        ("ShortcutModeOcr", "Text Extract mode", "D3"),
+        ("ShortcutToolbarRegion", "Region capture", "R"),
+        ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
         ("ShortcutModeScroll", "Scroll capture", "D4"),
+        ("ShortcutModeVideo", "Video mode", "D2"),
+        ("ShortcutToolbarWindow", "Window capture", "W"),
     };
 
     private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();
@@ -70,7 +70,6 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         BuildToolShortcutFields();
-        BuildShortcutSection(RecordingShortcuts, RecordingShortcutsPanel);
         BuildShortcutSection(ToolbarShortcuts, ToolbarShortcutsPanel);
         LoadSettings();
     }

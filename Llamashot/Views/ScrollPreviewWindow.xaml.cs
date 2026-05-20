@@ -396,7 +396,6 @@ public partial class ScrollPreviewWindow : Window
         var tbIcon = EmojiTool.RenderEmoji("😀", 16);
         if (tbIcon != null) BtnEmoji.Content = tbIcon;
         HighlightEmojiCat();
-        RefreshEmojiGrid();
     }
 
     private void HighlightEmojiCat()

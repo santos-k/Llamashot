@@ -84,15 +84,20 @@ public partial class OverlayWindow : Window
 
     private int _emojiCatIdx = -1; // -1 = All
 
+    private bool _emojiInitialized;
+
     public OverlayWindow()
     {
         InitializeComponent();
         InitializeColorPalette();
         InitializeThicknessPopup();
-        InitializeEmojiPicker();
         _currentThickness = 3;
         ThicknessLabel.Text = "3";
         InitializeDelayPopup();
+
+        // Render emoji toolbar icon eagerly (single D2D call), defer full picker init
+        var tbIcon = EmojiTool.RenderEmoji("😀", 16);
+        if (tbIcon != null) BtnEmoji.Content = tbIcon;
 
         // Load persisted color
         try
@@ -264,7 +269,7 @@ public partial class OverlayWindow : Window
         if (tbIcon != null) BtnEmoji.Content = tbIcon;
 
         HighlightEmojiCat();
-        RefreshEmojiGrid();
+        // Defer emoji grid rendering until picker is first opened (D2D rendering is slow)
     }
 
     private void HighlightEmojiCat()
@@ -403,36 +408,46 @@ public partial class OverlayWindow : Window
 
     private void UpdateModeIndicator()
     {
-        Button activeBtn = _captureMode switch
-        {
-            CaptureMode.Video => BtnModeVideo,
-            CaptureMode.Ocr => BtnModeOcr,
-            CaptureMode.Scroll => BtnModeScroll,
-            _ => BtnModeScreenshot
-        };
-        var color = _captureMode switch
-        {
-            CaptureMode.Video => Color.FromRgb(0xF4, 0x43, 0x36),
-            CaptureMode.Ocr => Color.FromRgb(0x26, 0xC6, 0xDA),
-            CaptureMode.Scroll => Color.FromRgb(0xFF, 0xA7, 0x26),
-            _ => Color.FromRgb(0x21, 0x96, 0xF3)
-        };
-        ModeIndicator.Background = new SolidColorBrush(color);
-
-        var btnPos = activeBtn.TranslatePoint(new Point(0, 0), RootGrid);
-        Canvas.SetLeft(ModeIndicator, btnPos.X + (activeBtn.ActualWidth - 22) / 2);
-        Canvas.SetTop(ModeIndicator, btnPos.Y + activeBtn.ActualHeight + 2);
-
+        // Hide the old underline indicator — pills handle active state now
+        ModeIndicator.Visibility = Visibility.Collapsed;
         UpdateModeButtonColors();
     }
 
+    // Pill fill colors for active mode buttons (dark tinted versions of accent)
+    private static readonly (Color Accent, Color PillBg, Color PillBorder)[] ModePillColors =
+    {
+        (Color.FromRgb(0x64, 0xB5, 0xF6), Color.FromArgb(0xFF, 0x14, 0x28, 0x48), Color.FromArgb(0x50, 0x42, 0x8B, 0xF0)), // Screenshot
+        (Color.FromRgb(0xF4, 0x43, 0x36), Color.FromArgb(0xFF, 0x38, 0x14, 0x18), Color.FromArgb(0x50, 0xF4, 0x43, 0x36)), // Video
+        (Color.FromRgb(0xFF, 0xA7, 0x26), Color.FromArgb(0xFF, 0x2A, 0x1E, 0x0A), Color.FromArgb(0x50, 0xFF, 0xA7, 0x26)), // Scroll
+        (Color.FromRgb(0x26, 0xC6, 0xDA), Color.FromArgb(0xFF, 0x0A, 0x24, 0x2C), Color.FromArgb(0x50, 0x26, 0xC6, 0xDA)), // OCR
+    };
+
     private void UpdateModeButtonColors()
     {
+        var modeButtons = new[] { BtnModeScreenshot, BtnModeVideo, BtnModeScroll, BtnModeOcr };
+        var modes = new[] { CaptureMode.Screenshot, CaptureMode.Video, CaptureMode.Scroll, CaptureMode.Ocr };
+        var inactiveBorder = Brushes.Transparent;
+
+        for (int i = 0; i < modeButtons.Length; i++)
+        {
+            bool active = _captureMode == modes[i];
+            if (active)
+            {
+                modeButtons[i].Background = new SolidColorBrush(ModePillColors[i].PillBg);
+                modeButtons[i].BorderBrush = new SolidColorBrush(ModePillColors[i].PillBorder);
+            }
+            else
+            {
+                modeButtons[i].Background = Brushes.Transparent;
+                modeButtons[i].BorderBrush = inactiveBorder;
+            }
+        }
+
+        // Update icon/label colors
         var screenshotBrush = new SolidColorBrush(_captureMode == CaptureMode.Screenshot ? Color.FromRgb(0x64, 0xB5, 0xF6) : Color.FromRgb(0x88, 0x88, 0x88));
         var videoBrush = new SolidColorBrush(_captureMode == CaptureMode.Video ? Color.FromRgb(0xF4, 0x43, 0x36) : Color.FromRgb(0x88, 0x88, 0x88));
         var ocrBrush = new SolidColorBrush(_captureMode == CaptureMode.Ocr ? Color.FromRgb(0x26, 0xC6, 0xDA) : Color.FromRgb(0x88, 0x88, 0x88));
 
-        // Update icon colors in the StackPanel > Canvas
         var ssPanel = (StackPanel)BtnModeScreenshot.Content;
         foreach (var child in ((Canvas)ssPanel.Children[0]).Children)
         {
@@ -449,12 +464,10 @@ public partial class OverlayWindow : Window
         }
         LblVideo.Foreground = videoBrush;
 
-        // OCR icon colors stay distinct but label color changes
         LblOcr.Foreground = ocrBrush;
 
         var scrollBrush = new SolidColorBrush(_captureMode == CaptureMode.Scroll ? Color.FromRgb(0xFF, 0xA7, 0x26) : Color.FromRgb(0x88, 0x88, 0x88));
         LblScroll.Foreground = scrollBrush;
-        // Update scroll icon colors
         var scrollPanel = (StackPanel)BtnModeScroll.Content;
         foreach (var child in ((Canvas)scrollPanel.Children[0]).Children)
         {
@@ -642,8 +655,38 @@ public partial class OverlayWindow : Window
     {
         Hide();
 
+        // Show floating countdown
+        var countdown = new Window
+        {
+            WindowStyle = WindowStyle.None,
+            AllowsTransparency = true,
+            Background = Brushes.Transparent,
+            Topmost = true,
+            ShowInTaskbar = false,
+            Width = 120, Height = 120,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen
+        };
+        var countdownText = new TextBlock
+        {
+            FontSize = 56, FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 20, Opacity = 0.8, ShadowDepth = 0, Color = Colors.Black
+            }
+        };
+        countdown.Content = countdownText;
+        countdown.Show();
+
         for (int i = _delaySeconds; i > 0; i--)
+        {
+            countdownText.Text = i.ToString();
             await Task.Delay(1000);
+        }
+
+        countdown.Close();
 
         _screenshot = ScreenCapture.CaptureFullScreen();
         ScreenshotImage.Source = _screenshot;
@@ -930,7 +973,11 @@ public partial class OverlayWindow : Window
                 {
                     ExecuteWithDelay(() =>
                     {
-                        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
+                        // After delay, show toolbar and reset delay so next click selects normally
+                        _delaySeconds = 0;
+                        DelayLabel.Text = "No delay";
+                        SnippingToolbarCanvas.Visibility = Visibility.Visible;
+                        PositionSnippingToolbar();
                         _interaction = Interaction.ToolbarIdle;
                         Cursor = Cursors.Cross;
                     });
@@ -1561,8 +1608,16 @@ public partial class OverlayWindow : Window
         Focus();
     }
 
+    private void EnsureEmojiInitialized()
+    {
+        if (_emojiInitialized) return;
+        _emojiInitialized = true;
+        InitializeEmojiPicker();
+    }
+
     private void Emoji_Click(object sender, RoutedEventArgs e)
     {
+        EnsureEmojiInitialized();
         ColorPaletteCanvas.Visibility = Visibility.Collapsed;
         ThicknessPopupCanvas.Visibility = Visibility.Collapsed;
 

@@ -45,25 +45,35 @@ public partial class HistoryWindow : Window
     {
         InitializeComponent();
         LoadHistory();
+        Activated += (_, _) => LoadHistory(); // Refresh when window gets focus
     }
 
     private void LoadHistory()
     {
         HistoryManager.Load();
 
-        _items = HistoryManager.Records.Select(r => new HistoryItemViewModel
+        _items = HistoryManager.Records.Select(r =>
         {
-            ThumbnailPath = r.ThumbnailPath,
-            FilePath = r.FilePath,
-            DateText = r.CapturedAt.ToString("MMM dd, HH:mm"),
-            SizeText = $"{r.Width} x {r.Height}",
-            TypeText = r.Type == RecordType.Clipboard ? "Copied" : "Saved",
-            TypeColor = r.Type == RecordType.Clipboard ? "#42A5F5" : "#66BB6A",
-            ToolTipText = $"{r.FilePath}\n{r.CapturedAt:yyyy-MM-dd HH:mm:ss}\n{r.Width} x {r.Height}\n{(r.Type == RecordType.Clipboard ? "Copied to clipboard" : "Saved to file")}"
+            var (typeText, typeColor, typeDesc) = r.Type switch
+            {
+                RecordType.Clipboard => ("Copied", "#42A5F5", "Copied to clipboard"),
+                RecordType.Recording => ("Video", "#F44336", "Video recording"),
+                _ => ("Saved", "#66BB6A", "Saved to file")
+            };
+            return new HistoryItemViewModel
+            {
+                ThumbnailPath = r.ThumbnailPath,
+                FilePath = r.FilePath,
+                DateText = r.CapturedAt.ToString("MMM dd, HH:mm"),
+                SizeText = $"{r.Width} x {r.Height}",
+                TypeText = typeText,
+                TypeColor = typeColor,
+                ToolTipText = $"{r.FilePath}\n{r.CapturedAt:yyyy-MM-dd HH:mm:ss}\n{r.Width} x {r.Height}\n{typeDesc}"
+            };
         }).ToList();
 
         HistoryList.ItemsSource = _items;
-        TxtCount.Text = $"{_items.Count} screenshot{(_items.Count != 1 ? "s" : "")}";
+        TxtCount.Text = $"{_items.Count} item{(_items.Count != 1 ? "s" : "")}";
         TxtEmpty.Visibility = _items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateSelectionUI();
     }
@@ -110,6 +120,15 @@ public partial class HistoryWindow : Window
 
         if (dialog.ShowDialog() == true)
             File.Copy(item.FilePath, dialog.FileName, overwrite: true);
+    }
+
+    private void OpenInExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is HistoryItemViewModel item)
+        {
+            if (File.Exists(item.FilePath))
+                Process.Start("explorer.exe", $"/select,\"{item.FilePath}\"");
+        }
     }
 
     private void DeleteItem_Click(object sender, RoutedEventArgs e)

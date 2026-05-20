@@ -44,10 +44,26 @@ public class LineTool : BaseDrawingTool
     public override void OnMouseMove(Point position, Canvas canvas)
     {
         if (!IsDrawing || _line == null) return;
-        _line.X2 = position.X;
-        _line.Y2 = position.Y;
+
+        var end = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
+            ? SnapToAngle(StartPoint, position)
+            : position;
+
+        _line.X2 = end.X;
+        _line.Y2 = end.Y;
         if (CurrentAction != null && CurrentAction.Points.Count >= 2)
-            CurrentAction.Points[1] = position;
+            CurrentAction.Points[1] = end;
+    }
+
+    /// <summary>Snaps endpoint to nearest 0/45/90/135/180 degree angle from start.</summary>
+    private static Point SnapToAngle(Point start, Point end)
+    {
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+        var angle = Math.Atan2(dy, dx);
+        var snapped = Math.Round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        return new Point(start.X + Math.Cos(snapped) * length, start.Y + Math.Sin(snapped) * length);
     }
 
     public override void OnMouseUp(Point position, Canvas canvas)

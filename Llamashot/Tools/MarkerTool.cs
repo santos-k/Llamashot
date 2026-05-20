@@ -44,8 +44,29 @@ public class MarkerTool : BaseDrawingTool
     public override void OnMouseMove(Point position, Canvas canvas)
     {
         if (!IsDrawing || _polyline == null) return;
-        _polyline.Points.Add(position);
-        CurrentAction?.Points.Add(position);
+
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            // Constrain to straight line from start: snap to nearest axis
+            var dx = Math.Abs(position.X - StartPoint.X);
+            var dy = Math.Abs(position.Y - StartPoint.Y);
+            var snapped = dx >= dy
+                ? new Point(position.X, StartPoint.Y)  // horizontal
+                : new Point(StartPoint.X, position.Y);  // vertical
+
+            // Replace all points with just start → current for a clean line
+            _polyline.Points.Clear();
+            _polyline.Points.Add(StartPoint);
+            _polyline.Points.Add(snapped);
+            CurrentAction?.Points.Clear();
+            CurrentAction?.Points.Add(StartPoint);
+            CurrentAction?.Points.Add(snapped);
+        }
+        else
+        {
+            _polyline.Points.Add(position);
+            CurrentAction?.Points.Add(position);
+        }
     }
 
     public override void OnMouseUp(Point position, Canvas canvas)

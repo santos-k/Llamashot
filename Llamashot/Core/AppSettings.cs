@@ -28,7 +28,7 @@ public class AppSettings
     public string ShortcutRectangle { get; set; } = "R";
     public string ShortcutEllipse { get; set; } = "E";
     public string ShortcutText { get; set; } = "T";
-    public string ShortcutMarker { get; set; } = "M";
+    public string ShortcutMarker { get; set; } = "H";
     public string ShortcutBlur { get; set; } = "B";
     public string ShortcutEraser { get; set; } = "X";
     public string ShortcutObjectEraser { get; set; } = "G";
@@ -38,17 +38,17 @@ public class AppSettings
     public string ShortcutEmoji { get; set; } = "J";
     public string ShortcutColor { get; set; } = "C";
     public string ShortcutThickness { get; set; } = "W";
-    public string ShortcutHistory { get; set; } = "H";
+    public string ShortcutHistory { get; set; } = "Ctrl+H";
     public string ShortcutRecord { get; set; } = "Ctrl+R";
     public string ShortcutOcr { get; set; } = "O";
     public string ShortcutPin { get; set; } = "F";
 
-    // Recording-only shortcuts
-    public string ShortcutRecMic { get; set; } = "M";
+    // Recording-specific shortcuts (shared section with tool shortcuts)
+    public string ShortcutRecMic { get; set; } = "N";
     public string ShortcutRecSystemAudio { get; set; } = "S";
     public string ShortcutRecPause { get; set; } = "Space";
     public string ShortcutRecStop { get; set; } = "Q";
-    public string ShortcutRecClearAll { get; set; } = "C";
+    public string ShortcutRecClearAll { get; set; } = "Ctrl+Delete";
 
     // Snipping toolbar shortcuts
     public string ShortcutModeScreenshot { get; set; } = "D1";

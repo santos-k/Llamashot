@@ -43,9 +43,24 @@ public class ArrowTool : BaseDrawingTool
     public override void OnMouseMove(Point position, Canvas canvas)
     {
         if (!IsDrawing || _arrowPath == null) return;
-        _arrowPath.Data = BuildArrowGeometry(StartPoint, position);
+
+        var end = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
+            ? SnapToAngle(StartPoint, position)
+            : position;
+
+        _arrowPath.Data = BuildArrowGeometry(StartPoint, end);
         if (CurrentAction != null && CurrentAction.Points.Count >= 2)
-            CurrentAction.Points[1] = position;
+            CurrentAction.Points[1] = end;
+    }
+
+    private static Point SnapToAngle(Point start, Point end)
+    {
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+        var angle = Math.Atan2(dy, dx);
+        var snapped = Math.Round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        return new Point(start.X + Math.Cos(snapped) * length, start.Y + Math.Sin(snapped) * length);
     }
 
     public override void OnMouseUp(Point position, Canvas canvas)

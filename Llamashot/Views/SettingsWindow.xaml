@@ -129,18 +129,11 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Tool Shortcuts -->
-                <TextBlock Text="Tool Shortcuts" Style="{StaticResource SectionTitle}" />
-                <TextBlock Text="Click a field, then press your desired key or combination" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
+                <!-- Annotation & Recording Shortcuts -->
+                <TextBlock Text="Annotation &amp; Recording Shortcuts" Style="{StaticResource SectionTitle}" />
+                <TextBlock Text="Shared across screenshot and recording — click a field, then press your desired key" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel x:Name="ToolShortcutsPanel" />
-                </Border>
-
-                <!-- Recording Shortcuts -->
-                <TextBlock Text="Recording Shortcuts" Style="{StaticResource SectionTitle}" />
-                <TextBlock Text="Active during screen recording" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
-                <Border Style="{StaticResource Card}">
-                    <StackPanel x:Name="RecordingShortcutsPanel" />
                 </Border>
 
                 <!-- Toolbar Shortcuts -->

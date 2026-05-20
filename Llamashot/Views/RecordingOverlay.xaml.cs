@@ -488,7 +488,6 @@ public partial class RecordingOverlay : Window
         var tbIcon = EmojiTool.RenderEmoji("😀", 14);
         if (tbIcon != null) BtnEmoji.Content = tbIcon;
         HighlightEmojiCat();
-        RefreshEmojiGrid();
     }
 
     private void HighlightEmojiCat()
@@ -756,7 +755,11 @@ public partial class RecordingOverlay : Window
             bool success = await _recorder.SaveAsync(dialog.FileName);
             Hide();
 
-            if (!success)
+            if (success)
+            {
+                HistoryManager.AddVideoRecord(dialog.FileName, _pixelW, _pixelH);
+            }
+            else
             {
                 MessageBox.Show($"Failed to save recording.\n{_recorder.LastError}", "Llamashot",
                     MessageBoxButton.OK, MessageBoxImage.Error);
