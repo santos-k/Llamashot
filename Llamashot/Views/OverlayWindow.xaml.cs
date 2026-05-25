@@ -19,7 +19,7 @@ public partial class OverlayWindow : Window
 
     // Interaction state
     private enum Interaction { None, ToolbarIdle, Selecting, Resizing, Moving, Drawing, OcrSelecting }
-    internal enum CaptureMode { Screenshot, Video, Ocr, Scroll }
+    internal enum CaptureMode { Screenshot, Video, Gif, Ocr, Scroll }
     private Interaction _interaction = Interaction.None;
     private bool _hasSelection;
     private Point _selStart, _selEnd;
@@ -418,14 +418,15 @@ public partial class OverlayWindow : Window
     {
         (Color.FromRgb(0x64, 0xB5, 0xF6), Color.FromArgb(0xFF, 0x14, 0x28, 0x48), Color.FromArgb(0x50, 0x42, 0x8B, 0xF0)), // Screenshot
         (Color.FromRgb(0xF4, 0x43, 0x36), Color.FromArgb(0xFF, 0x38, 0x14, 0x18), Color.FromArgb(0x50, 0xF4, 0x43, 0x36)), // Video
+        (Color.FromRgb(0x4C, 0xAF, 0x50), Color.FromArgb(0xFF, 0x14, 0x2C, 0x16), Color.FromArgb(0x50, 0x4C, 0xAF, 0x50)), // GIF
         (Color.FromRgb(0xFF, 0xA7, 0x26), Color.FromArgb(0xFF, 0x2A, 0x1E, 0x0A), Color.FromArgb(0x50, 0xFF, 0xA7, 0x26)), // Scroll
         (Color.FromRgb(0x26, 0xC6, 0xDA), Color.FromArgb(0xFF, 0x0A, 0x24, 0x2C), Color.FromArgb(0x50, 0x26, 0xC6, 0xDA)), // OCR
     };
 
     private void UpdateModeButtonColors()
     {
-        var modeButtons = new[] { BtnModeScreenshot, BtnModeVideo, BtnModeScroll, BtnModeOcr };
-        var modes = new[] { CaptureMode.Screenshot, CaptureMode.Video, CaptureMode.Scroll, CaptureMode.Ocr };
+        var modeButtons = new[] { BtnModeScreenshot, BtnModeVideo, BtnModeGif, BtnModeScroll, BtnModeOcr };
+        var modes = new[] { CaptureMode.Screenshot, CaptureMode.Video, CaptureMode.Gif, CaptureMode.Scroll, CaptureMode.Ocr };
         var inactiveBorder = Brushes.Transparent;
 
         for (int i = 0; i < modeButtons.Length; i++)
@@ -464,6 +465,16 @@ public partial class OverlayWindow : Window
         }
         LblVideo.Foreground = videoBrush;
 
+        var gifBrush = new SolidColorBrush(_captureMode == CaptureMode.Gif ? Color.FromRgb(0x4C, 0xAF, 0x50) : Color.FromRgb(0x88, 0x88, 0x88));
+        LblGif.Foreground = gifBrush;
+        var gifPanel = (StackPanel)BtnModeGif.Content;
+        foreach (var child in ((Canvas)gifPanel.Children[0]).Children)
+        {
+            if (child is System.Windows.Shapes.Rectangle r) r.Stroke = gifBrush;
+            if (child is Ellipse el) el.Fill = gifBrush;
+            if (child is System.Windows.Shapes.Path p) p.Fill = gifBrush;
+        }
+
         LblOcr.Foreground = ocrBrush;
 
         var scrollBrush = new SolidColorBrush(_captureMode == CaptureMode.Scroll ? Color.FromRgb(0xFF, 0xA7, 0x26) : Color.FromRgb(0x88, 0x88, 0x88));
@@ -488,6 +499,12 @@ public partial class OverlayWindow : Window
     private void ModeVideo_Click(object sender, RoutedEventArgs e)
     {
         _captureMode = CaptureMode.Video;
+        OnModeChanged();
+    }
+
+    private void ModeGif_Click(object sender, RoutedEventArgs e)
+    {
+        _captureMode = CaptureMode.Gif;
         OnModeChanged();
     }
 
@@ -526,6 +543,7 @@ public partial class OverlayWindow : Window
         {
             CaptureMode.Screenshot => ("Drag to select capture area", Color.FromRgb(0x21, 0x96, 0xF3)),
             CaptureMode.Video => ("Drag to select recording area", Color.FromRgb(0xF4, 0x43, 0x36)),
+            CaptureMode.Gif => ("Drag to select GIF recording area (max 30s)", Color.FromRgb(0x4C, 0xAF, 0x50)),
             CaptureMode.Ocr => ("Drag to select text area", Color.FromRgb(0x26, 0xC6, 0xDA)),
             CaptureMode.Scroll => ("Click on a window to capture scroll", Color.FromRgb(0xFF, 0xA7, 0x26)),
             _ => ("Drag to select area", Color.FromRgb(0x21, 0x96, 0xF3))
@@ -604,7 +622,7 @@ public partial class OverlayWindow : Window
 
         UpdateDimming(_selection);
 
-        if (_captureMode == CaptureMode.Video)
+        if (_captureMode is CaptureMode.Video or CaptureMode.Gif)
         {
             ShowVideoToolbar();
             ShowResizeHandles();
@@ -619,7 +637,7 @@ public partial class OverlayWindow : Window
 
     private void ExecuteFullscreenCapture_Inner()
     {
-        if (_captureMode == CaptureMode.Video)
+        if (_captureMode is CaptureMode.Video or CaptureMode.Gif)
         {
             SetSelectionAndShowToolbar(new Rect(0, 0, ActualWidth, ActualHeight), isFullRegion: true);
         }
@@ -646,7 +664,8 @@ public partial class OverlayWindow : Window
 
         Hide();
 
-        var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, dipRegion.Width, dipRegion.Height);
+        var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, dipRegion.Width, dipRegion.Height,
+            isGifMode: _captureMode == CaptureMode.Gif);
         overlay.Show();
         Close();
     }
@@ -1148,10 +1167,15 @@ public partial class OverlayWindow : Window
                         return;
                     }
                     SetSelectionAndShowToolbar(_selection);
-                    if (_captureMode == CaptureMode.Video)
+                    if (_captureMode is CaptureMode.Video or CaptureMode.Gif)
                     {
-                        CursorTooltipText.Text = "Press Record to start recording";
-                        CursorTooltipText.Foreground = new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36));
+                        CursorTooltipText.Text = _captureMode == CaptureMode.Gif
+                            ? "Press Record to start GIF recording (max 30s)"
+                            : "Press Record to start recording";
+                        CursorTooltipText.Foreground = new SolidColorBrush(
+                            _captureMode == CaptureMode.Gif
+                                ? Color.FromRgb(0x4C, 0xAF, 0x50)
+                                : Color.FromRgb(0xF4, 0x43, 0x36));
                         CursorTooltip.Visibility = Visibility.Visible;
                     }
                 }
@@ -1481,7 +1505,8 @@ public partial class OverlayWindow : Window
         Hide();
 
         var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, _selection.Width, _selection.Height,
-            startImmediately: true, micEnabled: _videoMicEnabled, sysAudioEnabled: _videoSysAudioEnabled);
+            startImmediately: true, micEnabled: _videoMicEnabled, sysAudioEnabled: _videoSysAudioEnabled,
+            isGifMode: _captureMode == CaptureMode.Gif);
         overlay.Show();
         Close();
     }
@@ -2185,7 +2210,8 @@ public partial class OverlayWindow : Window
 
         Hide();
 
-        var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, dw, dh);
+        var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, dw, dh,
+            isGifMode: _captureMode == CaptureMode.Gif);
         overlay.Show();
         Close();
     }
@@ -2218,6 +2244,7 @@ public partial class OverlayWindow : Window
             if (e.Key == Key.Escape) { Close(); e.Handled = true; return; }
             if (ShortcutHelper.Matches(e, st.ShortcutModeScreenshot)) { ModeScreenshot_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (ShortcutHelper.Matches(e, st.ShortcutModeVideo)) { ModeVideo_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (ShortcutHelper.Matches(e, st.ShortcutModeGif)) { ModeGif_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (ShortcutHelper.Matches(e, st.ShortcutModeOcr)) { ModeOcr_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (ShortcutHelper.Matches(e, st.ShortcutModeScroll)) { ModeScroll_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             return;

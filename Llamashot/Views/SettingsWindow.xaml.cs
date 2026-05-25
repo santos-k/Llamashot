@@ -56,7 +56,8 @@ public partial class SettingsWindow : Window
     private static readonly (string Key, string Label, string Default)[] ToolbarShortcuts =
     {
         ("ShortcutToolbarFullscreen", "Fullscreen capture", "F"),
-        ("ShortcutModeOcr", "Text Extract mode", "D3"),
+        ("ShortcutModeGif", "GIF mode", "D3"),
+        ("ShortcutModeOcr", "Text Extract mode", "D5"),
         ("ShortcutToolbarRegion", "Region capture", "R"),
         ("ShortcutModeScreenshot", "Screenshot mode", "D1"),
         ("ShortcutModeScroll", "Scroll capture", "D4"),

@@ -10,11 +10,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### Snipping Toolbar
 - **Windows Snipping Tool-style toolbar** - Press PrintScreen to open a top-center toolbar over dimmed screen
-- **Four capture modes** - Screenshot (default), Video, OCR, Scroll with labeled icon buttons
+- **Five capture modes** - Screenshot (default), Video, GIF, Scroll, Text Extract with labeled icon buttons
 - **Three capture types** - Region (draw to select), Window (hover + click), Fullscreen (instant)
 - **Window capture** - Hover over any window to highlight with blue border, click to capture
 - **Delay timer** - Dropdown: No delay, 1s, 3s, 5s, 10s countdown before capture
-- **Toolbar keyboard shortcuts** - 1/2/3 for modes, R/W/F for capture types
+- **Toolbar keyboard shortcuts** - 1/2/3/4/5 for modes, R/W/F for capture types
 - **Seamless default** - Drawing a region immediately works like before, toolbar auto-hides
 
 - **Cursor tooltip** - Context-aware message follows cursor (e.g. "Drag to select capture area", "Click on a window to capture scroll")
@@ -63,7 +63,9 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Same selection as screenshot** - 8 resize handles, move by dragging, double-click for fullscreen toggle
 - **Resizable recording border** - Blue L-shaped corner brackets, white midpoint bars, dimension label
 - Record any selected region as MP4 video (H.264 compressed)
-- **Unlimited duration**, 10fps
+- **GIF recording mode** - Dedicated mode (key 3) with 30-second limit, countdown timer, auto-stop
+- **Quality picker** - Choose Original (full res), High (720p), or Compact (480p) when saving GIF or video
+- **Unlimited duration** for video, 10fps
 - **Separate mic and system audio toggles** - Independent on/off before and during recording
 - **Full annotation toolkit** - All 12 screenshot tools available during recording (Pen, Line, Arrow, Rectangle, Ellipse, Text, Marker, Check, Cross, Emoji, Eraser, Undo, Clear)
 - **Color picker + Thickness** - Change annotation color and stroke width during recording
@@ -107,7 +109,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### Additional Features
 - **System tray** - Single click captures, double click opens settings
-- **Silent auto-start** - Launches with Windows without popups (`--silent` flag)
+- **Silent startup** - No popup when already running; launches quietly with Windows
 - **Double-Esc emergency exit** - Global hard kill for any stuck overlay/recording
 - **Selection clamping** - Selection region can't extend beyond screen bounds
 - **Move tool (V)** - Drag selection and annotations together
@@ -143,8 +145,9 @@ All shortcuts are customizable in Settings.
 |--------|---------|
 | Screenshot mode | 1 |
 | Recording mode | 2 |
-| Long Shot mode | 3 |
-| Text Extract mode | 4 |
+| GIF mode | 3 |
+| Long Shot mode | 4 |
+| Text Extract mode | 5 |
 | Region capture | R |
 | Window capture | W |
 | Fullscreen capture | F |
@@ -221,6 +224,7 @@ dotnet run
 - **Framework**: .NET 10, WPF
 - **Screen capture**: GDI BitBlt via P/Invoke
 - **Video encoding**: WinRT MediaComposition (JPEG frames to MP4)
+- **GIF encoding**: Custom GIF89a encoder with per-frame color tables
 - **Audio capture**: WinRT AudioGraph (microphone + system loopback)
 - **OCR**: Windows.Media.Ocr (built-in, offline)
 - **Settings**: JSON file in AppData/Roaming

@@ -25,6 +25,7 @@ public class ScreenRecorder : IDisposable
     private Windows.Media.Audio.AudioFileOutputNode? _audioOutputNode;
     private string? _audioFilePath;
 
+    public string? FramesDirectory => _framesDir;
     public bool IsRecording => _recording;
     public bool IsPaused => _paused;
     public bool HasMic { get; private set; }
@@ -285,7 +286,9 @@ public class ScreenRecorder : IDisposable
 
     // ============ SAVE ============
 
-    public async Task<bool> SaveAsync(string outputPath)
+    /// <param name="outputPath">Output MP4 file path.</param>
+    /// <param name="maxWidth">Max width in pixels (0 = original resolution).</param>
+    public async Task<bool> SaveAsync(string outputPath, int maxWidth = 0)
     {
         if (_framesDir == null || _frameCount == 0) return false;
 
@@ -300,6 +303,18 @@ public class ScreenRecorder : IDisposable
             try { _audioMicNode?.Dispose(); } catch { } _audioMicNode = null;
             try { _audioLoopbackNode?.Dispose(); } catch { } _audioLoopbackNode = null;
             try { _audioGraph?.Dispose(); } catch { } _audioGraph = null;
+
+            // Calculate output dimensions
+            int outW = _regionW;
+            int outH = _regionH;
+            if (maxWidth > 0 && outW > maxWidth)
+            {
+                double scale = (double)maxWidth / outW;
+                outW = maxWidth;
+                outH = (int)(_regionH * scale);
+            }
+            outW = outW % 2 == 0 ? outW : outW - 1;
+            outH = outH % 2 == 0 ? outH : outH - 1;
 
             var composition = new Windows.Media.Editing.MediaComposition();
             var frameDuration = TimeSpan.FromMilliseconds(1000.0 / _fps);
@@ -328,15 +343,15 @@ public class ScreenRecorder : IDisposable
                 catch { }
             }
 
-            var quality = _regionW >= 1920
+            var quality = outW >= 1920
                 ? Windows.Media.MediaProperties.VideoEncodingQuality.HD1080p
-                : _regionW >= 1280
+                : outW >= 1280
                     ? Windows.Media.MediaProperties.VideoEncodingQuality.HD720p
                     : Windows.Media.MediaProperties.VideoEncodingQuality.Vga;
 
             var profile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateMp4(quality);
-            profile.Video.Width = (uint)(_regionW % 2 == 0 ? _regionW : _regionW - 1);
-            profile.Video.Height = (uint)(_regionH % 2 == 0 ? _regionH : _regionH - 1);
+            profile.Video.Width = (uint)outW;
+            profile.Video.Height = (uint)outH;
 
             var dir = Path.GetDirectoryName(outputPath)!;
             Directory.CreateDirectory(dir);

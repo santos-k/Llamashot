@@ -26,13 +26,16 @@ public partial class RecordingOverlay : Window
     private DateTime _lastEscTime = DateTime.MinValue;
     private string _selectedEmoji = "👍";
     private int _emojiCatIdx = -1;
+    private readonly bool _isGifMode;
 
     public RecordingOverlay(int pixelX, int pixelY, int pixelW, int pixelH,
                             double dipX, double dipY, double dipW, double dipH,
-                            bool startImmediately = false, bool micEnabled = false, bool sysAudioEnabled = false)
+                            bool startImmediately = false, bool micEnabled = false, bool sysAudioEnabled = false,
+                            bool isGifMode = false)
     {
         InitializeComponent();
         InitializeEmojiPicker();
+        _isGifMode = isGifMode;
 
         _dipX = dipX; _dipY = dipY; _dipW = dipW; _dipH = dipH;
         _pixelX = pixelX; _pixelY = pixelY; _pixelW = pixelW; _pixelH = pixelH;
@@ -52,6 +55,12 @@ public partial class RecordingOverlay : Window
 
         _border = new RecordingBorder(dipX, dipY, dipW, dipH);
         App.ActiveRecordingOverlay = this;
+
+        if (_isGifMode)
+        {
+            GifBadge.Visibility = Visibility.Visible;
+            TxtTimer.Text = "00:30";
+        }
 
         Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
         Top = 10;
@@ -82,22 +91,24 @@ public partial class RecordingOverlay : Window
 
                 _preRecording = false;
 
-                // Init audio with requested settings
-                bool audioOk = await _recorder.InitAudioAsync(micEnabled, sysAudioEnabled);
-                if (audioOk)
+                // Skip audio in GIF mode (GIF has no audio)
+                if (!_isGifMode)
                 {
-                    _micEnabled = _recorder.MicActive;
-                    _systemAudioEnabled = _recorder.SystemAudioActive;
+                    bool audioOk = await _recorder.InitAudioAsync(micEnabled, sysAudioEnabled);
+                    if (audioOk)
+                    {
+                        _micEnabled = _recorder.MicActive;
+                        _systemAudioEnabled = _recorder.SystemAudioActive;
+                    }
+                    else
+                    {
+                        _micEnabled = false;
+                        _systemAudioEnabled = false;
+                    }
+                    UpdateMicUI();
+                    UpdateSystemAudioUI();
+                    UpdateAudioStatusText();
                 }
-                else
-                {
-                    // Audio init failed — reset to off but keep buttons enabled
-                    _micEnabled = false;
-                    _systemAudioEnabled = false;
-                }
-                UpdateMicUI();
-                UpdateSystemAudioUI();
-                UpdateAudioStatusText();
             };
         }
         else
@@ -115,14 +126,17 @@ public partial class RecordingOverlay : Window
                 var bh = new WindowInteropHelper(_border).Handle;
                 NativeMethods.SetWindowDisplayAffinity(bh, NativeMethods.WDA_EXCLUDEFROMCAPTURE);
 
-                bool audioOk = await _recorder.InitAudioAsync(true, true);
-                if (audioOk)
+                if (!_isGifMode)
                 {
-                    _micEnabled = _recorder.MicActive;
-                    _systemAudioEnabled = _recorder.SystemAudioActive;
-                    UpdateMicUI();
-                    UpdateSystemAudioUI();
-                    UpdateAudioStatusText();
+                    bool audioOk = await _recorder.InitAudioAsync(true, true);
+                    if (audioOk)
+                    {
+                        _micEnabled = _recorder.MicActive;
+                        _systemAudioEnabled = _recorder.SystemAudioActive;
+                        UpdateMicUI();
+                        UpdateSystemAudioUI();
+                        UpdateAudioStatusText();
+                    }
                 }
             };
         }
@@ -136,6 +150,14 @@ public partial class RecordingOverlay : Window
 
         BtnStart.Visibility = pre;
         BtnPreClose.Visibility = pre;
+
+        // Timer + audio controls hidden during pre-recording
+        TxtTimer.Visibility = rec;
+        SepAudio.Visibility = _isGifMode ? Visibility.Collapsed : rec;
+        BtnMic.Visibility = _isGifMode ? Visibility.Collapsed : rec;
+        BtnSystemAudio.Visibility = _isGifMode ? Visibility.Collapsed : rec;
+        TxtAudioStatus.Visibility = _isGifMode ? Visibility.Collapsed : rec;
+
         RecDot.Visibility = rec;
         SepAnnotations.Visibility = rec;
         BtnPen.Visibility = rec;
@@ -154,6 +176,12 @@ public partial class RecordingOverlay : Window
         BtnRecColor.Visibility = rec;
         BtnRecThickness.Visibility = rec;
         PanelRecControls.Visibility = rec;
+
+        // Re-center after layout change
+        Dispatcher.InvokeAsync(() =>
+        {
+            Left = (SystemParameters.PrimaryScreenWidth - ActualWidth) / 2;
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private async void Start_Click(object sender, RoutedEventArgs e)
@@ -209,9 +237,29 @@ public partial class RecordingOverlay : Window
     private void UpdateTimer()
     {
         var elapsed = _recorder.Elapsed;
-        TxtTimer.Text = elapsed.TotalHours >= 1
-            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
-            : $"{(int)elapsed.TotalMinutes:00}:{elapsed.Seconds:00}";
+
+        if (_isGifMode)
+        {
+            int maxSec = GifEncoder.MaxGifSeconds;
+            var remaining = TimeSpan.FromSeconds(maxSec) - elapsed;
+            if (remaining.TotalSeconds <= 0)
+            {
+                TxtTimer.Text = "00:00";
+                FinishRecording();
+                return;
+            }
+            TxtTimer.Text = $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
+            // Flash timer red in last 5 seconds
+            TxtTimer.Foreground = remaining.TotalSeconds <= 5
+                ? new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36))
+                : new SolidColorBrush(Colors.White);
+        }
+        else
+        {
+            TxtTimer.Text = elapsed.TotalHours >= 1
+                ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
+                : $"{(int)elapsed.TotalMinutes:00}:{elapsed.Seconds:00}";
+        }
     }
 
     private void UpdateMicUI()
@@ -398,6 +446,7 @@ public partial class RecordingOverlay : Window
         {
             _annotationOverlay = new RecordingAnnotation(_dipX, _dipY, _dipW, _dipH);
             _annotationOverlay.EscapePressed += HandleEscapePress;
+            _annotationOverlay.StrokeCompleted += () => Activate();
             _annotationOverlay.Show();
         }
 
@@ -608,6 +657,7 @@ public partial class RecordingOverlay : Window
         {
             _annotationOverlay = new RecordingAnnotation(_dipX, _dipY, _dipW, _dipH);
             _annotationOverlay.EscapePressed += HandleEscapePress;
+            _annotationOverlay.StrokeCompleted += () => Activate();
             _annotationOverlay.Show();
         }
         _annotationOverlay.SetEraserMode(false);
@@ -642,8 +692,10 @@ public partial class RecordingOverlay : Window
     {
         // Hide everything except saving panel
         BtnStart.Visibility = Visibility.Collapsed;
+        GifBadge.Visibility = Visibility.Collapsed;
         RecDot.Visibility = Visibility.Collapsed;
         TxtTimer.Visibility = Visibility.Collapsed;
+        SepAudio.Visibility = Visibility.Collapsed;
         BtnMic.Visibility = Visibility.Collapsed;
         BtnSystemAudio.Visibility = Visibility.Collapsed;
         TxtAudioStatus.Visibility = Visibility.Collapsed;
@@ -666,6 +718,12 @@ public partial class RecordingOverlay : Window
         BtnPreClose.Visibility = Visibility.Collapsed;
         PanelRecControls.Visibility = Visibility.Collapsed;
         SavingPanel.Visibility = Visibility.Visible;
+
+        // Re-center after layout change
+        Dispatcher.InvokeAsync(() =>
+        {
+            Left = (SystemParameters.PrimaryScreenWidth - ActualWidth) / 2;
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void Undo_Click(object sender, RoutedEventArgs e)
@@ -739,20 +797,60 @@ public partial class RecordingOverlay : Window
             return;
         }
 
+        string defaultExt;
+        string filter;
+        if (_isGifMode)
+        {
+            filter = "GIF Animation|*.gif|MP4 Video|*.mp4";
+            defaultExt = "gif";
+        }
+        else
+        {
+            filter = "MP4 Video|*.mp4|GIF Animation|*.gif";
+            defaultExt = "mp4";
+        }
+
         var dialog = new SaveFileDialog
         {
-            Filter = "MP4 Video|*.mp4",
-            DefaultExt = "mp4",
+            Filter = filter,
+            DefaultExt = defaultExt,
             FileName = $"recording_{DateTime.Now:yyyyMMdd_HHmmss}",
             InitialDirectory = AppSettings.Instance.LastSaveDirectory
         };
 
         if (dialog.ShowDialog() == true)
         {
-            // Hide all tools, show only saving message
-            SetSavingUI();
+            bool isGif = dialog.FileName.EndsWith(".gif", StringComparison.OrdinalIgnoreCase);
 
-            bool success = await _recorder.SaveAsync(dialog.FileName);
+            // Show quality picker
+            var qualityDialog = new GifQualityDialog(isGif: isGif);
+            if (qualityDialog.ShowDialog() != true)
+            {
+                _recorder.CleanupFrames();
+                _recorder.Dispose();
+                Close();
+                return;
+            }
+
+            SetSavingUI();
+            bool success;
+
+            if (isGif)
+            {
+                SavingText.Text = "Encoding GIF...";
+                success = await GifEncoder.SaveAsync(
+                    _recorder.FramesDirectory!, frameCount, 10, dialog.FileName,
+                    maxWidth: qualityDialog.MaxWidth,
+                    frameSkip: qualityDialog.FrameSkip,
+                    progress: p => Dispatcher.Invoke(() =>
+                        SavingText.Text = $"Encoding GIF... {(int)(p * 100)}%"));
+            }
+            else
+            {
+                SavingText.Text = "Saving video...";
+                success = await _recorder.SaveAsync(dialog.FileName, maxWidth: qualityDialog.MaxWidth);
+            }
+
             Hide();
 
             if (success)

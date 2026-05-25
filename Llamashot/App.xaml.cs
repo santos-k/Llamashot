@@ -48,12 +48,10 @@ public partial class App : Application
             ex.Handled = true;
         };
 
-        // Single instance check
+        // Single instance check — always silent (no dialog)
         _mutex = new Mutex(true, "LlamashotAppMutex", out bool isNew);
         if (!isNew)
         {
-            if (!_silentStart)
-                MessageBox.Show("Llamashot is already running.", "Llamashot", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -212,6 +210,7 @@ public partial class App : Application
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add("Take Screenshot", null, (s, e) => StartRegionCapture());
         menu.Items.Add("Record Screen", null, (s, e) => StartRecordCapture());
+        menu.Items.Add("Record GIF", null, (s, e) => StartGifCapture());
         menu.Items.Add("Delayed Capture...", null, (s, e) => ShowDelayedCapture());
         menu.Items.Add("Fullscreen to Clipboard", null, (s, e) => FullscreenClipboard());
         menu.Items.Add("-");
@@ -282,6 +281,16 @@ public partial class App : Application
             if (HasActiveOverlay()) return;
             var overlay = new OverlayWindow();
             overlay.StartCapture(OverlayWindow.CaptureMode.Video);
+        });
+    }
+
+    private void StartGifCapture()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (HasActiveOverlay()) return;
+            var overlay = new OverlayWindow();
+            overlay.StartCapture(OverlayWindow.CaptureMode.Gif);
         });
     }
 
