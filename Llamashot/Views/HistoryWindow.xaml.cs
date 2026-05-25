@@ -57,6 +57,8 @@ public partial class HistoryWindow : Window
             var (typeText, typeColor, typeDesc) = r.Type switch
             {
                 RecordType.Clipboard => ("Copied", "#42A5F5", "Copied to clipboard"),
+                RecordType.Recording when r.FilePath?.EndsWith(".gif", StringComparison.OrdinalIgnoreCase) == true
+                    => ("GIF", "#4CAF50", "GIF recording"),
                 RecordType.Recording => ("Video", "#F44336", "Video recording"),
                 _ => ("Saved", "#66BB6A", "Saved to file")
             };

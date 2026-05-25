@@ -7,7 +7,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        Width="680" Height="50"
+        SizeToContent="Width" Height="50"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
@@ -84,6 +84,12 @@
                 </Button.Template>
             </Button>
 
+            <!-- GIF badge (only visible in GIF mode) -->
+            <Border x:Name="GifBadge" CornerRadius="4" Background="#4CAF50" Padding="5,1" Margin="0,0,4,0"
+                    VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock Text="GIF" Foreground="White" FontSize="10" FontWeight="Bold" />
+            </Border>
+
             <!-- Recording dot (blinks) -->
             <Ellipse x:Name="RecDot" Width="12" Height="12" Fill="#F44336" Margin="0,0,6,0"
                      VerticalAlignment="Center" Visibility="Collapsed">
@@ -105,7 +111,7 @@
                        Foreground="White" FontSize="15" FontWeight="SemiBold" FontFamily="Consolas"
                        VerticalAlignment="Center" Margin="0,0,6,0" />
 
-            <Rectangle Width="1" Fill="#25FFFFFF" Margin="3,5" />
+            <Rectangle x:Name="SepAudio" Width="1" Fill="#25FFFFFF" Margin="3,5" />
 
             <!-- Mic toggle -->
             <Button x:Name="BtnMic" Click="Mic_Click" Style="{StaticResource RBtn}" ToolTip="Mic (M)">
@@ -231,7 +237,7 @@
             <!-- Saving message (hidden until saving) -->
             <StackPanel x:Name="SavingPanel" Orientation="Horizontal" Visibility="Collapsed">
                 <Ellipse Width="12" Height="12" Fill="#42A5F5" Margin="0,0,6,0" VerticalAlignment="Center" />
-                <TextBlock Text="Saving..." Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock x:Name="SavingText" Text="Saving..." Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
 
             <!-- Close (pre-recording) -->

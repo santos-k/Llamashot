@@ -457,9 +457,9 @@
             <div class="feature-text">
                 <span class="section-label label-cyan">Snipping Toolbar</span>
                 <h3>Snipping Toolbar</h3>
-                <p>Press PrintScreen and a sleek toolbar appears at the top of your dimmed screen &mdash; just like Windows Snipping Tool, but more powerful. Switch between Screenshot, Recording, Long Shot, and Text Extract modes, choose your capture type, set a delay, and go.</p>
+                <p>Press PrintScreen and a sleek toolbar appears at the top of your dimmed screen &mdash; just like Windows Snipping Tool, but more powerful. Switch between Screenshot, Recording, GIF, Long Shot, and Text Extract modes, choose your capture type, set a delay, and go.</p>
                 <ul class="feature-list cyan">
-                    <li><strong>Four capture modes</strong> &mdash; Screenshot (1), Recording (2), Long Shot (3), Text Extract (4)</li>
+                    <li><strong>Five capture modes</strong> &mdash; Screenshot (1), Recording (2), GIF (3), Long Shot (4), Text Extract (5)</li>
                     <li><strong>Three capture types</strong> &mdash; Region (draw), Window (hover &amp; click), Fullscreen (instant)</li>
                     <li><strong>Window capture</strong> &mdash; hover over any window to highlight with blue border, click to capture</li>
                     <li><strong>Delay timer</strong> &mdash; no delay, 1s, 3s, 5s, or 10s countdown before capture</li>
@@ -539,7 +539,7 @@
             <div class="feature-text">
                 <span class="section-label label-orange">New in v6.0</span>
                 <h3>Long Shot &mdash; Scrolling Screenshot</h3>
-                <p>Capture entire scrollable pages, chat threads, or long documents in a single image. Select Long Shot mode (3), click any window, and the app scrolls and stitches frames automatically. Or scroll manually and let the app capture as you go.</p>
+                <p>Capture entire scrollable pages, chat threads, or long documents in a single image. Select Long Shot mode (4), click any window, and the app scrolls and stitches frames automatically. Or scroll manually and let the app capture as you go.</p>
                 <ul class="feature-list orange">
                     <li><strong>Auto scroll</strong> &mdash; app scrolls via Page Down and captures frames automatically</li>
                     <li><strong>Manual scroll</strong> &mdash; scroll yourself, app captures on each scroll event</li>
@@ -684,16 +684,18 @@
             <div class="feature-text">
                 <span class="section-label label-red">Recording</span>
                 <h3>Screen Recording with Audio</h3>
-                <p>Record any region of your screen as high-quality MP4 video. Select and resize your region with the same handles as screenshots, toggle audio before starting, then hit Start with a 3-2-1 countdown.</p>
+                <p>Record any region of your screen as high-quality MP4 video or animated GIF. Select and resize your region with the same handles as screenshots, choose your format, and start recording.</p>
                 <ul class="feature-list red">
                     <li><strong>Pre-start flow</strong> &mdash; resize/move region with handles, toggle mic/sys audio, click Start with 3-2-1 countdown</li>
                     <li><strong>Full annotation toolkit</strong> &mdash; all 12 screenshot tools available during recording with color picker &amp; thickness</li>
                     <li><strong>MP4 output</strong> &mdash; auto-selects HD1080p, HD720p, or VGA based on region size</li>
+                    <li><strong style="color: #4caf50;">GIF recording mode</strong> &mdash; dedicated mode with 30-second limit, countdown timer, auto-stop &mdash; <span style="color:#4caf50">NEW</span></li>
+                    <li><strong style="color: #4caf50;">Quality picker</strong> &mdash; choose Original (full res), High (720p), or Compact (480p) for both GIF &amp; video &mdash; <span style="color:#4caf50">NEW</span></li>
                     <li><strong>Microphone + System audio</strong> &mdash; independent toggles before and during recording</li>
                     <li><strong>Pause &amp; resume</strong> &mdash; press Space to pause, press again to continue</li>
                     <li><strong>Tool toggle</strong> &mdash; tools stay active between strokes, click/shortcut again to deselect</li>
-                    <li><strong>Clean saving UI</strong> &mdash; all tools hidden during save, showing only &ldquo;Saving&hellip;&rdquo; message</li>
-                    <li><strong>Timer display</strong> &mdash; live elapsed time in the floating toolbar</li>
+                    <li><strong>Clean saving UI</strong> &mdash; auto-sizing toolbar adapts to each state (pre-record, recording, saving)</li>
+                    <li><strong>Timer display</strong> &mdash; live elapsed time or GIF countdown in the floating toolbar</li>
                 </ul>
             </div>
             <div class="feature-visual fv-red">
@@ -1125,8 +1127,22 @@
                 <div class="qf-icon blue">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2"/></svg>
                 </div>
-                <h4>Single Instance</h4>
-                <p>Enforces only one running instance via mutex. Start with --silent flag for auto-launch at Windows startup without any visible UI.</p>
+                <h4>Silent Startup</h4>
+                <p>Enforces only one running instance via mutex. Silently exits if already running &mdash; no popup dialogs on Windows startup. Just works.</p>
+            </div>
+            <div class="qf-card" style="border: 1.5px solid rgba(76,175,80,0.3); background: linear-gradient(135deg, rgba(76,175,80,0.08), var(--card));">
+                <div class="qf-icon green">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="14" rx="3" stroke="currentColor" stroke-width="2"/><circle cx="5" cy="8" r="1.5" fill="currentColor"/><circle cx="5" cy="14" r="1.5" fill="currentColor"/><circle cx="19" cy="8" r="1.5" fill="currentColor"/><circle cx="19" cy="14" r="1.5" fill="currentColor"/><path d="M8 9l4 2.5L8 14" fill="currentColor"/></svg>
+                </div>
+                <h4>GIF Recording <span style="background:#4caf50;color:#fff;font-size:0.6em;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-left:6px;">NEW</span></h4>
+                <p>Record your screen as animated GIF with a dedicated capture mode. 30-second limit with live countdown timer that flashes red in the last 5 seconds. Auto-stops when time runs out. No audio overhead &mdash; lightweight and fast.</p>
+            </div>
+            <div class="qf-card" style="border: 1.5px solid rgba(66,165,245,0.3); background: linear-gradient(135deg, rgba(66,165,245,0.08), var(--card));">
+                <div class="qf-icon blue">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="1.5"/><line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <h4>Quality Picker <span style="background:#42a5f5;color:#fff;font-size:0.6em;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-left:6px;">NEW</span></h4>
+                <p>Choose your save quality for both GIF and MP4. Three presets: <strong>Original</strong> (full resolution), <strong>High</strong> (720p), or <strong>Compact</strong> (480p with frame optimization). Glass-themed picker with one-click selection.</p>
             </div>
             <div class="qf-card">
                 <div class="qf-icon green">
@@ -1459,7 +1475,7 @@
             <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View Source on GitHub</a>
         </div>
         <!-- UPDATE THIS VERSION when releasing a new build -->
-        <p class="version-note">Version 6.2.0 &bull; Self-contained, no runtime needed</p>
+        <p class="version-note">Version 6.3.0 &bull; Self-contained, no runtime needed</p>
     </div>
 </section>
 

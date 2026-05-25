@@ -22,7 +22,7 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 6.2.0" Foreground="#666"
+                <TextBlock Text="Version 6.3.0" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -55,10 +55,13 @@
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Shift+draw: straight lines, perfect squares, circles" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; 250+ colorful emoji annotations with search" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screen recording to MP4 with mic &amp; system audio" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; GIF recording mode with 30s limit, quality picker" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Scrolling screenshot (auto/manual) with stitching" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Text extraction from any screen area" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, video records, open in Explorer" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Save quality picker (Original, High, Compact) for GIF &amp; video" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Silent startup — no duplicate instance popup" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
                     </StackPanel>
                 </Border>
