@@ -731,6 +731,14 @@ public partial class RecordingOverlay : Window
         }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
+    private void UpdateSavingProgress(double fraction, string label)
+    {
+        int pct = (int)(fraction * 100);
+        SavingText.Text = $"{label}...";
+        SavingPercent.Text = $"{pct}%";
+        SavingProgressBar.Width = fraction * 120; // 120 = progress bar container width
+    }
+
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
         _annotationOverlay?.Undo();
@@ -847,13 +855,14 @@ public partial class RecordingOverlay : Window
                     _recorder.FramesDirectory!, frameCount, 10, dialog.FileName,
                     maxWidth: qualityDialog.MaxWidth,
                     frameSkip: qualityDialog.FrameSkip,
-                    progress: p => Dispatcher.Invoke(() =>
-                        SavingText.Text = $"Encoding GIF... {(int)(p * 100)}%"));
+                    progress: p => Dispatcher.Invoke(() => UpdateSavingProgress(p, "Encoding GIF")));
             }
             else
             {
                 SavingText.Text = "Saving video...";
-                success = await _recorder.SaveAsync(dialog.FileName, maxWidth: qualityDialog.MaxWidth);
+                success = await _recorder.SaveAsync(dialog.FileName,
+                    maxWidth: qualityDialog.MaxWidth,
+                    progress: p => Dispatcher.Invoke(() => UpdateSavingProgress(p, "Saving video")));
             }
 
             Hide();

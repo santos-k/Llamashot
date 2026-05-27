@@ -17,6 +17,9 @@ public class ScreenRecorder : IDisposable
     private bool _disposed;
     private string? _framesDir;
     private int _frameCount;
+    private AviWriter? _aviWriter;
+    private FileStream? _aviStream;
+    private string? _aviPath;
 
     // Audio
     private Windows.Media.Audio.AudioGraph? _audioGraph;
@@ -68,6 +71,20 @@ public class ScreenRecorder : IDisposable
 
         _framesDir = Path.Combine(Path.GetTempPath(), $"llamashot_rec_{DateTime.Now:yyyyMMdd_HHmmss}");
         Directory.CreateDirectory(_framesDir);
+
+        // Build AVI in real-time during recording (near-instant on save)
+        try
+        {
+            _aviPath = Path.Combine(_framesDir, "recording.avi");
+            _aviStream = new FileStream(_aviPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+            _aviWriter = new AviWriter(_aviStream, _regionW, _regionH, _fps);
+        }
+        catch
+        {
+            _aviWriter = null;
+            _aviStream = null;
+            _aviPath = null;
+        }
 
         _startTime = DateTime.Now;
         _recording = true;
@@ -282,13 +299,19 @@ public class ScreenRecorder : IDisposable
         _paused = false;
         _timer.Stop();
         try { _audioGraph?.Stop(); } catch { }
+
+        // Finalize AVI (writes index and patches headers)
+        try { _aviWriter?.Dispose(); } catch { }
+        _aviWriter = null;
+        _aviStream = null;
     }
 
     // ============ SAVE ============
 
     /// <param name="outputPath">Output MP4 file path.</param>
     /// <param name="maxWidth">Max width in pixels (0 = original resolution).</param>
-    public async Task<bool> SaveAsync(string outputPath, int maxWidth = 0)
+    /// <param name="progress">Progress callback (0.0 to 1.0).</param>
+    public async Task<bool> SaveAsync(string outputPath, int maxWidth = 0, Action<double>? progress = null)
     {
         if (_framesDir == null || _frameCount == 0) return false;
 
@@ -317,15 +340,26 @@ public class ScreenRecorder : IDisposable
             outH = outH % 2 == 0 ? outH : outH - 1;
 
             var composition = new Windows.Media.Editing.MediaComposition();
-            var frameDuration = TimeSpan.FromMilliseconds(1000.0 / _fps);
 
-            for (int i = 0; i < _frameCount; i++)
+            // Use pre-built AVI as single clip (MUCH faster than loading individual frames)
+            if (_aviPath != null && File.Exists(_aviPath))
             {
-                var framePath = Path.Combine(_framesDir, $"frame_{i:D6}.jpg");
-                if (!File.Exists(framePath)) continue;
-                var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(framePath);
-                var clip = await Windows.Media.Editing.MediaClip.CreateFromImageFileAsync(file, frameDuration);
+                var aviFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(_aviPath);
+                var clip = await Windows.Media.Editing.MediaClip.CreateFromFileAsync(aviFile);
                 composition.Clips.Add(clip);
+            }
+            else
+            {
+                // Fallback: load individual frames (slow path)
+                var frameDuration = TimeSpan.FromMilliseconds(1000.0 / _fps);
+                for (int i = 0; i < _frameCount; i++)
+                {
+                    var framePath = Path.Combine(_framesDir, $"frame_{i:D6}.jpg");
+                    if (!File.Exists(framePath)) continue;
+                    var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(framePath);
+                    var clip = await Windows.Media.Editing.MediaClip.CreateFromImageFileAsync(file, frameDuration);
+                    composition.Clips.Add(clip);
+                }
             }
 
             if (composition.Clips.Count == 0) return false;
@@ -359,9 +393,20 @@ public class ScreenRecorder : IDisposable
             var outputFile = await outputFolder.CreateFileAsync(
                 Path.GetFileName(outputPath), Windows.Storage.CreationCollisionOption.ReplaceExisting);
 
-            await composition.RenderToFileAsync(outputFile,
+            var renderOp = composition.RenderToFileAsync(outputFile,
                 Windows.Media.Editing.MediaTrimmingPreference.Precise, profile);
-            return true;
+
+            // Report progress from the encoding operation
+            if (progress != null)
+            {
+                renderOp.Progress = (info, p) =>
+                {
+                    progress(p / 100.0);
+                };
+            }
+
+            var result = await renderOp;
+            return result == Windows.Media.Transcoding.TranscodeFailureReason.None;
         }
         catch (Exception ex)
         {
@@ -372,6 +417,7 @@ public class ScreenRecorder : IDisposable
 
     public void CleanupFrames()
     {
+        _aviPath = null;
         if (_framesDir != null)
         {
             try { Directory.Delete(_framesDir, true); } catch { }
@@ -404,6 +450,18 @@ public class ScreenRecorder : IDisposable
 
             var framePath = Path.Combine(_framesDir, $"frame_{_frameCount:D6}.jpg");
             bmp.Save(framePath, DrawImaging.ImageFormat.Jpeg);
+
+            // Also write to AVI stream (builds video in real-time)
+            if (_aviWriter != null)
+            {
+                try
+                {
+                    var jpegBytes = File.ReadAllBytes(framePath);
+                    _aviWriter.AddFrame(jpegBytes);
+                }
+                catch { }
+            }
+
             _frameCount++;
         }
         catch { }
