@@ -92,6 +92,7 @@ public class AppSettings
 
     // Quick Preview
     public bool QuickPreviewEnabled { get; set; } = true;
+    public string ShortcutQuickPreview { get; set; } = "Space";
 
     public static void Load()
     {

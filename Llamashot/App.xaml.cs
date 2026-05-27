@@ -136,8 +136,9 @@ public partial class App : Application
                 }
             }
 
-            // Quick Preview: Spacebar in Explorer
-            if (vkCode == NativeMethods.VK_SPACE && AppSettings.Instance.QuickPreviewEnabled)
+            // Quick Preview: configurable key in Explorer
+            if (AppSettings.Instance.QuickPreviewEnabled
+                && ShortcutHelper.MatchesVk(vkCode, AppSettings.Instance.ShortcutQuickPreview))
             {
                 var fgHwnd = NativeMethods.GetForegroundWindow();
                 var classNameBuf = new System.Text.StringBuilder(256);

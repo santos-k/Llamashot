@@ -38,6 +38,7 @@ public partial class SettingsWindow : Window
         ("ShortcutRecPause", "Pause/Resume", "Space"),
         ("ShortcutPen", "Pencil", "P"),
         ("ShortcutPin", "Pin", "F"),
+        ("ShortcutQuickPreview", "Quick Preview", "Space"),
         ("ShortcutRectangle", "Rectangle", "R"),
         ("ShortcutRecord", "Record", "Ctrl+R"),
         ("ShortcutRedo", "Redo", "Ctrl+Y"),
