@@ -406,7 +406,9 @@ public class FilePreviewManager
                         dynamic folderItem = folderObj.ParseName(fileName);
                         if (folderItem != null)
                         {
-                            document.SelectItem(folderItem, 8 | 1 | 16); // deselect all + select + ensure visible
+                            // First deselect all, then select + focus the target file
+                            document.SelectItem(folderItem, 0x8);  // SVSI_DESELECTOTHERS
+                            document.SelectItem(folderItem, 0x1 | 0x10 | 0x20); // SELECT + ENSUREVISIBLE + FOCUSED
                         }
                         return;
                     }
