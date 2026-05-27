@@ -65,7 +65,7 @@ public partial class HistoryWindow : Window
             return new HistoryItemViewModel
             {
                 ThumbnailPath = r.ThumbnailPath,
-                FilePath = r.FilePath,
+                FilePath = r.FilePath ?? "",
                 DateText = r.CapturedAt.ToString("MMM dd, HH:mm"),
                 SizeText = $"{r.Width} x {r.Height}",
                 TypeText = typeText,
