@@ -176,6 +176,13 @@ public partial class App : Application
                 return (IntPtr)1;
             }
 
+            // Escape closes Quick Preview
+            if (vkCode == NativeMethods.VK_ESCAPE && Core.FilePreviewManager.Instance.IsPreviewOpen)
+            {
+                Dispatcher.BeginInvoke(() => Core.FilePreviewManager.Instance.ClosePreview());
+                return (IntPtr)1;
+            }
+
             // Recording shortcuts (only when a Llamashot window is in foreground, not typing in TextBox)
             if (ActiveRecordingOverlay != null && IsOurWindowInForeground()
                 && !Views.RecordingAnnotation.IsTextInputActive)
