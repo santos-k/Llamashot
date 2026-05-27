@@ -247,18 +247,33 @@ public class FilePreviewManager
         _currentFile = _folderFiles[_currentIndex];
         _previewWindow?.LoadFile(_currentFile);
         _previewWindow?.Activate();
+
+        // Select the file in Explorer too
+        SelectFileInExplorer(_currentFile);
     }
 
     private void UpdateFolderFiles(string filePath)
     {
-        var folder = Path.GetDirectoryName(filePath);
-        if (!string.Equals(folder, _currentFolder, StringComparison.OrdinalIgnoreCase))
+        // Try to get file list from Explorer's current view order (no extra sorting)
+        var explorerFiles = GetExplorerFileList();
+        if (explorerFiles != null && explorerFiles.Length > 0)
         {
-            _currentFolder = folder;
-            _folderFiles = folder != null
-                ? Directory.GetFiles(folder).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToArray()
-                : Array.Empty<string>();
+            _folderFiles = explorerFiles;
+            _currentFolder = Path.GetDirectoryName(filePath);
         }
+        else
+        {
+            // Fallback: read from filesystem (no sorting — use OS order)
+            var folder = Path.GetDirectoryName(filePath);
+            if (!string.Equals(folder, _currentFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                _currentFolder = folder;
+                _folderFiles = folder != null
+                    ? Directory.GetFiles(folder)
+                    : Array.Empty<string>();
+            }
+        }
+
         // Case-insensitive path lookup
         _currentIndex = -1;
         for (int i = 0; i < _folderFiles!.Length; i++)
@@ -267,6 +282,146 @@ public class FilePreviewManager
             { _currentIndex = i; break; }
         }
         if (_currentIndex < 0) _currentIndex = 0;
+    }
+
+    /// <summary>
+    /// Get all files from the foreground Explorer window in its current display order.
+    /// </summary>
+    private string[]? GetExplorerFileList()
+    {
+        try
+        {
+            var shellWindowsType = Type.GetTypeFromCLSID(new Guid("9BA05972-F6A8-11CF-A442-00A0C90A8F39"));
+            if (shellWindowsType == null) return null;
+
+            dynamic shellWindows = Activator.CreateInstance(shellWindowsType)!;
+            try
+            {
+                // Find the Explorer window that was foreground when preview was opened
+                // or use last known HWND
+                int count = shellWindows.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    dynamic? window = null;
+                    try
+                    {
+                        window = shellWindows.Item(i);
+                        if (window == null) continue;
+
+                        // Check if this window's folder matches our current folder
+                        dynamic document = window.Document;
+                        dynamic folder = document.Folder;
+                        dynamic allItems = folder.Items();
+
+                        var files = new List<string>();
+                        int itemCount = allItems.Count;
+                        for (int j = 0; j < itemCount; j++)
+                        {
+                            try
+                            {
+                                dynamic fi = allItems.Item(j);
+                                string path = fi.Path;
+                                if (File.Exists(path))
+                                    files.Add(path);
+                            }
+                            catch { }
+                        }
+
+                        // Verify this is the right folder
+                        if (files.Count > 0 && _currentFolder != null)
+                        {
+                            var firstDir = Path.GetDirectoryName(files[0]);
+                            if (string.Equals(firstDir, _currentFolder, StringComparison.OrdinalIgnoreCase))
+                                return files.ToArray();
+                        }
+                        else if (files.Count > 0)
+                        {
+                            return files.ToArray();
+                        }
+                    }
+                    finally
+                    {
+                        if (window != null) Marshal.ReleaseComObject(window);
+                    }
+                }
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(shellWindows);
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Select a file in the foreground Explorer window.
+    /// </summary>
+    private void SelectFileInExplorer(string filePath)
+    {
+        try
+        {
+            var shellWindowsType = Type.GetTypeFromCLSID(new Guid("9BA05972-F6A8-11CF-A442-00A0C90A8F39"));
+            if (shellWindowsType == null) return;
+
+            dynamic shellWindows = Activator.CreateInstance(shellWindowsType)!;
+            try
+            {
+                var folder = Path.GetDirectoryName(filePath);
+                var fileName = Path.GetFileName(filePath);
+                int count = shellWindows.Count;
+
+                for (int i = 0; i < count; i++)
+                {
+                    dynamic? window = null;
+                    try
+                    {
+                        window = shellWindows.Item(i);
+                        if (window == null) continue;
+
+                        dynamic document = window.Document;
+                        dynamic folderObj = document.Folder;
+                        dynamic allItems = folderObj.Items();
+
+                        // Check if this is the right folder
+                        bool rightFolder = false;
+                        int itemCount = allItems.Count;
+                        for (int j = 0; j < itemCount; j++)
+                        {
+                            try
+                            {
+                                dynamic fi = allItems.Item(j);
+                                string dir = Path.GetDirectoryName(fi.Path);
+                                if (string.Equals(dir, folder, StringComparison.OrdinalIgnoreCase))
+                                { rightFolder = true; break; }
+                            }
+                            catch { }
+                        }
+
+                        if (!rightFolder) continue;
+
+                        // Select the item: first deselect all, then select our file
+                        // Shell.Application SelectItem flags: 0 = deselect, 1 = select,
+                        // 4 = edit, 8 = deselect all, 16 = ensure visible, 29 = focus+select
+                        dynamic folderItem = folderObj.ParseName(fileName);
+                        if (folderItem != null)
+                        {
+                            document.SelectItem(folderItem, 8 | 1 | 16); // deselect all + select + ensure visible
+                        }
+                        return;
+                    }
+                    finally
+                    {
+                        if (window != null) Marshal.ReleaseComObject(window);
+                    }
+                }
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(shellWindows);
+            }
+        }
+        catch { }
     }
 
     private void StartPolling()
