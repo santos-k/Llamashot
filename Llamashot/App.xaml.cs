@@ -23,6 +23,7 @@ public partial class App : Application
     private IntPtr _keyboardHook;
     private NativeMethods.LowLevelKeyboardProc? _keyboardProc;
     private DateTime _lastEscTime = DateTime.MinValue;
+    private DateTime _lastSpaceTime = DateTime.MinValue;
     internal static Views.RecordingOverlay? ActiveRecordingOverlay { get; set; }
 
     protected override void OnStartup(StartupEventArgs e)
@@ -133,6 +134,46 @@ public partial class App : Application
                 {
                     _lastEscTime = now;
                 }
+            }
+
+            // Quick Preview: Spacebar in Explorer
+            if (vkCode == NativeMethods.VK_SPACE && AppSettings.Instance.QuickPreviewEnabled)
+            {
+                var fgHwnd = NativeMethods.GetForegroundWindow();
+                var classNameBuf = new System.Text.StringBuilder(256);
+                NativeMethods.GetClassName(fgHwnd, classNameBuf, 256);
+                if (classNameBuf.ToString() == "CabinetWClass")
+                {
+                    var now2 = DateTime.Now;
+                    if ((now2 - _lastSpaceTime).TotalMilliseconds > 300)
+                    {
+                        _lastSpaceTime = now2;
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            var mgr = Core.FilePreviewManager.Instance;
+                            if (mgr.IsPreviewOpen)
+                            {
+                                mgr.ClosePreview();
+                            }
+                            else
+                            {
+                                var file = mgr.GetExplorerSelectedFile();
+                                if (file != null)
+                                    mgr.ShowPreview(file);
+                            }
+                        });
+                        return (IntPtr)1;
+                    }
+                }
+            }
+
+            // Arrow keys for preview navigation
+            if ((vkCode == NativeMethods.VK_LEFT || vkCode == NativeMethods.VK_RIGHT)
+                && Core.FilePreviewManager.Instance.IsPreviewOpen)
+            {
+                int direction = vkCode == NativeMethods.VK_LEFT ? -1 : 1;
+                Dispatcher.BeginInvoke(() => Core.FilePreviewManager.Instance.NavigateFile(direction));
+                return (IntPtr)1;
             }
 
             // Recording shortcuts (only when a Llamashot window is in foreground, not typing in TextBox)
