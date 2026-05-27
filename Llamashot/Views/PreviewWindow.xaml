@@ -33,9 +33,16 @@
                 <ScrollViewer x:Name="ImageScroller" Visibility="Collapsed"
                               HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Auto"
-                              Background="Transparent">
-                    <Image x:Name="PreviewImage" Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality" />
+                              Background="Transparent"
+                              MouseWheel="ImageScroller_MouseWheel">
+                    <Grid x:Name="ImageContainer">
+                        <Image x:Name="PreviewImage" Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image.LayoutTransform>
+                                <ScaleTransform x:Name="ImageScale" ScaleX="1" ScaleY="1" />
+                            </Image.LayoutTransform>
+                        </Image>
+                    </Grid>
                 </ScrollViewer>
 
                 <!-- Video/Audio preview -->

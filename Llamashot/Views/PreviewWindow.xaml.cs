@@ -29,7 +29,7 @@ public partial class PreviewWindow : Window
         Width = Math.Min(screenW * 0.7, 1200);
         Height = Math.Min(screenH * 0.75, 900);
 
-        PreviewImage.MouseWheel += Image_MouseWheel;
+        // Image zoom is handled by ImageScroller_MouseWheel in XAML
 
         _mediaTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _mediaTimer.Tick += MediaTimer_Tick;
@@ -102,7 +102,8 @@ public partial class PreviewWindow : Window
 
             PreviewImage.Source = bitmap;
             _imageZoom = 1.0;
-            PreviewImage.LayoutTransform = Transform.Identity;
+            ImageScale.ScaleX = 1;
+            ImageScale.ScaleY = 1;
             ImageScroller.Visibility = Visibility.Visible;
             TxtFileMeta.Text = $"{bitmap.PixelWidth} x {bitmap.PixelHeight}";
         }
@@ -112,11 +113,14 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private void Image_MouseWheel(object sender, MouseWheelEventArgs e)
+    private void ImageScroller_MouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (ImageScroller.Visibility != Visibility.Visible) return;
+
         _imageZoom *= e.Delta > 0 ? 1.15 : 0.87;
         _imageZoom = Math.Clamp(_imageZoom, 0.1, 10.0);
-        PreviewImage.LayoutTransform = new ScaleTransform(_imageZoom, _imageZoom);
+        ImageScale.ScaleX = _imageZoom;
+        ImageScale.ScaleY = _imageZoom;
         e.Handled = true;
     }
 
