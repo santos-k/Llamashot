@@ -16,8 +16,8 @@ public partial class PreviewWindow : Window
     private string? _currentFile;
     private DispatcherTimer? _mediaTimer;
     private bool _isSeeking;
-    private bool _updatingSeekBar;
     private bool _isPlaying;
+    private double _seekDuration;
     private WebView2? _webView;
     private double _imageZoom = 1.0;
 
@@ -148,7 +148,7 @@ public partial class PreviewWindow : Window
     {
         if (MediaPlayer.NaturalDuration.HasTimeSpan)
         {
-            SeekBar.Maximum = MediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+            _seekDuration = MediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
             TxtDuration.Text = $"0:00 / {FormatTime(MediaPlayer.NaturalDuration.TimeSpan)}";
 
             if (MediaPlayer.HasVideo)
@@ -162,7 +162,7 @@ public partial class PreviewWindow : Window
         BtnPlayPause.Content = "\u25B6";
         _mediaTimer?.Stop();
         MediaPlayer.Position = TimeSpan.Zero;
-        SeekBar.Value = 0;
+        UpdateSeekBarVisual(0);
     }
 
     private void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -187,37 +187,52 @@ public partial class PreviewWindow : Window
     {
         if (!_isSeeking && MediaPlayer.NaturalDuration.HasTimeSpan)
         {
-            _updatingSeekBar = true;
-            SeekBar.Value = MediaPlayer.Position.TotalSeconds;
-            _updatingSeekBar = false;
+            var pos = MediaPlayer.Position.TotalSeconds;
+            var fraction = _seekDuration > 0 ? pos / _seekDuration : 0;
+            UpdateSeekBarVisual(fraction);
             TxtDuration.Text = $"{FormatTime(MediaPlayer.Position)} / {FormatTime(MediaPlayer.NaturalDuration.TimeSpan)}";
         }
     }
 
-    private void SeekBar_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
-        => _isSeeking = true;
-
-    private void SeekBar_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    private void UpdateSeekBarVisual(double fraction)
     {
-        MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
-        _isSeeking = false;
+        fraction = Math.Clamp(fraction, 0, 1);
+        var totalWidth = SeekBarContainer.ActualWidth;
+        if (totalWidth <= 0) return;
+        SeekProgress.Width = fraction * totalWidth;
+        SeekThumb.Margin = new Thickness(fraction * totalWidth - 6, 0, 0, 0);
     }
 
-    private void SeekBar_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    private void SeekToClickPosition(MouseEventArgs e)
+    {
+        var pos = e.GetPosition(SeekBarContainer);
+        var fraction = Math.Clamp(pos.X / SeekBarContainer.ActualWidth, 0, 1);
+        var seekTime = fraction * _seekDuration;
+        MediaPlayer.Position = TimeSpan.FromSeconds(seekTime);
+        UpdateSeekBarVisual(fraction);
+    }
+
+    private void SeekTrack_MouseDown(object sender, MouseButtonEventArgs e)
     {
         _isSeeking = true;
+        SeekBarContainer.CaptureMouse();
+        SeekToClickPosition(e);
     }
 
-    private void SeekBar_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+    private void SeekTrack_MouseMove(object sender, MouseEventArgs e)
     {
-        MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
-        _isSeeking = false;
+        if (_isSeeking && e.LeftButton == MouseButtonState.Pressed)
+            SeekToClickPosition(e);
     }
 
-    private void SeekBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void SeekTrack_MouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_updatingSeekBar && _isSeeking)
-            MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
+        if (_isSeeking)
+        {
+            SeekToClickPosition(e);
+            _isSeeking = false;
+            SeekBarContainer.ReleaseMouseCapture();
+        }
     }
 
     private void LoadCode(string filePath)

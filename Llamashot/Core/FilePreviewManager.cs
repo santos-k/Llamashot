@@ -19,12 +19,12 @@ public class FilePreviewManager
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".tiff", ".tif", ".webp"
+        ".png", ".jpg", ".jpeg", ".bmp", ".ico", ".tiff", ".tif", ".webp"
     };
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm"
+        ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm", ".gif"
     };
 
     private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)

@@ -71,14 +71,22 @@
                                     Background="Transparent" Foreground="White"
                                     BorderThickness="0" Cursor="Hand"
                                     VerticalAlignment="Center" />
-                            <Slider x:Name="SeekBar" Grid.Column="1"
-                                    VerticalAlignment="Center" Margin="10,0"
-                                    Minimum="0" Maximum="100" IsMoveToPointEnabled="True"
-                                    Thumb.DragStarted="SeekBar_DragStarted"
-                                    Thumb.DragCompleted="SeekBar_DragCompleted"
-                                    PreviewMouseLeftButtonDown="SeekBar_PreviewMouseDown"
-                                    PreviewMouseLeftButtonUp="SeekBar_PreviewMouseUp"
-                                    ValueChanged="SeekBar_ValueChanged" />
+                            <!-- Custom seek bar: click anywhere to jump -->
+                            <Grid x:Name="SeekBarContainer" Grid.Column="1"
+                                  VerticalAlignment="Center" Margin="10,0"
+                                  Height="20" Background="Transparent" Cursor="Hand"
+                                  MouseLeftButtonDown="SeekTrack_MouseDown"
+                                  MouseMove="SeekTrack_MouseMove"
+                                  MouseLeftButtonUp="SeekTrack_MouseUp">
+                                <Border Background="#44FFFFFF" Height="4" CornerRadius="2"
+                                        VerticalAlignment="Center" />
+                                <Border x:Name="SeekProgress" Background="#42A5F5" Height="4"
+                                        CornerRadius="2" VerticalAlignment="Center"
+                                        HorizontalAlignment="Left" Width="0" />
+                                <Ellipse x:Name="SeekThumb" Width="12" Height="12"
+                                         Fill="White" HorizontalAlignment="Left"
+                                         VerticalAlignment="Center" Margin="-6,0,0,0" />
+                            </Grid>
                             <TextBlock x:Name="TxtDuration" Grid.Column="2"
                                        Foreground="#AAA" FontSize="12"
                                        VerticalAlignment="Center" Text="0:00 / 0:00" />
