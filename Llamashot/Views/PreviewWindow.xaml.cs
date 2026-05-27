@@ -405,13 +405,19 @@ public partial class PreviewWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        // Escape, Space, and arrow keys are handled by the global keyboard hook
-        // in App.xaml.cs — this is a fallback for when the window has focus
         switch (e.Key)
         {
             case Key.Escape:
             case Key.Space:
                 Close();
+                e.Handled = true;
+                break;
+            case Key.Left:
+                FilePreviewManager.Instance.NavigateFile(-1);
+                e.Handled = true;
+                break;
+            case Key.Right:
+                FilePreviewManager.Instance.NavigateFile(1);
                 e.Handled = true;
                 break;
         }

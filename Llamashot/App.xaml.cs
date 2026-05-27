@@ -167,15 +167,6 @@ public partial class App : Application
                 }
             }
 
-            // Arrow keys for preview navigation
-            if ((vkCode == NativeMethods.VK_LEFT || vkCode == NativeMethods.VK_RIGHT)
-                && Core.FilePreviewManager.Instance.IsPreviewOpen)
-            {
-                int direction = vkCode == NativeMethods.VK_LEFT ? -1 : 1;
-                Dispatcher.BeginInvoke(() => Core.FilePreviewManager.Instance.NavigateFile(direction));
-                return (IntPtr)1;
-            }
-
             // Escape closes Quick Preview
             if (vkCode == NativeMethods.VK_ESCAPE && Core.FilePreviewManager.Instance.IsPreviewOpen)
             {

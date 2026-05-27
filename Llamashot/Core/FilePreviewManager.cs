@@ -139,6 +139,8 @@ public class FilePreviewManager
                 _currentFile = null;
             };
             _previewWindow.Show();
+            _previewWindow.Activate();
+            _previewWindow.Focus();
             StartPolling();
         }
 
@@ -160,11 +162,12 @@ public class FilePreviewManager
         if (_folderFiles == null || _folderFiles.Length == 0) return;
 
         var newIndex = Math.Clamp(_currentIndex + direction, 0, _folderFiles.Length - 1);
-        if (newIndex == _currentIndex) return; // already at boundary
+        if (newIndex == _currentIndex) return;
 
         _currentIndex = newIndex;
         _currentFile = _folderFiles[_currentIndex];
         _previewWindow?.LoadFile(_currentFile);
+        _previewWindow?.Activate();
     }
 
     private void UpdateFolderFiles(string filePath)
