@@ -30,16 +30,30 @@ public static class SyntaxHighlighter
 
     private static readonly Dictionary<string, string> ExtToLang = new(StringComparer.OrdinalIgnoreCase)
     {
+        // C#
         { ".cs", "cs" }, { ".csx", "cs" },
-        { ".py", "py" }, { ".pyw", "py" },
-        { ".js", "js" }, { ".jsx", "js" }, { ".mjs", "js" },
+        // C/C++
+        { ".cpp", "cs" }, { ".c", "cs" }, { ".cc", "cs" }, { ".cxx", "cs" },
+        { ".h", "cs" }, { ".hh", "cs" }, { ".hpp", "cs" }, { ".hxx", "cs" },
+        { ".m", "cs" }, { ".mm", "cs" },
+        // Python
+        { ".py", "py" }, { ".pyw", "py" }, { ".pyi", "py" },
+        // JavaScript / TypeScript
+        { ".js", "js" }, { ".jsx", "js" }, { ".mjs", "js" }, { ".cjs", "js" },
         { ".ts", "js" }, { ".tsx", "js" },
-        { ".java", "java" }, { ".kt", "java" }, { ".scala", "java" },
+        { ".vue", "js" }, { ".svelte", "js" },
+        // JVM
+        { ".java", "java" }, { ".kt", "java" }, { ".kts", "java" },
+        { ".scala", "java" }, { ".groovy", "java" },
+        // Go / Rust
         { ".go", "go" },
         { ".rs", "rs" },
+        // SQL
         { ".sql", "sql" },
-        { ".rb", "js" }, { ".php", "js" }, { ".swift", "js" },
-        { ".cpp", "cs" }, { ".c", "cs" }, { ".h", "cs" }, { ".hpp", "cs" },
+        // Scripting (use JS-like highlighting)
+        { ".rb", "js" }, { ".php", "js" }, { ".swift", "js" }, { ".dart", "js" },
+        { ".lua", "js" }, { ".pl", "js" }, { ".r", "js" }, { ".R", "js" },
+        { ".jl", "js" }, { ".ex", "js" }, { ".exs", "js" },
     };
 
     public static FlowDocument Highlight(string text, string filePath)

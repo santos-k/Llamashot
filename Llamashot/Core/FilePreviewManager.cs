@@ -19,27 +19,106 @@ public class FilePreviewManager
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".png", ".jpg", ".jpeg", ".bmp", ".ico", ".tiff", ".tif", ".webp", ".heic", ".heif"
+        // Standard formats
+        ".png", ".jpg", ".jpeg", ".jpe", ".jfif", ".bmp", ".dib",
+        ".ico", ".cur", ".tiff", ".tif", ".webp",
+        // Apple / mobile
+        ".heic", ".heif", ".heics",
+        // Modern formats (Windows 10/11 with codec)
+        ".avif", ".jxl",
+        // RAW camera formats (WIC codecs)
+        ".raw", ".cr2", ".cr3", ".nef", ".arw", ".orf", ".rw2",
+        ".dng", ".raf", ".srw", ".pef", ".rwl",
+        // Other
+        ".wdp", ".hdp", ".jxr", // JPEG XR / HD Photo
+        ".svg", ".svgz",         // SVG (rendered as text if WIC fails)
+        ".tga", ".pcx", ".pbm", ".pgm", ".ppm",
+        ".exr",                   // OpenEXR
     };
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm"
+        // Common containers
+        ".mp4", ".m4v", ".avi", ".mov", ".mkv", ".wmv", ".webm",
+        // MPEG
+        ".mpg", ".mpeg", ".mpe", ".m2v", ".m2ts", ".mts", ".ts",
+        // Other
+        ".flv", ".f4v", ".3gp", ".3g2", ".ogv", ".vob",
+        ".asf", ".rm", ".rmvb", ".divx", ".xvid",
     };
 
     private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp3", ".wav", ".flac", ".aac", ".wma", ".ogg", ".m4a"
+        // Common
+        ".mp3", ".wav", ".flac", ".aac", ".m4a", ".wma", ".ogg",
+        // Lossless
+        ".alac", ".ape", ".aiff", ".aif",
+        // Other
+        ".opus", ".weba", ".amr", ".ac3", ".dts",
+        ".mid", ".midi",
+        ".ra", ".au", ".snd",
+        ".pcm", ".gsm",
     };
 
     private static readonly HashSet<string> CodeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".cs", ".py", ".js", ".ts", ".jsx", ".tsx", ".json", ".xml", ".html", ".htm",
-        ".css", ".scss", ".less", ".cpp", ".c", ".h", ".hpp", ".java", ".go", ".rs",
-        ".rb", ".php", ".swift", ".kt", ".scala", ".r", ".sql", ".sh", ".bash",
-        ".ps1", ".bat", ".cmd", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf",
-        ".txt", ".log", ".csv", ".env", ".gitignore", ".dockerignore", ".editorconfig",
-        ".csproj", ".sln", ".xaml", ".svg", ".makefile", ".dockerfile"
+        // C-family
+        ".cs", ".csx", ".cpp", ".c", ".cc", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+        ".m", ".mm",  // Objective-C
+        // JVM
+        ".java", ".kt", ".kts", ".scala", ".groovy", ".gradle",
+        // .NET / XAML
+        ".vb", ".fs", ".fsx", ".csproj", ".fsproj", ".vbproj", ".sln", ".xaml", ".razor", ".cshtml",
+        // Web
+        ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+        ".html", ".htm", ".xhtml",
+        ".css", ".scss", ".sass", ".less", ".styl",
+        ".vue", ".svelte", ".astro",
+        // Scripting
+        ".py", ".pyw", ".pyi", ".rb", ".erb", ".php", ".lua",
+        ".pl", ".pm", ".perl", ".tcl",
+        ".r", ".R", ".jl",  // R, Julia
+        // Shell
+        ".sh", ".bash", ".zsh", ".fish", ".ksh", ".csh",
+        ".bat", ".cmd", ".ps1", ".psm1", ".psd1",
+        // Systems
+        ".go", ".rs", ".zig", ".nim", ".d",
+        ".swift", ".dart", ".v", ".ex", ".exs", ".erl", ".hrl",
+        ".hs", ".lhs",  // Haskell
+        ".ml", ".mli",  // OCaml
+        ".clj", ".cljs", ".cljc", ".edn",  // Clojure
+        ".lisp", ".cl", ".el", ".scm", ".rkt",  // Lisps
+        // Data / config
+        ".json", ".jsonc", ".json5", ".jsonl",
+        ".xml", ".xsl", ".xslt", ".xsd", ".dtd",
+        ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf",
+        ".env", ".properties", ".plist",
+        // Database
+        ".sql", ".sqlite", ".prisma",
+        // Markup / docs
+        ".tex", ".latex", ".bib",
+        ".rst", ".adoc", ".asciidoc",
+        ".org",  // Org mode
+        // DevOps / infra
+        ".dockerfile", ".makefile", ".cmake",
+        ".tf", ".tfvars", ".hcl",  // Terraform
+        ".nix", ".dhall",
+        ".vagrantfile",
+        // Other text
+        ".txt", ".text", ".log", ".csv", ".tsv",
+        ".rtf",
+        ".gitignore", ".gitattributes", ".gitmodules",
+        ".dockerignore", ".editorconfig", ".eslintrc", ".prettierrc",
+        ".npmrc", ".nvmrc", ".babelrc",
+        ".htaccess", ".nginx", ".apache",
+        // Build / project
+        ".cmake", ".pro", ".pri",  // Qt
+        ".cabal",  // Haskell
+        ".gemspec", ".gemfile",  // Ruby
+        ".cargo",  // Rust
+        ".mod", ".sum",  // Go
+        ".lock",  // Various lock files
+        ".patch", ".diff",
     };
 
     public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Pdf, Unsupported }
