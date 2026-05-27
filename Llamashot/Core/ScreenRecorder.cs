@@ -20,6 +20,7 @@ public class ScreenRecorder : IDisposable
     private AviWriter? _aviWriter;
     private FileStream? _aviStream;
     private string? _aviPath;
+    private TimeSpan _finalElapsed; // actual recording duration (minus pauses)
 
     // Audio
     private Windows.Media.Audio.AudioGraph? _audioGraph;
@@ -295,12 +296,20 @@ public class ScreenRecorder : IDisposable
         if (!_recording) return;
         if (!_paused)
             _pausedElapsed += DateTime.Now - _startTime;
+        _finalElapsed = _pausedElapsed;
         _recording = false;
         _paused = false;
         _timer.Stop();
         try { _audioGraph?.Stop(); } catch { }
 
-        // Finalize AVI (writes index and patches headers)
+        // Patch AVI with actual fps so duration matches recording time
+        if (_aviWriter != null && _frameCount > 0 && _finalElapsed.TotalSeconds > 0)
+        {
+            double actualFps = _frameCount / _finalElapsed.TotalSeconds;
+            _aviWriter.SetActualFps(actualFps);
+        }
+
+        // Finalize AVI (writes index and patches headers including actual fps)
         try { _aviWriter?.Dispose(); } catch { }
         _aviWriter = null;
         _aviStream = null;
@@ -351,7 +360,11 @@ public class ScreenRecorder : IDisposable
             else
             {
                 // Fallback: load individual frames (slow path)
-                var frameDuration = TimeSpan.FromMilliseconds(1000.0 / _fps);
+                // Use actual elapsed time to calculate correct frame duration
+                double actualFrameDurationMs = _finalElapsed.TotalSeconds > 0 && _frameCount > 0
+                    ? (_finalElapsed.TotalMilliseconds / _frameCount)
+                    : (1000.0 / _fps);
+                var frameDuration = TimeSpan.FromMilliseconds(actualFrameDurationMs);
                 for (int i = 0; i < _frameCount; i++)
                 {
                     var framePath = Path.Combine(_framesDir, $"frame_{i:D6}.jpg");
@@ -448,17 +461,17 @@ public class ScreenRecorder : IDisposable
             NativeMethods.DeleteDC(memDc);
             NativeMethods.ReleaseDC(IntPtr.Zero, hdc);
 
-            var framePath = Path.Combine(_framesDir, $"frame_{_frameCount:D6}.jpg");
-            bmp.Save(framePath, DrawImaging.ImageFormat.Jpeg);
+            // Encode JPEG to memory once, write to both disk and AVI
+            using var ms = new MemoryStream();
+            bmp.Save(ms, DrawImaging.ImageFormat.Jpeg);
+            var jpegBytes = ms.ToArray();
 
-            // Also write to AVI stream (builds video in real-time)
+            var framePath = Path.Combine(_framesDir, $"frame_{_frameCount:D6}.jpg");
+            File.WriteAllBytes(framePath, jpegBytes);
+
             if (_aviWriter != null)
             {
-                try
-                {
-                    var jpegBytes = File.ReadAllBytes(framePath);
-                    _aviWriter.AddFrame(jpegBytes);
-                }
+                try { _aviWriter.AddFrame(jpegBytes); }
                 catch { }
             }
 
