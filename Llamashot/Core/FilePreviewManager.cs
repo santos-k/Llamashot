@@ -19,7 +19,7 @@ public class FilePreviewManager
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".png", ".jpg", ".jpeg", ".bmp", ".ico", ".tiff", ".tif", ".webp"
+        ".png", ".jpg", ".jpeg", ".bmp", ".ico", ".tiff", ".tif", ".webp", ".heic", ".heif"
     };
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
