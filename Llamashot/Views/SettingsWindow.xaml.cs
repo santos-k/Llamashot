@@ -186,6 +186,7 @@ public partial class SettingsWindow : Window
         ChkSaveHistory.IsChecked = s.SaveHistory;
         TxtHistoryDir.Text = s.HistoryDirectory;
         TxtMaxHistory.Text = s.MaxHistoryItems.ToString();
+        ChkQuickPreview.IsChecked = s.QuickPreviewEnabled;
     }
 
     // ============ HOTKEY RECORDING ============
@@ -380,6 +381,7 @@ public partial class SettingsWindow : Window
         s.HistoryDirectory = TxtHistoryDir.Text;
         if (int.TryParse(TxtMaxHistory.Text, out int max) && max > 0)
             s.MaxHistoryItems = max;
+        s.QuickPreviewEnabled = ChkQuickPreview.IsChecked == true;
 
         SetAutoStart(s.AutoStart);
         AppSettings.Save();

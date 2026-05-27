@@ -225,6 +225,16 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Quick Preview -->
+                <TextBlock Text="Quick Preview" Style="{StaticResource SectionTitle}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <CheckBox x:Name="ChkQuickPreview" Content="Enable Quick Preview (Space in Explorer)" />
+                        <TextBlock Text="Press Spacebar in File Explorer to preview files. Supports images, video, audio, text, PDF, and more."
+                                   Foreground="#666" FontSize="11" Margin="20,4,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
 

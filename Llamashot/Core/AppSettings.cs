@@ -90,6 +90,9 @@ public class AppSettings
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Llamashot");
     public int MaxHistoryItems { get; set; } = 100;
 
+    // Quick Preview
+    public bool QuickPreviewEnabled { get; set; } = true;
+
     public static void Load()
     {
         if (!File.Exists(SettingsPath))
