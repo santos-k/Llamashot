@@ -39,20 +39,22 @@ public class HistoryItemViewModel : INotifyPropertyChanged
 
 public partial class HistoryWindow : Window
 {
+    private List<HistoryItemViewModel> _allItems = new();
     private List<HistoryItemViewModel> _items = new();
+    private string _activeFilter = "All";
 
     public HistoryWindow()
     {
         InitializeComponent();
         LoadHistory();
-        Activated += (_, _) => LoadHistory(); // Refresh when window gets focus
+        Activated += (_, _) => LoadHistory();
     }
 
     private void LoadHistory()
     {
         HistoryManager.Load();
 
-        _items = HistoryManager.Records.Select(r =>
+        _allItems = HistoryManager.Records.Select(r =>
         {
             var (typeText, typeColor, typeDesc) = r.Type switch
             {
@@ -74,10 +76,54 @@ public partial class HistoryWindow : Window
             };
         }).ToList();
 
+        ApplyFilter();
+    }
+
+    private void Filter_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string filter)
+        {
+            _activeFilter = filter;
+            ApplyFilter();
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        _items = _activeFilter switch
+        {
+            "Images" => _allItems.Where(i => i.TypeText == "Saved").ToList(),
+            "Videos" => _allItems.Where(i => i.TypeText == "Video").ToList(),
+            "GIFs" => _allItems.Where(i => i.TypeText == "GIF").ToList(),
+            "Clipboard" => _allItems.Where(i => i.TypeText == "Copied").ToList(),
+            _ => _allItems.ToList()
+        };
+
         HistoryList.ItemsSource = _items;
         TxtCount.Text = $"{_items.Count} item{(_items.Count != 1 ? "s" : "")}";
         TxtEmpty.Visibility = _items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateSelectionUI();
+        UpdateFilterButtons();
+    }
+
+    private void UpdateFilterButtons()
+    {
+        var activeBg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x42, 0xA5, 0xF5));
+        var inactiveBg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
+        var activeFg = System.Windows.Media.Brushes.White;
+        var inactiveFg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xAA, 0xAA, 0xAA));
+
+        foreach (var child in FilterPanel.Children)
+        {
+            if (child is System.Windows.Controls.Button btn)
+            {
+                bool active = btn.Tag as string == _activeFilter;
+                btn.Background = active ? activeBg : inactiveBg;
+                btn.Foreground = active ? activeFg : inactiveFg;
+                btn.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
+                btn.BorderThickness = active ? new Thickness(0) : new Thickness(1);
+            }
+        }
     }
 
     private void Item_Click(object sender, MouseButtonEventArgs e)

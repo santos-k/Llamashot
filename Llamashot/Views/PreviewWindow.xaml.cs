@@ -16,7 +16,7 @@ public partial class PreviewWindow : Window
     private string? _currentFile;
     private DispatcherTimer? _mediaTimer;
     private bool _isSeeking;
-    private bool _isClickSeeking;
+    private bool _updatingSeekBar;
     private bool _isPlaying;
     private WebView2? _webView;
     private double _imageZoom = 1.0;
@@ -187,7 +187,9 @@ public partial class PreviewWindow : Window
     {
         if (!_isSeeking && MediaPlayer.NaturalDuration.HasTimeSpan)
         {
+            _updatingSeekBar = true;
             SeekBar.Value = MediaPlayer.Position.TotalSeconds;
+            _updatingSeekBar = false;
             TxtDuration.Text = $"{FormatTime(MediaPlayer.Position)} / {FormatTime(MediaPlayer.NaturalDuration.TimeSpan)}";
         }
     }
@@ -197,24 +199,24 @@ public partial class PreviewWindow : Window
 
     private void SeekBar_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
     {
-        _isSeeking = false;
         MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
+        _isSeeking = false;
     }
 
     private void SeekBar_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        _isClickSeeking = true;
+        _isSeeking = true;
     }
 
     private void SeekBar_PreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
-        _isClickSeeking = false;
         MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
+        _isSeeking = false;
     }
 
     private void SeekBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isSeeking || _isClickSeeking)
+        if (!_updatingSeekBar && _isSeeking)
             MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
     }
 
