@@ -7,8 +7,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen"
-        KeyDown="Window_KeyDown"
-        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+        KeyDown="Window_KeyDown">
 
     <Border x:Name="RootBorder" CornerRadius="10"
             BorderBrush="#33FFFFFF" BorderThickness="1">
@@ -29,14 +28,20 @@
             <Grid x:Name="ContentArea" Margin="2" ClipToBounds="True">
                 <Border x:Name="ContentBorder" CornerRadius="8,8,0,0" Background="#1E1E1E" />
 
-                <!-- Image preview (fit-to-window, zoom with mouse wheel) -->
+                <!-- Image preview (fit-to-window, zoom with wheel, pan with drag) -->
                 <Border x:Name="ImagePanel" Visibility="Collapsed" Background="Transparent"
-                        ClipToBounds="True" MouseWheel="ImagePanel_MouseWheel">
+                        ClipToBounds="True" MouseWheel="ImagePanel_MouseWheel"
+                        MouseLeftButtonDown="ImagePanel_MouseDown"
+                        MouseMove="ImagePanel_MouseMove"
+                        MouseLeftButtonUp="ImagePanel_MouseUp">
                     <Image x:Name="PreviewImage" Stretch="Uniform"
                            RenderOptions.BitmapScalingMode="HighQuality"
                            RenderTransformOrigin="0.5,0.5">
                         <Image.RenderTransform>
-                            <ScaleTransform x:Name="ImageScale" ScaleX="1" ScaleY="1" />
+                            <TransformGroup>
+                                <ScaleTransform x:Name="ImageScale" ScaleX="1" ScaleY="1" />
+                                <TranslateTransform x:Name="ImageTranslate" X="0" Y="0" />
+                            </TransformGroup>
                         </Image.RenderTransform>
                     </Image>
                 </Border>
@@ -134,9 +139,10 @@
                 </Border>
             </Grid>
 
-            <!-- Bottom info bar -->
+            <!-- Bottom info bar (drag to move window) -->
             <Border Grid.Row="1" Background="#12FFFFFF" Padding="14,8"
-                    CornerRadius="0,0,10,10">
+                    CornerRadius="0,0,10,10" Cursor="SizeAll"
+                    MouseLeftButtonDown="InfoBar_MouseLeftButtonDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

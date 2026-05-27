@@ -20,6 +20,9 @@ public partial class PreviewWindow : Window
     private double _seekDuration;
     private WebView2? _webView;
     private double _imageZoom = 1.0;
+    private Point _panStart;
+    private Point _imageOffset;
+    private bool _isPanning;
 
     // GIF animation
     private DispatcherTimer? _gifTimer;
@@ -113,6 +116,9 @@ public partial class PreviewWindow : Window
             _imageZoom = 1.0;
             ImageScale.ScaleX = 1;
             ImageScale.ScaleY = 1;
+            ImageTranslate.X = 0;
+            ImageTranslate.Y = 0;
+            _imageOffset = new Point(0, 0);
             ImagePanel.Visibility = Visibility.Visible;
             TxtFileMeta.Text = $"{bitmap.PixelWidth} x {bitmap.PixelHeight}";
         }
@@ -128,6 +134,14 @@ public partial class PreviewWindow : Window
         _imageZoom = Math.Clamp(_imageZoom, 0.5, 10.0);
         ImageScale.ScaleX = _imageZoom;
         ImageScale.ScaleY = _imageZoom;
+
+        // Reset pan when zooming back to fit
+        if (_imageZoom <= 1.01)
+        {
+            ImageTranslate.X = 0;
+            ImageTranslate.Y = 0;
+            _imageOffset = new Point(0, 0);
+        }
         e.Handled = true;
     }
 
@@ -213,11 +227,23 @@ public partial class PreviewWindow : Window
 
     private void SeekToClickPosition(MouseEventArgs e)
     {
+        // Get duration live if not yet set
+        if (_seekDuration <= 0 && MediaPlayer.NaturalDuration.HasTimeSpan)
+            _seekDuration = MediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+        if (_seekDuration <= 0) return;
+
         var pos = e.GetPosition(SeekBarContainer);
         var fraction = Math.Clamp(pos.X / SeekBarContainer.ActualWidth, 0, 1);
         var seekTime = fraction * _seekDuration;
+
+        // Pause → seek → resume for reliable WPF MediaElement seeking
+        bool wasPlaying = _isPlaying;
+        if (wasPlaying) MediaPlayer.Pause();
         MediaPlayer.Position = TimeSpan.FromSeconds(seekTime);
+        if (wasPlaying) MediaPlayer.Play();
+
         UpdateSeekBarVisual(fraction);
+        TxtDuration.Text = $"{FormatTime(TimeSpan.FromSeconds(seekTime))} / {FormatTime(TimeSpan.FromSeconds(_seekDuration))}";
     }
 
     private void SeekTrack_MouseDown(object sender, MouseButtonEventArgs e)
@@ -225,6 +251,7 @@ public partial class PreviewWindow : Window
         _isSeeking = true;
         SeekBarContainer.CaptureMouse();
         SeekToClickPosition(e);
+        e.Handled = true;
     }
 
     private void SeekTrack_MouseMove(object sender, MouseEventArgs e)
@@ -345,6 +372,9 @@ public partial class PreviewWindow : Window
             _imageZoom = 1.0;
             ImageScale.ScaleX = 1;
             ImageScale.ScaleY = 1;
+            ImageTranslate.X = 0;
+            ImageTranslate.Y = 0;
+            _imageOffset = new Point(0, 0);
             ImagePanel.Visibility = Visibility.Visible;
             TxtFileMeta.Text = $"{_gifFrames[0].PixelWidth} x {_gifFrames[0].PixelHeight} ({_gifFrames.Length} frames)";
 
@@ -423,10 +453,45 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void InfoBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 1)
             DragMove();
+    }
+
+    // Image pan when zoomed
+    private void ImagePanel_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_imageZoom > 1.0)
+        {
+            _isPanning = true;
+            _panStart = e.GetPosition(ImagePanel);
+            ImagePanel.CaptureMouse();
+            ImagePanel.Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+    }
+
+    private void ImagePanel_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isPanning && e.LeftButton == MouseButtonState.Pressed)
+        {
+            var pos = e.GetPosition(ImagePanel);
+            ImageTranslate.X = _imageOffset.X + (pos.X - _panStart.X);
+            ImageTranslate.Y = _imageOffset.Y + (pos.Y - _panStart.Y);
+            e.Handled = true;
+        }
+    }
+
+    private void ImagePanel_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_isPanning)
+        {
+            _isPanning = false;
+            _imageOffset = new Point(ImageTranslate.X, ImageTranslate.Y);
+            ImagePanel.ReleaseMouseCapture();
+            ImagePanel.Cursor = null;
+        }
     }
 
     private void PrevFile_Click(object sender, RoutedEventArgs e)
