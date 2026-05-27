@@ -16,6 +16,7 @@ public partial class PreviewWindow : Window
     private string? _currentFile;
     private DispatcherTimer? _mediaTimer;
     private bool _isSeeking;
+    private bool _isClickSeeking;
     private bool _isPlaying;
     private WebView2? _webView;
     private double _imageZoom = 1.0;
@@ -29,7 +30,7 @@ public partial class PreviewWindow : Window
         Width = Math.Min(screenW * 0.7, 1200);
         Height = Math.Min(screenH * 0.75, 900);
 
-        // Image zoom is handled by ImageScroller_MouseWheel in XAML
+        // Image zoom is handled by ImagePanel_MouseWheel in XAML
 
         _mediaTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _mediaTimer.Tick += MediaTimer_Tick;
@@ -52,7 +53,7 @@ public partial class PreviewWindow : Window
         _currentFile = filePath;
         var previewType = FilePreviewManager.GetPreviewType(filePath);
 
-        ImageScroller.Visibility = Visibility.Collapsed;
+        ImagePanel.Visibility = Visibility.Collapsed;
         MediaPanel.Visibility = Visibility.Collapsed;
         TextViewer.Visibility = Visibility.Collapsed;
         PdfPanel.Visibility = Visibility.Collapsed;
@@ -104,7 +105,7 @@ public partial class PreviewWindow : Window
             _imageZoom = 1.0;
             ImageScale.ScaleX = 1;
             ImageScale.ScaleY = 1;
-            ImageScroller.Visibility = Visibility.Visible;
+            ImagePanel.Visibility = Visibility.Visible;
             TxtFileMeta.Text = $"{bitmap.PixelWidth} x {bitmap.PixelHeight}";
         }
         catch
@@ -113,12 +114,10 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private void ImageScroller_MouseWheel(object sender, MouseWheelEventArgs e)
+    private void ImagePanel_MouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (ImageScroller.Visibility != Visibility.Visible) return;
-
         _imageZoom *= e.Delta > 0 ? 1.15 : 0.87;
-        _imageZoom = Math.Clamp(_imageZoom, 0.1, 10.0);
+        _imageZoom = Math.Clamp(_imageZoom, 0.5, 10.0);
         ImageScale.ScaleX = _imageZoom;
         ImageScale.ScaleY = _imageZoom;
         e.Handled = true;
@@ -202,9 +201,20 @@ public partial class PreviewWindow : Window
         MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
     }
 
+    private void SeekBar_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _isClickSeeking = true;
+    }
+
+    private void SeekBar_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        _isClickSeeking = false;
+        MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
+    }
+
     private void SeekBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isSeeking)
+        if (_isSeeking || _isClickSeeking)
             MediaPlayer.Position = TimeSpan.FromSeconds(SeekBar.Value);
     }
 
