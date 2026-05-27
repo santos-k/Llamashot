@@ -40,6 +40,116 @@ public static class HistoryManager
         {
             _records = new();
         }
+
+        // Regenerate thumbnails for recordings that have the fallback play-icon
+        RegenerateMissingThumbnails();
+    }
+
+    private static void RegenerateMissingThumbnails()
+    {
+        bool changed = false;
+        foreach (var r in _records)
+        {
+            if (r.Type != RecordType.Recording) continue;
+            if (!File.Exists(r.FilePath)) continue;
+
+            // Check if thumbnail is the small fallback icon (200x120) or missing
+            bool needsRegen = string.IsNullOrEmpty(r.ThumbnailPath) || !File.Exists(r.ThumbnailPath);
+            if (!needsRegen)
+            {
+                try
+                {
+                    var thumbBmp = new BitmapImage();
+                    thumbBmp.BeginInit();
+                    thumbBmp.UriSource = new System.Uri(r.ThumbnailPath);
+                    thumbBmp.CacheOption = BitmapCacheOption.OnLoad;
+                    thumbBmp.EndInit();
+                    // Fallback icon is exactly 200x120
+                    if (thumbBmp.PixelWidth == 200 && thumbBmp.PixelHeight == 120)
+                        needsRegen = true;
+                }
+                catch { needsRegen = true; }
+            }
+
+            if (!needsRegen) continue;
+
+            // Try to regenerate from the actual file
+            try
+            {
+                if (r.FilePath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+                {
+                    var gifBmp = new BitmapImage();
+                    gifBmp.BeginInit();
+                    gifBmp.UriSource = new System.Uri(r.FilePath);
+                    gifBmp.CacheOption = BitmapCacheOption.OnLoad;
+                    gifBmp.EndInit();
+                    gifBmp.Freeze();
+
+                    var thumbDir = Path.Combine(AppSettings.Instance.HistoryDirectory, "thumbnails");
+                    Directory.CreateDirectory(thumbDir);
+                    var thumbPath = Path.Combine(thumbDir, $"thumb_regen_{Path.GetFileNameWithoutExtension(r.FilePath)}.png");
+
+                    double scale = Math.Min(200.0 / gifBmp.PixelWidth, 1.0);
+                    var thumb = new TransformedBitmap(gifBmp, new System.Windows.Media.ScaleTransform(scale, scale));
+                    thumb.Freeze();
+
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(thumb));
+                    using var fs = File.Create(thumbPath);
+                    enc.Save(fs);
+
+                    // Delete old thumbnail
+                    if (!string.IsNullOrEmpty(r.ThumbnailPath) && File.Exists(r.ThumbnailPath))
+                        try { File.Delete(r.ThumbnailPath); } catch { }
+
+                    r.ThumbnailPath = thumbPath;
+                    r.Width = gifBmp.PixelWidth;
+                    r.Height = gifBmp.PixelHeight;
+                    changed = true;
+                }
+                else if (r.FilePath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                {
+                    // For video, try to find frames directory
+                    var framesDir = Path.Combine(Path.GetDirectoryName(r.FilePath)!,
+                        Path.GetFileNameWithoutExtension(r.FilePath) + "_frames");
+                    var firstFrame = Directory.Exists(framesDir)
+                        ? Directory.GetFiles(framesDir, "*.jpg").OrderBy(f => f).FirstOrDefault()
+                        : null;
+
+                    if (firstFrame != null)
+                    {
+                        var frameBmp = new BitmapImage();
+                        frameBmp.BeginInit();
+                        frameBmp.UriSource = new System.Uri(firstFrame);
+                        frameBmp.CacheOption = BitmapCacheOption.OnLoad;
+                        frameBmp.EndInit();
+                        frameBmp.Freeze();
+
+                        var thumbDir = Path.Combine(AppSettings.Instance.HistoryDirectory, "thumbnails");
+                        Directory.CreateDirectory(thumbDir);
+                        var thumbPath = Path.Combine(thumbDir, $"thumb_regen_{Path.GetFileNameWithoutExtension(r.FilePath)}.png");
+
+                        double scale = Math.Min(200.0 / frameBmp.PixelWidth, 1.0);
+                        var thumb = new TransformedBitmap(frameBmp, new System.Windows.Media.ScaleTransform(scale, scale));
+                        thumb.Freeze();
+
+                        var enc = new PngBitmapEncoder();
+                        enc.Frames.Add(BitmapFrame.Create(thumb));
+                        using var fs = File.Create(thumbPath);
+                        enc.Save(fs);
+
+                        if (!string.IsNullOrEmpty(r.ThumbnailPath) && File.Exists(r.ThumbnailPath))
+                            try { File.Delete(r.ThumbnailPath); } catch { }
+
+                        r.ThumbnailPath = thumbPath;
+                        changed = true;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (changed) Save();
     }
 
     public static void AddRecord(BitmapSource image, string savedPath)
@@ -59,35 +169,99 @@ public static class HistoryManager
                 Directory.CreateDirectory(dir);
                 Directory.CreateDirectory(thumbDir);
 
-                // Create a simple video icon thumbnail
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
                 thumbPath = Path.Combine(thumbDir, $"thumb_{timestamp}.png");
 
-                var dv = new System.Windows.Media.DrawingVisual();
-                using (var dc = dv.RenderOpen())
-                {
-                    dc.DrawRectangle(
-                        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x2E)),
-                        null, new System.Windows.Rect(0, 0, 200, 120));
-                    // Play triangle
-                    var playBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF4, 0x43, 0x36));
-                    var geo = new System.Windows.Media.StreamGeometry();
-                    using (var ctx = geo.Open())
-                    {
-                        ctx.BeginFigure(new System.Windows.Point(80, 40), true, true);
-                        ctx.LineTo(new System.Windows.Point(80, 80), true, false);
-                        ctx.LineTo(new System.Windows.Point(120, 60), true, false);
-                    }
-                    dc.DrawGeometry(playBrush, null, geo);
-                }
-                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(200, 120, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-                rtb.Render(dv);
-                rtb.Freeze();
+                bool generated = false;
 
-                var enc = new PngBitmapEncoder();
-                enc.Frames.Add(BitmapFrame.Create(rtb));
-                using (var fs = File.Create(thumbPath))
+                // For GIFs, extract the first frame as thumbnail
+                if (videoPath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var gifBmp = new BitmapImage();
+                        gifBmp.BeginInit();
+                        gifBmp.UriSource = new System.Uri(videoPath);
+                        gifBmp.CacheOption = BitmapCacheOption.OnLoad;
+                        gifBmp.EndInit();
+                        gifBmp.Freeze();
+
+                        double scale = Math.Min(200.0 / gifBmp.PixelWidth, 1.0);
+                        var thumb = new TransformedBitmap(gifBmp, new System.Windows.Media.ScaleTransform(scale, scale));
+                        thumb.Freeze();
+
+                        var enc = new PngBitmapEncoder();
+                        enc.Frames.Add(BitmapFrame.Create(thumb));
+                        using var fs = File.Create(thumbPath);
+                        enc.Save(fs);
+                        generated = true;
+                    }
+                    catch { }
+                }
+
+                // For MP4/video, try to extract first frame using the frames directory
+                if (!generated && videoPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        // Look for the frames directory next to the video
+                        var framesDir = Path.Combine(Path.GetDirectoryName(videoPath)!,
+                            Path.GetFileNameWithoutExtension(videoPath) + "_frames");
+                        var firstFrame = framesDir != null && Directory.Exists(framesDir)
+                            ? Directory.GetFiles(framesDir, "*.jpg").OrderBy(f => f).FirstOrDefault()
+                            : null;
+
+                        if (firstFrame != null)
+                        {
+                            var frameBmp = new BitmapImage();
+                            frameBmp.BeginInit();
+                            frameBmp.UriSource = new System.Uri(firstFrame);
+                            frameBmp.CacheOption = BitmapCacheOption.OnLoad;
+                            frameBmp.EndInit();
+                            frameBmp.Freeze();
+
+                            double scale = Math.Min(200.0 / frameBmp.PixelWidth, 1.0);
+                            var thumb = new TransformedBitmap(frameBmp, new System.Windows.Media.ScaleTransform(scale, scale));
+                            thumb.Freeze();
+
+                            var enc = new PngBitmapEncoder();
+                            enc.Frames.Add(BitmapFrame.Create(thumb));
+                            using var fs = File.Create(thumbPath);
+                            enc.Save(fs);
+                            generated = true;
+                        }
+                    }
+                    catch { }
+                }
+
+                // Fallback: draw play icon
+                if (!generated)
+                {
+                    var dv = new System.Windows.Media.DrawingVisual();
+                    using (var dc = dv.RenderOpen())
+                    {
+                        dc.DrawRectangle(
+                            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x2E)),
+                            null, new System.Windows.Rect(0, 0, 200, 120));
+                        var playBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF4, 0x43, 0x36));
+                        var geo = new System.Windows.Media.StreamGeometry();
+                        using (var ctx = geo.Open())
+                        {
+                            ctx.BeginFigure(new System.Windows.Point(80, 40), true, true);
+                            ctx.LineTo(new System.Windows.Point(80, 80), true, false);
+                            ctx.LineTo(new System.Windows.Point(120, 60), true, false);
+                        }
+                        dc.DrawGeometry(playBrush, null, geo);
+                    }
+                    var rtb = new RenderTargetBitmap(200, 120, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                    rtb.Render(dv);
+                    rtb.Freeze();
+
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using var fs = File.Create(thumbPath);
                     enc.Save(fs);
+                }
             }
 
             var record = new ScreenshotRecord

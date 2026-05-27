@@ -22,7 +22,7 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 6.3.0" Foreground="#666"
+                <TextBlock Text="Version 6.4.0" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -58,10 +58,13 @@
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; GIF recording mode with 30s limit, quality picker" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Scrolling screenshot (auto/manual) with stitching" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Text extraction from any screen area" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, video records, open in Explorer" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Quick Preview — Space in Explorer to preview 200+ file types" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Syntax highlighting for code, rendered markdown" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Video/audio auto-play with seek bar, image zoom &amp; pan" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: History categories (All/Images/Videos/GIFs/Clipboard)" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF preview via WebView2, animated GIF playback" />
+                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Save quality picker (Original, High, Compact) for GIF &amp; video" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Silent startup — no duplicate instance popup" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
                     </StackPanel>
                 </Border>

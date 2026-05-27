@@ -60,6 +60,11 @@ public partial class RecordingOverlay : Window
         {
             GifBadge.Visibility = Visibility.Visible;
             TxtTimer.Text = "00:30";
+            // GIF has no audio — hide mic/speaker everywhere
+            SepAudio.Visibility = Visibility.Collapsed;
+            BtnMic.Visibility = Visibility.Collapsed;
+            BtnSystemAudio.Visibility = Visibility.Collapsed;
+            TxtAudioStatus.Visibility = Visibility.Collapsed;
         }
 
         Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;

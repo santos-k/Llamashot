@@ -14,24 +14,44 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Background="#222" Padding="20,14" BorderBrush="#333" BorderThickness="0,0,0,1">
-            <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Canvas Width="20" Height="20" Margin="0,0,10,0">
-                        <Ellipse Width="20" Height="20" Stroke="#42A5F5" StrokeThickness="2" />
-                        <Line X1="10" Y1="5" X2="10" Y2="10" Stroke="#42A5F5" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                        <Line X1="10" Y1="10" X2="14" Y2="13" Stroke="#42A5F5" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                    </Canvas>
-                    <TextBlock Text="History" FontSize="17" FontWeight="SemiBold"
-                               Foreground="#EEE" VerticalAlignment="Center" />
+        <Border Background="#222" Padding="20,10" BorderBrush="#333" BorderThickness="0,0,0,1">
+            <StackPanel>
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Canvas Width="20" Height="20" Margin="0,0,10,0">
+                            <Ellipse Width="20" Height="20" Stroke="#42A5F5" StrokeThickness="2" />
+                            <Line X1="10" Y1="5" X2="10" Y2="10" Stroke="#42A5F5" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="10" Y1="10" X2="14" Y2="13" Stroke="#42A5F5" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Canvas>
+                        <TextBlock Text="History" FontSize="17" FontWeight="SemiBold"
+                                   Foreground="#EEE" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtCount" Foreground="#777" FontSize="12"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <CheckBox x:Name="ChkSelectAll" Content="Select All" Foreground="#AAA" FontSize="11"
+                                  VerticalAlignment="Center" Click="SelectAll_Click" Cursor="Hand" />
+                    </StackPanel>
+                </Grid>
+                <!-- Category filter pills -->
+                <StackPanel x:Name="FilterPanel" Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button x:Name="BtnFilterAll" Content="All" Tag="All" Click="Filter_Click"
+                            Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
+                            Background="#42A5F5" Foreground="White" BorderThickness="0" FontWeight="SemiBold" />
+                    <Button x:Name="BtnFilterImages" Content="Images" Tag="Images" Click="Filter_Click"
+                            Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
+                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                    <Button x:Name="BtnFilterVideos" Content="Videos" Tag="Videos" Click="Filter_Click"
+                            Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
+                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                    <Button x:Name="BtnFilterGifs" Content="GIFs" Tag="GIFs" Click="Filter_Click"
+                            Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
+                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                    <Button x:Name="BtnFilterClipboard" Content="Clipboard" Tag="Clipboard" Click="Filter_Click"
+                            Height="26" Padding="12,0" Cursor="Hand" FontSize="11"
+                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtCount" Foreground="#777" FontSize="12"
-                               VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <CheckBox x:Name="ChkSelectAll" Content="Select All" Foreground="#AAA" FontSize="11"
-                              VerticalAlignment="Center" Click="SelectAll_Click" Cursor="Hand" />
-                </StackPanel>
-            </Grid>
+            </StackPanel>
         </Border>
 
         <!-- Content -->

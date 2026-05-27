@@ -1,6 +1,6 @@
 # Llamashot
 
-A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, and extract text with a single hotkey.
+A fast, lightweight screenshot and screen recording tool for Windows. Capture, annotate, record, extract text, and preview files with a single hotkey.
 
 **[Live Page](https://santos-k.github.io/Llamashot/)** | **[Download Installer](https://github.com/santos-k/Llamashot/releases/latest)**
 
@@ -99,6 +99,8 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Save to file** - Per-item save button and bulk "Save Selected" to folder
 - **Delete** - Single or bulk delete with confirmation
 - One-click re-copy from history
+- **Category filter** - Filter by All, Images, Videos, GIFs, Clipboard
+- **Click to preview** - Thumbnails open in Quick Preview window
 - Configurable storage location and max items
 
 ### Pin on Screen
@@ -106,6 +108,21 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - Adjustable opacity with mouse wheel
 - Drag to reposition, double-click to copy
 - Right-click or close button to dismiss
+
+### Quick Preview (Space in Explorer)
+- **Instant file preview** - Select any file in Explorer, press Space to preview
+- **200+ file types** - Images (PNG, JPG, HEIC, RAW, AVIF), video, audio, code, PDF, markdown
+- **Syntax highlighting** - 15+ languages with VS Code-style colors (C#, Python, JS, Go, Rust, SQL, and more)
+- **Markdown rendering** - Headings, bold, italic, code blocks, links, lists rendered beautifully
+- **Animated GIF playback** - Frame-by-frame animation with correct timing
+- **Video/audio auto-play** - Click-to-seek progress bar, play/pause controls
+- **PDF preview** - Rendered via built-in WebView2 (no extra software needed)
+- **Image zoom & pan** - Mouse wheel to zoom, drag to pan when zoomed
+- **Arrow key navigation** - Left/Right to browse files in Explorer's sort order
+- **Explorer sync** - Navigating updates Explorer's selection highlight
+- **Auto-update** - Preview updates when you click a different file in Explorer
+- **Configurable shortcut** - Change the trigger key in Settings (default: Space)
+- **File info fallback** - Unsupported files show name, size, dates, and "Open with" button
 
 ### Additional Features
 - **System tray** - Single click captures, double click opens settings
@@ -181,6 +198,7 @@ All shortcuts are customizable in Settings.
 | Text Extract | O |
 | Pin | F |
 | Pan (temporary) | Space+drag |
+| Quick Preview | Space (in Explorer) |
 | Double-click | Toggle full region |
 | Close overlay | Escape |
 | **Double-Esc** | **Force close all overlays** |
@@ -228,6 +246,7 @@ dotnet run
 - **Audio capture**: WinRT AudioGraph (microphone + system loopback)
 - **OCR**: Windows.Media.Ocr (built-in, offline)
 - **Settings**: JSON file in AppData/Roaming
+- **File preview**: WebView2 (PDF), GifBitmapDecoder (animated GIF), WPF FlowDocument (markdown/code)
 - **Installer**: Inno Setup 6
 - **Target**: Windows 10 (1903+) / Windows 11
 
