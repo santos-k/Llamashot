@@ -85,7 +85,7 @@ public partial class HistoryWindow : Window
         if (sender is FrameworkElement fe && fe.DataContext is HistoryItemViewModel item)
         {
             if (File.Exists(item.FilePath))
-                Process.Start(new ProcessStartInfo(item.FilePath) { UseShellExecute = true });
+                Core.FilePreviewManager.Instance.ShowPreview(item.FilePath);
         }
     }
 
