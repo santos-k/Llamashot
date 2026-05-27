@@ -24,7 +24,7 @@ public class FilePreviewManager
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm", ".gif"
+        ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm"
     };
 
     private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -42,12 +42,13 @@ public class FilePreviewManager
         ".csproj", ".sln", ".xaml", ".svg", ".makefile", ".dockerfile"
     };
 
-    public enum PreviewType { Image, Video, Audio, Code, Markdown, Pdf, Unsupported }
+    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Pdf, Unsupported }
 
     public static PreviewType GetPreviewType(string filePath)
     {
         var ext = Path.GetExtension(filePath);
         if (string.IsNullOrEmpty(ext)) return PreviewType.Code;
+        if (ext.Equals(".gif", StringComparison.OrdinalIgnoreCase)) return PreviewType.Gif;
         if (ext.Equals(".md", StringComparison.OrdinalIgnoreCase)) return PreviewType.Markdown;
         if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase)) return PreviewType.Pdf;
         if (ImageExtensions.Contains(ext)) return PreviewType.Image;

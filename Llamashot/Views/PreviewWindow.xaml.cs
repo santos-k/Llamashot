@@ -21,6 +21,11 @@ public partial class PreviewWindow : Window
     private WebView2? _webView;
     private double _imageZoom = 1.0;
 
+    // GIF animation
+    private DispatcherTimer? _gifTimer;
+    private BitmapFrame[]? _gifFrames;
+    private int _gifFrameIndex;
+
     public PreviewWindow()
     {
         InitializeComponent();
@@ -68,6 +73,9 @@ public partial class PreviewWindow : Window
         {
             case FilePreviewManager.PreviewType.Image:
                 LoadImage(filePath);
+                break;
+            case FilePreviewManager.PreviewType.Gif:
+                LoadGif(filePath);
                 break;
             case FilePreviewManager.PreviewType.Video:
                 LoadMedia(filePath, isAudio: false);
@@ -305,11 +313,68 @@ public partial class PreviewWindow : Window
         TxtFileMeta.Text = fi.Extension.TrimStart('.').ToUpperInvariant();
     }
 
+    private void LoadGif(string filePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            var decoder = new GifBitmapDecoder(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+
+            if (decoder.Frames.Count <= 1)
+            {
+                // Static GIF — treat as image
+                LoadImage(filePath);
+                return;
+            }
+
+            _gifFrames = decoder.Frames.ToArray();
+            _gifFrameIndex = 0;
+
+            // Get frame delay from metadata (default 100ms)
+            int delayMs = 100;
+            try
+            {
+                var metadata = decoder.Frames[0].Metadata as BitmapMetadata;
+                var delay = metadata?.GetQuery("/grctlext/Delay");
+                if (delay is ushort d && d > 0) delayMs = d * 10;
+            }
+            catch { }
+            if (delayMs < 20) delayMs = 100;
+
+            PreviewImage.Source = _gifFrames[0];
+            _imageZoom = 1.0;
+            ImageScale.ScaleX = 1;
+            ImageScale.ScaleY = 1;
+            ImagePanel.Visibility = Visibility.Visible;
+            TxtFileMeta.Text = $"{_gifFrames[0].PixelWidth} x {_gifFrames[0].PixelHeight} ({_gifFrames.Length} frames)";
+
+            _gifTimer?.Stop();
+            _gifTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(delayMs) };
+            _gifTimer.Tick += (s, e) =>
+            {
+                if (_gifFrames == null) return;
+                _gifFrameIndex = (_gifFrameIndex + 1) % _gifFrames.Length;
+                PreviewImage.Source = _gifFrames[_gifFrameIndex];
+            };
+            _gifTimer.Start();
+        }
+        catch
+        {
+            LoadImage(filePath);
+        }
+    }
+
     private void StopMedia()
     {
         _mediaTimer?.Stop();
         _isPlaying = false;
+        _seekDuration = 0;
         try { MediaPlayer.Stop(); MediaPlayer.Source = null; } catch { }
+
+        // Stop GIF animation
+        _gifTimer?.Stop();
+        _gifTimer = null;
+        _gifFrames = null;
     }
 
     private string? ReadFileText(string filePath)
