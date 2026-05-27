@@ -173,6 +173,9 @@ internal static class NativeMethods
     public const int WH_KEYBOARD_LL = 13;
     public const int WM_KEYDOWN = 0x0100;
     public const uint VK_ESCAPE = 0x1B;
+    public const uint VK_SPACE = 0x20;
+    public const uint VK_LEFT = 0x25;
+    public const uint VK_RIGHT = 0x27;
 
     // --- DPI ---
     [DllImport("user32.dll")]
@@ -243,4 +246,7 @@ internal static class NativeMethods
     // --- Window class name ---
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 }
