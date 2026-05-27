@@ -29,9 +29,6 @@ public partial class PreviewWindow : Window
         Width = Math.Min(screenW * 0.7, 1200);
         Height = Math.Min(screenH * 0.75, 900);
 
-        MouseEnter += (s, e) => CloseBtn.Opacity = 1;
-        MouseLeave += (s, e) => CloseBtn.Opacity = 0;
-
         PreviewImage.MouseWheel += Image_MouseWheel;
 
         _mediaTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
@@ -40,12 +37,10 @@ public partial class PreviewWindow : Window
         Opacity = 0;
         Loaded += (s, e) =>
         {
-            var anim = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150));
+            var anim = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+            anim.Completed += (_, _) => { BeginAnimation(OpacityProperty, null); Opacity = 1; };
             BeginAnimation(OpacityProperty, anim);
         };
-
-        MediaPanel.MouseEnter += (s, e) => MediaControls.Opacity = 1;
-        MediaPanel.MouseLeave += (s, e) => { if (!_isSeeking) MediaControls.Opacity = 0; };
     }
 
     public void LoadFile(string filePath)
@@ -314,19 +309,13 @@ public partial class PreviewWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        // Escape, Space, and arrow keys are handled by the global keyboard hook
+        // in App.xaml.cs — this is a fallback for when the window has focus
         switch (e.Key)
         {
             case Key.Escape:
             case Key.Space:
                 Close();
-                e.Handled = true;
-                break;
-            case Key.Left:
-                FilePreviewManager.Instance.NavigateFile(-1);
-                e.Handled = true;
-                break;
-            case Key.Right:
-                FilePreviewManager.Instance.NavigateFile(1);
                 e.Handled = true;
                 break;
         }
@@ -337,6 +326,12 @@ public partial class PreviewWindow : Window
         if (e.ClickCount == 1)
             DragMove();
     }
+
+    private void PrevFile_Click(object sender, RoutedEventArgs e)
+        => FilePreviewManager.Instance.NavigateFile(-1);
+
+    private void NextFile_Click(object sender, RoutedEventArgs e)
+        => FilePreviewManager.Instance.NavigateFile(1);
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 

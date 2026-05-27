@@ -56,7 +56,7 @@
 
                     <!-- Media controls overlay -->
                     <Border x:Name="MediaControls" VerticalAlignment="Bottom"
-                            Background="#CC000000" Padding="12,8" Opacity="0">
+                            Background="#CC000000" Padding="12,8" CornerRadius="0,0,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -139,12 +139,89 @@
                 </Grid>
             </Border>
 
-            <!-- Close button -->
+            <!-- Close button (always visible) -->
             <Button x:Name="CloseBtn" HorizontalAlignment="Right" VerticalAlignment="Top"
-                    Width="32" Height="32" Margin="6" Click="Close_Click"
-                    Opacity="0" Cursor="Hand" Style="{x:Null}">
-                <Border Background="#CC333333" CornerRadius="16" Width="32" Height="32">
-                    <TextBlock Text="&#x2715;" Foreground="White" FontSize="14"
+                    Width="36" Height="36" Margin="8" Click="Close_Click"
+                    Cursor="Hand">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+                <Border x:Name="CloseBtnBorder" Background="#99333333" CornerRadius="18"
+                        Width="36" Height="36">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#CCE53935" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="&#x2715;" Foreground="White" FontSize="15" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </Button>
+
+            <!-- Navigation arrows -->
+            <Button x:Name="BtnPrev" HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Width="40" Height="40" Margin="8,0" Click="PrevFile_Click"
+                    Cursor="Hand" Opacity="0.6">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Border Background="#88222222" CornerRadius="20" Width="40" Height="40">
+                    <TextBlock Text="&#x276E;" Foreground="White" FontSize="20"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </Button>
+            <Button x:Name="BtnNext" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Width="40" Height="40" Margin="8,0" Click="NextFile_Click"
+                    Cursor="Hand" Opacity="0.6">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Border Background="#88222222" CornerRadius="20" Width="40" Height="40">
+                    <TextBlock Text="&#x276F;" Foreground="White" FontSize="20"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
             </Button>

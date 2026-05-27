@@ -158,26 +158,31 @@ public class FilePreviewManager
     {
         if (_folderFiles == null || _folderFiles.Length == 0) return;
 
-        _currentIndex = Math.Clamp(_currentIndex + direction, 0, _folderFiles.Length - 1);
-        var newFile = _folderFiles[_currentIndex];
-        if (newFile != _currentFile)
-        {
-            _currentFile = newFile;
-            _previewWindow?.LoadFile(newFile);
-        }
+        var newIndex = Math.Clamp(_currentIndex + direction, 0, _folderFiles.Length - 1);
+        if (newIndex == _currentIndex) return; // already at boundary
+
+        _currentIndex = newIndex;
+        _currentFile = _folderFiles[_currentIndex];
+        _previewWindow?.LoadFile(_currentFile);
     }
 
     private void UpdateFolderFiles(string filePath)
     {
         var folder = Path.GetDirectoryName(filePath);
-        if (folder != _currentFolder)
+        if (!string.Equals(folder, _currentFolder, StringComparison.OrdinalIgnoreCase))
         {
             _currentFolder = folder;
             _folderFiles = folder != null
                 ? Directory.GetFiles(folder).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToArray()
                 : Array.Empty<string>();
         }
-        _currentIndex = Array.IndexOf(_folderFiles!, filePath);
+        // Case-insensitive path lookup
+        _currentIndex = -1;
+        for (int i = 0; i < _folderFiles!.Length; i++)
+        {
+            if (string.Equals(_folderFiles[i], filePath, StringComparison.OrdinalIgnoreCase))
+            { _currentIndex = i; break; }
+        }
         if (_currentIndex < 0) _currentIndex = 0;
     }
 
