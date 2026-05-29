@@ -148,12 +148,20 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="TxtFileName" Foreground="#CCC" FontSize="12"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="TxtFileSize" Grid.Column="1" Foreground="#888"
                                FontSize="12" VerticalAlignment="Center" Margin="16,0" />
-                    <TextBlock x:Name="TxtFileMeta" Grid.Column="2" Foreground="#888"
+                    <Button x:Name="BtnToggleCode" Grid.Column="2" Content="&lt;/&gt;"
+                            Visibility="Collapsed" Click="ToggleCode_Click"
+                            Cursor="Hand" Margin="0,0,10,0" Padding="8,2"
+                            FontSize="11" FontFamily="Consolas" FontWeight="Bold"
+                            Background="#33FFFFFF" Foreground="#AAA"
+                            BorderThickness="1" BorderBrush="#33FFFFFF"
+                            ToolTip="Toggle code / rendered view" />
+                    <TextBlock x:Name="TxtFileMeta" Grid.Column="3" Foreground="#888"
                                FontSize="12" VerticalAlignment="Center" />
                 </Grid>
             </Border>

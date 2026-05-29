@@ -121,7 +121,12 @@ public class FilePreviewManager
         ".patch", ".diff",
     };
 
-    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Pdf, Unsupported }
+    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Html, Pdf, Unsupported }
+
+    private static readonly HashSet<string> HtmlExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".html", ".htm", ".xhtml",
+    };
 
     public static PreviewType GetPreviewType(string filePath)
     {
@@ -130,6 +135,7 @@ public class FilePreviewManager
         if (ext.Equals(".gif", StringComparison.OrdinalIgnoreCase)) return PreviewType.Gif;
         if (ext.Equals(".md", StringComparison.OrdinalIgnoreCase)) return PreviewType.Markdown;
         if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase)) return PreviewType.Pdf;
+        if (HtmlExtensions.Contains(ext)) return PreviewType.Html;
         if (ImageExtensions.Contains(ext)) return PreviewType.Image;
         if (VideoExtensions.Contains(ext)) return PreviewType.Video;
         if (AudioExtensions.Contains(ext)) return PreviewType.Audio;

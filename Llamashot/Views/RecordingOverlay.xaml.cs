@@ -683,6 +683,14 @@ public partial class RecordingOverlay : Window
         RefreshRecentEmojis();
         RefreshEmojiGrid();
         EmojiPopup.IsOpen = true;
+
+        // Exclude the Popup's own window from screen capture
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var source = (HwndSource?)PresentationSource.FromVisual(EmojiPopup.Child);
+            if (source != null)
+                NativeMethods.SetWindowDisplayAffinity(source.Handle, NativeMethods.WDA_EXCLUDEFROMCAPTURE);
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)

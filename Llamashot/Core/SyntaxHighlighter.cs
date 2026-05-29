@@ -52,7 +52,7 @@ public static class SyntaxHighlighter
         { ".sql", "sql" },
         // Scripting (use JS-like highlighting)
         { ".rb", "js" }, { ".php", "js" }, { ".swift", "js" }, { ".dart", "js" },
-        { ".lua", "js" }, { ".pl", "js" }, { ".r", "js" }, { ".R", "js" },
+        { ".lua", "js" }, { ".pl", "js" }, { ".r", "js" },
         { ".jl", "js" }, { ".ex", "js" }, { ".exs", "js" },
     };
 

@@ -29,6 +29,11 @@ public partial class PreviewWindow : Window
     private BitmapFrame[]? _gifFrames;
     private int _gifFrameIndex;
 
+    // Code/rendered toggle
+    private bool _isCodeView;
+    private string? _currentText;
+    private FilePreviewManager.PreviewType _currentPreviewType;
+
     public PreviewWindow()
     {
         InitializeComponent();
@@ -60,6 +65,9 @@ public partial class PreviewWindow : Window
 
         _currentFile = filePath;
         var previewType = FilePreviewManager.GetPreviewType(filePath);
+        _currentPreviewType = previewType;
+        _isCodeView = false;
+        _currentText = null;
 
         ImagePanel.Visibility = Visibility.Collapsed;
         MediaPanel.Visibility = Visibility.Collapsed;
@@ -67,6 +75,7 @@ public partial class PreviewWindow : Window
         PdfPanel.Visibility = Visibility.Collapsed;
         FileInfoPanel.Visibility = Visibility.Collapsed;
         LoadingOverlay.Visibility = Visibility.Collapsed;
+        BtnToggleCode.Visibility = Visibility.Collapsed;
 
         var fi = new FileInfo(filePath);
         TxtFileName.Text = fi.Name;
@@ -91,6 +100,9 @@ public partial class PreviewWindow : Window
                 break;
             case FilePreviewManager.PreviewType.Markdown:
                 LoadMarkdown(filePath);
+                break;
+            case FilePreviewManager.PreviewType.Html:
+                LoadHtml(filePath);
                 break;
             case FilePreviewManager.PreviewType.Pdf:
                 LoadPdf(filePath);
@@ -297,14 +309,82 @@ public partial class PreviewWindow : Window
             var text = ReadFileText(filePath);
             if (text == null) { ShowFileInfo(filePath); return; }
 
+            _currentText = text;
             var doc = MarkdownRenderer.Render(text);
             TextViewer.Document = doc;
             TextViewer.Visibility = Visibility.Visible;
+            BtnToggleCode.Visibility = Visibility.Visible;
+            BtnToggleCode.Content = "</>";
             TxtFileMeta.Text = "Markdown";
         }
         catch
         {
             ShowFileInfo(filePath);
+        }
+    }
+
+    private async void LoadHtml(string filePath)
+    {
+        try
+        {
+            var text = ReadFileText(filePath);
+            if (text == null) { ShowFileInfo(filePath); return; }
+
+            _currentText = text;
+
+            if (_webView == null)
+            {
+                _webView = new WebView2();
+                PdfPanel.Child = _webView;
+                await _webView.EnsureCoreWebView2Async();
+            }
+
+            PdfPanel.Visibility = Visibility.Visible;
+            _webView.Source = new Uri(filePath);
+            BtnToggleCode.Visibility = Visibility.Visible;
+            BtnToggleCode.Content = "</>";
+            TxtFileMeta.Text = "HTML";
+        }
+        catch
+        {
+            // Fallback to code view
+            LoadCode(filePath);
+        }
+    }
+
+    private void ToggleCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentFile == null || _currentText == null) return;
+
+        _isCodeView = !_isCodeView;
+
+        if (_isCodeView)
+        {
+            // Show raw code
+            PdfPanel.Visibility = Visibility.Collapsed;
+            var doc = SyntaxHighlighter.Highlight(_currentText, _currentFile);
+            TextViewer.Document = doc;
+            TextViewer.Visibility = Visibility.Visible;
+            BtnToggleCode.Content = "\u25B6"; // ▶ (rendered)
+        }
+        else
+        {
+            // Show rendered view
+            TextViewer.Visibility = Visibility.Collapsed;
+            PdfPanel.Visibility = Visibility.Collapsed;
+
+            if (_currentPreviewType == FilePreviewManager.PreviewType.Markdown)
+            {
+                var doc = MarkdownRenderer.Render(_currentText);
+                TextViewer.Document = doc;
+                TextViewer.Visibility = Visibility.Visible;
+            }
+            else if (_currentPreviewType == FilePreviewManager.PreviewType.Html)
+            {
+                PdfPanel.Visibility = Visibility.Visible;
+                _webView!.Source = new Uri(_currentFile);
+            }
+            BtnToggleCode.Content = "</>";
         }
     }
 
@@ -414,12 +494,24 @@ public partial class PreviewWindow : Window
             var fi = new FileInfo(filePath);
             if (fi.Length > 10 * 1024 * 1024) return null;
 
-            using var fs = File.OpenRead(filePath);
-            var buffer = new byte[Math.Min(8192, fi.Length)];
-            var read = fs.Read(buffer, 0, buffer.Length);
-            for (int i = 0; i < read; i++)
+            byte[] header;
+            using (var fs = File.OpenRead(filePath))
             {
-                if (buffer[i] == 0) return null;
+                header = new byte[Math.Min(8192, fi.Length)];
+                fs.Read(header, 0, header.Length);
+            }
+
+            // Detect UTF-16 BOM — these files naturally contain null bytes
+            bool isUtf16 = header.Length >= 2 &&
+                ((header[0] == 0xFF && header[1] == 0xFE) ||
+                 (header[0] == 0xFE && header[1] == 0xFF));
+
+            if (!isUtf16)
+            {
+                for (int i = 0; i < header.Length; i++)
+                {
+                    if (header[i] == 0) return null;
+                }
             }
 
             return File.ReadAllText(filePath);

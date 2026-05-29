@@ -86,8 +86,8 @@ public class AviWriter : IDisposable
         _writer.Write(0); // suggested buffer size
         _writer.Write(-1); // quality
         _writer.Write(0); // sample size
-        _writer.Write((short)0); _writer.Write((short)0); // frame rect
-        _writer.Write((short)_width); _writer.Write((short)_height);
+        _writer.Write(0); _writer.Write(0); // frame rect (left, top)
+        _writer.Write(_width); _writer.Write(_height); // frame rect (right, bottom)
 
         // strf - stream format (BITMAPINFOHEADER)
         WriteChunkId("strf");
