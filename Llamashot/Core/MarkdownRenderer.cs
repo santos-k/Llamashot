@@ -66,6 +66,22 @@ public static class MarkdownRenderer
                 continue;
             }
 
+            // Table detection: starts with |
+            if (line.TrimStart().StartsWith('|'))
+            {
+                var tableRows = new List<string>();
+                while (i < lines.Length)
+                {
+                    var tl = lines[i].TrimEnd('\r');
+                    if (!tl.TrimStart().StartsWith('|')) break;
+                    tableRows.Add(tl);
+                    i++;
+                }
+                if (tableRows.Count > 0)
+                    AddTable(doc, tableRows);
+                continue;
+            }
+
             var trimmed = line.Trim();
             if (Regex.IsMatch(trimmed, @"^[-*_]{3,}$"))
             {
@@ -173,6 +189,72 @@ public static class MarkdownRenderer
             AddCodeBlock(doc, string.Join("\n", codeBlockLines));
 
         return doc;
+    }
+
+    private static void AddTable(FlowDocument doc, List<string> rows)
+    {
+        var table = new Table
+        {
+            CellSpacing = 0,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 6, 0, 6)
+        };
+
+        var rowGroup = new TableRowGroup();
+        bool isHeader = true;
+        int colCount = 0;
+
+        foreach (var rowText in rows)
+        {
+            var cells = rowText.Trim().Trim('|').Split('|');
+
+            // Skip separator row (|---|---|)
+            if (cells.All(c => Regex.IsMatch(c.Trim(), @"^:?-{2,}:?$")))
+            {
+                isHeader = false;
+                continue;
+            }
+
+            if (colCount == 0)
+            {
+                colCount = cells.Length;
+                for (int c = 0; c < colCount; c++)
+                    table.Columns.Add(new TableColumn());
+            }
+
+            var tr = new TableRow();
+            if (isHeader)
+                tr.Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x3A));
+
+            foreach (var cellText in cells)
+            {
+                var para = new Paragraph
+                {
+                    Margin = new Thickness(0),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    FontSize = 13
+                };
+                if (isHeader)
+                    para.FontWeight = FontWeights.SemiBold;
+                AddInlineMarkdown(para, cellText.Trim());
+
+                var tc = new TableCell(para)
+                {
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                    BorderThickness = new Thickness(0, 0, 1, 1)
+                };
+                tr.Cells.Add(tc);
+            }
+
+            rowGroup.Rows.Add(tr);
+
+            if (isHeader)
+                isHeader = false;
+        }
+
+        table.RowGroups.Add(rowGroup);
+        doc.Blocks.Add(table);
     }
 
     private static void AddCodeBlock(FlowDocument doc, string code)

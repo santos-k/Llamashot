@@ -1430,6 +1430,17 @@ public partial class OverlayWindow : Window
         VideoToolbarCanvas.Visibility = Visibility.Visible;
         HandleCanvas.Visibility = Visibility.Visible;
 
+        // Hide audio controls for GIF mode (no audio in GIF)
+        var audioVis = _captureMode == CaptureMode.Gif ? Visibility.Collapsed : Visibility.Visible;
+        BtnVideoMic.Visibility = audioVis;
+        BtnVideoSysAudio.Visibility = audioVis;
+
+        // Reset blur state
+        _videoBlurActive = false;
+        BtnVideoBlur.Background = Brushes.Transparent;
+        DrawingCanvas.Visibility = Visibility.Visible;
+        UpdateDrawingCanvasClip();
+
         // Restore dimming (video mode removed it during selection)
         if (_screenshot != null)
         {
@@ -1479,6 +1490,44 @@ public partial class OverlayWindow : Window
         UpdateVideoSysAudioUI();
     }
 
+    private bool _videoBlurActive;
+
+    private void VideoBlur_Click(object sender, RoutedEventArgs e)
+    {
+        _videoBlurActive = !_videoBlurActive;
+
+        if (_videoBlurActive)
+        {
+            // Enable drawing canvas and set blur tool
+            DrawingCanvas.Visibility = Visibility.Visible;
+            UpdateDrawingCanvasClip();
+            _currentTool = new BlurTool { ScreenshotSource = _screenshot };
+            _currentTool.StrokeColor = _currentColor;
+            _currentTool.Thickness = _currentThickness;
+            DrawingCanvas.Cursor = _currentTool.Cursor;
+            _currentToolTag = "Blur";
+            BtnVideoBlur.Background = new SolidColorBrush(Color.FromArgb(0x50, 0x78, 0x90, 0x9C));
+        }
+        else
+        {
+            _currentTool = null;
+            _currentToolTag = null;
+            DrawingCanvas.Cursor = Cursors.Cross;
+            BtnVideoBlur.Background = Brushes.Transparent;
+        }
+    }
+
+    private void VideoUndo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_undoStack.Count > 0)
+        {
+            var action = _undoStack.Pop();
+            if (action.RenderedElement != null)
+                DrawingCanvas.Children.Remove(action.RenderedElement);
+            _redoStack.Push(action);
+        }
+    }
+
     private async void VideoStart_Click(object sender, RoutedEventArgs e)
     {
         BtnVideoStart.IsEnabled = false;
@@ -1502,11 +1551,59 @@ public partial class OverlayWindow : Window
         double dx = _selection.X + Left;
         double dy = _selection.Y + Top;
 
+        // Render blur annotations to a persistent overlay window
+        Window? blurOverlay = null;
+        if (DrawingCanvas.Children.Count > 0)
+        {
+            // Save and temporarily remove clip so we render full canvas
+            var savedClip = DrawingCanvas.Clip;
+            DrawingCanvas.Clip = null;
+            DrawingCanvas.UpdateLayout();
+
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                (int)(_selection.Width * dpi), (int)(_selection.Height * dpi),
+                96 * dpi, 96 * dpi, PixelFormats.Pbgra32);
+
+            // Translate so only the selection region is rendered
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                var vb = new VisualBrush(DrawingCanvas)
+                {
+                    ViewboxUnits = BrushMappingMode.Absolute,
+                    Viewbox = _selection,
+                    Stretch = Stretch.None,
+                    AlignmentX = AlignmentX.Left,
+                    AlignmentY = AlignmentY.Top
+                };
+                dc.DrawRectangle(vb, null, new Rect(0, 0, _selection.Width, _selection.Height));
+            }
+            rtb.Render(dv);
+            rtb.Freeze();
+
+            DrawingCanvas.Clip = savedClip;
+
+            blurOverlay = new Window
+            {
+                WindowStyle = WindowStyle.None,
+                AllowsTransparency = true,
+                Background = Brushes.Transparent,
+                ShowInTaskbar = false,
+                Topmost = false,
+                Left = dx, Top = dy,
+                Width = _selection.Width, Height = _selection.Height,
+                Content = new Image { Source = rtb, Stretch = Stretch.Fill }
+            };
+            blurOverlay.Show();
+        }
+
         Hide();
 
         var overlay = new RecordingOverlay(px, py, pw, ph, dx, dy, _selection.Width, _selection.Height,
             startImmediately: true, micEnabled: _videoMicEnabled, sysAudioEnabled: _videoSysAudioEnabled,
             isGifMode: _captureMode == CaptureMode.Gif);
+        if (blurOverlay != null)
+            overlay.Closed += (_, _) => blurOverlay.Close();
         overlay.Show();
         Close();
     }

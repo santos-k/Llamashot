@@ -607,6 +607,31 @@
                         </Canvas>
                     </Button>
                     <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
+                    <!-- Blur tool for pre-recording -->
+                    <Button x:Name="BtnVideoBlur" Click="VideoBlur_Click" Width="28" Height="28" Margin="2,0"
+                            Cursor="Hand" ToolTip="Blur sensitive area (B)"
+                            Background="Transparent" BorderBrush="Transparent" Focusable="False">
+                        <Canvas Width="14" Height="14">
+                            <Rectangle Canvas.Left="0" Canvas.Top="0" Width="4.5" Height="4.5" Fill="#78909C" />
+                            <Rectangle Canvas.Left="5" Canvas.Top="0" Width="4.5" Height="4.5" Fill="#546E7A" />
+                            <Rectangle Canvas.Left="10" Canvas.Top="0" Width="4" Height="4.5" Fill="#78909C" />
+                            <Rectangle Canvas.Left="0" Canvas.Top="5" Width="4.5" Height="4.5" Fill="#546E7A" />
+                            <Rectangle Canvas.Left="5" Canvas.Top="5" Width="4.5" Height="4.5" Fill="#78909C" />
+                            <Rectangle Canvas.Left="10" Canvas.Top="5" Width="4" Height="4.5" Fill="#546E7A" />
+                            <Rectangle Canvas.Left="0" Canvas.Top="10" Width="4.5" Height="4" Fill="#78909C" />
+                            <Rectangle Canvas.Left="5" Canvas.Top="10" Width="4.5" Height="4" Fill="#546E7A" />
+                            <Rectangle Canvas.Left="10" Canvas.Top="10" Width="4" Height="4" Fill="#78909C" />
+                        </Canvas>
+                    </Button>
+                    <Button x:Name="BtnVideoUndo" Click="VideoUndo_Click" Width="28" Height="28" Margin="0,0,2,0"
+                            Cursor="Hand" ToolTip="Undo blur"
+                            Background="Transparent" BorderBrush="Transparent" Focusable="False">
+                        <Canvas Width="14" Height="14">
+                            <Path Stroke="#FFA726" StrokeThickness="2" Data="M5,3 L2,6 L5,9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            <Path Stroke="#FFA726" StrokeThickness="2" Data="M2,6 L9,6 A3,3 0 0,1 9,12 L7,12" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Canvas>
+                    </Button>
+                    <Rectangle Width="1" Fill="#25FFFFFF" Margin="4,5" />
                     <!-- Close -->
                     <Button Click="Close_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="14" Height="14">

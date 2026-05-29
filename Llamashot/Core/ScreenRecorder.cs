@@ -17,6 +17,7 @@ public class ScreenRecorder : IDisposable
     private bool _disposed;
     private string? _framesDir;
     private int _frameCount;
+    private TimeSpan _finalElapsed; // actual recording duration (minus pauses)
 
     // Audio
     private Windows.Media.Audio.AudioGraph? _audioGraph;
@@ -278,6 +279,7 @@ public class ScreenRecorder : IDisposable
         if (!_recording) return;
         if (!_paused)
             _pausedElapsed += DateTime.Now - _startTime;
+        _finalElapsed = _pausedElapsed;
         _recording = false;
         _paused = false;
         _timer.Stop();
@@ -288,7 +290,8 @@ public class ScreenRecorder : IDisposable
 
     /// <param name="outputPath">Output MP4 file path.</param>
     /// <param name="maxWidth">Max width in pixels (0 = original resolution).</param>
-    public async Task<bool> SaveAsync(string outputPath, int maxWidth = 0)
+    /// <param name="progress">Progress callback (0.0 to 1.0).</param>
+    public async Task<bool> SaveAsync(string outputPath, int maxWidth = 0, Action<double>? progress = null)
     {
         if (_framesDir == null || _frameCount == 0) return false;
 
@@ -316,21 +319,48 @@ public class ScreenRecorder : IDisposable
             outW = outW % 2 == 0 ? outW : outW - 1;
             outH = outH % 2 == 0 ? outH : outH - 1;
 
-            var composition = new Windows.Media.Editing.MediaComposition();
-            var frameDuration = TimeSpan.FromMilliseconds(1000.0 / _fps);
+            double frameDurationMs = _finalElapsed.TotalSeconds > 0 && _frameCount > 0
+                ? (_finalElapsed.TotalMilliseconds / _frameCount)
+                : (1000.0 / _fps);
 
+            var quality = outW >= 1920
+                ? Windows.Media.MediaProperties.VideoEncodingQuality.HD1080p
+                : outW >= 1280
+                    ? Windows.Media.MediaProperties.VideoEncodingQuality.HD720p
+                    : Windows.Media.MediaProperties.VideoEncodingQuality.Vga;
+
+            var dir = Path.GetDirectoryName(outputPath)!;
+            Directory.CreateDirectory(dir);
+
+            bool hasAudio = _audioFilePath != null && File.Exists(_audioFilePath);
+
+            // Fast path: MediaStreamSource feeds decoded frames directly to H.264 encoder
+            if (!hasAudio)
+            {
+                try
+                {
+                    bool fast = await SaveWithTranscoderAsync(outputPath, outW, outH,
+                        frameDurationMs, quality, progress);
+                    if (fast) return true;
+                }
+                catch { /* Fall through to composition path */ }
+            }
+
+            // Fallback: MediaComposition with individual image clips (slower but supports audio)
+            var composition = new Windows.Media.Editing.MediaComposition();
+            var clipDuration = TimeSpan.FromMilliseconds(frameDurationMs);
             for (int i = 0; i < _frameCount; i++)
             {
                 var framePath = Path.Combine(_framesDir, $"frame_{i:D6}.jpg");
                 if (!File.Exists(framePath)) continue;
                 var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(framePath);
-                var clip = await Windows.Media.Editing.MediaClip.CreateFromImageFileAsync(file, frameDuration);
+                var clip = await Windows.Media.Editing.MediaClip.CreateFromImageFileAsync(file, clipDuration);
                 composition.Clips.Add(clip);
+                progress?.Invoke((double)i / _frameCount * 0.5);
             }
 
             if (composition.Clips.Count == 0) return false;
 
-            bool hasAudio = _audioFilePath != null && File.Exists(_audioFilePath);
             if (hasAudio)
             {
                 try
@@ -343,31 +373,112 @@ public class ScreenRecorder : IDisposable
                 catch { }
             }
 
-            var quality = outW >= 1920
-                ? Windows.Media.MediaProperties.VideoEncodingQuality.HD1080p
-                : outW >= 1280
-                    ? Windows.Media.MediaProperties.VideoEncodingQuality.HD720p
-                    : Windows.Media.MediaProperties.VideoEncodingQuality.Vga;
-
             var profile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateMp4(quality);
             profile.Video.Width = (uint)outW;
             profile.Video.Height = (uint)outH;
 
-            var dir = Path.GetDirectoryName(outputPath)!;
-            Directory.CreateDirectory(dir);
             var outputFolder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(dir);
             var outputFile = await outputFolder.CreateFileAsync(
                 Path.GetFileName(outputPath), Windows.Storage.CreationCollisionOption.ReplaceExisting);
 
-            await composition.RenderToFileAsync(outputFile,
+            var renderOp = composition.RenderToFileAsync(outputFile,
                 Windows.Media.Editing.MediaTrimmingPreference.Precise, profile);
-            return true;
+            if (progress != null)
+                renderOp.Progress = (info, p) => progress(0.5 + p / 200.0);
+
+            var result = await renderOp;
+            return result == Windows.Media.Transcoding.TranscodeFailureReason.None;
         }
         catch (Exception ex)
         {
             LastError = ex.Message;
             return false;
         }
+    }
+
+    /// <summary>
+    /// Fast save: uses MediaStreamSource to feed decoded BGRA frames directly
+    /// to MediaTranscoder's H.264 encoder. No intermediate file needed.
+    /// </summary>
+    private async Task<bool> SaveWithTranscoderAsync(string outputPath, int outW, int outH,
+        double frameDurationMs, Windows.Media.MediaProperties.VideoEncodingQuality quality,
+        Action<double>? progress)
+    {
+        var videoProps = Windows.Media.MediaProperties.VideoEncodingProperties.CreateUncompressed(
+            Windows.Media.MediaProperties.MediaEncodingSubtypes.Bgra8,
+            (uint)_regionW, (uint)_regionH);
+        uint fpsX1000 = (uint)Math.Round(1000000.0 / frameDurationMs);
+        videoProps.FrameRate.Numerator = fpsX1000;
+        videoProps.FrameRate.Denominator = 1000;
+
+        var videoDesc = new Windows.Media.Core.VideoStreamDescriptor(videoProps);
+        var mss = new Windows.Media.Core.MediaStreamSource(videoDesc);
+        mss.Duration = TimeSpan.FromMilliseconds(_frameCount * frameDurationMs);
+        mss.CanSeek = false;
+        mss.BufferTime = TimeSpan.Zero;
+
+        int frameIndex = 0;
+        string framesDir = _framesDir!;
+        int totalFrames = _frameCount;
+
+        mss.SampleRequested += (sender, args) =>
+        {
+            if (frameIndex >= totalFrames)
+            {
+                args.Request.Sample = null;
+                return;
+            }
+
+            var path = Path.Combine(framesDir, $"frame_{frameIndex:D6}.jpg");
+            if (!File.Exists(path))
+            {
+                args.Request.Sample = null;
+                return;
+            }
+
+            // Decode JPEG to raw BGRA pixels
+            using var bmp = new DrawBitmap(path);
+            var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+            var bmpData = bmp.LockBits(rect, DrawImaging.ImageLockMode.ReadOnly,
+                DrawImaging.PixelFormat.Format32bppArgb);
+            byte[] pixels = new byte[bmpData.Stride * bmp.Height];
+            System.Runtime.InteropServices.Marshal.Copy(bmpData.Scan0, pixels, 0, pixels.Length);
+            bmp.UnlockBits(bmpData);
+
+            var buffer = Windows.Security.Cryptography.CryptographicBuffer.CreateFromByteArray(pixels);
+            var timestamp = TimeSpan.FromMilliseconds(frameIndex * frameDurationMs);
+            var sample = Windows.Media.Core.MediaStreamSample.CreateFromBuffer(buffer, timestamp);
+            sample.Duration = TimeSpan.FromMilliseconds(frameDurationMs);
+            args.Request.Sample = sample;
+
+            frameIndex++;
+            progress?.Invoke((double)frameIndex / totalFrames);
+        };
+
+        var profile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateMp4(quality);
+        profile.Video.Width = (uint)outW;
+        profile.Video.Height = (uint)outH;
+        profile.Audio = null;
+
+        var dir = Path.GetDirectoryName(outputPath)!;
+        var outputFolder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(dir);
+        var outputFile = await outputFolder.CreateFileAsync(
+            Path.GetFileName(outputPath), Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+        using var outputStream = await outputFile.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite);
+
+        var transcoder = new Windows.Media.Transcoding.MediaTranscoder();
+        var prepResult = await transcoder.PrepareMediaStreamSourceTranscodeAsync(
+            mss, outputStream, profile);
+
+        if (!prepResult.CanTranscode)
+        {
+            LastError = $"Transcode failed: {prepResult.FailureReason}";
+            return false;
+        }
+
+        await prepResult.TranscodeAsync();
+        return true;
     }
 
     public void CleanupFrames()
@@ -404,6 +515,7 @@ public class ScreenRecorder : IDisposable
 
             var framePath = Path.Combine(_framesDir, $"frame_{_frameCount:D6}.jpg");
             bmp.Save(framePath, DrawImaging.ImageFormat.Jpeg);
+
             _frameCount++;
         }
         catch { }

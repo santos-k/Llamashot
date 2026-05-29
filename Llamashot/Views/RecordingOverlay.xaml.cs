@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Llamashot.Core;
 using Llamashot.Tools;
@@ -164,7 +165,7 @@ public partial class RecordingOverlay : Window
         TxtAudioStatus.Visibility = _isGifMode ? Visibility.Collapsed : rec;
 
         RecDot.Visibility = rec;
-        SepAnnotations.Visibility = rec;
+        SepAnnotations.Visibility = Visibility.Visible; // Always show separator (blur available in pre-recording)
         BtnPen.Visibility = rec;
         BtnLine.Visibility = rec;
         BtnArrow.Visibility = rec;
@@ -174,10 +175,11 @@ public partial class RecordingOverlay : Window
         BtnMarker.Visibility = rec;
         BtnCheck.Visibility = rec;
         BtnCross.Visibility = rec;
+        BtnBlur.Visibility = Visibility.Visible;
         BtnEmoji.Visibility = rec;
-        BtnEraser.Visibility = rec;
-        BtnUndo.Visibility = rec;
-        BtnClearAnnotations.Visibility = rec;
+        BtnEraser.Visibility = Visibility.Visible;
+        BtnUndo.Visibility = Visibility.Visible;
+        BtnClearAnnotations.Visibility = Visibility.Visible;
         BtnRecColor.Visibility = rec;
         BtnRecThickness.Visibility = rec;
         PanelRecControls.Visibility = rec;
@@ -476,6 +478,7 @@ public partial class RecordingOverlay : Window
             "Marker" => new MarkerTool(),
             "Check" => new StampTool(StampType.Check),
             "CrossMark" => new StampTool(StampType.Cross),
+            "Blur" => new BlurTool { ScreenshotSource = CaptureRecordingArea() },
             _ => new PenTool()
         };
         tool.StrokeColor = _recColor;
@@ -484,6 +487,24 @@ public partial class RecordingOverlay : Window
         _annotationOverlay.SetTool(tool);
         UpdateAnnotationToolHighlights();
         Activate(); // Bring toolbar back on top of annotation overlay
+    }
+
+    private BitmapSource? CaptureRecordingArea()
+    {
+        try
+        {
+            using var bmp = new System.Drawing.Bitmap(_pixelW, _pixelH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
+                g.CopyFromScreen(_pixelX, _pixelY, 0, 0, new System.Drawing.Size(_pixelW, _pixelH));
+            var bmpData = bmp.LockBits(new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height),
+                System.Drawing.Imaging.ImageLockMode.ReadOnly, bmp.PixelFormat);
+            var source = BitmapSource.Create(bmp.Width, bmp.Height, 96, 96, PixelFormats.Bgra32, null,
+                bmpData.Scan0, bmpData.Stride * bmp.Height, bmpData.Stride);
+            bmp.UnlockBits(bmpData);
+            source.Freeze();
+            return source;
+        }
+        catch { return null; }
     }
 
     private void ClearAnnotations_Click(object sender, RoutedEventArgs e)
@@ -504,6 +525,7 @@ public partial class RecordingOverlay : Window
             (BtnMarker, "Marker", Color.FromRgb(0xFF, 0xEE, 0x58)),
             (BtnCheck, "Check", Color.FromRgb(0x4C, 0xAF, 0x50)),
             (BtnCross, "CrossMark", Color.FromRgb(0xF4, 0x43, 0x36)),
+            (BtnBlur, "Blur", Color.FromRgb(0x78, 0x90, 0x9C)),
             (BtnEmoji, "Emoji", Color.FromRgb(0xFF, 0xC1, 0x07)),
             (BtnEraser, "Eraser", Color.FromRgb(0xEF, 0x53, 0x50)),
         };
@@ -683,6 +705,14 @@ public partial class RecordingOverlay : Window
         RefreshRecentEmojis();
         RefreshEmojiGrid();
         EmojiPopup.IsOpen = true;
+
+        // Exclude the Popup's own window from screen capture
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var source = (HwndSource?)PresentationSource.FromVisual(EmojiPopup.Child);
+            if (source != null)
+                NativeMethods.SetWindowDisplayAffinity(source.Handle, NativeMethods.WDA_EXCLUDEFROMCAPTURE);
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void EmojiSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -714,6 +744,7 @@ public partial class RecordingOverlay : Window
         BtnMarker.Visibility = Visibility.Collapsed;
         BtnCheck.Visibility = Visibility.Collapsed;
         BtnCross.Visibility = Visibility.Collapsed;
+        BtnBlur.Visibility = Visibility.Collapsed;
         BtnEmoji.Visibility = Visibility.Collapsed;
         BtnEraser.Visibility = Visibility.Collapsed;
         BtnUndo.Visibility = Visibility.Collapsed;
@@ -729,6 +760,14 @@ public partial class RecordingOverlay : Window
         {
             Left = (SystemParameters.PrimaryScreenWidth - ActualWidth) / 2;
         }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void UpdateSavingProgress(double fraction, string label)
+    {
+        int pct = (int)(fraction * 100);
+        SavingText.Text = $"{label}...";
+        SavingPercent.Text = $"{pct}%";
+        SavingProgressBar.Width = fraction * 120; // 120 = progress bar container width
     }
 
     private void Undo_Click(object sender, RoutedEventArgs e)
@@ -847,13 +886,14 @@ public partial class RecordingOverlay : Window
                     _recorder.FramesDirectory!, frameCount, 10, dialog.FileName,
                     maxWidth: qualityDialog.MaxWidth,
                     frameSkip: qualityDialog.FrameSkip,
-                    progress: p => Dispatcher.Invoke(() =>
-                        SavingText.Text = $"Encoding GIF... {(int)(p * 100)}%"));
+                    progress: p => Dispatcher.Invoke(() => UpdateSavingProgress(p, "Encoding GIF")));
             }
             else
             {
                 SavingText.Text = "Saving video...";
-                success = await _recorder.SaveAsync(dialog.FileName, maxWidth: qualityDialog.MaxWidth);
+                success = await _recorder.SaveAsync(dialog.FileName,
+                    maxWidth: qualityDialog.MaxWidth,
+                    progress: p => Dispatcher.Invoke(() => UpdateSavingProgress(p, "Saving video")));
             }
 
             Hide();

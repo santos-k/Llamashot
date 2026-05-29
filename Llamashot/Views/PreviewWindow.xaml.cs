@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -29,6 +31,16 @@ public partial class PreviewWindow : Window
     private BitmapFrame[]? _gifFrames;
     private int _gifFrameIndex;
 
+    // Code/rendered toggle
+    private bool _isCodeView;
+    private string? _currentText;
+    private FilePreviewManager.PreviewType _currentPreviewType;
+
+    // Fullscreen toggle
+    private bool _isFullscreen;
+    private Rect _restoreBounds;
+    private Thickness _restoreMargin;
+
     public PreviewWindow()
     {
         InitializeComponent();
@@ -54,12 +66,14 @@ public partial class PreviewWindow : Window
 
     public void LoadFile(string filePath)
     {
-        if (!File.Exists(filePath)) return;
+        bool isDir = Directory.Exists(filePath);
+        if (!isDir && !File.Exists(filePath)) return;
 
         StopMedia();
 
         _currentFile = filePath;
-        var previewType = FilePreviewManager.GetPreviewType(filePath);
+        _isCodeView = false;
+        _currentText = null;
 
         ImagePanel.Visibility = Visibility.Collapsed;
         MediaPanel.Visibility = Visibility.Collapsed;
@@ -67,10 +81,26 @@ public partial class PreviewWindow : Window
         PdfPanel.Visibility = Visibility.Collapsed;
         FileInfoPanel.Visibility = Visibility.Collapsed;
         LoadingOverlay.Visibility = Visibility.Collapsed;
+        BtnToggleCode.Visibility = Visibility.Collapsed;
+
+        if (isDir)
+        {
+            var di = new DirectoryInfo(filePath);
+            TxtFileName.Text = di.Name;
+            TxtFileSize.Text = "";
+            ShowFolderInfo(filePath);
+            SetCompactMode(true);
+            return;
+        }
+
+        var previewType = FilePreviewManager.GetPreviewType(filePath);
+        _currentPreviewType = previewType;
 
         var fi = new FileInfo(filePath);
         TxtFileName.Text = fi.Name;
         TxtFileSize.Text = FormatFileSize(fi.Length);
+
+        bool isCompact = previewType == FilePreviewManager.PreviewType.Unsupported;
 
         switch (previewType)
         {
@@ -92,6 +122,9 @@ public partial class PreviewWindow : Window
             case FilePreviewManager.PreviewType.Markdown:
                 LoadMarkdown(filePath);
                 break;
+            case FilePreviewManager.PreviewType.Html:
+                LoadHtml(filePath);
+                break;
             case FilePreviewManager.PreviewType.Pdf:
                 LoadPdf(filePath);
                 break;
@@ -99,6 +132,7 @@ public partial class PreviewWindow : Window
                 ShowFileInfo(filePath);
                 break;
         }
+        SetCompactMode(isCompact);
     }
 
     private void LoadImage(string filePath)
@@ -297,14 +331,82 @@ public partial class PreviewWindow : Window
             var text = ReadFileText(filePath);
             if (text == null) { ShowFileInfo(filePath); return; }
 
+            _currentText = text;
             var doc = MarkdownRenderer.Render(text);
             TextViewer.Document = doc;
             TextViewer.Visibility = Visibility.Visible;
+            BtnToggleCode.Visibility = Visibility.Visible;
+            BtnToggleCode.Content = "</>";
             TxtFileMeta.Text = "Markdown";
         }
         catch
         {
             ShowFileInfo(filePath);
+        }
+    }
+
+    private async void LoadHtml(string filePath)
+    {
+        try
+        {
+            var text = ReadFileText(filePath);
+            if (text == null) { ShowFileInfo(filePath); return; }
+
+            _currentText = text;
+
+            if (_webView == null)
+            {
+                _webView = new WebView2();
+                PdfPanel.Child = _webView;
+                await _webView.EnsureCoreWebView2Async();
+            }
+
+            PdfPanel.Visibility = Visibility.Visible;
+            _webView.Source = new Uri(filePath);
+            BtnToggleCode.Visibility = Visibility.Visible;
+            BtnToggleCode.Content = "</>";
+            TxtFileMeta.Text = "HTML";
+        }
+        catch
+        {
+            // Fallback to code view
+            LoadCode(filePath);
+        }
+    }
+
+    private void ToggleCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentFile == null || _currentText == null) return;
+
+        _isCodeView = !_isCodeView;
+
+        if (_isCodeView)
+        {
+            // Show raw code
+            PdfPanel.Visibility = Visibility.Collapsed;
+            var doc = SyntaxHighlighter.Highlight(_currentText, _currentFile);
+            TextViewer.Document = doc;
+            TextViewer.Visibility = Visibility.Visible;
+            BtnToggleCode.Content = "\u25B6"; // ▶ (rendered)
+        }
+        else
+        {
+            // Show rendered view
+            TextViewer.Visibility = Visibility.Collapsed;
+            PdfPanel.Visibility = Visibility.Collapsed;
+
+            if (_currentPreviewType == FilePreviewManager.PreviewType.Markdown)
+            {
+                var doc = MarkdownRenderer.Render(_currentText);
+                TextViewer.Document = doc;
+                TextViewer.Visibility = Visibility.Visible;
+            }
+            else if (_currentPreviewType == FilePreviewManager.PreviewType.Html)
+            {
+                PdfPanel.Visibility = Visibility.Visible;
+                _webView!.Source = new Uri(_currentFile);
+            }
+            BtnToggleCode.Content = "</>";
         }
     }
 
@@ -329,15 +431,113 @@ public partial class PreviewWindow : Window
         }
     }
 
+    private void SetFileIcon(string path)
+    {
+        try
+        {
+            var shinfo = new NativeMethods.SHFILEINFO();
+            NativeMethods.SHGetFileInfo(path, 0, ref shinfo,
+                (uint)Marshal.SizeOf(shinfo),
+                NativeMethods.SHGFI_ICON | NativeMethods.SHGFI_LARGEICON);
+
+            if (shinfo.hIcon != IntPtr.Zero)
+            {
+                var source = Imaging.CreateBitmapSourceFromHIcon(
+                    shinfo.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                source.Freeze();
+                FileInfoImage.Source = source;
+                NativeMethods.DestroyIcon(shinfo.hIcon);
+                return;
+            }
+        }
+        catch { }
+        FileInfoImage.Source = null;
+    }
+
     private void ShowFileInfo(string filePath)
     {
         FileInfoPanel.Visibility = Visibility.Visible;
+        SetFileIcon(filePath);
+        BtnOpenWith.Visibility = Visibility.Visible;
         var fi = new FileInfo(filePath);
         FileInfoName.Text = fi.Name;
         FileInfoType.Text = fi.Extension.TrimStart('.').ToUpperInvariant() + " file";
         FileInfoSize.Text = FormatFileSize(fi.Length);
         FileInfoDates.Text = $"Created: {fi.CreationTime:MMM dd, yyyy HH:mm}\nModified: {fi.LastWriteTime:MMM dd, yyyy HH:mm}";
         TxtFileMeta.Text = fi.Extension.TrimStart('.').ToUpperInvariant();
+    }
+
+    private void ShowFolderInfo(string folderPath)
+    {
+        FileInfoPanel.Visibility = Visibility.Visible;
+        BtnOpenWith.Visibility = Visibility.Collapsed;
+        SetFileIcon(folderPath);
+        var di = new DirectoryInfo(folderPath);
+        FileInfoName.Text = di.Name;
+
+        try
+        {
+            int fileCount = di.GetFiles().Length;
+            int folderCount = di.GetDirectories().Length;
+            FileInfoType.Text = $"{fileCount} files, {folderCount} folders";
+
+            long totalSize = 0;
+            foreach (var f in di.EnumerateFiles("*", SearchOption.AllDirectories))
+            {
+                try { totalSize += f.Length; } catch { }
+            }
+            FileInfoSize.Text = FormatFileSize(totalSize);
+        }
+        catch
+        {
+            FileInfoType.Text = "Folder";
+            FileInfoSize.Text = "";
+        }
+
+        FileInfoDates.Text = $"Created: {di.CreationTime:MMM dd, yyyy HH:mm}\nModified: {di.LastWriteTime:MMM dd, yyyy HH:mm}";
+        TxtFileMeta.Text = "Folder";
+        TxtFileName.Text = di.Name;
+    }
+
+    private double _normalWidth, _normalHeight, _normalLeft, _normalTop;
+    private bool _isCompact;
+
+    private void SetCompactMode(bool compact)
+    {
+        if (compact == _isCompact) return;
+
+        if (compact)
+        {
+            if (!_isCompact)
+            {
+                _normalWidth = Width;
+                _normalHeight = Height;
+                _normalLeft = Left;
+                _normalTop = Top;
+            }
+            Width = 340;
+            Height = 250;
+            BtnPrev.Visibility = Visibility.Collapsed;
+            BtnNext.Visibility = Visibility.Collapsed;
+            BtnOpenWith.Visibility = Visibility.Collapsed;
+            CenterOnScreen();
+        }
+        else if (_isCompact)
+        {
+            Width = _normalWidth > 0 ? _normalWidth : Math.Min(SystemParameters.PrimaryScreenWidth * 0.7, 1200);
+            Height = _normalHeight > 0 ? _normalHeight : Math.Min(SystemParameters.PrimaryScreenHeight * 0.75, 900);
+            BtnPrev.Visibility = Visibility.Visible;
+            BtnNext.Visibility = Visibility.Visible;
+            Left = _normalLeft;
+            Top = _normalTop;
+        }
+        _isCompact = compact;
+    }
+
+    private void CenterOnScreen()
+    {
+        Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
+        Top = (SystemParameters.PrimaryScreenHeight - Height) / 2;
     }
 
     private void LoadGif(string filePath)
@@ -414,12 +614,24 @@ public partial class PreviewWindow : Window
             var fi = new FileInfo(filePath);
             if (fi.Length > 10 * 1024 * 1024) return null;
 
-            using var fs = File.OpenRead(filePath);
-            var buffer = new byte[Math.Min(8192, fi.Length)];
-            var read = fs.Read(buffer, 0, buffer.Length);
-            for (int i = 0; i < read; i++)
+            byte[] header;
+            using (var fs = File.OpenRead(filePath))
             {
-                if (buffer[i] == 0) return null;
+                header = new byte[Math.Min(8192, fi.Length)];
+                fs.Read(header, 0, header.Length);
+            }
+
+            // Detect UTF-16 BOM — these files naturally contain null bytes
+            bool isUtf16 = header.Length >= 2 &&
+                ((header[0] == 0xFF && header[1] == 0xFE) ||
+                 (header[0] == 0xFE && header[1] == 0xFF));
+
+            if (!isUtf16)
+            {
+                for (int i = 0; i < header.Length; i++)
+                {
+                    if (header[i] == 0) return null;
+                }
             }
 
             return File.ReadAllText(filePath);
@@ -457,6 +669,57 @@ public partial class PreviewWindow : Window
     {
         if (e.ClickCount == 1)
             DragMove();
+    }
+
+    private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
+
+    private void ToggleFullscreen()
+    {
+        _isFullscreen = !_isFullscreen;
+
+        if (_isFullscreen)
+        {
+            _restoreBounds = new Rect(Left, Top, Width, Height);
+            _restoreMargin = RootBorder.Margin;
+            RootBorder.CornerRadius = new CornerRadius(0);
+            RootBorder.Margin = new Thickness(0);
+            WindowState = WindowState.Maximized;
+            TxtFullscreenBarIcon.Text = "\u2750"; // restore icon
+        }
+        else
+        {
+            WindowState = WindowState.Normal;
+            Left = _restoreBounds.Left;
+            Top = _restoreBounds.Top;
+            Width = _restoreBounds.Width;
+            Height = _restoreBounds.Height;
+            RootBorder.CornerRadius = new CornerRadius(10);
+            RootBorder.Margin = new Thickness(3);
+            TxtFullscreenBarIcon.Text = "\u26F6"; // fullscreen icon
+        }
+    }
+
+    private void ResizeEdge_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.Tag is not string edge) return;
+
+        int dir = edge switch
+        {
+            "Left" => 1,
+            "Right" => 2,
+            "Top" => 3,
+            "TopLeft" => 4,
+            "TopRight" => 5,
+            "Bottom" => 6,
+            "BottomLeft" => 7,
+            "BottomRight" => 8,
+            _ => 0
+        };
+        if (dir == 0) return;
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+        NativeMethods.ReleaseCapture();
+        NativeMethods.SendMessage(hwnd, 0x112 /* WM_SYSCOMMAND */, (IntPtr)(0xF000 + dir), IntPtr.Zero);
     }
 
     // Image pan when zoomed

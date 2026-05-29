@@ -4,12 +4,36 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        Topmost="True"
-        ShowInTaskbar="False"
+        Topmost="False"
+        ShowInTaskbar="True"
         WindowStartupLocation="CenterScreen"
+        MinWidth="320" MinHeight="240"
         KeyDown="Window_KeyDown">
 
-    <Border x:Name="RootBorder" CornerRadius="10"
+    <Grid>
+    <!-- Invisible resize grips on all edges -->
+    <Border Background="Transparent" Width="6" HorizontalAlignment="Left" Cursor="SizeWE"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="Left" />
+    <Border Background="Transparent" Width="6" HorizontalAlignment="Right" Cursor="SizeWE"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="Right" />
+    <Border Background="Transparent" Height="6" VerticalAlignment="Top" Cursor="SizeNS"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="Top" />
+    <Border Background="Transparent" Height="6" VerticalAlignment="Bottom" Cursor="SizeNS"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="Bottom" />
+    <Border Background="Transparent" Width="10" Height="10" HorizontalAlignment="Right"
+            VerticalAlignment="Bottom" Cursor="SizeNWSE"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="BottomRight" />
+    <Border Background="Transparent" Width="10" Height="10" HorizontalAlignment="Left"
+            VerticalAlignment="Bottom" Cursor="SizeNESW"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="BottomLeft" />
+    <Border Background="Transparent" Width="10" Height="10" HorizontalAlignment="Right"
+            VerticalAlignment="Top" Cursor="SizeNESW"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="TopRight" />
+    <Border Background="Transparent" Width="10" Height="10" HorizontalAlignment="Left"
+            VerticalAlignment="Top" Cursor="SizeNWSE"
+            MouseLeftButtonDown="ResizeEdge_MouseDown" Tag="TopLeft" />
+
+    <Border x:Name="RootBorder" CornerRadius="10" Margin="3"
             BorderBrush="#33FFFFFF" BorderThickness="1">
         <Border.Background>
             <SolidColorBrush Color="#1A1A2E" Opacity="0.95" />
@@ -112,8 +136,9 @@
                 <!-- Unsupported file info card -->
                 <StackPanel x:Name="FileInfoPanel" Visibility="Collapsed"
                             VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock x:Name="FileInfoIcon" Text="&#x1F4C4;" FontSize="64"
-                               HorizontalAlignment="Center" Margin="0,0,0,16" />
+                    <Image x:Name="FileInfoImage" Width="48" Height="48"
+                           HorizontalAlignment="Center" Margin="0,0,0,10"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock x:Name="FileInfoName" Foreground="#EEE" FontSize="18"
                                FontWeight="SemiBold" HorizontalAlignment="Center"
                                TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center" />
@@ -148,12 +173,29 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="TxtFileName" Foreground="#CCC" FontSize="12"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="TxtFileSize" Grid.Column="1" Foreground="#888"
                                FontSize="12" VerticalAlignment="Center" Margin="16,0" />
-                    <TextBlock x:Name="TxtFileMeta" Grid.Column="2" Foreground="#888"
+                    <Button x:Name="BtnToggleCode" Grid.Column="2" Content="&lt;/&gt;"
+                            Visibility="Collapsed" Click="ToggleCode_Click"
+                            Cursor="Hand" Margin="0,0,6,0" Padding="8,2"
+                            FontSize="11" FontFamily="Consolas" FontWeight="Bold"
+                            Background="#33FFFFFF" Foreground="#AAA"
+                            BorderThickness="1" BorderBrush="#33FFFFFF"
+                            ToolTip="Toggle code / rendered view" />
+                    <Button x:Name="BtnFullscreenBar" Grid.Column="3"
+                            Click="Fullscreen_Click" Cursor="Hand"
+                            Margin="0,0,10,0" Padding="8,2"
+                            FontSize="13" Background="#33FFFFFF" Foreground="#AAA"
+                            BorderThickness="1" BorderBrush="#33FFFFFF"
+                            ToolTip="Toggle fullscreen">
+                        <TextBlock x:Name="TxtFullscreenBarIcon" Text="&#x26F6;" />
+                    </Button>
+                    <TextBlock x:Name="TxtFileMeta" Grid.Column="4" Foreground="#888"
                                FontSize="12" VerticalAlignment="Center" />
                 </Grid>
             </Border>
@@ -246,4 +288,5 @@
             </Button>
         </Grid>
     </Border>
+    </Grid>
 </Window>

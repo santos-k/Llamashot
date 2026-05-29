@@ -121,7 +121,12 @@ public class FilePreviewManager
         ".patch", ".diff",
     };
 
-    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Pdf, Unsupported }
+    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Html, Pdf, Unsupported }
+
+    private static readonly HashSet<string> HtmlExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".html", ".htm", ".xhtml",
+    };
 
     public static PreviewType GetPreviewType(string filePath)
     {
@@ -130,6 +135,7 @@ public class FilePreviewManager
         if (ext.Equals(".gif", StringComparison.OrdinalIgnoreCase)) return PreviewType.Gif;
         if (ext.Equals(".md", StringComparison.OrdinalIgnoreCase)) return PreviewType.Markdown;
         if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase)) return PreviewType.Pdf;
+        if (HtmlExtensions.Contains(ext)) return PreviewType.Html;
         if (ImageExtensions.Contains(ext)) return PreviewType.Image;
         if (VideoExtensions.Contains(ext)) return PreviewType.Video;
         if (AudioExtensions.Contains(ext)) return PreviewType.Audio;
@@ -168,7 +174,7 @@ public class FilePreviewManager
                         dynamic item = selectedItems.Item(0);
                         string path = item.Path;
 
-                        if (File.Exists(path))
+                        if (File.Exists(path) || Directory.Exists(path))
                             return path;
                     }
                     finally
@@ -203,10 +209,11 @@ public class FilePreviewManager
 
     public void ShowPreview(string filePath)
     {
-        if (!File.Exists(filePath)) return;
+        if (!File.Exists(filePath) && !Directory.Exists(filePath)) return;
 
         _currentFile = filePath;
-        UpdateFolderFiles(filePath);
+        if (File.Exists(filePath))
+            UpdateFolderFiles(filePath);
 
         if (_previewWindow == null || !_previewWindow.IsVisible)
         {
@@ -218,12 +225,16 @@ public class FilePreviewManager
                 _currentFile = null;
             };
             _previewWindow.Show();
-            _previewWindow.Activate();
-            _previewWindow.Focus();
             StartPolling();
         }
 
         _previewWindow.LoadFile(filePath);
+
+        // Force window to foreground (Activate alone can't steal focus from Explorer)
+        _previewWindow.Topmost = true;
+        _previewWindow.Activate();
+        _previewWindow.Focus();
+        _previewWindow.Topmost = false;
     }
 
     public void ClosePreview()
@@ -246,10 +257,10 @@ public class FilePreviewManager
         _currentIndex = newIndex;
         _currentFile = _folderFiles[_currentIndex];
         _previewWindow?.LoadFile(_currentFile);
-        _previewWindow?.Activate();
 
-        // Select the file in Explorer too
+        // Select the file in Explorer, then re-activate preview window
         SelectFileInExplorer(_currentFile);
+        _previewWindow?.Activate();
     }
 
     private void UpdateFolderFiles(string filePath)
@@ -400,15 +411,12 @@ public class FilePreviewManager
 
                         if (!rightFolder) continue;
 
-                        // Select the item: first deselect all, then select our file
-                        // Shell.Application SelectItem flags: 0 = deselect, 1 = select,
-                        // 4 = edit, 8 = deselect all, 16 = ensure visible, 29 = focus+select
+                        // Select the item exclusively
+                        // SVSI flags: 0x1=SELECT, 0x4=DESELECTOTHERS, 0x8=ENSUREVISIBLE, 0x10=FOCUSED
                         dynamic folderItem = folderObj.ParseName(fileName);
                         if (folderItem != null)
                         {
-                            // First deselect all, then select + focus the target file
-                            document.SelectItem(folderItem, 0x8);  // SVSI_DESELECTOTHERS
-                            document.SelectItem(folderItem, 0x1 | 0x10 | 0x20); // SELECT + ENSUREVISIBLE + FOCUSED
+                            document.SelectItem(folderItem, 0x1 | 0x4 | 0x8 | 0x10);
                         }
                         return;
                     }

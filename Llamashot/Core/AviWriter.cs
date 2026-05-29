@@ -16,6 +16,17 @@ public class AviWriter : IDisposable
 
     public int FrameCount => _frameIndex.Count;
 
+    /// <summary>
+    /// Set the actual FPS before disposing. This patches the AVI headers
+    /// to match real recording duration instead of the nominal FPS.
+    /// </summary>
+    public void SetActualFps(double actualFps)
+    {
+        if (actualFps > 0)
+            _actualMicrosecondsPerFrame = (int)(1000000.0 / actualFps);
+    }
+    private int _actualMicrosecondsPerFrame;
+
     public AviWriter(Stream output, int width, int height, int fps)
     {
         _writer = new BinaryWriter(output, Encoding.ASCII, leaveOpen: false);
@@ -75,8 +86,8 @@ public class AviWriter : IDisposable
         _writer.Write(0); // suggested buffer size
         _writer.Write(-1); // quality
         _writer.Write(0); // sample size
-        _writer.Write((short)0); _writer.Write((short)0); // frame rect
-        _writer.Write((short)_width); _writer.Write((short)_height);
+        _writer.Write(0); _writer.Write(0); // frame rect (left, top)
+        _writer.Write(_width); _writer.Write(_height); // frame rect (right, bottom)
 
         // strf - stream format (BITMAPINFOHEADER)
         WriteChunkId("strf");
@@ -154,6 +165,21 @@ public class AviWriter : IDisposable
         // Patch total frames in avih
         _writer.BaseStream.Position = 48;
         _writer.Write(_frameIndex.Count);
+
+        // Patch microseconds-per-frame in avih and scale/rate in strh if actual fps was set
+        if (_actualMicrosecondsPerFrame > 0)
+        {
+            // avih: microseconds per frame at offset 32
+            _writer.BaseStream.Position = 32;
+            _writer.Write(_actualMicrosecondsPerFrame);
+
+            // strh: scale (offset 128) and rate (offset 132) — use scale=1000, rate=fps*1000
+            // This gives sub-integer fps precision
+            int rateValue = (int)(1000000.0 / _actualMicrosecondsPerFrame * 1000);
+            _writer.BaseStream.Position = 128;
+            _writer.Write(1000); // scale
+            _writer.Write(rateValue); // rate (fps * 1000)
+        }
 
         // Patch length in strh
         _writer.BaseStream.Position = 140;
