@@ -195,6 +195,19 @@
                     <Line X1="10" Y1="4" X2="4" Y2="10" Stroke="#F44336" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                 </Canvas>
             </Button>
+            <Button x:Name="BtnBlur" Click="AnnotationTool_Click" Tag="Blur" Style="{StaticResource RBtn}" ToolTip="Blur (B)">
+                <Canvas Width="14" Height="14">
+                    <Rectangle Canvas.Left="0" Canvas.Top="0" Width="4.5" Height="4.5" Fill="#78909C" />
+                    <Rectangle Canvas.Left="5" Canvas.Top="0" Width="4.5" Height="4.5" Fill="#546E7A" />
+                    <Rectangle Canvas.Left="10" Canvas.Top="0" Width="4" Height="4.5" Fill="#78909C" />
+                    <Rectangle Canvas.Left="0" Canvas.Top="5" Width="4.5" Height="4.5" Fill="#546E7A" />
+                    <Rectangle Canvas.Left="5" Canvas.Top="5" Width="4.5" Height="4.5" Fill="#78909C" />
+                    <Rectangle Canvas.Left="10" Canvas.Top="5" Width="4" Height="4.5" Fill="#546E7A" />
+                    <Rectangle Canvas.Left="0" Canvas.Top="10" Width="4.5" Height="4" Fill="#78909C" />
+                    <Rectangle Canvas.Left="5" Canvas.Top="10" Width="4.5" Height="4" Fill="#546E7A" />
+                    <Rectangle Canvas.Left="10" Canvas.Top="10" Width="4" Height="4" Fill="#78909C" />
+                </Canvas>
+            </Button>
             <Button x:Name="BtnEmoji" Click="Emoji_Click" Tag="Emoji" Style="{StaticResource RBtn}" ToolTip="Emoji (J)" />
             <Button x:Name="BtnEraser" Click="AnnotationTool_Click" Tag="Eraser" Style="{StaticResource RBtn}" ToolTip="Eraser (G)">
                 <Canvas Width="14" Height="14">
