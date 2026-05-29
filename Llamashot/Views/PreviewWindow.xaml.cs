@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -33,6 +35,11 @@ public partial class PreviewWindow : Window
     private bool _isCodeView;
     private string? _currentText;
     private FilePreviewManager.PreviewType _currentPreviewType;
+
+    // Fullscreen toggle
+    private bool _isFullscreen;
+    private Rect _restoreBounds;
+    private Thickness _restoreMargin;
 
     public PreviewWindow()
     {
@@ -542,6 +549,10 @@ public partial class PreviewWindow : Window
                 FilePreviewManager.Instance.NavigateFile(1);
                 e.Handled = true;
                 break;
+            case Key.F:
+                ToggleFullscreen();
+                e.Handled = true;
+                break;
         }
     }
 
@@ -549,6 +560,57 @@ public partial class PreviewWindow : Window
     {
         if (e.ClickCount == 1)
             DragMove();
+    }
+
+    private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
+
+    private void ToggleFullscreen()
+    {
+        _isFullscreen = !_isFullscreen;
+
+        if (_isFullscreen)
+        {
+            _restoreBounds = new Rect(Left, Top, Width, Height);
+            _restoreMargin = RootBorder.Margin;
+            RootBorder.CornerRadius = new CornerRadius(0);
+            RootBorder.Margin = new Thickness(0);
+            WindowState = WindowState.Maximized;
+            TxtFullscreenBarIcon.Text = "\u2750"; // restore icon
+        }
+        else
+        {
+            WindowState = WindowState.Normal;
+            Left = _restoreBounds.Left;
+            Top = _restoreBounds.Top;
+            Width = _restoreBounds.Width;
+            Height = _restoreBounds.Height;
+            RootBorder.CornerRadius = new CornerRadius(10);
+            RootBorder.Margin = new Thickness(3);
+            TxtFullscreenBarIcon.Text = "\u26F6"; // fullscreen icon
+        }
+    }
+
+    private void ResizeEdge_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.Tag is not string edge) return;
+
+        int dir = edge switch
+        {
+            "Left" => 1,
+            "Right" => 2,
+            "Top" => 3,
+            "TopLeft" => 4,
+            "TopRight" => 5,
+            "Bottom" => 6,
+            "BottomLeft" => 7,
+            "BottomRight" => 8,
+            _ => 0
+        };
+        if (dir == 0) return;
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+        NativeMethods.ReleaseCapture();
+        NativeMethods.SendMessage(hwnd, 0x112 /* WM_SYSCOMMAND */, (IntPtr)(0xF000 + dir), IntPtr.Zero);
     }
 
     // Image pan when zoomed

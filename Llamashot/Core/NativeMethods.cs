@@ -151,6 +151,13 @@ internal static class NativeMethods
 
     public const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
+    // --- Window resize (borderless) ---
+    [DllImport("user32.dll")]
+    public static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
     // --- Process / Window ownership ---
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);

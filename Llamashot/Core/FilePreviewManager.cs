@@ -224,12 +224,16 @@ public class FilePreviewManager
                 _currentFile = null;
             };
             _previewWindow.Show();
-            _previewWindow.Activate();
-            _previewWindow.Focus();
             StartPolling();
         }
 
         _previewWindow.LoadFile(filePath);
+
+        // Force window to foreground (Activate alone can't steal focus from Explorer)
+        _previewWindow.Topmost = true;
+        _previewWindow.Activate();
+        _previewWindow.Focus();
+        _previewWindow.Topmost = false;
     }
 
     public void ClosePreview()
@@ -252,10 +256,10 @@ public class FilePreviewManager
         _currentIndex = newIndex;
         _currentFile = _folderFiles[_currentIndex];
         _previewWindow?.LoadFile(_currentFile);
-        _previewWindow?.Activate();
 
-        // Select the file in Explorer too
+        // Select the file in Explorer, then re-activate preview window
         SelectFileInExplorer(_currentFile);
+        _previewWindow?.Activate();
     }
 
     private void UpdateFolderFiles(string filePath)
@@ -406,15 +410,12 @@ public class FilePreviewManager
 
                         if (!rightFolder) continue;
 
-                        // Select the item: first deselect all, then select our file
-                        // Shell.Application SelectItem flags: 0 = deselect, 1 = select,
-                        // 4 = edit, 8 = deselect all, 16 = ensure visible, 29 = focus+select
+                        // Select the item exclusively
+                        // SVSI flags: 0x1=SELECT, 0x4=DESELECTOTHERS, 0x8=ENSUREVISIBLE, 0x10=FOCUSED
                         dynamic folderItem = folderObj.ParseName(fileName);
                         if (folderItem != null)
                         {
-                            // First deselect all, then select + focus the target file
-                            document.SelectItem(folderItem, 0x8);  // SVSI_DESELECTOTHERS
-                            document.SelectItem(folderItem, 0x1 | 0x10 | 0x20); // SELECT + ENSUREVISIBLE + FOCUSED
+                            document.SelectItem(folderItem, 0x1 | 0x4 | 0x8 | 0x10);
                         }
                         return;
                     }
