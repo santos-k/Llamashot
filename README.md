@@ -67,7 +67,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Quality picker** - Choose Original (full res), High (720p), or Compact (480p) when saving GIF or video
 - **Unlimited duration** for video, 10fps
 - **Separate mic and system audio toggles** - Independent on/off before and during recording
-- **Full annotation toolkit** - All 12 screenshot tools available during recording (Pen, Line, Arrow, Rectangle, Ellipse, Text, Marker, Check, Cross, Emoji, Eraser, Undo, Clear)
+- **Full annotation toolkit** - All 12 screenshot tools + blur available during recording (Pen, Line, Arrow, Rectangle, Ellipse, Text, Marker, Blur, Check, Cross, Emoji, Eraser, Undo, Clear)
 - **Color picker + Thickness** - Change annotation color and stroke width during recording
 - **Tool toggle** - Click or shortcut again to deselect, tools stay active between strokes
 - **Text input isolation** - Keyboard shortcuts suppressed while typing text annotations, Enter/Esc to dismiss
@@ -77,6 +77,10 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - Pause/resume with visual indicators
 - Red pulsing border shows recorded area
 - Recording toolbar excluded from capture
+- **Blur tool in recording** — blur sensitive areas before and during recording
+- **Pre-recording blur** — blur, undo, erase available on the pre-start toolbar before clicking Start
+- **GIF audio cleanup** — mic and system audio buttons hidden in GIF mode pre-start toolbar
+- **Emoji excluded from capture** — emoji picker popup excluded from screen recording via SetWindowDisplayAffinity
 
 ### Text Extraction
 - Extract text from any area of the screen
@@ -123,6 +127,16 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Auto-update** - Preview updates when you click a different file in Explorer
 - **Configurable shortcut** - Change the trigger key in Settings (default: Space)
 - **File info fallback** - Unsupported files show name, size, dates, and "Open with" button
+- **Resizable window** — drag edges and corners to resize freely
+- **Fullscreen toggle** — expand to fill entire screen with one click
+- **Code/rendered toggle (C)** — switch between rendered view and raw code for Markdown and HTML files
+- **Markdown tables** — rendered with styled headers and cell borders
+- **HTML preview** — rendered via WebView2, with source code toggle
+- **Folder preview** — shows file count, folder count, total size, and dates
+- **Shell icons** — unsupported files and folders show their actual Windows icon
+- **Compact info view** — small card for unsupported files/folders instead of full window
+- **Taskbar integration** — preview shows in taskbar, Space brings it forward when in background
+- **UTF-16 support** — correctly detects and previews UTF-16 encoded text files
 
 ### Additional Features
 - **System tray** - Single click captures, double click opens settings

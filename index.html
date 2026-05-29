@@ -418,8 +418,8 @@
 <header class="hero">
     <img src="assets/icon-web.png" alt="Llamashot icon" class="hero-icon" />
     <h1><span>Llama</span>shot</h1>
-    <p class="tagline">The all-in-one screenshot, screen recording, and annotation tool for Windows.</p>
-    <p class="sub-tagline">Capture. Annotate. Record. Extract text. All in one lightweight app.</p>
+    <p class="tagline">The all-in-one screenshot, screen recording, annotation, and file preview tool for Windows.</p>
+    <p class="sub-tagline">Capture. Annotate. Record. Preview. Extract text. All in one lightweight app.</p>
     <div class="hero-badges">
         <span class="badge badge-blue">WPF / .NET 10</span>
         <span class="badge badge-green">Free &amp; Open Source</span>
@@ -433,7 +433,7 @@
 
 <!-- Stats Bar -->
 <div class="stats-bar">
-    <div class="stat"><div class="num">11</div><div class="label">Annotation Tools</div></div>
+    <div class="stat"><div class="num">12</div><div class="label">Annotation Tools</div></div>
     <div class="stat"><div class="num">28+</div><div class="label">Keyboard Shortcuts</div></div>
     <div class="stat"><div class="num">~28</div><div class="label">MB RAM Usage</div></div>
     <div class="stat"><div class="num">9</div><div class="label">Capture Combos</div></div>
@@ -455,7 +455,7 @@
         <!-- NEW: Quick Preview -->
         <div class="feature-row fade-in">
             <div class="feature-text">
-                <span class="section-label label-blue">New in v6.4</span>
+                <span class="section-label label-blue">Enhanced in v6.6</span>
                 <h3>Quick Preview — Space to Preview Any File</h3>
                 <p>Select any file in Windows Explorer and press <strong>Space</strong> to instantly preview it in a beautiful floating window. Navigate with arrow keys, zoom images, scrub through video — all without opening a single app. Like macOS Quick Look, but for Windows.</p>
                 <ul class="feature-list blue">
@@ -468,6 +468,16 @@
                     <li><strong>Arrow key navigation</strong> — browse files in Explorer's sort order</li>
                     <li><strong>Explorer sync</strong> — navigating updates the selected file in Explorer</li>
                     <li><strong>Configurable shortcut</strong> — change the trigger key in Settings</li>
+                    <li><strong>Resizable window</strong> — drag edges and corners to resize the preview window freely</li>
+                    <li><strong>Fullscreen toggle</strong> — expand preview to fill the entire screen with one click</li>
+                    <li><strong>Code/rendered toggle</strong> — switch between rendered and raw code view for Markdown and HTML files</li>
+                    <li><strong>Markdown tables</strong> — tables render with styled headers, borders, and cell formatting</li>
+                    <li><strong>HTML rendering</strong> — HTML files rendered in WebView2 with toggle to view source code</li>
+                    <li><strong>Folder preview</strong> — shows file/folder counts, total size, and creation dates</li>
+                    <li><strong>Shell icons</strong> — unsupported files and folders show their actual Windows icon</li>
+                    <li><strong>Compact info view</strong> — unsupported files and folders show a small info card instead of full window</li>
+                    <li><strong>Taskbar integration</strong> — preview window appears in taskbar and can be brought forward anytime</li>
+                    <li><strong>Smart file detection</strong> — UTF-16 encoded files correctly previewed instead of showing as unsupported</li>
                 </ul>
             </div>
             <div class="feature-visual fv-blue">
@@ -751,6 +761,10 @@
                     <li><strong>Tool toggle</strong> &mdash; tools stay active between strokes, click/shortcut again to deselect</li>
                     <li><strong>Clean saving UI</strong> &mdash; auto-sizing toolbar adapts to each state (pre-record, recording, saving)</li>
                     <li><strong>Timer display</strong> &mdash; live elapsed time or GIF countdown in the floating toolbar</li>
+                    <li><strong>Blur tool</strong> &mdash; blur sensitive areas before and during recording to hide private data</li>
+                    <li><strong>Pre-recording annotations</strong> &mdash; blur, undo, and erase available before clicking Start</li>
+                    <li><strong>GIF mode cleanup</strong> &mdash; mic and system audio controls hidden in GIF mode (no audio in GIF)</li>
+                    <li><strong>Emoji excluded from capture</strong> &mdash; emoji picker popup hidden from screen recording output</li>
                 </ul>
             </div>
             <div class="feature-visual fv-red">
@@ -1125,7 +1139,7 @@
                 <div class="qf-card" style="border-color: var(--accent); box-shadow: 0 0 20px rgba(66,165,245,0.15);">
                     <div class="qf-icon blue">&#x1F50D;</div>
                     <h4>Quick Preview <span style="color:var(--accent);font-size:0.75rem;">NEW</span></h4>
-                    <p>Press Space in Explorer to preview 200+ file types — images, video, audio, code with syntax highlighting, PDF, markdown, and more.</p>
+                    <p>Press Space in Explorer to preview 200+ file types — images, video, audio, code, PDF, markdown, HTML, folders. Resizable, fullscreen, code toggle.</p>
                 </div>
                 <div class="qf-card" style="border-color: var(--accent); box-shadow: 0 0 20px rgba(66,165,245,0.15);">
                     <div class="qf-icon blue">&#x1F3AC;</div>
@@ -1540,7 +1554,7 @@
             <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View Source on GitHub</a>
         </div>
         <!-- UPDATE THIS VERSION when releasing a new build -->
-        <p class="version-note">Version 6.4.0 &bull; Self-contained, no runtime needed</p>
+        <p class="version-note">Version 6.6.0 &bull; Self-contained, no runtime needed</p>
     </div>
 </section>
 
@@ -1554,7 +1568,7 @@
         <a href="https://github.com/santos-k/Llamashot/releases">Releases</a>
         <a href="https://github.com/santos-k/Llamashot/issues">Issues</a>
     </div>
-    <p class="footer-sub">Llamashot &copy; 2025</p>
+    <p class="footer-sub">Llamashot &copy; 2025-2026</p>
 </footer>
 
 <!-- Back to top -->
