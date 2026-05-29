@@ -174,7 +174,7 @@ public class FilePreviewManager
                         dynamic item = selectedItems.Item(0);
                         string path = item.Path;
 
-                        if (File.Exists(path))
+                        if (File.Exists(path) || Directory.Exists(path))
                             return path;
                     }
                     finally
@@ -209,10 +209,11 @@ public class FilePreviewManager
 
     public void ShowPreview(string filePath)
     {
-        if (!File.Exists(filePath)) return;
+        if (!File.Exists(filePath) && !Directory.Exists(filePath)) return;
 
         _currentFile = filePath;
-        UpdateFolderFiles(filePath);
+        if (File.Exists(filePath))
+            UpdateFolderFiles(filePath);
 
         if (_previewWindow == null || !_previewWindow.IsVisible)
         {

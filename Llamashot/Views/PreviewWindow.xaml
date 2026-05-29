@@ -136,8 +136,9 @@
                 <!-- Unsupported file info card -->
                 <StackPanel x:Name="FileInfoPanel" Visibility="Collapsed"
                             VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock x:Name="FileInfoIcon" Text="&#x1F4C4;" FontSize="64"
-                               HorizontalAlignment="Center" Margin="0,0,0,16" />
+                    <Image x:Name="FileInfoImage" Width="48" Height="48"
+                           HorizontalAlignment="Center" Margin="0,0,0,10"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock x:Name="FileInfoName" Foreground="#EEE" FontSize="18"
                                FontWeight="SemiBold" HorizontalAlignment="Center"
                                TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center" />
@@ -191,7 +192,7 @@
                             Margin="0,0,10,0" Padding="8,2"
                             FontSize="13" Background="#33FFFFFF" Foreground="#AAA"
                             BorderThickness="1" BorderBrush="#33FFFFFF"
-                            ToolTip="Toggle fullscreen (F)">
+                            ToolTip="Toggle fullscreen">
                         <TextBlock x:Name="TxtFullscreenBarIcon" Text="&#x26F6;" />
                     </Button>
                     <TextBlock x:Name="TxtFileMeta" Grid.Column="4" Foreground="#888"
