@@ -41,6 +41,11 @@ public partial class PreviewWindow : Window
     private Rect _restoreBounds;
     private Thickness _restoreMargin;
 
+    // Shell preview handler (Office docs)
+    private NativeMethods.IPreviewHandler? _previewHandler;
+    private System.Windows.Forms.Integration.WindowsFormsHost? _shellHost;
+    private System.Windows.Forms.Panel? _shellPanel;
+
     public PreviewWindow()
     {
         InitializeComponent();
@@ -75,10 +80,13 @@ public partial class PreviewWindow : Window
         _isCodeView = false;
         _currentText = null;
 
+        UnloadPreviewHandler();
+
         ImagePanel.Visibility = Visibility.Collapsed;
         MediaPanel.Visibility = Visibility.Collapsed;
         TextViewer.Visibility = Visibility.Collapsed;
         PdfPanel.Visibility = Visibility.Collapsed;
+        ShellPreviewPanel.Visibility = Visibility.Collapsed;
         FileInfoPanel.Visibility = Visibility.Collapsed;
         LoadingOverlay.Visibility = Visibility.Collapsed;
         BtnToggleCode.Visibility = Visibility.Collapsed;
@@ -127,6 +135,9 @@ public partial class PreviewWindow : Window
                 break;
             case FilePreviewManager.PreviewType.Pdf:
                 LoadPdf(filePath);
+                break;
+            case FilePreviewManager.PreviewType.ShellPreview:
+                LoadShellPreview(filePath);
                 break;
             default:
                 ShowFileInfo(filePath);
@@ -312,6 +323,7 @@ public partial class PreviewWindow : Window
             if (text == null) { ShowFileInfo(filePath); return; }
 
             var doc = SyntaxHighlighter.Highlight(text, filePath);
+            doc.PageWidth = 10000; // prevent word wrap, enable horizontal scroll
             TextViewer.Document = doc;
             TextViewer.Visibility = Visibility.Visible;
 
@@ -385,6 +397,7 @@ public partial class PreviewWindow : Window
             // Show raw code
             PdfPanel.Visibility = Visibility.Collapsed;
             var doc = SyntaxHighlighter.Highlight(_currentText, _currentFile);
+            doc.PageWidth = 10000;
             TextViewer.Document = doc;
             TextViewer.Visibility = Visibility.Visible;
             BtnToggleCode.Content = "\u25B6"; // ▶ (rendered)
@@ -428,6 +441,116 @@ public partial class PreviewWindow : Window
         catch
         {
             ShowFileInfo(filePath);
+        }
+    }
+
+    private void LoadShellPreview(string filePath)
+    {
+        try
+        {
+            var ext = Path.GetExtension(filePath);
+            var clsid = FilePreviewManager.GetPreviewHandlerCLSID(ext);
+            if (clsid == Guid.Empty) { ShowFileInfo(filePath); return; }
+
+            var handlerType = Type.GetTypeFromCLSID(clsid);
+            if (handlerType == null) { ShowFileInfo(filePath); return; }
+
+            // Create hosting panel first so HWND is ready
+            if (_shellHost == null)
+            {
+                _shellPanel = new System.Windows.Forms.Panel();
+                _shellPanel.BackColor = System.Drawing.Color.FromArgb(0xF0, 0xF0, 0xF0);
+                _shellPanel.Resize += (s, e) => UpdatePreviewHandlerRect();
+                _shellHost = new System.Windows.Forms.Integration.WindowsFormsHost();
+                _shellHost.Child = _shellPanel;
+                ShellPreviewPanel.Child = _shellHost;
+            }
+
+            ShellPreviewPanel.Visibility = Visibility.Visible;
+            // Force layout so the panel gets a real size
+            ShellPreviewPanel.UpdateLayout();
+            _shellHost.UpdateLayout();
+
+            var comObj = Activator.CreateInstance(handlerType);
+            if (comObj is not NativeMethods.IPreviewHandler handler)
+            {
+                if (comObj != null) Marshal.ReleaseComObject(comObj);
+                ShowFileInfo(filePath); return;
+            }
+
+            // Initialize: try IInitializeWithStream first (Office handlers prefer it), then IInitializeWithFile
+            bool initialized = false;
+            if (comObj is NativeMethods.IInitializeWithStream initStream)
+            {
+                try
+                {
+                    int hr = NativeMethods.SHCreateStreamOnFileEx(filePath, NativeMethods.STGM_READ, 0, false, IntPtr.Zero, out var stream);
+                    if (hr == 0)
+                    {
+                        initStream.Initialize(stream, NativeMethods.STGM_READ);
+                        initialized = true;
+                    }
+                }
+                catch { }
+            }
+            if (!initialized && comObj is NativeMethods.IInitializeWithFile initFile)
+            {
+                try { initFile.Initialize(filePath, NativeMethods.STGM_READ); initialized = true; }
+                catch { }
+            }
+
+            if (!initialized)
+            {
+                Marshal.ReleaseComObject(comObj);
+                ShellPreviewPanel.Visibility = Visibility.Collapsed;
+                ShowFileInfo(filePath);
+                return;
+            }
+
+            // Set window and render
+            int w = Math.Max(_shellPanel!.Width, 200);
+            int h = Math.Max(_shellPanel.Height, 200);
+            var rect = new NativeMethods.RECT { Left = 0, Top = 0, Right = w, Bottom = h };
+            handler.SetWindow(_shellPanel.Handle, ref rect);
+            handler.SetRect(ref rect);
+            handler.DoPreview();
+
+            _previewHandler = handler;
+
+            var fi = new FileInfo(filePath);
+            TxtFileMeta.Text = fi.Extension.TrimStart('.').ToUpperInvariant();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"ShellPreview error: {ex}");
+            ShellPreviewPanel.Visibility = Visibility.Collapsed;
+            ShowFileInfo(filePath);
+        }
+    }
+
+    private void UpdatePreviewHandlerRect()
+    {
+        if (_previewHandler == null || _shellPanel == null) return;
+        try
+        {
+            var rect = new NativeMethods.RECT
+            {
+                Left = 0, Top = 0,
+                Right = _shellPanel.Width,
+                Bottom = _shellPanel.Height
+            };
+            _previewHandler.SetRect(ref rect);
+        }
+        catch { }
+    }
+
+    private void UnloadPreviewHandler()
+    {
+        if (_previewHandler != null)
+        {
+            try { _previewHandler.Unload(); } catch { }
+            try { Marshal.ReleaseComObject(_previewHandler); } catch { }
+            _previewHandler = null;
         }
     }
 
@@ -768,6 +891,11 @@ public partial class PreviewWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         StopMedia();
+        UnloadPreviewHandler();
+        _shellHost?.Dispose();
+        _shellHost = null;
+        _shellPanel?.Dispose();
+        _shellPanel = null;
         _webView?.Dispose();
         _webView = null;
         base.OnClosed(e);

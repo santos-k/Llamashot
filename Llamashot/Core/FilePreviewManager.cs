@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Threading;
+using Microsoft.Win32;
 
 namespace Llamashot.Core;
 
@@ -121,7 +122,7 @@ public class FilePreviewManager
         ".patch", ".diff",
     };
 
-    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Html, Pdf, Unsupported }
+    public enum PreviewType { Image, Gif, Video, Audio, Code, Markdown, Html, Pdf, ShellPreview, Unsupported }
 
     private static readonly HashSet<string> HtmlExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -140,7 +141,37 @@ public class FilePreviewManager
         if (VideoExtensions.Contains(ext)) return PreviewType.Video;
         if (AudioExtensions.Contains(ext)) return PreviewType.Audio;
         if (CodeExtensions.Contains(ext)) return PreviewType.Code;
+        if (GetPreviewHandlerCLSID(ext) != Guid.Empty) return PreviewType.ShellPreview;
         return PreviewType.Unsupported;
+    }
+
+    public static Guid GetPreviewHandlerCLSID(string extension)
+    {
+        if (string.IsNullOrEmpty(extension)) return Guid.Empty;
+
+        try
+        {
+            // Direct: HKCR\<ext>\shellex\{preview-handler-guid}
+            using (var key = Registry.ClassesRoot.OpenSubKey($"{extension}\\shellex\\{NativeMethods.PreviewHandlerGuid}"))
+            {
+                if (key?.GetValue(null) is string clsidStr && Guid.TryParse(clsidStr, out var clsid))
+                    return clsid;
+            }
+
+            // Via ProgID: HKCR\<ext> → default → HKCR\<progid>\shellex\{preview-handler-guid}
+            using (var extKey = Registry.ClassesRoot.OpenSubKey(extension))
+            {
+                if (extKey?.GetValue(null) is string progId && !string.IsNullOrEmpty(progId))
+                {
+                    using var progKey = Registry.ClassesRoot.OpenSubKey($"{progId}\\shellex\\{NativeMethods.PreviewHandlerGuid}");
+                    if (progKey?.GetValue(null) is string clsidStr2 && Guid.TryParse(clsidStr2, out var clsid2))
+                        return clsid2;
+                }
+            }
+        }
+        catch { }
+
+        return Guid.Empty;
     }
 
     public string? GetExplorerSelectedFile()
