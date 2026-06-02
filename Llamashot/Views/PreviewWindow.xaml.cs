@@ -8,6 +8,8 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.IO.Compression;
+using System.Xml.Linq;
 using Llamashot.Core;
 using Microsoft.Web.WebView2.Wpf;
 
@@ -137,7 +139,13 @@ public partial class PreviewWindow : Window
                 LoadPdf(filePath);
                 break;
             case FilePreviewManager.PreviewType.ShellPreview:
-                LoadShellPreview(filePath);
+                var ext2 = Path.GetExtension(filePath);
+                if (ext2.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
+                    ext2.Equals(".ppt", StringComparison.OrdinalIgnoreCase) ||
+                    ext2.Equals(".odp", StringComparison.OrdinalIgnoreCase))
+                    LoadPptx(filePath);
+                else
+                    LoadShellPreview(filePath);
                 break;
             default:
                 ShowFileInfo(filePath);
@@ -444,6 +452,182 @@ public partial class PreviewWindow : Window
         }
     }
 
+    private async void LoadPptx(string filePath)
+    {
+        try
+        {
+            var html = RenderPptxToHtml(filePath);
+            if (html == null) { ShowFileInfo(filePath); return; }
+
+            if (_webView == null)
+            {
+                _webView = new WebView2();
+                PdfPanel.Child = _webView;
+                await _webView.EnsureCoreWebView2Async();
+            }
+
+            PdfPanel.Visibility = Visibility.Visible;
+            _webView.NavigateToString(html);
+
+            int slideCount = 0;
+            try
+            {
+                using var zip = ZipFile.OpenRead(filePath);
+                slideCount = zip.Entries.Count(e =>
+                    e.FullName.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase) &&
+                    e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+            }
+            catch { }
+            TxtFileMeta.Text = $"PPTX — {slideCount} slides";
+        }
+        catch
+        {
+            ShowFileInfo(filePath);
+        }
+    }
+
+    private static string? RenderPptxToHtml(string filePath)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(filePath);
+            var ns_a = XNamespace.Get("http://schemas.openxmlformats.org/drawingml/2006/main");
+            var ns_p = XNamespace.Get("http://schemas.openxmlformats.org/presentationml/2006/main");
+            var ns_r = XNamespace.Get("http://schemas.openxmlformats.org/officeDocument/2006/relationships");
+            var ns_rel = XNamespace.Get("http://schemas.openxmlformats.org/package/2006/relationships");
+
+            // Find slide entries sorted by number
+            var slideEntries = zip.Entries
+                .Where(e => e.FullName.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase)
+                         && e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e =>
+                {
+                    var name = Path.GetFileNameWithoutExtension(e.Name);
+                    return int.TryParse(name.Replace("slide", "", StringComparison.OrdinalIgnoreCase), out int n) ? n : 999;
+                })
+                .ToList();
+
+            if (slideEntries.Count == 0) return null;
+
+            // Extract images as base64 for embedding
+            var imageMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in zip.Entries.Where(e => e.FullName.StartsWith("ppt/media/", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    using var ms = new MemoryStream();
+                    using (var s = entry.Open()) s.CopyTo(ms);
+                    var ext = Path.GetExtension(entry.Name).ToLower();
+                    var mime = ext switch
+                    {
+                        ".png" => "image/png",
+                        ".jpg" or ".jpeg" => "image/jpeg",
+                        ".gif" => "image/gif",
+                        ".svg" => "image/svg+xml",
+                        ".bmp" => "image/bmp",
+                        _ => "image/png"
+                    };
+                    imageMap[entry.Name] = $"data:{mime};base64,{Convert.ToBase64String(ms.ToArray())}";
+                }
+                catch { }
+            }
+
+            var slides = new System.Text.StringBuilder();
+            int slideNum = 0;
+
+            foreach (var slideEntry in slideEntries)
+            {
+                slideNum++;
+                XDocument slideDoc;
+                using (var s = slideEntry.Open()) slideDoc = XDocument.Load(s);
+
+                // Get image relationships for this slide
+                var relMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var relPath = slideEntry.FullName.Replace("slides/", "slides/_rels/") + ".rels";
+                var relEntry = zip.GetEntry(relPath);
+                if (relEntry != null)
+                {
+                    try
+                    {
+                        XDocument relDoc;
+                        using (var rs = relEntry.Open()) relDoc = XDocument.Load(rs);
+                        foreach (var rel in relDoc.Descendants(ns_rel + "Relationship"))
+                        {
+                            var id = rel.Attribute("Id")?.Value;
+                            var target = rel.Attribute("Target")?.Value;
+                            if (id != null && target != null)
+                                relMap[id] = target.Replace("../media/", "").Replace("../", "");
+                        }
+                    }
+                    catch { }
+                }
+
+                slides.Append($"<div class=\"slide\"><div class=\"slide-num\">Slide {slideNum}</div><div class=\"slide-content\">");
+
+                // Extract shapes with text and images
+                foreach (var sp in slideDoc.Descendants(ns_p + "sp").Concat(slideDoc.Descendants(ns_p + "pic")))
+                {
+                    // Check for image
+                    var blipFill = sp.Descendants(ns_p + "blipFill").FirstOrDefault()
+                                  ?? sp.Descendants(ns_a + "blipFill").FirstOrDefault();
+                    var blip = blipFill?.Descendants(ns_a + "blip").FirstOrDefault();
+                    var embedId = blip?.Attribute(ns_r + "embed")?.Value;
+                    if (embedId != null && relMap.TryGetValue(embedId, out var mediaFile) && imageMap.TryGetValue(mediaFile, out var dataUri))
+                    {
+                        slides.Append($"<img src=\"{dataUri}\" class=\"slide-img\" />");
+                    }
+
+                    // Extract text
+                    var txBody = sp.Element(ns_p + "txBody");
+                    if (txBody == null) continue;
+
+                    foreach (var para in txBody.Elements(ns_a + "p"))
+                    {
+                        var runs = para.Elements(ns_a + "r");
+                        if (!runs.Any()) continue;
+
+                        // Check text properties for styling
+                        bool isBold = false, isTitle = false;
+                        int fontSize = 0;
+                        foreach (var rPr in para.Descendants(ns_a + "rPr"))
+                        {
+                            isBold = rPr.Attribute("b")?.Value == "1";
+                            if (int.TryParse(rPr.Attribute("sz")?.Value, out int sz))
+                                fontSize = sz / 100; // hundredths of a point → points
+                        }
+                        // Check if placeholder type is title
+                        var phType = sp.Descendants(ns_p + "ph").FirstOrDefault()?.Attribute("type")?.Value;
+                        isTitle = phType == "title" || phType == "ctrTitle" || fontSize >= 24;
+
+                        var text = string.Join("", runs.Select(r => System.Net.WebUtility.HtmlEncode(r.Element(ns_a + "t")?.Value ?? "")));
+                        if (string.IsNullOrWhiteSpace(text)) continue;
+
+                        if (isTitle)
+                            slides.Append($"<h2 style=\"font-size:{Math.Max(fontSize, 24)}pt;margin:4px 0\">{text}</h2>");
+                        else if (isBold)
+                            slides.Append($"<p><strong>{text}</strong></p>");
+                        else
+                            slides.Append($"<p>{text}</p>");
+                    }
+                }
+
+                slides.Append("</div></div>");
+            }
+
+            return $@"<!DOCTYPE html>
+<html><head><meta charset=""utf-8""><style>
+body {{ margin:0; padding:20px; background:#2d2d2d; font-family:Segoe UI,sans-serif; color:#e0e0e0; }}
+.slide {{ background:#fff; color:#333; border-radius:8px; margin:0 auto 24px; padding:32px 40px;
+  max-width:900px; box-shadow:0 2px 12px rgba(0,0,0,0.4); position:relative; min-height:120px; }}
+.slide-num {{ position:absolute; top:8px; right:14px; font-size:11px; color:#999; }}
+.slide-content h2 {{ color:#1a3a5c; margin:8px 0; }}
+.slide-content p {{ margin:6px 0; line-height:1.5; font-size:14px; }}
+.slide-img {{ max-width:100%; max-height:300px; margin:10px 0; border-radius:4px; }}
+</style></head><body>{slides}</body></html>";
+        }
+        catch { return null; }
+    }
+
     private void LoadShellPreview(string filePath)
     {
         try
@@ -480,11 +664,10 @@ public partial class PreviewWindow : Window
 
             // Initialize: try IInitializeWithFile first, then IInitializeWithStream
             bool initialized = false;
-            string initMethod = "none";
             if (comObj is NativeMethods.IInitializeWithFile initFile)
             {
-                try { initFile.Initialize(filePath, NativeMethods.STGM_READ); initialized = true; initMethod = "File"; }
-                catch (Exception ex1) { initMethod = $"File failed: {ex1.Message}"; }
+                try { initFile.Initialize(filePath, NativeMethods.STGM_READ); initialized = true; }
+                catch { }
             }
             if (!initialized && comObj is NativeMethods.IInitializeWithStream initStream)
             {
@@ -495,16 +678,13 @@ public partial class PreviewWindow : Window
                     {
                         initStream.Initialize(stream, NativeMethods.STGM_READ);
                         initialized = true;
-                        initMethod = "Stream";
                     }
-                    else initMethod += $" | Stream SHCreate hr=0x{hr:X8}";
                 }
-                catch (Exception ex2) { initMethod += $" | Stream failed: {ex2.Message}"; }
+                catch { }
             }
 
             if (!initialized)
             {
-                System.Windows.MessageBox.Show($"Preview handler init failed.\nCLSID: {clsid}\nInit: {initMethod}\nSupports IInitFile: {comObj is NativeMethods.IInitializeWithFile}\nSupports IInitStream: {comObj is NativeMethods.IInitializeWithStream}", "Debug");
                 Marshal.ReleaseComObject(comObj);
                 ShellPreviewPanel.Visibility = Visibility.Collapsed;
                 ShowFileInfo(filePath);
@@ -544,9 +724,8 @@ public partial class PreviewWindow : Window
             var fi = new FileInfo(filePath);
             TxtFileMeta.Text = fi.Extension.TrimStart('.').ToUpperInvariant();
         }
-        catch (Exception ex)
+        catch
         {
-            System.Windows.MessageBox.Show($"ShellPreview error:\n{ex.GetType().Name}: {ex.Message}", "Debug");
             ShellPreviewPanel.Visibility = Visibility.Collapsed;
             ShowFileInfo(filePath);
         }
