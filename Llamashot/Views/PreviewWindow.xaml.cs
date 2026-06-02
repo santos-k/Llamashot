@@ -478,9 +478,15 @@ public partial class PreviewWindow : Window
                 ShowFileInfo(filePath); return;
             }
 
-            // Initialize: try IInitializeWithStream first (Office handlers prefer it), then IInitializeWithFile
+            // Initialize: try IInitializeWithFile first, then IInitializeWithStream
             bool initialized = false;
-            if (comObj is NativeMethods.IInitializeWithStream initStream)
+            string initMethod = "none";
+            if (comObj is NativeMethods.IInitializeWithFile initFile)
+            {
+                try { initFile.Initialize(filePath, NativeMethods.STGM_READ); initialized = true; initMethod = "File"; }
+                catch (Exception ex1) { initMethod = $"File failed: {ex1.Message}"; }
+            }
+            if (!initialized && comObj is NativeMethods.IInitializeWithStream initStream)
             {
                 try
                 {
@@ -489,18 +495,16 @@ public partial class PreviewWindow : Window
                     {
                         initStream.Initialize(stream, NativeMethods.STGM_READ);
                         initialized = true;
+                        initMethod = "Stream";
                     }
+                    else initMethod += $" | Stream SHCreate hr=0x{hr:X8}";
                 }
-                catch { }
-            }
-            if (!initialized && comObj is NativeMethods.IInitializeWithFile initFile)
-            {
-                try { initFile.Initialize(filePath, NativeMethods.STGM_READ); initialized = true; }
-                catch { }
+                catch (Exception ex2) { initMethod += $" | Stream failed: {ex2.Message}"; }
             }
 
             if (!initialized)
             {
+                System.Windows.MessageBox.Show($"Preview handler init failed.\nCLSID: {clsid}\nInit: {initMethod}\nSupports IInitFile: {comObj is NativeMethods.IInitializeWithFile}\nSupports IInitStream: {comObj is NativeMethods.IInitializeWithStream}", "Debug");
                 Marshal.ReleaseComObject(comObj);
                 ShellPreviewPanel.Visibility = Visibility.Collapsed;
                 ShowFileInfo(filePath);
@@ -517,12 +521,32 @@ public partial class PreviewWindow : Window
 
             _previewHandler = handler;
 
+            // Deferred re-layout: give the handler time to initialize
+            var layoutTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            layoutTimer.Tick += (s, _) =>
+            {
+                layoutTimer.Stop();
+                if (_previewHandler == null || _shellPanel == null) return;
+                try
+                {
+                    var r2 = new NativeMethods.RECT
+                    {
+                        Left = 0, Top = 0,
+                        Right = _shellPanel.Width,
+                        Bottom = _shellPanel.Height
+                    };
+                    _previewHandler.SetRect(ref r2);
+                }
+                catch { }
+            };
+            layoutTimer.Start();
+
             var fi = new FileInfo(filePath);
             TxtFileMeta.Text = fi.Extension.TrimStart('.').ToUpperInvariant();
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"ShellPreview error: {ex}");
+            System.Windows.MessageBox.Show($"ShellPreview error:\n{ex.GetType().Name}: {ex.Message}", "Debug");
             ShellPreviewPanel.Visibility = Visibility.Collapsed;
             ShowFileInfo(filePath);
         }
