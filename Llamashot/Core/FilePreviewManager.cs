@@ -228,11 +228,20 @@ public class FilePreviewManager
     {
         if (_previewWindow != null && _previewWindow.IsVisible)
         {
-            ClosePreview();
-            return;
+            // If same file and window is in foreground, close it (toggle off)
+            // If different file or window is behind, bring to front with new file
+            bool isForeground = NativeMethods.GetForegroundWindow() ==
+                new System.Windows.Interop.WindowInteropHelper(_previewWindow).Handle;
+            bool sameFile = string.Equals(_currentFile, filePath, StringComparison.OrdinalIgnoreCase);
+
+            if (sameFile && isForeground)
+            {
+                ClosePreview();
+                return;
+            }
         }
 
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        if (string.IsNullOrEmpty(filePath) || (!File.Exists(filePath) && !Directory.Exists(filePath)))
             return;
 
         ShowPreview(filePath);
@@ -260,12 +269,7 @@ public class FilePreviewManager
         }
 
         _previewWindow.LoadFile(filePath);
-
-        // Force window to foreground (Activate alone can't steal focus from Explorer)
-        _previewWindow.Topmost = true;
-        _previewWindow.Activate();
-        _previewWindow.Focus();
-        _previewWindow.Topmost = false;
+        _previewWindow.BringToFront();
     }
 
     public void ClosePreview()

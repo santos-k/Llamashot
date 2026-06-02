@@ -393,6 +393,10 @@ public partial class App : Application
         {
             var window = new HistoryWindow();
             window.Show();
+            window.Topmost = true;
+            window.Activate();
+            window.Focus();
+            window.Topmost = false;
         });
     }
 

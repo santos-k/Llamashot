@@ -2279,8 +2279,12 @@ public partial class OverlayWindow : Window
 
     private void History_Click(object sender, RoutedEventArgs e)
     {
-        var win = new HistoryWindow { Topmost = true };
+        var win = new HistoryWindow();
         win.Show();
+        win.Topmost = true;
+        win.Activate();
+        win.Focus();
+        win.Topmost = false;
     }
 
     private void Pin_Click(object sender, RoutedEventArgs e)

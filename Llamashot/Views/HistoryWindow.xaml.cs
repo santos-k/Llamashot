@@ -46,6 +46,16 @@ public partial class HistoryWindow : Window
     public HistoryWindow()
     {
         InitializeComponent();
+
+        // Size for 5 columns × 4 rows, capped to screen
+        const int cols = 5, rows = 4;
+        const double itemW = 225, itemH = 152; // item + margins
+        const double chromeW = 80, chromeH = 160; // scrollbar + header + footer + borders
+        var screenW = SystemParameters.PrimaryScreenWidth;
+        var screenH = SystemParameters.PrimaryScreenHeight;
+        Width = Math.Min(cols * itemW + chromeW, screenW * 0.9);
+        Height = Math.Min(rows * itemH + chromeH, screenH * 0.85);
+
         LoadHistory();
         Activated += (_, _) => LoadHistory();
     }

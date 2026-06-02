@@ -43,6 +43,9 @@ public partial class PreviewWindow : Window
     private Rect _restoreBounds;
     private Thickness _restoreMargin;
 
+    // Debounce: ignore Space/Esc briefly after window is brought to front
+    private DateTime _activatedAt;
+
     // Shell preview handler (Office docs)
     private NativeMethods.IPreviewHandler? _previewHandler;
     private System.Windows.Forms.Integration.WindowsFormsHost? _shellHost;
@@ -971,12 +974,27 @@ body {{ margin:0; padding:20px; background:#2d2d2d; font-family:Segoe UI,sans-se
             Process.Start(new ProcessStartInfo(_currentFile) { UseShellExecute = true });
     }
 
+    public void BringToFront()
+    {
+        _activatedAt = DateTime.UtcNow;
+        Topmost = true;
+        Activate();
+        Focus();
+        Topmost = false;
+    }
+
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
         switch (e.Key)
         {
             case Key.Escape:
             case Key.Space:
+                // Ignore if window was just brought to front (prevents Space from closing immediately)
+                if ((DateTime.UtcNow - _activatedAt).TotalMilliseconds < 400)
+                {
+                    e.Handled = true;
+                    break;
+                }
                 Close();
                 e.Handled = true;
                 break;
