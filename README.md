@@ -94,7 +94,7 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 
 ### History
 - Thumbnails for all saved screenshots, clipboard captures, and video recordings
-- Responsive grid layout (3 columns default, adapts to window width)
+- Responsive grid layout (5 columns x 4 rows default, adapts to screen size)
 - Type badges: green "Saved", blue "Copied", red "Video"
 - **Open in File Explorer** - One-click to reveal any file in Explorer
 - **Auto-refresh** - History updates when window gets focus after new captures
@@ -137,6 +137,11 @@ Built with .NET 10 and WPF. Made with love by **Santosh Kumar**.
 - **Compact info view** — small card for unsupported files/folders instead of full window
 - **Taskbar integration** — preview shows in taskbar, Space brings it forward when in background
 - **UTF-16 support** — correctly detects and previews UTF-16 encoded text files
+- **Office document preview** — Word (.docx), Excel (.xlsx) via Windows Shell preview handlers
+- **PowerPoint slide renderer** — PPTX parsed from XML, rendered as styled HTML slides with embedded images
+- **Horizontal scroll for code** — CSV and code files no longer wrap; horizontal scrollbar for wide content
+- **Smart bring-to-front** — Space brings preview to front instead of closing when window is behind Explorer
+- **Any registered file type** — automatically previews any format with a Windows Shell preview handler
 
 ### Additional Features
 - **System tray** - Single click captures, double click opens settings
@@ -260,7 +265,7 @@ dotnet run
 - **Audio capture**: WinRT AudioGraph (microphone + system loopback)
 - **OCR**: Windows.Media.Ocr (built-in, offline)
 - **Settings**: JSON file in AppData/Roaming
-- **File preview**: WebView2 (PDF), GifBitmapDecoder (animated GIF), WPF FlowDocument (markdown/code)
+- **File preview**: WebView2 (PDF/HTML/PPTX), Shell IPreviewHandler (Office docs), GifBitmapDecoder (animated GIF), WPF FlowDocument (markdown/code)
 - **Installer**: Inno Setup 6
 - **Target**: Windows 10 (1903+) / Windows 11
 

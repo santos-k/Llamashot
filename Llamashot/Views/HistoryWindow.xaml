@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Icon="/Resources/icon32.png"
         Title="Llamashot - History"
-        Width="740" Height="680"
         WindowStartupLocation="CenterScreen"
-        Background="#1A1A1E">
+        Background="#1A1A1E"
+        SizeToContent="Manual">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

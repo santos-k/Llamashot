@@ -126,12 +126,16 @@
                 <!-- Text/Code preview -->
                 <FlowDocumentScrollViewer x:Name="TextViewer" Visibility="Collapsed"
                                           VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Auto"
                                           IsToolBarVisible="False"
                                           Background="#1E1E1E"
                                           Zoom="100" />
 
                 <!-- PDF preview -->
                 <Border x:Name="PdfPanel" Visibility="Collapsed" Background="#1E1E1E" />
+
+                <!-- Shell preview handler (Office docs, etc.) -->
+                <Border x:Name="ShellPreviewPanel" Visibility="Collapsed" Background="#F0F0F0" />
 
                 <!-- Unsupported file info card -->
                 <StackPanel x:Name="FileInfoPanel" Visibility="Collapsed"
