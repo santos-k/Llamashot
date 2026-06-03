@@ -83,10 +83,15 @@ public partial class FileToolsWindow : Window
     private string? _cropSourcePath;
     private int _cropImgWidth, _cropImgHeight;
     private bool _isDraggingCrop;
-    private Point _cropStart;
-    private Point _cropEnd;
+    private Point _cropDragStart;
+    private Rect _cropSelectionRect;
+    private CropDragMode _cropMode = CropDragMode.None;
     private Rectangle? _cropRect;
     private readonly Rectangle[] _cropOverlays = new Rectangle[4];
+    private readonly Border[] _cropHandles = new Border[8]; // TL, TC, TR, ML, MR, BL, BC, BR
+    private double _cropAspectRatio;
+
+    private enum CropDragMode { None, Create, Move, ResizeTL, ResizeTC, ResizeTR, ResizeML, ResizeMR, ResizeBL, ResizeBC, ResizeBR }
 
     // =====================================================================
     //  Resize state
@@ -101,6 +106,8 @@ public partial class FileToolsWindow : Window
     // =====================================================================
 
     private string? _rotateFlipSourcePath;
+    private double _rfAngle = 0;
+    private bool _rfFlipH = false, _rfFlipV = false;
 
     // =====================================================================
     //  Convert state
@@ -353,8 +360,19 @@ public partial class FileToolsWindow : Window
         _convertSourcePath = null;
 
         // Reset crop
-        ClearCropRect();
+        ClearCropVisuals();
+        _cropSelectionRect = Rect.Empty;
         CropPreviewImage.Source = null;
+
+        // Reset resize/convert previews
+        ResizePreviewImage.Source = null;
+        ConvertPreviewImage.Source = null;
+
+        // Reset rotate/flip
+        RotateFlipPreview.Source = null;
+        _rfAngle = 0; _rfFlipH = false; _rfFlipV = false;
+        RfRotateTransform.Angle = 0;
+        RfFlipTransform.ScaleX = 1; RfFlipTransform.ScaleY = 1;
     }
 
     // =====================================================================
@@ -419,6 +437,12 @@ public partial class FileToolsWindow : Window
     // =====================================================================
     //  Shared drag-over handler
     // =====================================================================
+
+    private void PreviewFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string path && File.Exists(path))
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+    }
 
     private void Generic_DragOver(object sender, DragEventArgs e)
     {
@@ -1162,6 +1186,10 @@ public partial class FileToolsWindow : Window
             TxtResizeW.Text = w.ToString();
             TxtResizeH.Text = h.ToString();
             _suppressAspectUpdate = false;
+
+            var bmp = new BitmapImage();
+            bmp.BeginInit(); bmp.UriSource = new Uri(path); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
+            ResizePreviewImage.Source = bmp;
         }
         catch (Exception ex)
         {
@@ -1263,118 +1291,248 @@ public partial class FileToolsWindow : Window
             CropPreviewImage.Source = bmp;
             _cropImgWidth = bmp.PixelWidth;
             _cropImgHeight = bmp.PixelHeight;
-            ClearCropRect();
-            TxtCropInfo.Text = $"Image: {_cropImgWidth} x {_cropImgHeight}  |  X: 0  Y: 0  W: 0  H: 0";
+            TxtCropImgSize.Text = $"{_cropImgWidth} x {_cropImgHeight}";
+            CreateCropHandles();
+            TxtCropInfo.Text = "Draw a crop area on the image";
         }
         catch { /* ignore */ }
     }
 
-    private void ClearCropRect()
+    private void CreateCropHandles()
+    {
+        CropCanvas.Children.Clear();
+
+        // Create 4 overlay rectangles
+        for (int i = 0; i < 4; i++)
+        {
+            _cropOverlays[i] = new Rectangle { Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xAA, 0, 0, 0)) };
+            CropCanvas.Children.Add(_cropOverlays[i]);
+        }
+
+        // Create crop rectangle
+        _cropRect = new Rectangle
+        {
+            Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5")),
+            StrokeThickness = 2,
+            Fill = Brushes.Transparent,
+            StrokeDashArray = new DoubleCollection { 4, 2 }
+        };
+        CropCanvas.Children.Add(_cropRect);
+
+        // Create 8 handles (small white squares with blue border)
+        var cursors = new[] { Cursors.SizeNWSE, Cursors.SizeNS, Cursors.SizeNESW, Cursors.SizeWE, Cursors.SizeWE, Cursors.SizeNESW, Cursors.SizeNS, Cursors.SizeNWSE };
+        var modes = new[] { CropDragMode.ResizeTL, CropDragMode.ResizeTC, CropDragMode.ResizeTR, CropDragMode.ResizeML, CropDragMode.ResizeMR, CropDragMode.ResizeBL, CropDragMode.ResizeBC, CropDragMode.ResizeBR };
+
+        for (int i = 0; i < 8; i++)
+        {
+            var handle = new Border
+            {
+                Width = 10, Height = 10,
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5")),
+                BorderThickness = new Thickness(1),
+                Cursor = cursors[i],
+                Tag = modes[i],
+                Visibility = Visibility.Collapsed
+            };
+            handle.MouseLeftButtonDown += CropHandle_MouseDown;
+            CropCanvas.Children.Add(handle);
+            _cropHandles[i] = handle;
+        }
+
+        // Initialize with empty selection
+        _cropSelectionRect = Rect.Empty;
+    }
+
+    private void ClearCropVisuals()
     {
         CropCanvas.Children.Clear();
         _cropRect = null;
         _isDraggingCrop = false;
+        _cropMode = CropDragMode.None;
         for (int i = 0; i < _cropOverlays.Length; i++)
             _cropOverlays[i] = null!;
+        for (int i = 0; i < _cropHandles.Length; i++)
+            _cropHandles[i] = null!;
     }
 
     private void CropCanvas_MouseDown(object sender, MouseButtonEventArgs e)
     {
         if (CropPreviewImage.Source == null) return;
-        ClearCropRect();
+        var pos = e.GetPosition(CropCanvas);
 
-        _isDraggingCrop = true;
-        _cropStart = e.GetPosition(CropCanvas);
-        _cropEnd = _cropStart;
-
-        _cropRect = new Rectangle
+        // Check if clicking inside existing crop rect (move mode)
+        if (!_cropSelectionRect.IsEmpty && _cropSelectionRect.Contains(pos))
         {
-            Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5")),
-            StrokeThickness = 2,
-            Fill = Brushes.Transparent
-        };
-        CropCanvas.Children.Add(_cropRect);
-
-        for (int i = 0; i < 4; i++)
-        {
-            _cropOverlays[i] = new Rectangle
-            {
-                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x88, 0, 0, 0))
-            };
-            CropCanvas.Children.Add(_cropOverlays[i]);
+            _cropMode = CropDragMode.Move;
+            _cropDragStart = pos;
+            _isDraggingCrop = true;
+            CropCanvas.CaptureMouse();
+            e.Handled = true;
+            return;
         }
 
+        // Otherwise start new crop
+        _cropMode = CropDragMode.Create;
+        _cropDragStart = pos;
+        _cropSelectionRect = new Rect(pos, new System.Windows.Size(0, 0));
+        _isDraggingCrop = true;
         CropCanvas.CaptureMouse();
         e.Handled = true;
     }
 
+    private void CropHandle_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Border handle && handle.Tag is CropDragMode mode)
+        {
+            _cropMode = mode;
+            _cropDragStart = e.GetPosition(CropCanvas);
+            _isDraggingCrop = true;
+            CropCanvas.CaptureMouse();
+            e.Handled = true;
+        }
+    }
+
     private void CropCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (!_isDraggingCrop || _cropRect == null) return;
-        _cropEnd = e.GetPosition(CropCanvas);
-        UpdateCropRect();
+        if (!_isDraggingCrop) return;
+        var pos = e.GetPosition(CropCanvas);
+        double canvasW = CropCanvas.ActualWidth;
+        double canvasH = CropCanvas.ActualHeight;
+
+        // Clamp to canvas
+        pos = new Point(Math.Max(0, Math.Min(pos.X, canvasW)), Math.Max(0, Math.Min(pos.Y, canvasH)));
+
+        var dx = pos.X - _cropDragStart.X;
+        var dy = pos.Y - _cropDragStart.Y;
+
+        switch (_cropMode)
+        {
+            case CropDragMode.Create:
+                double x = Math.Min(_cropDragStart.X, pos.X);
+                double y = Math.Min(_cropDragStart.Y, pos.Y);
+                double w = Math.Abs(pos.X - _cropDragStart.X);
+                double h = Math.Abs(pos.Y - _cropDragStart.Y);
+                _cropSelectionRect = new Rect(x, y, w, h);
+                break;
+
+            case CropDragMode.Move:
+                var moved = _cropSelectionRect;
+                moved.Offset(dx, dy);
+                if (moved.Left < 0) moved.X = 0;
+                if (moved.Top < 0) moved.Y = 0;
+                if (moved.Right > canvasW) moved.X = canvasW - moved.Width;
+                if (moved.Bottom > canvasH) moved.Y = canvasH - moved.Height;
+                _cropSelectionRect = moved;
+                _cropDragStart = pos;
+                break;
+
+            case CropDragMode.ResizeTL:
+                _cropSelectionRect = new Rect(pos.X, pos.Y, _cropSelectionRect.Right - pos.X, _cropSelectionRect.Bottom - pos.Y);
+                break;
+            case CropDragMode.ResizeTR:
+                _cropSelectionRect = new Rect(_cropSelectionRect.Left, pos.Y, pos.X - _cropSelectionRect.Left, _cropSelectionRect.Bottom - pos.Y);
+                break;
+            case CropDragMode.ResizeBL:
+                _cropSelectionRect = new Rect(pos.X, _cropSelectionRect.Top, _cropSelectionRect.Right - pos.X, pos.Y - _cropSelectionRect.Top);
+                break;
+            case CropDragMode.ResizeBR:
+                _cropSelectionRect = new Rect(_cropSelectionRect.Left, _cropSelectionRect.Top, pos.X - _cropSelectionRect.Left, pos.Y - _cropSelectionRect.Top);
+                break;
+            case CropDragMode.ResizeTC:
+                _cropSelectionRect = new Rect(_cropSelectionRect.Left, pos.Y, _cropSelectionRect.Width, _cropSelectionRect.Bottom - pos.Y);
+                break;
+            case CropDragMode.ResizeBC:
+                _cropSelectionRect = new Rect(_cropSelectionRect.Left, _cropSelectionRect.Top, _cropSelectionRect.Width, pos.Y - _cropSelectionRect.Top);
+                break;
+            case CropDragMode.ResizeML:
+                _cropSelectionRect = new Rect(pos.X, _cropSelectionRect.Top, _cropSelectionRect.Right - pos.X, _cropSelectionRect.Height);
+                break;
+            case CropDragMode.ResizeMR:
+                _cropSelectionRect = new Rect(_cropSelectionRect.Left, _cropSelectionRect.Top, pos.X - _cropSelectionRect.Left, _cropSelectionRect.Height);
+                break;
+        }
+
+        // Normalize (ensure positive width/height)
+        if (_cropSelectionRect.Width < 0 || _cropSelectionRect.Height < 0)
+            _cropSelectionRect = new Rect(
+                Math.Min(_cropSelectionRect.Left, _cropSelectionRect.Right),
+                Math.Min(_cropSelectionRect.Top, _cropSelectionRect.Bottom),
+                Math.Abs(_cropSelectionRect.Width),
+                Math.Abs(_cropSelectionRect.Height));
+
+        UpdateCropVisuals();
     }
 
     private void CropCanvas_MouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_isDraggingCrop) return;
         _isDraggingCrop = false;
+        _cropMode = CropDragMode.None;
         CropCanvas.ReleaseMouseCapture();
     }
 
-    private void UpdateCropRect()
+    private void UpdateCropVisuals()
     {
-        if (_cropRect == null) return;
-
+        if (_cropRect == null || _cropSelectionRect.IsEmpty) return;
+        var r = _cropSelectionRect;
         double canvasW = CropCanvas.ActualWidth;
         double canvasH = CropCanvas.ActualHeight;
 
-        double x = Math.Max(0, Math.Min(_cropStart.X, _cropEnd.X));
-        double y = Math.Max(0, Math.Min(_cropStart.Y, _cropEnd.Y));
-        double w = Math.Min(Math.Abs(_cropEnd.X - _cropStart.X), canvasW - x);
-        double h = Math.Min(Math.Abs(_cropEnd.Y - _cropStart.Y), canvasH - y);
+        // Position crop rectangle
+        Canvas.SetLeft(_cropRect, r.X);
+        Canvas.SetTop(_cropRect, r.Y);
+        _cropRect.Width = Math.Max(0, r.Width);
+        _cropRect.Height = Math.Max(0, r.Height);
 
-        if (x + w > canvasW) w = canvasW - x;
-        if (y + h > canvasH) h = canvasH - y;
+        // Overlays (darkening)
+        Canvas.SetLeft(_cropOverlays[0], 0); Canvas.SetTop(_cropOverlays[0], 0); // Top
+        _cropOverlays[0].Width = canvasW; _cropOverlays[0].Height = Math.Max(0, r.Y);
 
-        Canvas.SetLeft(_cropRect, x);
-        Canvas.SetTop(_cropRect, y);
-        _cropRect.Width = w;
-        _cropRect.Height = h;
+        Canvas.SetLeft(_cropOverlays[1], 0); Canvas.SetTop(_cropOverlays[1], r.Bottom); // Bottom
+        _cropOverlays[1].Width = canvasW; _cropOverlays[1].Height = Math.Max(0, canvasH - r.Bottom);
 
-        // Top overlay
-        Canvas.SetLeft(_cropOverlays[0], 0);
-        Canvas.SetTop(_cropOverlays[0], 0);
-        _cropOverlays[0].Width = canvasW;
-        _cropOverlays[0].Height = y;
+        Canvas.SetLeft(_cropOverlays[2], 0); Canvas.SetTop(_cropOverlays[2], r.Y); // Left
+        _cropOverlays[2].Width = Math.Max(0, r.X); _cropOverlays[2].Height = Math.Max(0, r.Height);
 
-        // Bottom overlay
-        Canvas.SetLeft(_cropOverlays[1], 0);
-        Canvas.SetTop(_cropOverlays[1], y + h);
-        _cropOverlays[1].Width = canvasW;
-        _cropOverlays[1].Height = Math.Max(0, canvasH - y - h);
+        Canvas.SetLeft(_cropOverlays[3], r.Right); Canvas.SetTop(_cropOverlays[3], r.Y); // Right
+        _cropOverlays[3].Width = Math.Max(0, canvasW - r.Right); _cropOverlays[3].Height = Math.Max(0, r.Height);
 
-        // Left overlay
-        Canvas.SetLeft(_cropOverlays[2], 0);
-        Canvas.SetTop(_cropOverlays[2], y);
-        _cropOverlays[2].Width = x;
-        _cropOverlays[2].Height = h;
+        // Position 8 handles (TL, TC, TR, ML, MR, BL, BC, BR)
+        double hs = 5; // half handle size
+        var positions = new Point[]
+        {
+            new(r.X - hs, r.Y - hs),                           // TL
+            new(r.X + r.Width / 2 - hs, r.Y - hs),            // TC
+            new(r.Right - hs, r.Y - hs),                       // TR
+            new(r.X - hs, r.Y + r.Height / 2 - hs),           // ML
+            new(r.Right - hs, r.Y + r.Height / 2 - hs),       // MR
+            new(r.X - hs, r.Bottom - hs),                      // BL
+            new(r.X + r.Width / 2 - hs, r.Bottom - hs),       // BC
+            new(r.Right - hs, r.Bottom - hs),                  // BR
+        };
 
-        // Right overlay
-        Canvas.SetLeft(_cropOverlays[3], x + w);
-        Canvas.SetTop(_cropOverlays[3], y);
-        _cropOverlays[3].Width = Math.Max(0, canvasW - x - w);
-        _cropOverlays[3].Height = h;
+        for (int i = 0; i < 8; i++)
+        {
+            if (_cropHandles[i] == null) continue;
+            Canvas.SetLeft(_cropHandles[i], positions[i].X);
+            Canvas.SetTop(_cropHandles[i], positions[i].Y);
+            _cropHandles[i].Visibility = r.Width > 10 && r.Height > 10 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
+        // Update info text with image-space coordinates
         var (scaleX, scaleY, offsetX, offsetY) = GetImageScale();
-        int imgX = Math.Max(0, (int)Math.Round((x - offsetX) * scaleX));
-        int imgY = Math.Max(0, (int)Math.Round((y - offsetY) * scaleY));
-        int imgW = (int)Math.Round(w * scaleX);
-        int imgH = (int)Math.Round(h * scaleY);
-        imgW = Math.Min(imgW, _cropImgWidth - imgX);
-        imgH = Math.Min(imgH, _cropImgHeight - imgY);
+        int imgX = Math.Max(0, (int)Math.Round((r.X - offsetX) * scaleX));
+        int imgY = Math.Max(0, (int)Math.Round((r.Y - offsetY) * scaleY));
+        int imgW = Math.Min((int)Math.Round(r.Width * scaleX), _cropImgWidth - imgX);
+        int imgH = Math.Min((int)Math.Round(r.Height * scaleY), _cropImgHeight - imgY);
+        TxtCropInfo.Text = $"Crop: {imgW} x {imgH}  (X:{imgX}  Y:{imgY})";
+    }
 
-        TxtCropInfo.Text = $"X: {imgX}  Y: {imgY}  W: {imgW}  H: {imgH}";
+    private void Crop_Reset(object sender, RoutedEventArgs e)
+    {
+        _cropSelectionRect = Rect.Empty;
+        CreateCropHandles();
+        TxtCropInfo.Text = "Draw a crop area on the image";
     }
 
     private (double scaleX, double scaleY, double offsetX, double offsetY) GetImageScale()
@@ -1411,27 +1569,24 @@ public partial class FileToolsWindow : Window
 
     private async void Crop_Execute(object sender, RoutedEventArgs e)
     {
-        if (_cropSourcePath == null || _cropRect == null)
+        if (_cropSourcePath == null || _cropSelectionRect.IsEmpty)
         {
             System.Windows.MessageBox.Show("Load an image and draw a crop area first.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        double x = Canvas.GetLeft(_cropRect);
-        double y = Canvas.GetTop(_cropRect);
-        double w = _cropRect.Width;
-        double h = _cropRect.Height;
-        if (w < 1 || h < 1)
+        var r = _cropSelectionRect;
+        if (r.Width < 1 || r.Height < 1)
         {
             System.Windows.MessageBox.Show("Draw a crop area on the image.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         var (scaleX, scaleY, offsetX, offsetY) = GetImageScale();
-        int imgX = Math.Max(0, (int)Math.Round((x - offsetX) * scaleX));
-        int imgY = Math.Max(0, (int)Math.Round((y - offsetY) * scaleY));
-        int imgW = (int)Math.Round(w * scaleX);
-        int imgH = (int)Math.Round(h * scaleY);
+        int imgX = Math.Max(0, (int)Math.Round((r.X - offsetX) * scaleX));
+        int imgY = Math.Max(0, (int)Math.Round((r.Y - offsetY) * scaleY));
+        int imgW = (int)Math.Round(r.Width * scaleX);
+        int imgH = (int)Math.Round(r.Height * scaleY);
         imgW = Math.Min(imgW, _cropImgWidth - imgX);
         imgH = Math.Min(imgH, _cropImgHeight - imgY);
 
@@ -1487,67 +1642,103 @@ public partial class FileToolsWindow : Window
     {
         _rotateFlipSourcePath = path;
         TxtRotateFlipFileName.Text = System.IO.Path.GetFileName(path);
+
+        var bmp = new BitmapImage();
+        bmp.BeginInit(); bmp.UriSource = new Uri(path); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
+        RotateFlipPreview.Source = bmp;
+        _rfAngle = 0; _rfFlipH = false; _rfFlipV = false;
+        RfRotateTransform.Angle = 0;
+        RfFlipTransform.ScaleX = 1; RfFlipTransform.ScaleY = 1;
+
         ShowConfigState("rotate_flip");
     }
 
-    private async void RotateFlip_CW(object sender, RoutedEventArgs e) => await DoRotateImage(90);
-    private async void RotateFlip_CCW(object sender, RoutedEventArgs e) => await DoRotateImage(270);
-    private async void RotateFlip_180(object sender, RoutedEventArgs e) => await DoRotateImage(180);
-
-    private async Task DoRotateImage(int degrees)
+    private void RotateFlip_CW(object sender, RoutedEventArgs e)
     {
-        if (_rotateFlipSourcePath == null) return;
-
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "PNG|*.png|JPEG|*.jpg|BMP|*.bmp",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateFlipSourcePath) + $"_rot{degrees}"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing($"Rotating {degrees}\u00B0...");
-        try
-        {
-            await FileToolsService.RotateImageAsync(_rotateFlipSourcePath, dlg.FileName, degrees);
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Image rotated successfully!",
-                $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
-                dlg.FileName);
-        }
-        catch (Exception ex)
-        {
-            FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        _rfAngle = (_rfAngle + 90) % 360;
+        RfRotateTransform.Angle = _rfAngle;
     }
 
-    private async void RotateFlip_FlipH(object sender, RoutedEventArgs e) => await DoFlipImage(true);
-    private async void RotateFlip_FlipV(object sender, RoutedEventArgs e) => await DoFlipImage(false);
+    private void RotateFlip_CCW(object sender, RoutedEventArgs e)
+    {
+        _rfAngle = (_rfAngle + 270) % 360;
+        RfRotateTransform.Angle = _rfAngle;
+    }
 
-    private async Task DoFlipImage(bool horizontal)
+    private void RotateFlip_180(object sender, RoutedEventArgs e)
+    {
+        _rfAngle = (_rfAngle + 180) % 360;
+        RfRotateTransform.Angle = _rfAngle;
+    }
+
+    private void RotateFlip_FlipH(object sender, RoutedEventArgs e)
+    {
+        _rfFlipH = !_rfFlipH;
+        RfFlipTransform.ScaleX = _rfFlipH ? -1 : 1;
+    }
+
+    private void RotateFlip_FlipV(object sender, RoutedEventArgs e)
+    {
+        _rfFlipV = !_rfFlipV;
+        RfFlipTransform.ScaleY = _rfFlipV ? -1 : 1;
+    }
+
+    private async void RotateFlip_Execute(object sender, RoutedEventArgs e)
     {
         if (_rotateFlipSourcePath == null) return;
-
-        string suffix = horizontal ? "_flipH" : "_flipV";
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "PNG|*.png|JPEG|*.jpg|BMP|*.bmp",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateFlipSourcePath) + suffix
-        };
+        var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "PNG|*.png|JPEG|*.jpg|BMP|*.bmp", FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateFlipSourcePath) + "_edited" };
         if (dlg.ShowDialog() != true) return;
 
-        ShowProcessing(horizontal ? "Flipping horizontally..." : "Flipping vertically...");
+        ShowProcessing("Applying transforms...");
         try
         {
-            await FileToolsService.FlipImageAsync(_rotateFlipSourcePath, dlg.FileName, horizontal);
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Image flipped successfully!",
-                $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
-                dlg.FileName);
+            string tempPath = _rotateFlipSourcePath;
+            string outputPath = dlg.FileName;
+
+            // Apply rotation if non-zero
+            if (_rfAngle != 0)
+            {
+                string tempRotated = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_rf_{Guid.NewGuid():N}.png");
+                await FileToolsService.RotateImageAsync(tempPath, tempRotated, (int)_rfAngle);
+                if (tempPath != _rotateFlipSourcePath) File.Delete(tempPath);
+                tempPath = tempRotated;
+            }
+
+            // Apply horizontal flip
+            if (_rfFlipH)
+            {
+                string tempFlipped = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_rf_{Guid.NewGuid():N}.png");
+                await FileToolsService.FlipImageAsync(tempPath, tempFlipped, true);
+                if (tempPath != _rotateFlipSourcePath) File.Delete(tempPath);
+                tempPath = tempFlipped;
+            }
+
+            // Apply vertical flip
+            if (_rfFlipV)
+            {
+                string tempFlipped = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_rf_{Guid.NewGuid():N}.png");
+                await FileToolsService.FlipImageAsync(tempPath, tempFlipped, false);
+                if (tempPath != _rotateFlipSourcePath) File.Delete(tempPath);
+                tempPath = tempFlipped;
+            }
+
+            // Move final result to output
+            if (tempPath != _rotateFlipSourcePath)
+            {
+                File.Copy(tempPath, outputPath, true);
+                File.Delete(tempPath);
+            }
+            else
+            {
+                File.Copy(tempPath, outputPath, true);
+            }
+
+            var info = new FileInfo(outputPath);
+            ShowComplete("Image transformed!", $"{System.IO.Path.GetFileName(outputPath)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", outputPath);
         }
         catch (Exception ex)
         {
-            FadeOut(ProcessingOverlay);
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
             System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -1578,6 +1769,10 @@ public partial class FileToolsWindow : Window
         {
             var (w, h, size, fmt) = FileToolsService.GetImageInfo(path);
             TxtConvertInfo.Text = $"Current: {w} x {h}  ({FileToolsService.FormatFileSize(size)}, {fmt})";
+
+            var bmp = new BitmapImage();
+            bmp.BeginInit(); bmp.UriSource = new Uri(path); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
+            ConvertPreviewImage.Source = bmp;
         }
         catch
         {

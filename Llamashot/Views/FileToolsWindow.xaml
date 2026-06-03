@@ -159,6 +159,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding Index}" Foreground="#555" FontSize="12" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Column="1" Text="{Binding FileName}" Foreground="#CCC" FontSize="12"
@@ -167,7 +168,11 @@
                                                VerticalAlignment="Center" Margin="0,0,10,0"/>
                                     <TextBlock Grid.Column="3" Text="{Binding FileSize}" Foreground="#666" FontSize="10"
                                                VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button Grid.Column="4" Content="&#x2715;" Width="24" Height="24" FontSize="10"
+                                    <Button Grid.Column="4" Content="&#x25CE;" Width="24" Height="24" FontSize="12"
+                                            Background="Transparent" Foreground="#42A5F5" BorderThickness="0" Cursor="Hand"
+                                            Click="PreviewFile_Click" Tag="{Binding FilePath}" VerticalAlignment="Center"
+                                            ToolTip="Preview" Margin="0,0,4,0"/>
+                                    <Button Grid.Column="5" Content="&#x2715;" Width="24" Height="24" FontSize="10"
                                             Background="Transparent" Foreground="#EF5350" BorderThickness="0" Cursor="Hand"
                                             Click="MergePdf_Remove" Tag="{Binding FilePath}" VerticalAlignment="Center"/>
                                 </Grid>
@@ -369,6 +374,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding Index}" Foreground="#555" FontSize="12" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                     <Image Grid.Column="1" Source="{Binding Thumbnail}" Width="40" Height="40" Stretch="Uniform"
@@ -377,7 +383,11 @@
                                         <TextBlock Text="{Binding FileName}" Foreground="#CCC" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Text="{Binding FileSize}" Foreground="#666" FontSize="10" Margin="0,2,0,0"/>
                                     </StackPanel>
-                                    <Button Grid.Column="3" Content="&#x2715;" Width="24" Height="24" FontSize="10"
+                                    <Button Grid.Column="3" Content="&#x25CE;" Width="24" Height="24" FontSize="12"
+                                            Background="Transparent" Foreground="#42A5F5" BorderThickness="0" Cursor="Hand"
+                                            Click="PreviewFile_Click" Tag="{Binding FilePath}" VerticalAlignment="Center"
+                                            ToolTip="Preview" Margin="0,0,4,0"/>
+                                    <Button Grid.Column="4" Content="&#x2715;" Width="24" Height="24" FontSize="10"
                                             Background="Transparent" Foreground="#EF5350" BorderThickness="0" Cursor="Hand"
                                             Click="ImgToPdf_Remove" Tag="{Binding FilePath}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                 </Grid>
@@ -578,6 +588,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding Index}" Foreground="#555" FontSize="12" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                     <Image Grid.Column="1" Source="{Binding Thumbnail}" Width="40" Height="40" Stretch="Uniform"
@@ -586,7 +597,11 @@
                                         <TextBlock Text="{Binding FileName}" Foreground="#CCC" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Text="{Binding FileSize}" Foreground="#666" FontSize="10" Margin="0,2,0,0"/>
                                     </StackPanel>
-                                    <Button Grid.Column="3" Content="&#x2715;" Width="24" Height="24" FontSize="10"
+                                    <Button Grid.Column="3" Content="&#x25CE;" Width="24" Height="24" FontSize="12"
+                                            Background="Transparent" Foreground="#42A5F5" BorderThickness="0" Cursor="Hand"
+                                            Click="PreviewFile_Click" Tag="{Binding FilePath}" VerticalAlignment="Center"
+                                            ToolTip="Preview" Margin="0,0,4,0"/>
+                                    <Button Grid.Column="4" Content="&#x2715;" Width="24" Height="24" FontSize="10"
                                             Background="Transparent" Foreground="#EF5350" BorderThickness="0" Cursor="Hand"
                                             Click="CompressImg_Remove" Tag="{Binding FilePath}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                 </Grid>
@@ -647,7 +662,11 @@
                 <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
                     <TextBlock x:Name="TxtResizeFileName" Text="" Foreground="#CCC" FontSize="14"
                                FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtResizeInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="TxtResizeInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
+                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                            Margin="0,0,0,12" MinHeight="200" MaxHeight="300">
+                        <Image x:Name="ResizePreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -694,21 +713,31 @@
             </Border>
             <ScrollViewer x:Name="CropConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
-                    <TextBlock x:Name="TxtCropFileName" Text="" Foreground="#CCC" FontSize="14"
-                               FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <Border Background="#1A1A1E" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                            MinHeight="200" MaxHeight="300" Margin="0,0,0,8">
-                        <Grid x:Name="CropContainer">
-                            <Image x:Name="CropPreviewImage" Stretch="Uniform"
-                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock x:Name="TxtCropFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="TxtCropImgSize" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
+
+                    <!-- Large image preview with crop overlay -->
+                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                            Margin="0,0,0,12" ClipToBounds="True">
+                        <Grid x:Name="CropContainer" MinHeight="350" MaxHeight="450">
+                            <Image x:Name="CropPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                             <Canvas x:Name="CropCanvas" Background="Transparent"
                                     MouseLeftButtonDown="CropCanvas_MouseDown"
                                     MouseMove="CropCanvas_MouseMove"
                                     MouseLeftButtonUp="CropCanvas_MouseUp"/>
                         </Grid>
                     </Border>
-                    <TextBlock x:Name="TxtCropInfo" Text="X: 0  Y: 0  W: 0  H: 0"
-                               Foreground="#888" FontSize="11" Margin="0,0,0,8"/>
+
+                    <!-- Crop info + reset -->
+                    <Grid Margin="0,0,0,12">
+                        <TextBlock x:Name="TxtCropInfo" Text="Draw a crop area on the image" Foreground="#888" FontSize="12" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <CheckBox x:Name="ChkCropAspect" Content="Lock ratio" Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,0,12,0"/>
+                            <Button Content="Reset" Width="60" Height="26" FontSize="11" Background="#333" Foreground="#CCC"
+                                    BorderBrush="#444" Cursor="Hand" Click="Crop_Reset"/>
+                        </StackPanel>
+                    </Grid>
+
                     <Button Content="Crop &amp; Save &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#42A5F5"
                             HorizontalAlignment="Center" Cursor="Hand" Click="Crop_Execute"
@@ -738,27 +767,46 @@
             <ScrollViewer x:Name="RotateFlipConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
                     <TextBlock x:Name="TxtRotateFlipFileName" Text="" Foreground="#CCC" FontSize="14"
-                               FontWeight="SemiBold" Margin="0,0,0,16"/>
-                    <TextBlock Text="Select an action:" Foreground="#CCC" FontSize="14" Margin="0,0,0,12"/>
+                               FontWeight="SemiBold" Margin="0,0,0,12"/>
+
+                    <!-- Live preview area -->
+                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                            Margin="0,0,0,16" ClipToBounds="True" MinHeight="300" MaxHeight="400">
+                        <Image x:Name="RotateFlipPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
+                               RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="RfFlipTransform" ScaleX="1" ScaleY="1"/>
+                                    <RotateTransform x:Name="RfRotateTransform" Angle="0"/>
+                                </TransformGroup>
+                            </Image.RenderTransform>
+                        </Image>
+                    </Border>
+
+                    <!-- Rotation/flip buttons -->
                     <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <Button Content="90&#x00B0; CW" Width="120" Height="42" Margin="0,0,10,10" FontSize="14"
-                                Background="#AB47BC" Foreground="White" BorderThickness="0" Cursor="Hand"
-                                Click="RotateFlip_CW" Template="{StaticResource RoundedButton21}"/>
-                        <Button Content="90&#x00B0; CCW" Width="120" Height="42" Margin="0,0,10,10" FontSize="14"
-                                Background="#AB47BC" Foreground="White" BorderThickness="0" Cursor="Hand"
-                                Click="RotateFlip_CCW" Template="{StaticResource RoundedButton21}"/>
-                        <Button Content="180&#x00B0;" Width="120" Height="42" Margin="0,0,0,10" FontSize="14"
-                                Background="#AB47BC" Foreground="White" BorderThickness="0" Cursor="Hand"
-                                Click="RotateFlip_180" Template="{StaticResource RoundedButton21}"/>
+                        <Button Content="&#x21BA; 90&#x00B0;" Width="80" Height="36" Margin="0,0,10,10" FontSize="13"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="RotateFlip_CW"/>
+                        <Button Content="&#x21BB; 90&#x00B0;" Width="80" Height="36" Margin="0,0,10,10" FontSize="13"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="RotateFlip_CCW"/>
+                        <Button Content="180&#x00B0;" Width="60" Height="36" Margin="0,0,10,10" FontSize="13"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="RotateFlip_180"/>
+                        <Button Content="&#x2194; Flip H" Width="80" Height="36" Margin="0,0,10,10" FontSize="13"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="RotateFlip_FlipH"/>
+                        <Button Content="&#x2195; Flip V" Width="80" Height="36" Margin="0,0,0,10" FontSize="13"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="RotateFlip_FlipV"/>
                     </WrapPanel>
-                    <WrapPanel HorizontalAlignment="Center">
-                        <Button Content="Flip Horizontal" Width="140" Height="42" Margin="0,0,10,10" FontSize="14"
-                                Background="#AB47BC" Foreground="White" BorderThickness="0" Cursor="Hand"
-                                Click="RotateFlip_FlipH" Template="{StaticResource RoundedButton21}"/>
-                        <Button Content="Flip Vertical" Width="140" Height="42" Margin="0,0,0,10" FontSize="14"
-                                Background="#AB47BC" Foreground="White" BorderThickness="0" Cursor="Hand"
-                                Click="RotateFlip_FlipV" Template="{StaticResource RoundedButton21}"/>
-                    </WrapPanel>
+
+                    <!-- Save button -->
+                    <Button Content="Save &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
+                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#AB47BC"
+                            HorizontalAlignment="Center" Cursor="Hand" Click="RotateFlip_Execute"
+                            Template="{StaticResource RoundedButton}"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>
@@ -785,7 +833,11 @@
                 <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
                     <TextBlock x:Name="TxtConvertFileName" Text="" Foreground="#CCC" FontSize="14"
                                FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtConvertInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="TxtConvertInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
+                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                            Margin="0,0,0,12" MinHeight="200" MaxHeight="300">
+                        <Image x:Name="ConvertPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -867,13 +919,18 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding Index}" Foreground="#555" FontSize="12" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Column="1" Text="{Binding FileName}" Foreground="#CCC" FontSize="12"
                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0"/>
                                     <TextBlock Grid.Column="2" Text="{Binding FileSize}" Foreground="#888" FontSize="11"
                                                VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button Grid.Column="3" Content="&#x2715;" Width="24" Height="24" FontSize="10"
+                                    <Button Grid.Column="3" Content="&#x25CE;" Width="24" Height="24" FontSize="12"
+                                            Background="Transparent" Foreground="#42A5F5" BorderThickness="0" Cursor="Hand"
+                                            Click="PreviewFile_Click" Tag="{Binding FilePath}" VerticalAlignment="Center"
+                                            ToolTip="Preview" Margin="0,0,4,0"/>
+                                    <Button Grid.Column="4" Content="&#x2715;" Width="24" Height="24" FontSize="10"
                                             Background="Transparent" Foreground="#EF5350" BorderThickness="0" Cursor="Hand"
                                             Click="CompressOffice_Remove" Tag="{Binding FilePath}" VerticalAlignment="Center"/>
                                 </Grid>
