@@ -4,6 +4,7 @@
         Icon="/Resources/icon32.png"
         Title="Llamashot - File Tools"
         Width="850" Height="680"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A1E">
@@ -13,6 +14,9 @@
         <ControlTemplate x:Key="RoundedButton" TargetType="Button">
             <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="25"
                     Padding="{TemplateBinding Padding}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.35" Color="Black"/>
+                </Border.Effect>
                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -29,6 +33,9 @@
         <ControlTemplate x:Key="RoundedButton21" TargetType="Button">
             <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="21"
                     Padding="{TemplateBinding Padding}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.35" Color="Black"/>
+                </Border.Effect>
                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -148,6 +155,11 @@
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="BorderBrush" Value="#333"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.15" Color="Black"/>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -364,6 +376,11 @@
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="BorderBrush" Value="#333"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.15" Color="Black"/>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -428,6 +445,9 @@
                     <!-- First page preview with live rotation -->
                     <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
                             Margin="0,0,0,16" ClipToBounds="True" MinHeight="300" MaxHeight="400">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                        </Border.Effect>
                         <Image x:Name="RotatePdfPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
                                RenderOptions.BitmapScalingMode="HighQuality">
                             <Image.RenderTransform>
@@ -579,18 +599,20 @@
                 </StackPanel>
             </Border>
             <ScrollViewer x:Name="ExtractConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
+                <StackPanel Margin="24,20" HorizontalAlignment="Center">
                     <TextBlock x:Name="TxtExtractFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtExtractInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="TxtExtractInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,4"/>
+                    <TextBlock Text="Click pages to select/deselect. Selected pages will be extracted." Foreground="#666" FontSize="11" Margin="0,0,0,12"/>
 
-                    <TextBlock Text="Pages to extract:" Foreground="#CCC" FontSize="13" Margin="0,0,0,6"/>
-                    <TextBox x:Name="TxtExtractPages" Height="30" Padding="8,4" FontSize="13"
-                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444"
-                             ToolTip="e.g. 1,3,5-8"/>
-                    <TextBlock Text="Enter page numbers separated by commas. Use dash for ranges (e.g. 1,3,5-8)"
-                               Foreground="#666" FontSize="11" Margin="0,4,0,20"/>
+                    <!-- Page thumbnail grid -->
+                    <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16">
+                        <WrapPanel x:Name="ExtractPageGrid" HorizontalAlignment="Center"/>
+                    </ScrollViewer>
 
-                    <Button Content="Extract Pages &#x2192;" Width="280" Height="50"
+                    <!-- Selection info -->
+                    <TextBlock x:Name="TxtExtractSelection" Text="No pages selected" Foreground="#42A5F5" FontSize="13" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+
+                    <Button Content="Extract Selected Pages &#x2192;" Width="300" Height="50"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#FF8A65"
                             HorizontalAlignment="Center" Cursor="Hand" Click="Extract_Execute"
                             Template="{StaticResource RoundedButton}"/>
@@ -617,19 +639,29 @@
                 </StackPanel>
             </Border>
             <ScrollViewer x:Name="InsertConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
+                <StackPanel Margin="24,20" HorizontalAlignment="Center">
                     <TextBlock x:Name="TxtInsertBaseName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtInsertBaseInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="TxtInsertBaseInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,4"/>
+                    <TextBlock Text="Click a &#x2295; button between pages to set insertion point, then add images." Foreground="#666" FontSize="11" Margin="0,0,0,12"/>
 
-                    <TextBlock Text="Images to insert as pages:" Foreground="#CCC" FontSize="13" Margin="0,0,0,8"/>
+                    <!-- Page flow with insertion points -->
+                    <ScrollViewer MaxHeight="350" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12">
+                        <WrapPanel x:Name="InsertPageGrid" HorizontalAlignment="Center"/>
+                    </ScrollViewer>
+
+                    <!-- Insertion point indicator -->
+                    <TextBlock x:Name="TxtInsertPosition" Text="Insert position: beginning" Foreground="#42A5F5" FontSize="13" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+
+                    <!-- Image drop zone -->
+                    <TextBlock Text="Images to insert:" Foreground="#CCC" FontSize="13" Margin="0,0,0,6"/>
                     <Border Background="#1E1E22" BorderBrush="#444" BorderThickness="2" CornerRadius="6"
-                            Padding="16" Cursor="Hand" Margin="0,0,0,8" AllowDrop="True"
+                            Padding="14" Cursor="Hand" Margin="0,0,0,8" AllowDrop="True"
                             Drop="Insert_ImageDrop" DragOver="Generic_DragOver"
                             MouseLeftButtonDown="Insert_BrowseImages">
                         <TextBlock Text="Drop images here or click to browse" Foreground="#888" FontSize="12" HorizontalAlignment="Center"/>
                     </Border>
                     <ListBox x:Name="InsertImageList" Background="#252528" Foreground="#CCC"
-                             BorderBrush="#333" BorderThickness="1" MaxHeight="150" MinHeight="30"
+                             BorderBrush="#333" BorderThickness="1" MaxHeight="120" MinHeight="30"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,16">
                         <ListBox.ItemContainerStyle>
@@ -638,6 +670,11 @@
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="BorderBrush" Value="#333"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.15" Color="Black"/>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -660,20 +697,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <Grid Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Insert after page:" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBox x:Name="TxtInsertAfterPage" Grid.Column="1" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0"/>
-                        <TextBlock Grid.Column="2" Text="(0 = at beginning)" Foreground="#666" FontSize="11"
-                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
-                    </Grid>
-
-                    <Button Content="Insert Pages &#x2192;" Width="280" Height="50"
+                    <Button Content="Insert Pages &#x2192;" Width="300" Height="50"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#A1887F"
                             HorizontalAlignment="Center" Cursor="Hand" Click="Insert_Execute"
                             Template="{StaticResource RoundedButton}"/>
@@ -716,6 +740,11 @@
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="BorderBrush" Value="#333"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.15" Color="Black"/>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -803,6 +832,9 @@
                     <TextBlock x:Name="TxtResizeInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
                     <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
                             Margin="0,0,0,12" MinHeight="200" MaxHeight="300">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                        </Border.Effect>
                         <Image x:Name="ResizePreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Border>
                     <Grid Margin="0,0,0,8">
@@ -857,6 +889,9 @@
                     <!-- Large image preview with crop overlay -->
                     <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
                             Margin="0,0,0,12" ClipToBounds="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                        </Border.Effect>
                         <Grid x:Name="CropContainer" MinHeight="350" MaxHeight="450">
                             <Image x:Name="CropPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                             <Canvas x:Name="CropCanvas" Background="Transparent"
@@ -910,6 +945,9 @@
                     <!-- Live preview area -->
                     <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
                             Margin="0,0,0,16" ClipToBounds="True" MinHeight="300" MaxHeight="400">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                        </Border.Effect>
                         <Image x:Name="RotateFlipPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
                                RenderOptions.BitmapScalingMode="HighQuality">
                             <Image.RenderTransform>
@@ -974,6 +1012,9 @@
                     <TextBlock x:Name="TxtConvertInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
                     <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
                             Margin="0,0,0,12" MinHeight="200" MaxHeight="300">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                        </Border.Effect>
                         <Image x:Name="ConvertPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Border>
                     <Grid Margin="0,0,0,8">
@@ -1047,6 +1088,11 @@
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="BorderBrush" Value="#333"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.15" Color="Black"/>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>

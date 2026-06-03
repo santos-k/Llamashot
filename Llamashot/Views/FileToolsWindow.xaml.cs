@@ -79,7 +79,9 @@ public partial class FileToolsWindow : Window
     private string? _watermarkPdfPath;
     private string? _pageNumPdfPath;
     private string? _extractPdfPath;
+    private readonly HashSet<int> _extractSelectedPages = new(); // 1-based page numbers
     private string? _insertBasePath;
+    private int _insertAfterPage = 0;
     private double _rpAngle = 0;
 
     // =====================================================================
@@ -187,11 +189,33 @@ public partial class FileToolsWindow : Window
             });
             card.Child = stack;
 
+            card.Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 10, ShadowDepth = 3, Opacity = 0.4, Color = Colors.Black
+            };
+
+            card.RenderTransformOrigin = new Point(0.5, 0.5);
+            card.RenderTransform = new ScaleTransform(1, 1);
+
             card.MouseLeftButtonDown += Card_Click;
-            card.MouseEnter += (s, _) => ((Border)s).Background =
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2E2E34"));
-            card.MouseLeave += (s, _) => ((Border)s).Background =
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#252528"));
+            card.MouseEnter += (s, _) =>
+            {
+                var b = (Border)s;
+                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2E2E34"));
+                ((ScaleTransform)b.RenderTransform).ScaleX = 1.04;
+                ((ScaleTransform)b.RenderTransform).ScaleY = 1.04;
+                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).BlurRadius = 18;
+                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).Opacity = 0.6;
+            };
+            card.MouseLeave += (s, _) =>
+            {
+                var b = (Border)s;
+                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#252528"));
+                ((ScaleTransform)b.RenderTransform).ScaleX = 1.0;
+                ((ScaleTransform)b.RenderTransform).ScaleY = 1.0;
+                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).BlurRadius = 10;
+                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).Opacity = 0.4;
+            };
 
             CardPanel.Children.Add(card);
         }
@@ -372,7 +396,11 @@ public partial class FileToolsWindow : Window
         _rotateFlipSourcePath = null;
         _convertSourcePath = null;
         _extractPdfPath = null;
+        _extractSelectedPages.Clear();
+        ExtractPageGrid.Children.Clear();
         _insertBasePath = null;
+        _insertAfterPage = 0;
+        InsertPageGrid.Children.Clear();
         _insertImages.Clear();
 
         // Reset rotate PDF preview
@@ -1155,23 +1183,21 @@ public partial class FileToolsWindow : Window
         {
             int pages = await FileToolsService.GetPdfPageCountAsync(path);
             TxtExtractInfo.Text = $"Pages: {pages}";
-            TxtExtractPages.Text = "";
         }
         catch { TxtExtractInfo.Text = ""; }
         ShowConfigState("extract_pages");
+        await LoadExtractThumbnails(path);
     }
 
     private async void Extract_Execute(object sender, RoutedEventArgs e)
     {
-        if (_extractPdfPath == null || string.IsNullOrWhiteSpace(TxtExtractPages.Text)) return;
-
-        var pageNumbers = ParsePageNumbers(TxtExtractPages.Text.Trim());
-        if (pageNumbers.Length == 0)
+        if (_extractPdfPath == null || _extractSelectedPages.Count == 0)
         {
-            System.Windows.MessageBox.Show("Enter valid page numbers.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show("Select at least one page to extract.", "Extract Pages", MessageBoxButton.OK);
             return;
         }
 
+        var pageNumbers = _extractSelectedPages.OrderBy(x => x).ToArray();
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "PDF|*.pdf",
@@ -1212,6 +1238,149 @@ public partial class FileToolsWindow : Window
         return result.Distinct().OrderBy(x => x).ToArray();
     }
 
+    private async Task LoadExtractThumbnails(string pdfPath)
+    {
+        ExtractPageGrid.Children.Clear();
+        _extractSelectedPages.Clear();
+
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            uint pageCount = pdfDoc.PageCount;
+
+            for (uint i = 0; i < pageCount; i++)
+            {
+                using var page = pdfDoc.GetPage(i);
+                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                var options = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 150 };
+                await page.RenderToStreamAsync(stream, options);
+                stream.Seek(0);
+
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.StreamSource = stream.AsStreamForRead();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+
+                int pageNum = (int)i + 1;
+
+                var thumbnail = new Border
+                {
+                    Width = 130, Height = 180, Margin = new Thickness(6),
+                    CornerRadius = new CornerRadius(6),
+                    BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444")),
+                    BorderThickness = new Thickness(2),
+                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#222")),
+                    Cursor = Cursors.Hand,
+                    Tag = pageNum,
+                    ClipToBounds = true,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        BlurRadius = 6, ShadowDepth = 2, Opacity = 0.3, Color = Colors.Black
+                    }
+                };
+
+                var grid = new Grid();
+                grid.Children.Add(new System.Windows.Controls.Image
+                {
+                    Source = bmp, Stretch = Stretch.Uniform,
+                    Margin = new Thickness(2)
+                });
+
+                // Page number label
+                var label = new Border
+                {
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xCC, 0, 0, 0)),
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                    Padding = new Thickness(0, 3, 0, 3)
+                };
+                label.Child = new TextBlock
+                {
+                    Text = $"Page {pageNum}",
+                    Foreground = Brushes.White, FontSize = 11,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                };
+                grid.Children.Add(label);
+
+                // Selection check overlay (initially hidden)
+                var checkOverlay = new Border
+                {
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x44, 0x42, 0xA5, 0xF5)),
+                    Visibility = Visibility.Collapsed,
+                    CornerRadius = new CornerRadius(4)
+                };
+                var checkMark = new TextBlock
+                {
+                    Text = "\u2713", FontSize = 28, FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.White, HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                checkOverlay.Child = checkMark;
+                grid.Children.Add(checkOverlay);
+
+                thumbnail.Child = grid;
+
+                // Click to toggle selection
+                thumbnail.MouseLeftButtonDown += (s, _) =>
+                {
+                    var border = (Border)s;
+                    int pn = (int)border.Tag;
+                    // Find the check overlay (3rd child of grid)
+                    var g = (Grid)border.Child;
+                    var overlay = (Border)g.Children[2];
+
+                    if (_extractSelectedPages.Contains(pn))
+                    {
+                        _extractSelectedPages.Remove(pn);
+                        border.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
+                        border.BorderThickness = new Thickness(2);
+                        overlay.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        _extractSelectedPages.Add(pn);
+                        border.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5"));
+                        border.BorderThickness = new Thickness(3);
+                        overlay.Visibility = Visibility.Visible;
+                    }
+
+                    UpdateExtractSelection();
+                };
+
+                // Hover effect
+                thumbnail.MouseEnter += (s, _) =>
+                {
+                    var b = (Border)s;
+                    ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).BlurRadius = 12;
+                };
+                thumbnail.MouseLeave += (s, _) =>
+                {
+                    var b = (Border)s;
+                    ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).BlurRadius = 6;
+                };
+
+                ExtractPageGrid.Children.Add(thumbnail);
+            }
+
+            UpdateExtractSelection();
+        }
+        catch (Exception ex)
+        {
+            TxtExtractInfo.Text = $"Error loading pages: {ex.Message}";
+        }
+    }
+
+    private void UpdateExtractSelection()
+    {
+        int count = _extractSelectedPages.Count;
+        TxtExtractSelection.Text = count == 0
+            ? "No pages selected"
+            : $"{count} page{(count > 1 ? "s" : "")} selected: {string.Join(", ", _extractSelectedPages.OrderBy(x => x))}";
+    }
+
     // =====================================================================
     //  10. Insert Pages
     // =====================================================================
@@ -1226,33 +1395,145 @@ public partial class FileToolsWindow : Window
         {
             int pages = await FileToolsService.GetPdfPageCountAsync(dlg.FileName);
             TxtInsertBaseInfo.Text = $"Pages: {pages}";
-            TxtInsertAfterPage.Text = pages.ToString();
         }
         catch { TxtInsertBaseInfo.Text = ""; }
         ShowConfigState("insert_pages");
+        await LoadInsertThumbnails(dlg.FileName);
     }
 
-    private void Insert_SelectDrop(object sender, DragEventArgs e)
+    private async void Insert_SelectDrop(object sender, DragEventArgs e)
     {
         var files = GetDroppedFiles(e, IsPdfFile);
         if (files.Length > 0)
         {
             _insertBasePath = files[0];
             TxtInsertBaseName.Text = System.IO.Path.GetFileName(files[0]);
-            _ = LoadInsertBaseInfoAsync(files[0]);
+            try
+            {
+                int pages = await FileToolsService.GetPdfPageCountAsync(files[0]);
+                TxtInsertBaseInfo.Text = $"Pages: {pages}";
+            }
+            catch { TxtInsertBaseInfo.Text = ""; }
             ShowConfigState("insert_pages");
+            await LoadInsertThumbnails(files[0]);
         }
     }
 
-    private async Task LoadInsertBaseInfoAsync(string path)
+    private async Task LoadInsertThumbnails(string pdfPath)
     {
+        InsertPageGrid.Children.Clear();
+        _insertAfterPage = 0;
+
         try
         {
-            int pages = await FileToolsService.GetPdfPageCountAsync(path);
-            TxtInsertBaseInfo.Text = $"Pages: {pages}";
-            TxtInsertAfterPage.Text = pages.ToString();
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            uint pageCount = pdfDoc.PageCount;
+
+            // Add initial insertion point (before page 1)
+            AddInsertionPoint(0, pageCount);
+
+            for (uint i = 0; i < pageCount; i++)
+            {
+                using var page = pdfDoc.GetPage(i);
+                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                var options = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 120 };
+                await page.RenderToStreamAsync(stream, options);
+                stream.Seek(0);
+
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.StreamSource = stream.AsStreamForRead();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+
+                int pageNum = (int)i + 1;
+
+                // Page thumbnail (smaller than extract -- just for reference)
+                var thumbnail = new Border
+                {
+                    Width = 100, Height = 140, Margin = new Thickness(2),
+                    CornerRadius = new CornerRadius(4),
+                    BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444")),
+                    BorderThickness = new Thickness(1),
+                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#222")),
+                    ClipToBounds = true
+                };
+                var grid = new Grid();
+                grid.Children.Add(new System.Windows.Controls.Image { Source = bmp, Stretch = Stretch.Uniform, Margin = new Thickness(2) });
+                var label = new Border
+                {
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xBB, 0, 0, 0)),
+                    VerticalAlignment = VerticalAlignment.Bottom, Padding = new Thickness(0, 2, 0, 2)
+                };
+                label.Child = new TextBlock { Text = $"{pageNum}", Foreground = Brushes.White, FontSize = 10, HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+                grid.Children.Add(label);
+                thumbnail.Child = grid;
+
+                InsertPageGrid.Children.Add(thumbnail);
+
+                // Add insertion point after this page
+                AddInsertionPoint(pageNum, pageCount);
+            }
+
+            UpdateInsertPosition();
         }
-        catch { TxtInsertBaseInfo.Text = ""; }
+        catch { }
+    }
+
+    private void AddInsertionPoint(int afterPage, uint totalPages)
+    {
+        var btn = new Border
+        {
+            Width = 28, Height = 28, Margin = new Thickness(2, 56, 2, 56),
+            CornerRadius = new CornerRadius(14),
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(afterPage == _insertAfterPage ? "#42A5F5" : "#444")),
+            Cursor = Cursors.Hand,
+            Tag = afterPage,
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = afterPage == 0 ? "Insert at beginning" : $"Insert after page {afterPage}"
+        };
+        btn.Child = new TextBlock
+        {
+            Text = "\u2295", FontSize = 16, Foreground = Brushes.White,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        btn.MouseLeftButtonDown += (s, _) =>
+        {
+            _insertAfterPage = (int)((Border)s).Tag;
+            // Update all insertion point visuals
+            foreach (var child in InsertPageGrid.Children)
+            {
+                if (child is Border b && b.Tag is int pos)
+                {
+                    b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                        pos == _insertAfterPage ? "#42A5F5" : "#444"));
+                }
+            }
+            UpdateInsertPosition();
+        };
+        btn.MouseEnter += (s, _) =>
+        {
+            var b = (Border)s;
+            if ((int)b.Tag != _insertAfterPage)
+                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666"));
+        };
+        btn.MouseLeave += (s, _) =>
+        {
+            var b = (Border)s;
+            if ((int)b.Tag != _insertAfterPage)
+                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
+        };
+        InsertPageGrid.Children.Add(btn);
+    }
+
+    private void UpdateInsertPosition()
+    {
+        TxtInsertPosition.Text = _insertAfterPage == 0
+            ? "Insert position: at the beginning"
+            : $"Insert position: after page {_insertAfterPage}";
     }
 
     private void Insert_BrowseImages(object sender, MouseButtonEventArgs e)
@@ -1285,11 +1566,7 @@ public partial class FileToolsWindow : Window
     private async void Insert_Execute(object sender, RoutedEventArgs e)
     {
         if (_insertBasePath == null || _insertImages.Count == 0) return;
-        if (!int.TryParse(TxtInsertAfterPage.Text, out int afterPage))
-        {
-            System.Windows.MessageBox.Show("Enter a valid page number.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+        int afterPage = _insertAfterPage;
 
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
