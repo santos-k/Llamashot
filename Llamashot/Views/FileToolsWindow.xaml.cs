@@ -1703,11 +1703,13 @@ public partial class FileToolsWindow : Window
             var (w, h, size, fmt) = FileToolsService.GetImageInfo(path);
             _resizeOrigW = w;
             _resizeOrigH = h;
-            TxtResizeInfo.Text = $"Current: {w} x {h}  ({FileToolsService.FormatFileSize(size)}, {fmt})";
+            TxtResizeInfo.Text = $"Current: {w} x {h} px  ({FileToolsService.FormatFileSize(size)}, {fmt})";
+            RbResizePixels.IsChecked = true;
             _suppressAspectUpdate = true;
             TxtResizeW.Text = w.ToString();
             TxtResizeH.Text = h.ToString();
             _suppressAspectUpdate = false;
+            UpdateResizeOutput();
 
             var bmp = new BitmapImage();
             bmp.BeginInit(); bmp.UriSource = new Uri(path); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
@@ -1720,37 +1722,117 @@ public partial class FileToolsWindow : Window
         ShowConfigState("resize_image");
     }
 
+    private string GetResizeUnit()
+    {
+        if (RbResizePercent?.IsChecked == true) return "%";
+        if (RbResizeInches?.IsChecked == true) return "in";
+        if (RbResizeCm?.IsChecked == true) return "cm";
+        if (RbResizeMm?.IsChecked == true) return "mm";
+        return "px";
+    }
+
+    private (int pixelW, int pixelH) GetResizePixels()
+    {
+        if (!double.TryParse(TxtResizeW?.Text, out double valW) || !double.TryParse(TxtResizeH?.Text, out double valH)
+            || valW <= 0 || valH <= 0)
+            return (0, 0);
+
+        double dpi = 96;
+        if (TxtResizeDpi != null) double.TryParse(TxtResizeDpi.Text, out dpi);
+        if (dpi <= 0) dpi = 96;
+
+        string unit = GetResizeUnit();
+        return unit switch
+        {
+            "%" => ((int)Math.Round(_resizeOrigW * valW / 100), (int)Math.Round(_resizeOrigH * valH / 100)),
+            "in" => ((int)Math.Round(valW * dpi), (int)Math.Round(valH * dpi)),
+            "cm" => ((int)Math.Round(valW / 2.54 * dpi), (int)Math.Round(valH / 2.54 * dpi)),
+            "mm" => ((int)Math.Round(valW / 25.4 * dpi), (int)Math.Round(valH / 25.4 * dpi)),
+            _ => ((int)valW, (int)valH)
+        };
+    }
+
+    private void UpdateResizeOutput()
+    {
+        var (pw, ph) = GetResizePixels();
+        if (TxtResizeOutput != null)
+            TxtResizeOutput.Text = pw > 0 && ph > 0 ? $"Output: {pw} x {ph} px" : "";
+    }
+
+    private void ResizeUnit_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_resizeOrigW == 0) return;
+        _suppressAspectUpdate = true;
+
+        string unit = GetResizeUnit();
+        bool showDpi = unit is "in" or "cm" or "mm";
+        if (ResizeDpiRow != null) ResizeDpiRow.Visibility = showDpi ? Visibility.Visible : Visibility.Collapsed;
+        if (TxtResizeUnit != null) TxtResizeUnit.Text = unit;
+
+        double dpi = 96;
+        if (TxtResizeDpi != null) double.TryParse(TxtResizeDpi.Text, out dpi);
+        if (dpi <= 0) dpi = 96;
+
+        switch (unit)
+        {
+            case "px":
+                TxtResizeW.Text = _resizeOrigW.ToString();
+                TxtResizeH.Text = _resizeOrigH.ToString();
+                break;
+            case "%":
+                TxtResizeW.Text = "100";
+                TxtResizeH.Text = "100";
+                break;
+            case "in":
+                TxtResizeW.Text = Math.Round(_resizeOrigW / dpi, 2).ToString();
+                TxtResizeH.Text = Math.Round(_resizeOrigH / dpi, 2).ToString();
+                break;
+            case "cm":
+                TxtResizeW.Text = Math.Round(_resizeOrigW / dpi * 2.54, 2).ToString();
+                TxtResizeH.Text = Math.Round(_resizeOrigH / dpi * 2.54, 2).ToString();
+                break;
+            case "mm":
+                TxtResizeW.Text = Math.Round(_resizeOrigW / dpi * 25.4, 1).ToString();
+                TxtResizeH.Text = Math.Round(_resizeOrigH / dpi * 25.4, 1).ToString();
+                break;
+        }
+        _suppressAspectUpdate = false;
+        UpdateResizeOutput();
+    }
+
     private void ResizeW_Changed(object sender, TextChangedEventArgs e)
     {
         if (_suppressAspectUpdate || ChkResizeAspect?.IsChecked != true) return;
         if (_resizeOrigW == 0 || _resizeOrigH == 0) return;
-        if (!int.TryParse(TxtResizeW.Text, out int w) || w <= 0) return;
+        if (!double.TryParse(TxtResizeW.Text, out double w) || w <= 0) return;
 
         _suppressAspectUpdate = true;
-        int h = (int)Math.Round((double)w / _resizeOrigW * _resizeOrigH);
-        TxtResizeH.Text = h.ToString();
+        double h = Math.Round(w / _resizeOrigW * _resizeOrigH, 2);
+        TxtResizeH.Text = GetResizeUnit() == "px" ? ((int)h).ToString() : h.ToString();
         _suppressAspectUpdate = false;
+        UpdateResizeOutput();
     }
 
     private void ResizeH_Changed(object sender, TextChangedEventArgs e)
     {
         if (_suppressAspectUpdate || ChkResizeAspect?.IsChecked != true) return;
         if (_resizeOrigW == 0 || _resizeOrigH == 0) return;
-        if (!int.TryParse(TxtResizeH.Text, out int h) || h <= 0) return;
+        if (!double.TryParse(TxtResizeH.Text, out double h) || h <= 0) return;
 
         _suppressAspectUpdate = true;
-        int w = (int)Math.Round((double)h / _resizeOrigH * _resizeOrigW);
-        TxtResizeW.Text = w.ToString();
+        double w = Math.Round(h / _resizeOrigH * _resizeOrigW, 2);
+        TxtResizeW.Text = GetResizeUnit() == "px" ? ((int)w).ToString() : w.ToString();
         _suppressAspectUpdate = false;
+        UpdateResizeOutput();
     }
 
     private async void Resize_Execute(object sender, RoutedEventArgs e)
     {
         if (_resizeSourcePath == null) return;
-        if (!int.TryParse(TxtResizeW.Text, out int w) || !int.TryParse(TxtResizeH.Text, out int h)
-            || w <= 0 || h <= 0)
+        var (w, h) = GetResizePixels();
+        if (w <= 0 || h <= 0)
         {
-            System.Windows.MessageBox.Show("Enter valid width and height.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show("Enter valid dimensions.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 

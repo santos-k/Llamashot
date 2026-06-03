@@ -837,24 +837,59 @@
                         </Border.Effect>
                         <Image x:Name="ResizePreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Border>
+                    <!-- Resize mode selector -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <RadioButton x:Name="RbResizePixels" Content="Pixels" Foreground="#CCC" FontSize="12"
+                                     IsChecked="True" GroupName="ResizeUnit" Margin="0,0,16,0" Cursor="Hand"
+                                     Checked="ResizeUnit_Changed"/>
+                        <RadioButton x:Name="RbResizePercent" Content="Percentage" Foreground="#CCC" FontSize="12"
+                                     GroupName="ResizeUnit" Margin="0,0,16,0" Cursor="Hand"
+                                     Checked="ResizeUnit_Changed"/>
+                        <RadioButton x:Name="RbResizeInches" Content="Inches" Foreground="#CCC" FontSize="12"
+                                     GroupName="ResizeUnit" Margin="0,0,16,0" Cursor="Hand"
+                                     Checked="ResizeUnit_Changed"/>
+                        <RadioButton x:Name="RbResizeCm" Content="cm" Foreground="#CCC" FontSize="12"
+                                     GroupName="ResizeUnit" Margin="0,0,16,0" Cursor="Hand"
+                                     Checked="ResizeUnit_Changed"/>
+                        <RadioButton x:Name="RbResizeMm" Content="mm" Foreground="#CCC" FontSize="12"
+                                     GroupName="ResizeUnit" Cursor="Hand"
+                                     Checked="ResizeUnit_Changed"/>
+                    </StackPanel>
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TxtResizeWLabel" Text="Width:" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="TxtResizeW" Grid.Column="1" Height="28" Padding="6,4" FontSize="12"
+                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" TextChanged="ResizeW_Changed"/>
+                        <TextBlock x:Name="TxtResizeHLabel" Text="Height:" Grid.Column="2" Foreground="#CCC" FontSize="13"
+                                   VerticalAlignment="Center" Margin="16,0,6,0"/>
+                        <TextBox x:Name="TxtResizeH" Grid.Column="3" Height="28" Padding="6,4" FontSize="12"
+                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" TextChanged="ResizeH_Changed"/>
+                        <TextBlock x:Name="TxtResizeUnit" Grid.Column="4" Text="px" Foreground="#666" FontSize="12"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </Grid>
+                    <!-- DPI input for physical units -->
+                    <Grid x:Name="ResizeDpiRow" Margin="0,0,0,8" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Width:" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox x:Name="TxtResizeW" Grid.Column="1" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" TextChanged="ResizeW_Changed"/>
-                        <TextBlock Text="Height:" Grid.Column="2" Foreground="#CCC" FontSize="13"
-                                   VerticalAlignment="Center" Margin="16,0,6,0"/>
-                        <TextBox x:Name="TxtResizeH" Grid.Column="3" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" TextChanged="ResizeH_Changed"/>
+                        <TextBlock Text="DPI:" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="TxtResizeDpi" Height="28" Padding="6,4" FontSize="12"
+                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="96" Grid.Column="1"/>
+                        <TextBlock Text="(dots per inch)" Foreground="#666" FontSize="11" VerticalAlignment="Center"
+                                   Margin="8,0,0,0" Grid.Column="2"/>
                     </Grid>
                     <CheckBox x:Name="ChkResizeAspect" Content="Maintain aspect ratio" Foreground="#CCC" FontSize="12"
-                              IsChecked="True" Margin="0,0,0,12" Cursor="Hand"/>
+                              IsChecked="True" Margin="0,0,0,4" Cursor="Hand"/>
+                    <!-- Output pixel size preview -->
+                    <TextBlock x:Name="TxtResizeOutput" Text="" Foreground="#42A5F5" FontSize="12" Margin="0,0,0,12"/>
                     <Button Content="Resize &amp; Save &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#26A69A"
                             HorizontalAlignment="Center" Cursor="Hand" Click="Resize_Execute"
