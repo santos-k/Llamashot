@@ -437,45 +437,45 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <ScrollViewer x:Name="RotatePdfConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
-                    <TextBlock x:Name="TxtRotatePdfFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtRotatePdfInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,16"/>
-
-                    <!-- First page preview with live rotation -->
-                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                            Margin="0,0,0,16" ClipToBounds="True" MinHeight="300" MaxHeight="400">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
-                        </Border.Effect>
-                        <Image x:Name="RotatePdfPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
-                               RenderOptions.BitmapScalingMode="HighQuality">
-                            <Image.RenderTransform>
-                                <RotateTransform x:Name="RpRotateTransform" Angle="0"/>
-                            </Image.RenderTransform>
-                        </Image>
-                    </Border>
-
-                    <!-- Rotation buttons -->
-                    <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,20">
-                        <Button Content="&#x21BA; 90&#x00B0; CW" Width="100" Height="36" Margin="0,0,8,0" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotatePdf_CW"
-                                Template="{StaticResource RoundedButton21}"/>
-                        <Button Content="&#x21BB; 90&#x00B0; CCW" Width="100" Height="36" Margin="0,0,8,0" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotatePdf_CCW"
-                                Template="{StaticResource RoundedButton21}"/>
-                        <Button Content="180&#x00B0;" Width="70" Height="36" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotatePdf_180"
-                                Template="{StaticResource RoundedButton21}"/>
-                    </WrapPanel>
-
-                    <!-- Save button -->
-                    <Button Content="Save Rotated PDF &#x2192;" Width="280" Height="50"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#FFA726"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="RotatePdf_Execute"
-                            Template="{StaticResource RoundedButton}"/>
+            <Grid x:Name="RotatePdfConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,8">
+                    <TextBlock x:Name="TxtRotatePdfFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Name="TxtRotatePdfInfo" Text="" Foreground="#888" FontSize="12"/>
                 </StackPanel>
-            </ScrollViewer>
+                <Border Grid.Row="1" Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        Margin="0,0,0,12" ClipToBounds="True">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                    </Border.Effect>
+                    <Image x:Name="RotatePdfPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
+                           RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.RenderTransform>
+                            <RotateTransform x:Name="RpRotateTransform" Angle="0"/>
+                        </Image.RenderTransform>
+                    </Image>
+                </Border>
+                <WrapPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <Button Content="&#x21BA; 90&#x00B0; CW" Width="100" Height="36" Margin="0,0,8,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotatePdf_CW"
+                            Template="{StaticResource RoundedButton21}"/>
+                    <Button Content="&#x21BB; 90&#x00B0; CCW" Width="100" Height="36" Margin="0,0,8,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotatePdf_CCW"
+                            Template="{StaticResource RoundedButton21}"/>
+                    <Button Content="180&#x00B0;" Width="70" Height="36" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotatePdf_180"
+                            Template="{StaticResource RoundedButton21}"/>
+                </WrapPanel>
+                <Button Grid.Row="3" Content="Save Rotated PDF &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                        FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#FFA726"
+                        HorizontalAlignment="Center" Cursor="Hand" Click="RotatePdf_Execute"
+                        Template="{StaticResource RoundedButton}"/>
+            </Grid>
         </Grid>
 
         <!-- ====================== 7. PanelWatermark ====================== -->
@@ -825,18 +825,25 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <ScrollViewer x:Name="ResizeConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
+            <Grid x:Name="ResizeConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,8">
                     <TextBlock x:Name="TxtResizeFileName" Text="" Foreground="#CCC" FontSize="14"
-                               FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtResizeInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
-                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                            Margin="0,0,0,12" MinHeight="200" MaxHeight="300">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
-                        </Border.Effect>
-                        <Image x:Name="ResizePreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    </Border>
+                               FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Name="TxtResizeInfo" Text="" Foreground="#888" FontSize="12"/>
+                </StackPanel>
+                <Border Grid.Row="1" Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        Margin="0,0,0,8">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                    </Border.Effect>
+                    <Image x:Name="ResizePreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Border>
+                <StackPanel Grid.Row="2">
                     <!-- Resize mode selector -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <RadioButton x:Name="RbResizePixels" Content="Pixels" Foreground="#CCC" FontSize="12"
@@ -889,13 +896,13 @@
                     <CheckBox x:Name="ChkResizeAspect" Content="Maintain aspect ratio" Foreground="#CCC" FontSize="12"
                               IsChecked="True" Margin="0,0,0,4" Cursor="Hand"/>
                     <!-- Output pixel size preview -->
-                    <TextBlock x:Name="TxtResizeOutput" Text="" Foreground="#42A5F5" FontSize="12" Margin="0,0,0,12"/>
-                    <Button Content="Resize &amp; Save &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
+                    <TextBlock x:Name="TxtResizeOutput" Text="" Foreground="#42A5F5" FontSize="12" Margin="0,0,0,8"/>
+                    <Button Content="Resize &amp; Save &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#26A69A"
                             HorizontalAlignment="Center" Cursor="Hand" Click="Resize_Execute"
                             Template="{StaticResource RoundedButton}"/>
                 </StackPanel>
-            </ScrollViewer>
+            </Grid>
         </Grid>
 
         <!-- ====================== 13. PanelCropImage ====================== -->
@@ -916,42 +923,43 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <ScrollViewer x:Name="CropConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
-                    <TextBlock x:Name="TxtCropFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtCropImgSize" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
-
-                    <!-- Large image preview with crop overlay -->
-                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                            Margin="0,0,0,12" ClipToBounds="True">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
-                        </Border.Effect>
-                        <Grid x:Name="CropContainer" MinHeight="350" MaxHeight="450">
-                            <Image x:Name="CropPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                            <Canvas x:Name="CropCanvas" Background="Transparent"
-                                    MouseLeftButtonDown="CropCanvas_MouseDown"
-                                    MouseMove="CropCanvas_MouseMove"
-                                    MouseLeftButtonUp="CropCanvas_MouseUp"/>
-                        </Grid>
-                    </Border>
-
-                    <!-- Crop info + reset -->
-                    <Grid Margin="0,0,0,12">
-                        <TextBlock x:Name="TxtCropInfo" Text="Draw a crop area on the image" Foreground="#888" FontSize="12" VerticalAlignment="Center"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <CheckBox x:Name="ChkCropAspect" Content="Lock ratio" Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,0,12,0"/>
-                            <Button Content="Reset" Width="60" Height="26" FontSize="11" Background="#333" Foreground="#CCC"
-                                    BorderBrush="#444" Cursor="Hand" Click="Crop_Reset"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Button Content="Crop &amp; Save &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#42A5F5"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="Crop_Execute"
-                            Template="{StaticResource RoundedButton}"/>
+            <Grid x:Name="CropConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,8">
+                    <TextBlock x:Name="TxtCropFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Name="TxtCropImgSize" Text="" Foreground="#888" FontSize="12"/>
                 </StackPanel>
-            </ScrollViewer>
+                <Border Grid.Row="1" Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        Margin="0,0,0,8" ClipToBounds="True">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                    </Border.Effect>
+                    <Grid x:Name="CropContainer">
+                        <Image x:Name="CropPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <Canvas x:Name="CropCanvas" Background="Transparent"
+                                MouseLeftButtonDown="CropCanvas_MouseDown"
+                                MouseMove="CropCanvas_MouseMove"
+                                MouseLeftButtonUp="CropCanvas_MouseUp"/>
+                    </Grid>
+                </Border>
+                <Grid Grid.Row="2" Margin="0,0,0,8">
+                    <TextBlock x:Name="TxtCropInfo" Text="Draw a crop area on the image" Foreground="#888" FontSize="12" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <CheckBox x:Name="ChkCropAspect" Content="Lock ratio" Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,0,12,0"/>
+                        <Button Content="Reset" Width="60" Height="26" FontSize="11" Background="#333" Foreground="#CCC"
+                                BorderBrush="#444" Cursor="Hand" Click="Crop_Reset"/>
+                    </StackPanel>
+                </Grid>
+                <Button Grid.Row="3" Content="Crop &amp; Save &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                        FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#42A5F5"
+                        HorizontalAlignment="Center" Cursor="Hand" Click="Crop_Execute"
+                        Template="{StaticResource RoundedButton}"/>
+            </Grid>
         </Grid>
 
         <!-- ====================== 14. PanelRotateFlip ====================== -->
@@ -972,54 +980,47 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <ScrollViewer x:Name="RotateFlipConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
-                    <TextBlock x:Name="TxtRotateFlipFileName" Text="" Foreground="#CCC" FontSize="14"
-                               FontWeight="SemiBold" Margin="0,0,0,12"/>
-
-                    <!-- Live preview area -->
-                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                            Margin="0,0,0,16" ClipToBounds="True" MinHeight="300" MaxHeight="400">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
-                        </Border.Effect>
-                        <Image x:Name="RotateFlipPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
-                               RenderOptions.BitmapScalingMode="HighQuality">
-                            <Image.RenderTransform>
-                                <TransformGroup>
-                                    <ScaleTransform x:Name="RfFlipTransform" ScaleX="1" ScaleY="1"/>
-                                    <RotateTransform x:Name="RfRotateTransform" Angle="0"/>
-                                </TransformGroup>
-                            </Image.RenderTransform>
-                        </Image>
-                    </Border>
-
-                    <!-- Rotation/flip buttons -->
-                    <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <Button Content="&#x21BA; 90&#x00B0;" Width="80" Height="36" Margin="0,0,10,10" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="RotateFlip_CW"/>
-                        <Button Content="&#x21BB; 90&#x00B0;" Width="80" Height="36" Margin="0,0,10,10" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="RotateFlip_CCW"/>
-                        <Button Content="180&#x00B0;" Width="60" Height="36" Margin="0,0,10,10" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="RotateFlip_180"/>
-                        <Button Content="&#x2194; Flip H" Width="80" Height="36" Margin="0,0,10,10" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="RotateFlip_FlipH"/>
-                        <Button Content="&#x2195; Flip V" Width="80" Height="36" Margin="0,0,0,10" FontSize="13"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="RotateFlip_FlipV"/>
-                    </WrapPanel>
-
-                    <!-- Save button -->
-                    <Button Content="Save &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#AB47BC"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="RotateFlip_Execute"
-                            Template="{StaticResource RoundedButton}"/>
-                </StackPanel>
-            </ScrollViewer>
+            <Grid x:Name="RotateFlipConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="TxtRotateFlipFileName" Text="" Foreground="#CCC" FontSize="14"
+                           FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <Border Grid.Row="1" Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        Margin="0,0,0,12" ClipToBounds="True">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                    </Border.Effect>
+                    <Image x:Name="RotateFlipPreview" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
+                           RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="RfFlipTransform" ScaleX="1" ScaleY="1"/>
+                                <RotateTransform x:Name="RfRotateTransform" Angle="0"/>
+                            </TransformGroup>
+                        </Image.RenderTransform>
+                    </Image>
+                </Border>
+                <WrapPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <Button Content="&#x21BA; 90&#x00B0;" Width="80" Height="36" Margin="0,0,10,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateFlip_CW"/>
+                    <Button Content="&#x21BB; 90&#x00B0;" Width="80" Height="36" Margin="0,0,10,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateFlip_CCW"/>
+                    <Button Content="180&#x00B0;" Width="60" Height="36" Margin="0,0,10,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateFlip_180"/>
+                    <Button Content="&#x2194; Flip H" Width="80" Height="36" Margin="0,0,10,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateFlip_FlipH"/>
+                    <Button Content="&#x2195; Flip V" Width="80" Height="36" Margin="0,0,0,6" FontSize="13"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateFlip_FlipV"/>
+                </WrapPanel>
+                <Button Grid.Row="3" Content="Save &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                        FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#AB47BC"
+                        HorizontalAlignment="Center" Cursor="Hand" Click="RotateFlip_Execute"
+                        Template="{StaticResource RoundedButton}"/>
+            </Grid>
         </Grid>
 
         <!-- ====================== 15. PanelConvertFormat ====================== -->
@@ -1040,18 +1041,25 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <ScrollViewer x:Name="ConvertConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,20" MaxWidth="600" HorizontalAlignment="Center">
+            <Grid x:Name="ConvertConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,8">
                     <TextBlock x:Name="TxtConvertFileName" Text="" Foreground="#CCC" FontSize="14"
-                               FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="TxtConvertInfo" Text="" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
-                    <Border Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                            Margin="0,0,0,12" MinHeight="200" MaxHeight="300">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
-                        </Border.Effect>
-                        <Image x:Name="ConvertPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    </Border>
+                               FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Name="TxtConvertInfo" Text="" Foreground="#888" FontSize="12"/>
+                </StackPanel>
+                <Border Grid.Row="1" Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        Margin="0,0,0,8">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                    </Border.Effect>
+                    <Image x:Name="ConvertPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Border>
+                <StackPanel Grid.Row="2">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -1080,12 +1088,12 @@
                         <TextBlock x:Name="TxtConvertQualityVal" Grid.Column="2" Text="90" Foreground="#AAA" FontSize="13"
                                    Width="30" VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </Grid>
-                    <Button Content="Convert &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
+                    <Button Content="Convert &#x2192;" Width="280" Height="50" Margin="0,8,0,12"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#EC407A"
                             HorizontalAlignment="Center" Cursor="Hand" Click="Convert_Execute"
                             Template="{StaticResource RoundedButton}"/>
                 </StackPanel>
-            </ScrollViewer>
+            </Grid>
         </Grid>
 
         <!-- ====================== 16. PanelCompressOffice ====================== -->
