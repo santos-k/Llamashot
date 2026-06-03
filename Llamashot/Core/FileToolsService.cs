@@ -613,6 +613,93 @@ public static class FileToolsService
         }
     }
 
+    public static async Task ExtractPdfPagesAsync(string pdfPath, int[] pageNumbers, string outputPath, IProgress<int>? progress = null)
+    {
+        string tempDir = CreateTempDir("extract");
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+
+            int totalPages = pageNumbers.Length;
+            var tempImages = new List<string>();
+
+            for (int i = 0; i < totalPages; i++)
+            {
+                uint pageIndex = (uint)(pageNumbers[i] - 1);
+                using var page = pdfDoc.GetPage(pageIndex);
+                var bmp = await RenderPdfPageAsync(page);
+
+                string tempFile = Path.Combine(tempDir, $"page_{i:D5}.jpg");
+                await Task.Run(() =>
+                {
+                    var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+                    encoder.Frames.Add(BitmapFrame.Create(bmp));
+                    using var fs = new FileStream(tempFile, FileMode.Create);
+                    encoder.Save(fs);
+                });
+                tempImages.Add(tempFile);
+
+                progress?.Report((i + 1) * 50 / totalPages);
+            }
+
+            var imgProgress = new Progress<int>(v => progress?.Report(50 + v / 2));
+            await ImagesToPdfAsync(tempImages.ToArray(), outputPath, imgProgress);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { }
+        }
+    }
+
+    public static async Task InsertPdfPagesAsync(string basePdfPath, string[] insertImagePaths, int afterPage, string outputPath, IProgress<int>? progress = null)
+    {
+        string tempDir = CreateTempDir("insert");
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(basePdfPath);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            uint pageCount = pdfDoc.PageCount;
+
+            var tempImages = new List<string>();
+
+            for (uint i = 0; i < pageCount; i++)
+            {
+                using var page = pdfDoc.GetPage(i);
+                var bmp = await RenderPdfPageAsync(page);
+
+                string tempFile = Path.Combine(tempDir, $"page_{i:D5}.jpg");
+                await Task.Run(() =>
+                {
+                    var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+                    encoder.Frames.Add(BitmapFrame.Create(bmp));
+                    using var fs = new FileStream(tempFile, FileMode.Create);
+                    encoder.Save(fs);
+                });
+                tempImages.Add(tempFile);
+
+                progress?.Report((int)((i + 1) * 40 / pageCount));
+            }
+
+            // Build ordered list: base pages 1..afterPage, then insert images, then remaining base pages
+            var allImages = new List<string>();
+            for (int i = 0; i < afterPage; i++)
+                allImages.Add(tempImages[i]);
+
+            allImages.AddRange(insertImagePaths);
+
+            for (int i = afterPage; i < tempImages.Count; i++)
+                allImages.Add(tempImages[i]);
+
+            var imgProgress = new Progress<int>(v => progress?.Report(40 + v * 60 / 100));
+            await ImagesToPdfAsync(allImages.ToArray(), outputPath, imgProgress);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { }
+        }
+    }
+
     public static bool IsImageExtension(string ext) =>
         ext.ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".gif" or ".tiff" or ".tif" or ".webp" or ".ico";
 

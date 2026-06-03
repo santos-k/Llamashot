@@ -31,6 +31,8 @@ public partial class FileToolsWindow : Window
         ("rotate_pdf",     "Rotate PDF",      "Rotate PDF pages",                   "#FFA726"),
         ("watermark",      "Watermark PDF",   "Add text watermark",                 "#7E57C2"),
         ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                 "#5C6BC0"),
+        ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",       "#FF8A65"),
+        ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",             "#A1887F"),
         ("compress_image", "Compress Image",  "Reduce image file size",             "#26C6DA"),
         ("resize_image",   "Resize Image",    "Change dimensions",                  "#26A69A"),
         ("crop_image",     "Crop Image",      "Crop to selection",                  "#42A5F5"),
@@ -64,6 +66,7 @@ public partial class FileToolsWindow : Window
     private readonly ObservableCollection<FileItem> _imgToPdfFiles = new();
     private readonly ObservableCollection<FileItem> _compressImgFiles = new();
     private readonly ObservableCollection<FileItem> _compressOfficeFiles = new();
+    private readonly ObservableCollection<FileItem> _insertImages = new();
 
     // =====================================================================
     //  Single-file tool paths
@@ -75,6 +78,9 @@ public partial class FileToolsWindow : Window
     private string? _rotatePdfPath;
     private string? _watermarkPdfPath;
     private string? _pageNumPdfPath;
+    private string? _extractPdfPath;
+    private string? _insertBasePath;
+    private double _rpAngle = 0;
 
     // =====================================================================
     //  Crop state
@@ -139,6 +145,7 @@ public partial class FileToolsWindow : Window
         ImgToPdfList.ItemsSource = _imgToPdfFiles;
         CompressImgList.ItemsSource = _compressImgFiles;
         CompressOfficeList.ItemsSource = _compressOfficeFiles;
+        InsertImageList.ItemsSource = _insertImages;
     }
 
     // =====================================================================
@@ -204,6 +211,8 @@ public partial class FileToolsWindow : Window
         _toolPanels["rotate_pdf"] = PanelRotatePdf;
         _toolPanels["watermark"] = PanelWatermark;
         _toolPanels["page_numbers"] = PanelPageNumbers;
+        _toolPanels["extract_pages"] = PanelExtractPages;
+        _toolPanels["insert_pages"] = PanelInsertPages;
         _toolPanels["compress_image"] = PanelCompressImage;
         _toolPanels["resize_image"] = PanelResizeImage;
         _toolPanels["crop_image"] = PanelCropImage;
@@ -219,6 +228,8 @@ public partial class FileToolsWindow : Window
         _selectViews["rotate_pdf"] = RotatePdfSelectView;
         _selectViews["watermark"] = WatermarkSelectView;
         _selectViews["page_numbers"] = PageNumSelectView;
+        _selectViews["extract_pages"] = ExtractSelectView;
+        _selectViews["insert_pages"] = InsertSelectView;
         _selectViews["compress_image"] = CompressImgSelectView;
         _selectViews["resize_image"] = ResizeSelectView;
         _selectViews["crop_image"] = CropSelectView;
@@ -234,6 +245,8 @@ public partial class FileToolsWindow : Window
         _configViews["rotate_pdf"] = RotatePdfConfigView;
         _configViews["watermark"] = WatermarkConfigView;
         _configViews["page_numbers"] = PageNumConfigView;
+        _configViews["extract_pages"] = ExtractConfigView;
+        _configViews["insert_pages"] = InsertConfigView;
         _configViews["compress_image"] = CompressImgConfigView;
         _configViews["resize_image"] = ResizeConfigView;
         _configViews["crop_image"] = CropConfigView;
@@ -358,6 +371,14 @@ public partial class FileToolsWindow : Window
         _resizeSourcePath = null;
         _rotateFlipSourcePath = null;
         _convertSourcePath = null;
+        _extractPdfPath = null;
+        _insertBasePath = null;
+        _insertImages.Clear();
+
+        // Reset rotate PDF preview
+        _rpAngle = 0;
+        RotatePdfPreview.Source = null;
+        RpRotateTransform.Angle = 0;
 
         // Reset crop
         ClearCropVisuals();
@@ -880,7 +901,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  6. Rotate PDF
+    //  6. Rotate PDF (live preview)
     // =====================================================================
 
     private async void RotatePdf_SelectFiles(object sender, RoutedEventArgs e)
@@ -910,36 +931,75 @@ public partial class FileToolsWindow : Window
         {
             TxtRotatePdfInfo.Text = "";
         }
+        await LoadRotatePdfPreview(path);
+        _rpAngle = 0;
+        RpRotateTransform.Angle = 0;
         ShowConfigState("rotate_pdf");
     }
 
-    private async void RotatePdf_CW(object sender, RoutedEventArgs e) => await DoRotatePdf(90);
-    private async void RotatePdf_CCW(object sender, RoutedEventArgs e) => await DoRotatePdf(270);
-    private async void RotatePdf_180(object sender, RoutedEventArgs e) => await DoRotatePdf(180);
-
-    private async Task DoRotatePdf(int degrees)
+    private async Task LoadRotatePdfPreview(string pdfPath)
     {
-        if (_rotatePdfPath == null) return;
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            using var page = pdfDoc.GetPage(0);
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            var options = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 400 };
+            await page.RenderToStreamAsync(stream, options);
+            stream.Seek(0);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.StreamSource = stream.AsStreamForRead();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            RotatePdfPreview.Source = bmp;
+        }
+        catch { }
+    }
+
+    private void RotatePdf_CW(object sender, RoutedEventArgs e)
+    {
+        _rpAngle = (_rpAngle + 90) % 360;
+        RpRotateTransform.Angle = _rpAngle;
+    }
+
+    private void RotatePdf_CCW(object sender, RoutedEventArgs e)
+    {
+        _rpAngle = (_rpAngle + 270) % 360;
+        RpRotateTransform.Angle = _rpAngle;
+    }
+
+    private void RotatePdf_180(object sender, RoutedEventArgs e)
+    {
+        _rpAngle = (_rpAngle + 180) % 360;
+        RpRotateTransform.Angle = _rpAngle;
+    }
+
+    private async void RotatePdf_Execute(object sender, RoutedEventArgs e)
+    {
+        if (_rotatePdfPath == null || _rpAngle == 0) return;
 
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "PDF|*.pdf",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotatePdfPath) + $"_rot{degrees}.pdf"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotatePdfPath) + "_rotated.pdf"
         };
         if (dlg.ShowDialog() != true) return;
 
-        ShowProcessing($"Rotating PDF {degrees}\u00B0...");
+        ShowProcessing("Rotating PDF...");
         try
         {
-            await FileToolsService.RotatePdfAsync(_rotatePdfPath, dlg.FileName, degrees, CreateProgress());
+            await FileToolsService.RotatePdfAsync(_rotatePdfPath, dlg.FileName, (int)_rpAngle, CreateProgress());
             var info = new FileInfo(dlg.FileName);
-            ShowComplete("PDF rotated successfully!",
+            ShowComplete("PDF rotated!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
                 dlg.FileName);
         }
         catch (Exception ex)
         {
-            FadeOut(ProcessingOverlay);
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
             System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -1071,7 +1131,192 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  9. Compress Image
+    //  9. Extract Pages
+    // =====================================================================
+
+    private async void Extract_SelectFiles(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf" };
+        if (dlg.ShowDialog() != true) return;
+        await LoadExtractPdf(dlg.FileName);
+    }
+
+    private async void Extract_SelectDrop(object sender, DragEventArgs e)
+    {
+        var files = GetDroppedFiles(e, IsPdfFile);
+        if (files.Length > 0) await LoadExtractPdf(files[0]);
+    }
+
+    private async Task LoadExtractPdf(string path)
+    {
+        _extractPdfPath = path;
+        TxtExtractFileName.Text = System.IO.Path.GetFileName(path);
+        try
+        {
+            int pages = await FileToolsService.GetPdfPageCountAsync(path);
+            TxtExtractInfo.Text = $"Pages: {pages}";
+            TxtExtractPages.Text = "";
+        }
+        catch { TxtExtractInfo.Text = ""; }
+        ShowConfigState("extract_pages");
+    }
+
+    private async void Extract_Execute(object sender, RoutedEventArgs e)
+    {
+        if (_extractPdfPath == null || string.IsNullOrWhiteSpace(TxtExtractPages.Text)) return;
+
+        var pageNumbers = ParsePageNumbers(TxtExtractPages.Text.Trim());
+        if (pageNumbers.Length == 0)
+        {
+            System.Windows.MessageBox.Show("Enter valid page numbers.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "PDF|*.pdf",
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_extractPdfPath) + "_extracted.pdf"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        ShowProcessing("Extracting pages...");
+        try
+        {
+            await FileToolsService.ExtractPdfPagesAsync(_extractPdfPath, pageNumbers, dlg.FileName, CreateProgress());
+            var info = new FileInfo(dlg.FileName);
+            ShowComplete("Pages extracted!",
+                $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {pageNumbers.Length} pages \u2014 {FileToolsService.FormatFileSize(info.Length)}",
+                dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
+            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static int[] ParsePageNumbers(string input)
+    {
+        var result = new List<int>();
+        foreach (var part in input.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (part.Contains('-'))
+            {
+                var range = part.Split('-');
+                if (range.Length == 2 && int.TryParse(range[0].Trim(), out int from) && int.TryParse(range[1].Trim(), out int to))
+                    for (int i = from; i <= to; i++) result.Add(i);
+            }
+            else if (int.TryParse(part.Trim(), out int num))
+                result.Add(num);
+        }
+        return result.Distinct().OrderBy(x => x).ToArray();
+    }
+
+    // =====================================================================
+    //  10. Insert Pages
+    // =====================================================================
+
+    private async void Insert_SelectBase(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf" };
+        if (dlg.ShowDialog() != true) return;
+        _insertBasePath = dlg.FileName;
+        TxtInsertBaseName.Text = System.IO.Path.GetFileName(dlg.FileName);
+        try
+        {
+            int pages = await FileToolsService.GetPdfPageCountAsync(dlg.FileName);
+            TxtInsertBaseInfo.Text = $"Pages: {pages}";
+            TxtInsertAfterPage.Text = pages.ToString();
+        }
+        catch { TxtInsertBaseInfo.Text = ""; }
+        ShowConfigState("insert_pages");
+    }
+
+    private void Insert_SelectDrop(object sender, DragEventArgs e)
+    {
+        var files = GetDroppedFiles(e, IsPdfFile);
+        if (files.Length > 0)
+        {
+            _insertBasePath = files[0];
+            TxtInsertBaseName.Text = System.IO.Path.GetFileName(files[0]);
+            _ = LoadInsertBaseInfoAsync(files[0]);
+            ShowConfigState("insert_pages");
+        }
+    }
+
+    private async Task LoadInsertBaseInfoAsync(string path)
+    {
+        try
+        {
+            int pages = await FileToolsService.GetPdfPageCountAsync(path);
+            TxtInsertBaseInfo.Text = $"Pages: {pages}";
+            TxtInsertAfterPage.Text = pages.ToString();
+        }
+        catch { TxtInsertBaseInfo.Text = ""; }
+    }
+
+    private void Insert_BrowseImages(object sender, MouseButtonEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tiff;*.webp",
+            Multiselect = true
+        };
+        if (dlg.ShowDialog() == true)
+            AddFilesToList(_insertImages, dlg.FileNames);
+    }
+
+    private void Insert_ImageDrop(object sender, DragEventArgs e)
+    {
+        var files = GetDroppedFiles(e, IsImageFile);
+        if (files.Length > 0) AddFilesToList(_insertImages, files);
+    }
+
+    private void Insert_RemoveImage(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string path)
+        {
+            var item = _insertImages.FirstOrDefault(f => f.FilePath == path);
+            if (item != null) _insertImages.Remove(item);
+            RenumberList(_insertImages);
+        }
+    }
+
+    private async void Insert_Execute(object sender, RoutedEventArgs e)
+    {
+        if (_insertBasePath == null || _insertImages.Count == 0) return;
+        if (!int.TryParse(TxtInsertAfterPage.Text, out int afterPage))
+        {
+            System.Windows.MessageBox.Show("Enter a valid page number.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "PDF|*.pdf",
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_insertBasePath) + "_with_inserts.pdf"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        ShowProcessing("Inserting pages...");
+        try
+        {
+            var imagePaths = _insertImages.Select(f => f.FilePath).ToArray();
+            await FileToolsService.InsertPdfPagesAsync(_insertBasePath, imagePaths, afterPage, dlg.FileName, CreateProgress());
+            var info = new FileInfo(dlg.FileName);
+            ShowComplete("Pages inserted!",
+                $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
+                dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
+            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // =====================================================================
+    //  11. Compress Image
     // =====================================================================
 
     private void CompressImg_SelectFiles(object sender, RoutedEventArgs e)
@@ -1155,7 +1400,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  10. Resize Image
+    //  12. Resize Image
     // =====================================================================
 
     private void Resize_SelectFiles(object sender, RoutedEventArgs e)
@@ -1256,7 +1501,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  11. Crop Image
+    //  13. Crop Image
     // =====================================================================
 
     private void Crop_SelectFiles(object sender, RoutedEventArgs e)
@@ -1621,7 +1866,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  12. Rotate & Flip (Image)
+    //  14. Rotate & Flip (Image)
     // =====================================================================
 
     private void RotateFlip_SelectFiles(object sender, RoutedEventArgs e)
@@ -1744,7 +1989,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  13. Convert Format
+    //  15. Convert Format
     // =====================================================================
 
     private void Convert_SelectFiles(object sender, RoutedEventArgs e)
@@ -1828,7 +2073,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  14. Compress Office
+    //  16. Compress Office
     // =====================================================================
 
     private void CompressOffice_SelectFiles(object sender, RoutedEventArgs e)
