@@ -254,6 +254,7 @@ public partial class App : Application
         menu.Items.Add("Delayed Capture...", null, (s, e) => ShowDelayedCapture());
         menu.Items.Add("Fullscreen to Clipboard", null, (s, e) => FullscreenClipboard());
         menu.Items.Add("-");
+        menu.Items.Add("File Tools", null, (s, e) => ShowFileTools());
         menu.Items.Add("History", null, (s, e) => ShowHistory());
         menu.Items.Add("Settings", null, (s, e) => ShowSettings());
         menu.Items.Add("About", null, (s, e) => ShowAbout());
@@ -392,6 +393,19 @@ public partial class App : Application
         Dispatcher.Invoke(() =>
         {
             var window = new HistoryWindow();
+            window.Show();
+            window.Topmost = true;
+            window.Activate();
+            window.Focus();
+            window.Topmost = false;
+        });
+    }
+
+    private void ShowFileTools()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var window = new FileToolsWindow();
             window.Show();
             window.Topmost = true;
             window.Activate();
