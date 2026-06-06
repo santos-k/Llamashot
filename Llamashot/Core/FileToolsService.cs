@@ -807,7 +807,7 @@ public static class FileToolsService
     public static async Task CropVideoAsync(string inputPath, string outputPath, int cropW, int cropH, int cropX, int cropY, IProgress<int>? progress = null)
     {
         var info = await GetVideoInfoAsync(inputPath);
-        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"crop={cropW}:{cropH}:{cropX}:{cropY}\" -c:a copy \"{outputPath}\"", info.duration, progress);
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"crop={cropW}:{cropH}:{cropX}:{cropY}\" -c:v libx264 -crf 18 -preset fast -c:a aac \"{outputPath}\"", info.duration, progress);
     }
 
     public static async Task RotateVideoAsync(string inputPath, string outputPath, int degrees, IProgress<int>? progress = null)
@@ -820,14 +820,14 @@ public static class FileToolsService
             270 => "transpose=2",
             _ => throw new ArgumentException($"Unsupported rotation: {degrees}")
         };
-        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"{filter}\" -c:a copy \"{outputPath}\"", info.duration, progress);
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"{filter}\" -c:v libx264 -crf 18 -preset fast -c:a aac \"{outputPath}\"", info.duration, progress);
     }
 
     public static async Task FlipVideoAsync(string inputPath, string outputPath, bool horizontal, IProgress<int>? progress = null)
     {
         var info = await GetVideoInfoAsync(inputPath);
         string filter = horizontal ? "hflip" : "vflip";
-        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"{filter}\" -c:a copy \"{outputPath}\"", info.duration, progress);
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"{filter}\" -c:v libx264 -crf 18 -preset fast -c:a aac \"{outputPath}\"", info.duration, progress);
     }
 
     public static async Task ExtractAudioAsync(string inputPath, string outputPath, IProgress<int>? progress = null)
@@ -843,6 +843,41 @@ public static class FileToolsService
             _ => "-acodec libmp3lame -q:a 2"
         };
         await RunFFmpegAsync($"-i \"{inputPath}\" -vn {codec} \"{outputPath}\"", info.duration, progress);
+    }
+
+    public static async Task ExportVideoAsync(string inputPath, string outputPath,
+        TimeSpan? trimStart, TimeSpan? trimEnd,
+        int rotateDegrees, bool flipH, bool flipV,
+        int cropW, int cropH, int cropX, int cropY, int origW, int origH,
+        IProgress<int>? progress = null)
+    {
+        var filters = new List<string>();
+
+        if (cropW > 0 && cropH > 0 && (cropW != origW || cropH != origH || cropX != 0 || cropY != 0))
+            filters.Add($"crop={cropW}:{cropH}:{cropX}:{cropY}");
+        if (rotateDegrees == 90) filters.Add("transpose=1");
+        else if (rotateDegrees == 180) { filters.Add("transpose=1"); filters.Add("transpose=1"); }
+        else if (rotateDegrees == 270) filters.Add("transpose=2");
+        if (flipH) filters.Add("hflip");
+        if (flipV) filters.Add("vflip");
+
+        string trimArgs = "";
+        TimeSpan duration = TimeSpan.Zero;
+        if (trimStart.HasValue && trimEnd.HasValue && trimEnd.Value > trimStart.Value)
+        {
+            trimArgs = $"-ss {trimStart.Value:hh\\:mm\\:ss\\.ff} -to {trimEnd.Value:hh\\:mm\\:ss\\.ff}";
+            duration = trimEnd.Value - trimStart.Value;
+        }
+        else
+        {
+            var info = await GetVideoInfoAsync(inputPath);
+            duration = info.duration;
+        }
+
+        string filterArg = filters.Count > 0 ? $"-vf \"{string.Join(",", filters)}\"" : "";
+        string codecArgs = filters.Count > 0 ? "-c:v libx264 -crf 18 -preset fast -c:a aac" : "-c copy";
+
+        await RunFFmpegAsync($"{trimArgs} -i \"{inputPath}\" {filterArg} {codecArgs} \"{outputPath}\"", duration, progress);
     }
 
     public static bool IsVideoExtension(string ext) =>

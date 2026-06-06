@@ -2765,70 +2765,31 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Exporting video...");
         try
         {
-            string currentFile = _videoToolsPath;
-            string? tempFile = null;
-
-            // Step 1: Trim (if needed)
-            if (TimeSpan.TryParse(TxtTrimStart.Text.Trim(), out var trimStart) &&
-                TimeSpan.TryParse(TxtTrimEnd.Text.Trim(), out var trimEnd) && trimEnd > trimStart &&
-                (trimStart > TimeSpan.Zero || trimEnd < _videoDuration))
+            // Determine trim
+            TimeSpan? trimStart = null, trimEnd = null;
+            if (TimeSpan.TryParse(TxtTrimStart.Text.Trim(), out var ts) &&
+                TimeSpan.TryParse(TxtTrimEnd.Text.Trim(), out var te) && te > ts &&
+                (ts > TimeSpan.Zero || te < _videoDuration - TimeSpan.FromSeconds(0.5)))
             {
-                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
-                await FileToolsService.TrimVideoAsync(currentFile, tempFile, trimStart, trimEnd, CreateProgress());
-                if (currentFile != _videoToolsPath) File.Delete(currentFile);
-                currentFile = tempFile;
+                trimStart = ts;
+                trimEnd = te;
             }
 
-            // Step 2: Rotate (if needed)
-            if (_videoAngle != 0)
-            {
-                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
-                await FileToolsService.RotateVideoAsync(currentFile, tempFile, (int)_videoAngle, CreateProgress());
-                if (currentFile != _videoToolsPath) File.Delete(currentFile);
-                currentFile = tempFile;
-            }
+            // Determine crop
+            int.TryParse(TxtCropVideoW.Text, out int cw);
+            int.TryParse(TxtCropVideoH.Text, out int ch);
+            int.TryParse(TxtCropVideoX.Text, out int cx);
+            int.TryParse(TxtCropVideoY.Text, out int cy);
 
-            // Step 3: Flip H (if needed)
-            if (_videoFlipH)
-            {
-                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
-                await FileToolsService.FlipVideoAsync(currentFile, tempFile, true, CreateProgress());
-                if (currentFile != _videoToolsPath) File.Delete(currentFile);
-                currentFile = tempFile;
-            }
+            // Single-pass export with all operations combined
+            await FileToolsService.ExportVideoAsync(
+                _videoToolsPath, dlg.FileName,
+                trimStart, trimEnd,
+                (int)_videoAngle, _videoFlipH, _videoFlipV,
+                cw, ch, cx, cy, _videoW, _videoH,
+                CreateProgress());
 
-            // Step 4: Flip V (if needed)
-            if (_videoFlipV)
-            {
-                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
-                await FileToolsService.FlipVideoAsync(currentFile, tempFile, false, CreateProgress());
-                if (currentFile != _videoToolsPath) File.Delete(currentFile);
-                currentFile = tempFile;
-            }
-
-            // Step 5: Crop (if needed)
-            if (int.TryParse(TxtCropVideoW.Text, out int cw) && int.TryParse(TxtCropVideoH.Text, out int ch) &&
-                int.TryParse(TxtCropVideoX.Text, out int cx) && int.TryParse(TxtCropVideoY.Text, out int cy) &&
-                (cw != _videoW || ch != _videoH || cx != 0 || cy != 0))
-            {
-                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
-                await FileToolsService.CropVideoAsync(currentFile, tempFile, cw, ch, cx, cy, CreateProgress());
-                if (currentFile != _videoToolsPath) File.Delete(currentFile);
-                currentFile = tempFile;
-            }
-
-            // Final: copy to output
-            if (currentFile != _videoToolsPath)
-            {
-                File.Copy(currentFile, dlg.FileName, true);
-                File.Delete(currentFile);
-            }
-            else
-            {
-                File.Copy(currentFile, dlg.FileName, true);
-            }
-
-            // Step 6: Extract audio (if checked)
+            // Extract audio (if checked)
             string? audioPath = null;
             if (ChkExtractAudio.IsChecked == true)
             {
