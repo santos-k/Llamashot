@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -699,6 +701,155 @@ public static class FileToolsService
             try { Directory.Delete(tempDir, true); } catch { }
         }
     }
+
+    public static bool IsFFmpegAvailable()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("ffmpeg", "-version")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit(3000);
+            return proc?.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
+    public static async Task<(TimeSpan duration, int width, int height, string codec)> GetVideoInfoAsync(string path)
+    {
+        return await Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo("ffprobe",
+                $"-v error -select_streams v:0 -show_entries stream=width,height,codec_name -show_entries format=duration -of csv=p=0:s=, \"{path}\"")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+            string output = proc.StandardOutput.ReadToEnd().Trim();
+            proc.WaitForExit(10000);
+
+            // Output format: "width,height,codec\nduration"
+            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            int width = 0, height = 0;
+            string codec = "unknown";
+            double durationSec = 0;
+
+            if (lines.Length >= 1)
+            {
+                var parts = lines[0].Split(',');
+                if (parts.Length >= 1) int.TryParse(parts[0].Trim(), out width);
+                if (parts.Length >= 2) int.TryParse(parts[1].Trim(), out height);
+                if (parts.Length >= 3) codec = parts[2].Trim();
+            }
+            if (lines.Length >= 2)
+                double.TryParse(lines[1].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out durationSec);
+
+            return (TimeSpan.FromSeconds(durationSec), width, height, codec);
+        });
+    }
+
+    private static async Task RunFFmpegAsync(string arguments, TimeSpan? totalDuration = null, IProgress<int>? progress = null)
+    {
+        await Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo("ffmpeg", $"-y {arguments}")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+
+            // Read stderr for progress (FFmpeg outputs progress to stderr)
+            double totalMs = totalDuration?.TotalMilliseconds ?? 0;
+            var stderr = new StringBuilder();
+
+            proc.ErrorDataReceived += (s, e) =>
+            {
+                if (e.Data == null) return;
+                stderr.AppendLine(e.Data);
+                if (totalMs > 0 && progress != null && e.Data.Contains("time="))
+                {
+                    // Parse "time=HH:MM:SS.ff"
+                    var match = Regex.Match(e.Data, @"time=(\d+):(\d+):(\d+)\.(\d+)");
+                    if (match.Success)
+                    {
+                        int h = int.Parse(match.Groups[1].Value);
+                        int m = int.Parse(match.Groups[2].Value);
+                        int sec = int.Parse(match.Groups[3].Value);
+                        double currentMs = (h * 3600 + m * 60 + sec) * 1000;
+                        int pct = Math.Min(99, (int)(currentMs * 100 / totalMs));
+                        progress.Report(pct);
+                    }
+                }
+            };
+            proc.BeginErrorReadLine();
+            proc.WaitForExit();
+
+            if (proc.ExitCode != 0)
+                throw new Exception($"FFmpeg failed (exit code {proc.ExitCode})");
+
+            progress?.Report(100);
+        });
+    }
+
+    public static async Task TrimVideoAsync(string inputPath, string outputPath, TimeSpan start, TimeSpan end, IProgress<int>? progress = null)
+    {
+        string startStr = start.ToString(@"hh\:mm\:ss\.ff");
+        string endStr = end.ToString(@"hh\:mm\:ss\.ff");
+        var duration = end - start;
+        await RunFFmpegAsync($"-i \"{inputPath}\" -ss {startStr} -to {endStr} -c copy \"{outputPath}\"", duration, progress);
+    }
+
+    public static async Task CropVideoAsync(string inputPath, string outputPath, int cropW, int cropH, int cropX, int cropY, IProgress<int>? progress = null)
+    {
+        var info = await GetVideoInfoAsync(inputPath);
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"crop={cropW}:{cropH}:{cropX}:{cropY}\" -c:a copy \"{outputPath}\"", info.duration, progress);
+    }
+
+    public static async Task RotateVideoAsync(string inputPath, string outputPath, int degrees, IProgress<int>? progress = null)
+    {
+        var info = await GetVideoInfoAsync(inputPath);
+        string filter = degrees switch
+        {
+            90 => "transpose=1",
+            180 => "transpose=1,transpose=1",
+            270 => "transpose=2",
+            _ => throw new ArgumentException($"Unsupported rotation: {degrees}")
+        };
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"{filter}\" -c:a copy \"{outputPath}\"", info.duration, progress);
+    }
+
+    public static async Task FlipVideoAsync(string inputPath, string outputPath, bool horizontal, IProgress<int>? progress = null)
+    {
+        var info = await GetVideoInfoAsync(inputPath);
+        string filter = horizontal ? "hflip" : "vflip";
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vf \"{filter}\" -c:a copy \"{outputPath}\"", info.duration, progress);
+    }
+
+    public static async Task ExtractAudioAsync(string inputPath, string outputPath, IProgress<int>? progress = null)
+    {
+        var info = await GetVideoInfoAsync(inputPath);
+        string ext = Path.GetExtension(outputPath).ToLowerInvariant();
+        string codec = ext switch
+        {
+            ".mp3" => "-acodec libmp3lame -q:a 2",
+            ".wav" => "",
+            ".aac" => "-acodec aac",
+            ".flac" => "-acodec flac",
+            _ => "-acodec libmp3lame -q:a 2"
+        };
+        await RunFFmpegAsync($"-i \"{inputPath}\" -vn {codec} \"{outputPath}\"", info.duration, progress);
+    }
+
+    public static bool IsVideoExtension(string ext) =>
+        ext.ToLowerInvariant() is ".mp4" or ".avi" or ".mov" or ".mkv" or ".wmv" or ".webm" or ".m4v" or ".flv" or ".3gp" or ".mpeg" or ".mpg";
+
+    public static string FormatTimeSpan(TimeSpan ts) =>
+        ts.TotalHours >= 1 ? ts.ToString(@"h\:mm\:ss") : ts.ToString(@"m\:ss");
 
     public static bool IsImageExtension(string ext) =>
         ext.ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".gif" or ".tiff" or ".tif" or ".webp" or ".ico";
