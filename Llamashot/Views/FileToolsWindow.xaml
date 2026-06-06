@@ -1202,119 +1202,169 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <Grid x:Name="VideoConfigView" Visibility="Collapsed" Margin="24,12">
+            <Grid x:Name="VideoConfigView" Visibility="Collapsed" Margin="16,8">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>   <!-- File info -->
+                    <RowDefinition Height="*"/>      <!-- Video preview -->
+                    <RowDefinition Height="Auto"/>   <!-- Playback controls + timeline -->
+                    <RowDefinition Height="Auto"/>   <!-- Trim markers -->
+                    <RowDefinition Height="Auto"/>   <!-- Tool bar -->
+                    <RowDefinition Height="Auto"/>   <!-- Export -->
                 </Grid.RowDefinitions>
 
-                <!-- Video info -->
-                <StackPanel Margin="0,0,0,8">
-                    <TextBlock x:Name="TxtVideoFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <!-- Row 0: File info -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock x:Name="TxtVideoFileName" Text="" Foreground="#CCC" FontSize="13" FontWeight="SemiBold" Margin="0,0,12,0"/>
                     <TextBlock x:Name="TxtVideoInfo" Text="" Foreground="#888" FontSize="12"/>
                 </StackPanel>
 
-                <!-- Operation tabs -->
-                <WrapPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,4,0,16">
-                    <Button x:Name="VideoOpTrim" Content="Trim" Width="90" Height="34" Margin="4" FontSize="13"
-                            Background="#42A5F5" Foreground="White" BorderThickness="0" Cursor="Hand" Click="VideoOp_Click"/>
-                    <Button x:Name="VideoOpCrop" Content="Crop" Width="90" Height="34" Margin="4" FontSize="13"
-                            Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="VideoOp_Click"/>
-                    <Button x:Name="VideoOpRotate" Content="Rotate/Flip" Width="100" Height="34" Margin="4" FontSize="13"
-                            Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="VideoOp_Click"/>
-                    <Button x:Name="VideoOpAudio" Content="Extract Audio" Width="110" Height="34" Margin="4" FontSize="13"
-                            Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="VideoOp_Click"/>
-                </WrapPanel>
+                <!-- Row 1: Video preview with rotate/flip transforms -->
+                <Border Grid.Row="1" Background="#000" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        ClipToBounds="True" Margin="0,0,0,6">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                    </Border.Effect>
+                    <MediaElement x:Name="VideoPreview" LoadedBehavior="Manual" UnloadedBehavior="Stop"
+                                  Stretch="Uniform" MediaOpened="VideoPreview_MediaOpened"
+                                  MediaEnded="VideoPreview_MediaEnded"
+                                  RenderTransformOrigin="0.5,0.5">
+                        <MediaElement.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="VideoFlipTransform" ScaleX="1" ScaleY="1"/>
+                                <RotateTransform x:Name="VideoRotateTransform" Angle="0"/>
+                            </TransformGroup>
+                        </MediaElement.RenderTransform>
+                    </MediaElement>
+                </Border>
 
-                <!-- Trim panel -->
-                <StackPanel x:Name="VideoOpTrimPanel" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="120"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Start:" Foreground="#CCC" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <TextBox x:Name="TxtTrimStart" Grid.Column="1" Height="32" Padding="8,4" FontSize="14"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="00:00:00"/>
-                        <TextBlock Text="End:" Grid.Column="2" Foreground="#CCC" FontSize="14" VerticalAlignment="Center" Margin="20,0,10,0"/>
-                        <TextBox x:Name="TxtTrimEnd" Grid.Column="3" Height="32" Padding="8,4" FontSize="14"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="00:00:00"/>
+                <!-- Row 2: Playback controls -->
+                <Grid Grid.Row="2" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BtnVideoPlay" Content="&#x25B6;" FontSize="18" Width="36" Height="36"
+                            Background="Transparent" Foreground="White" BorderThickness="0" Cursor="Hand"
+                            Click="VideoPlay_Click" VerticalAlignment="Center"/>
+                    <!-- Seek bar -->
+                    <Grid x:Name="VideoSeekContainer" Grid.Column="1" Height="24" Background="Transparent"
+                          Cursor="Hand" Margin="10,0"
+                          MouseLeftButtonDown="VideoSeek_MouseDown" MouseMove="VideoSeek_MouseMove"
+                          MouseLeftButtonUp="VideoSeek_MouseUp" VerticalAlignment="Center">
+                        <Border Background="#44FFFFFF" Height="4" CornerRadius="2" VerticalAlignment="Center"/>
+                        <Border x:Name="VideoSeekProgress" Background="#42A5F5" Height="4" CornerRadius="2"
+                                VerticalAlignment="Center" HorizontalAlignment="Left" Width="0"/>
+                        <!-- Trim region highlight -->
+                        <Border x:Name="VideoTrimRegion" Background="#3342A5F5" Height="8" CornerRadius="2"
+                                VerticalAlignment="Center" HorizontalAlignment="Left" Width="0" Margin="0,0,0,0"/>
+                        <Ellipse x:Name="VideoSeekThumb" Width="14" Height="14" Fill="White"
+                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-7,0,0,0"/>
                     </Grid>
-                    <TextBlock Text="Format: HH:MM:SS (e.g. 0:00:05 to 0:01:30)" Foreground="#666" FontSize="11"
-                               HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                    <Button Content="Trim Video &#x2192;" Width="280" Height="50"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#F44336"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="TrimVideo_Execute"
-                            Template="{StaticResource RoundedButton}"/>
-                </StackPanel>
+                    <TextBlock x:Name="TxtVideoTime" Grid.Column="2" Foreground="#AAA" FontSize="12"
+                               VerticalAlignment="Center" Text="0:00 / 0:00"/>
+                </Grid>
 
-                <!-- Crop panel -->
-                <StackPanel x:Name="VideoOpCropPanel" Grid.Row="2" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
-                    <Grid Margin="0,0,0,8">
+                <!-- Row 3: Trim controls -->
+                <Grid Grid.Row="3" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Trim:" Foreground="#42A5F5" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Start" Grid.Column="1" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBox x:Name="TxtTrimStart" Grid.Column="2" Height="26" Padding="6,2" FontSize="12"
+                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
+                    <TextBlock Text="End" Grid.Column="3" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="10,0,4,0"/>
+                    <TextBox x:Name="TxtTrimEnd" Grid.Column="4" Height="26" Padding="6,2" FontSize="12"
+                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
+                    <TextBlock x:Name="TxtTrimDuration" Grid.Column="5" Foreground="#666" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    <Button Content="Set to current" Grid.Column="6" Height="26" Padding="8,0" FontSize="11"
+                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="VideoSetTrimToCurrent"/>
+                </Grid>
+
+                <!-- Row 4: Tool bar -->
+                <Border Grid.Row="4" Background="#1E1E22" CornerRadius="6" Padding="12,8" Margin="0,0,0,8">
+                    <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>  <!-- Rotate/Flip -->
+                            <ColumnDefinition Width="Auto"/>  <!-- Separator -->
+                            <ColumnDefinition Width="Auto"/>  <!-- Crop -->
+                            <ColumnDefinition Width="Auto"/>  <!-- Separator -->
+                            <ColumnDefinition Width="Auto"/>  <!-- Extract audio checkbox -->
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Width:" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox x:Name="TxtCropVideoW" Grid.Column="1" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444"/>
-                        <TextBlock Text="Height:" Grid.Column="2" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="16,0,6,0"/>
-                        <TextBox x:Name="TxtCropVideoH" Grid.Column="3" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444"/>
-                    </Grid>
-                    <Grid Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="80"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="X offset:" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox x:Name="TxtCropVideoX" Grid.Column="1" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0"/>
-                        <TextBlock Text="Y offset:" Grid.Column="2" Foreground="#CCC" FontSize="13" VerticalAlignment="Center" Margin="16,0,6,0"/>
-                        <TextBox x:Name="TxtCropVideoY" Grid.Column="3" Height="28" Padding="6,4" FontSize="12"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0"/>
-                    </Grid>
-                    <Button Content="Crop Video &#x2192;" Width="280" Height="50"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#E91E63"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="CropVideo_Execute"
-                            Template="{StaticResource RoundedButton}"/>
-                </StackPanel>
 
-                <!-- Rotate/Flip panel -->
-                <StackPanel x:Name="VideoOpRotatePanel" Grid.Row="2" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="Select transformation:" Foreground="#CCC" FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                    <WrapPanel HorizontalAlignment="Center">
-                        <Button Content="90&#x00B0; CW" Width="100" Height="42" Margin="6" FontSize="14"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateVideo_CW"/>
-                        <Button Content="90&#x00B0; CCW" Width="100" Height="42" Margin="6" FontSize="14"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateVideo_CCW"/>
-                        <Button Content="180&#x00B0;" Width="80" Height="42" Margin="6" FontSize="14"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="RotateVideo_180"/>
-                        <Button Content="Flip H" Width="80" Height="42" Margin="6" FontSize="14"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="FlipVideo_H"/>
-                        <Button Content="Flip V" Width="80" Height="42" Margin="6" FontSize="14"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="FlipVideo_V"/>
-                    </WrapPanel>
-                </StackPanel>
+                        <!-- Rotate/Flip buttons -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Transform:" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Button Content="&#x21BA;90" Width="42" Height="30" FontSize="11" Background="#333" Foreground="#CCC"
+                                    BorderBrush="#444" Cursor="Hand" Click="VideoRotate_CW" Margin="0,0,3,0"/>
+                            <Button Content="&#x21BB;90" Width="42" Height="30" FontSize="11" Background="#333" Foreground="#CCC"
+                                    BorderBrush="#444" Cursor="Hand" Click="VideoRotate_CCW" Margin="0,0,3,0"/>
+                            <Button Content="180" Width="36" Height="30" FontSize="11" Background="#333" Foreground="#CCC"
+                                    BorderBrush="#444" Cursor="Hand" Click="VideoRotate_180" Margin="0,0,3,0"/>
+                            <Button Content="&#x2194;" Width="30" Height="30" FontSize="13" Background="#333" Foreground="#CCC"
+                                    BorderBrush="#444" Cursor="Hand" Click="VideoFlip_H" ToolTip="Flip Horizontal" Margin="0,0,3,0"/>
+                            <Button Content="&#x2195;" Width="30" Height="30" FontSize="13" Background="#333" Foreground="#CCC"
+                                    BorderBrush="#444" Cursor="Hand" Click="VideoFlip_V" ToolTip="Flip Vertical"/>
+                            <TextBlock x:Name="TxtVideoTransform" Text="" Foreground="#42A5F5" FontSize="11"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
 
-                <!-- Extract Audio panel -->
-                <StackPanel x:Name="VideoOpAudioPanel" Grid.Row="2" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="400">
-                    <TextBlock Text="Output format:" Foreground="#CCC" FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                    <ComboBox x:Name="CmbAudioFormat" Width="150" Height="32" FontSize="13" SelectedIndex="0"
-                              HorizontalAlignment="Center" Margin="0,0,0,20">
-                        <ComboBoxItem Content="MP3"/>
-                        <ComboBoxItem Content="WAV"/>
-                        <ComboBoxItem Content="AAC"/>
-                        <ComboBoxItem Content="FLAC"/>
-                    </ComboBox>
-                    <Button Content="Extract Audio &#x2192;" Width="280" Height="50"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#00BCD4"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="ExtractAudio_Execute"
+                        <!-- Separator -->
+                        <Border Grid.Column="1" Width="1" Background="#444" Margin="12,2"/>
+
+                        <!-- Crop inputs -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <TextBlock Text="Crop:" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBox x:Name="TxtCropVideoW" Width="50" Height="26" Padding="4,2" FontSize="11"
+                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" ToolTip="Width"/>
+                            <TextBlock Text="x" Foreground="#666" VerticalAlignment="Center" Margin="3,0"/>
+                            <TextBox x:Name="TxtCropVideoH" Width="50" Height="26" Padding="4,2" FontSize="11"
+                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" ToolTip="Height"/>
+                            <TextBlock Text="at" Foreground="#666" VerticalAlignment="Center" Margin="4,0"/>
+                            <TextBox x:Name="TxtCropVideoX" Width="40" Height="26" Padding="4,2" FontSize="11"
+                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" ToolTip="X"/>
+                            <TextBlock Text="," Foreground="#666" VerticalAlignment="Center" Margin="2,0"/>
+                            <TextBox x:Name="TxtCropVideoY" Width="40" Height="26" Padding="4,2" FontSize="11"
+                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" ToolTip="Y"/>
+                        </StackPanel>
+
+                        <!-- Separator -->
+                        <Border Grid.Column="3" Width="1" Background="#444" Margin="12,2"/>
+
+                        <!-- Extract audio option -->
+                        <StackPanel Grid.Column="4" Orientation="Horizontal">
+                            <CheckBox x:Name="ChkExtractAudio" Content="Also extract audio as" Foreground="#CCC" FontSize="12"
+                                      VerticalAlignment="Center" Cursor="Hand" Margin="0,0,6,0"/>
+                            <ComboBox x:Name="CmbAudioFormat" Width="65" Height="26" FontSize="11" SelectedIndex="0">
+                                <ComboBoxItem Content="MP3"/>
+                                <ComboBoxItem Content="WAV"/>
+                                <ComboBoxItem Content="AAC"/>
+                                <ComboBoxItem Content="FLAC"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Row 5: Export -->
+                <Grid Grid.Row="5" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtVideoExportInfo" Text="" Foreground="#666" FontSize="11" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Export Video &#x2192;" Width="240" Height="46"
+                            FontSize="15" FontWeight="SemiBold" Foreground="White" Background="#F44336"
+                            Cursor="Hand" Click="VideoExport_Execute"
                             Template="{StaticResource RoundedButton}"/>
-                </StackPanel>
+                </Grid>
             </Grid>
         </Grid>
 

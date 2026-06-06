@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Llamashot.Core;
 using DragEventArgs = System.Windows.DragEventArgs;
 using DataFormats = System.Windows.DataFormats;
@@ -129,6 +130,11 @@ public partial class FileToolsWindow : Window
     // =====================================================================
 
     private string? _videoToolsPath;
+    private double _videoAngle = 0;
+    private bool _videoFlipH = false, _videoFlipV = false;
+    private bool _isVideoPlaying;
+    private bool _isVideoSeeking;
+    private DispatcherTimer? _videoTimer;
 
     // =====================================================================
     //  File extension lists
@@ -406,9 +412,11 @@ public partial class FileToolsWindow : Window
         _rotateFlipSourcePath = null;
         _convertSourcePath = null;
         _videoToolsPath = null;
-        _videoToolsPath = null;
-        _videoToolsPath = null;
-        _videoToolsPath = null;
+        _videoAngle = 0; _videoFlipH = false; _videoFlipV = false;
+        _isVideoPlaying = false;
+        _videoTimer?.Stop();
+        VideoPreview.Stop();
+        VideoPreview.Source = null;
         _extractPdfPath = null;
         _extractSelectedPages.Clear();
         ExtractPageGrid.Children.Clear();
@@ -2556,7 +2564,7 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  17. Video Tools (unified)
+    //  17. Video Tools (unified editor)
     // =====================================================================
 
     private TimeSpan _videoDuration;
@@ -2580,245 +2588,265 @@ public partial class FileToolsWindow : Window
     private async void LoadVideoTools(string path)
     {
         _videoToolsPath = path;
+        _videoAngle = 0; _videoFlipH = false; _videoFlipV = false;
+        VideoRotateTransform.Angle = 0;
+        VideoFlipTransform.ScaleX = 1; VideoFlipTransform.ScaleY = 1;
+        TxtVideoTransform.Text = "";
         TxtVideoFileName.Text = System.IO.Path.GetFileName(path);
+
         try
         {
             var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
             _videoDuration = duration;
-            _videoW = w;
-            _videoH = h;
-            TxtVideoInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
+            _videoW = w; _videoH = h;
+            TxtVideoInfo.Text = $"{w}x{h} | {codec} | {FileToolsService.FormatTimeSpan(duration)}";
             TxtTrimStart.Text = "0:00:00";
             TxtTrimEnd.Text = duration.ToString(@"h\:mm\:ss");
+            TxtTrimDuration.Text = $"({FileToolsService.FormatTimeSpan(duration)})";
             TxtCropVideoW.Text = w.ToString();
             TxtCropVideoH.Text = h.ToString();
-            TxtCropVideoX.Text = "0";
-            TxtCropVideoY.Text = "0";
+            TxtCropVideoX.Text = "0"; TxtCropVideoY.Text = "0";
         }
         catch { TxtVideoInfo.Text = "Could not read video info"; }
-        VideoOp_Click(VideoOpTrim, null!);
+
+        // Load video into MediaElement
+        VideoPreview.Source = new Uri(path);
+        VideoPreview.Play();
+        VideoPreview.Pause();
+        _isVideoPlaying = false;
+        BtnVideoPlay.Content = "\u25B6"; // play symbol
+
+        // Start timer for seek bar updates
+        _videoTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _videoTimer.Tick -= VideoTimer_Tick;
+        _videoTimer.Tick += VideoTimer_Tick;
+        _videoTimer.Start();
+
         ShowConfigState("video_tools");
     }
 
-    private void VideoOp_Click(object sender, RoutedEventArgs e)
+    // ----- Video playback handlers -----
+
+    private void VideoPreview_MediaOpened(object sender, RoutedEventArgs e)
     {
-        // Hide all operation panels
-        VideoOpTrimPanel.Visibility = Visibility.Collapsed;
-        VideoOpCropPanel.Visibility = Visibility.Collapsed;
-        VideoOpRotatePanel.Visibility = Visibility.Collapsed;
-        VideoOpAudioPanel.Visibility = Visibility.Collapsed;
-
-        // Reset tab button colors
-        foreach (var btn in new[] { VideoOpTrim, VideoOpCrop, VideoOpRotate, VideoOpAudio })
-            btn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
-
-        // Show selected panel
-        var b = (System.Windows.Controls.Button)sender;
-        b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5"));
-
-        if (b == VideoOpTrim) VideoOpTrimPanel.Visibility = Visibility.Visible;
-        else if (b == VideoOpCrop) VideoOpCropPanel.Visibility = Visibility.Visible;
-        else if (b == VideoOpRotate) VideoOpRotatePanel.Visibility = Visibility.Visible;
-        else if (b == VideoOpAudio) VideoOpAudioPanel.Visibility = Visibility.Visible;
+        if (VideoPreview.NaturalDuration.HasTimeSpan)
+            _videoDuration = VideoPreview.NaturalDuration.TimeSpan;
     }
 
-    private async void TrimVideo_Execute(object sender, RoutedEventArgs e)
+    private void VideoPreview_MediaEnded(object sender, RoutedEventArgs e)
     {
-        if (_videoToolsPath == null) return;
-        if (!TimeSpan.TryParse(TxtTrimStart.Text.Trim(), out var start) ||
-            !TimeSpan.TryParse(TxtTrimEnd.Text.Trim(), out var end) || end <= start)
-        {
-            System.Windows.MessageBox.Show("Enter valid start and end times.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_trimmed"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing("Trimming video...");
-        try
-        {
-            await FileToolsService.TrimVideoAsync(_videoToolsPath, dlg.FileName, start, end, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video trimmed!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        VideoPreview.Position = TimeSpan.Zero;
+        VideoPreview.Pause();
+        _isVideoPlaying = false;
+        BtnVideoPlay.Content = "\u25B6";
     }
 
-    // =====================================================================
-    //  Crop Video Execute
-    // =====================================================================
-
-    private async void CropVideo_Execute(object sender, RoutedEventArgs e)
+    private void VideoPlay_Click(object sender, RoutedEventArgs e)
     {
-        if (_videoToolsPath == null) return;
-        if (!int.TryParse(TxtCropVideoW.Text.Trim(), out int cropW) || cropW <= 0 ||
-            !int.TryParse(TxtCropVideoH.Text.Trim(), out int cropH) || cropH <= 0 ||
-            !int.TryParse(TxtCropVideoX.Text.Trim(), out int cropX) || cropX < 0 ||
-            !int.TryParse(TxtCropVideoY.Text.Trim(), out int cropY) || cropY < 0)
-        {
-            System.Windows.MessageBox.Show("Enter valid crop dimensions.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_cropped"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing("Cropping video...");
-        try
-        {
-            await FileToolsService.CropVideoAsync(_videoToolsPath, dlg.FileName, cropW, cropH, cropX, cropY, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video cropped!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        if (_isVideoPlaying) { VideoPreview.Pause(); BtnVideoPlay.Content = "\u25B6"; }
+        else { VideoPreview.Play(); BtnVideoPlay.Content = "\u23F8"; }
+        _isVideoPlaying = !_isVideoPlaying;
     }
 
-    // =====================================================================
-    //  Rotate/Flip Video Execute
-    // =====================================================================
-
-    private async void RotateVideo_CW(object sender, RoutedEventArgs e)
+    private void VideoTimer_Tick(object? sender, EventArgs e)
     {
-        if (_videoToolsPath == null) return;
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_rotated"
-        };
-        if (dlg.ShowDialog() != true) return;
+        if (_isVideoSeeking || _videoDuration.TotalSeconds <= 0) return;
+        var pos = VideoPreview.Position;
+        double pct = pos.TotalSeconds / _videoDuration.TotalSeconds;
+        double barW = VideoSeekContainer.ActualWidth;
+        VideoSeekProgress.Width = Math.Max(0, pct * barW);
+        VideoSeekThumb.Margin = new Thickness(pct * barW - 7, 0, 0, 0);
 
-        ShowProcessing("Rotating video 90\u00B0 CW...");
-        try
-        {
-            await FileToolsService.RotateVideoAsync(_videoToolsPath, dlg.FileName, 90, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video rotated!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        string cur = FileToolsService.FormatTimeSpan(pos);
+        string total = FileToolsService.FormatTimeSpan(_videoDuration);
+        TxtVideoTime.Text = $"{cur} / {total}";
     }
 
-    private async void RotateVideo_CCW(object sender, RoutedEventArgs e)
+    private void VideoSeek_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_videoToolsPath == null) return;
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_rotated"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing("Rotating video 90\u00B0 CCW...");
-        try
-        {
-            await FileToolsService.RotateVideoAsync(_videoToolsPath, dlg.FileName, 270, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video rotated!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        _isVideoSeeking = true;
+        VideoSeekContainer.CaptureMouse();
+        SeekToPosition(e.GetPosition(VideoSeekContainer).X);
     }
 
-    private async void RotateVideo_180(object sender, RoutedEventArgs e)
+    private void VideoSeek_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (_videoToolsPath == null) return;
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_rotated"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing("Rotating video 180\u00B0...");
-        try
-        {
-            await FileToolsService.RotateVideoAsync(_videoToolsPath, dlg.FileName, 180, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video rotated!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        if (_isVideoSeeking) SeekToPosition(e.GetPosition(VideoSeekContainer).X);
     }
 
-    private async void FlipVideo_H(object sender, RoutedEventArgs e)
+    private void VideoSeek_MouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (_videoToolsPath == null) return;
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_flipped"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing("Flipping video horizontally...");
-        try
-        {
-            await FileToolsService.FlipVideoAsync(_videoToolsPath, dlg.FileName, true, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video flipped!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        _isVideoSeeking = false;
+        VideoSeekContainer.ReleaseMouseCapture();
     }
 
-    private async void FlipVideo_V(object sender, RoutedEventArgs e)
+    private void SeekToPosition(double x)
     {
-        if (_videoToolsPath == null) return;
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_flipped"
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        ShowProcessing("Flipping video vertically...");
-        try
-        {
-            await FileToolsService.FlipVideoAsync(_videoToolsPath, dlg.FileName, false, CreateProgress());
-            var info = new FileInfo(dlg.FileName);
-            ShowComplete("Video flipped!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
-        }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        double barW = VideoSeekContainer.ActualWidth;
+        if (barW <= 0) return;
+        double pct = Math.Max(0, Math.Min(1, x / barW));
+        VideoPreview.Position = TimeSpan.FromSeconds(pct * _videoDuration.TotalSeconds);
+        VideoSeekProgress.Width = pct * barW;
+        VideoSeekThumb.Margin = new Thickness(pct * barW - 7, 0, 0, 0);
     }
 
-    // =====================================================================
-    //  Extract Audio Execute
-    // =====================================================================
+    // ----- Rotate/Flip handlers (live preview) -----
 
-    private async void ExtractAudio_Execute(object sender, RoutedEventArgs e)
+    private void VideoRotate_CW(object sender, RoutedEventArgs e)
+    {
+        _videoAngle = (_videoAngle + 90) % 360;
+        VideoRotateTransform.Angle = _videoAngle;
+        UpdateVideoTransformText();
+    }
+    private void VideoRotate_CCW(object sender, RoutedEventArgs e)
+    {
+        _videoAngle = (_videoAngle + 270) % 360;
+        VideoRotateTransform.Angle = _videoAngle;
+        UpdateVideoTransformText();
+    }
+    private void VideoRotate_180(object sender, RoutedEventArgs e)
+    {
+        _videoAngle = (_videoAngle + 180) % 360;
+        VideoRotateTransform.Angle = _videoAngle;
+        UpdateVideoTransformText();
+    }
+    private void VideoFlip_H(object sender, RoutedEventArgs e)
+    {
+        _videoFlipH = !_videoFlipH;
+        VideoFlipTransform.ScaleX = _videoFlipH ? -1 : 1;
+        UpdateVideoTransformText();
+    }
+    private void VideoFlip_V(object sender, RoutedEventArgs e)
+    {
+        _videoFlipV = !_videoFlipV;
+        VideoFlipTransform.ScaleY = _videoFlipV ? -1 : 1;
+        UpdateVideoTransformText();
+    }
+    private void UpdateVideoTransformText()
+    {
+        var parts = new List<string>();
+        if (_videoAngle != 0) parts.Add($"Rotate {_videoAngle}\u00B0");
+        if (_videoFlipH) parts.Add("Flip H");
+        if (_videoFlipV) parts.Add("Flip V");
+        TxtVideoTransform.Text = parts.Count > 0 ? string.Join(" + ", parts) : "";
+    }
+
+    // ----- Set trim to current position -----
+
+    private void VideoSetTrimToCurrent(object sender, RoutedEventArgs e)
+    {
+        var pos = VideoPreview.Position;
+        // If trim start is at zero, set start. Otherwise set end.
+        if (TxtTrimStart.Text == "0:00:00" || TxtTrimStart.Text == "0:00" ||
+            (TimeSpan.TryParse(TxtTrimStart.Text, out var ts) && ts == TimeSpan.Zero))
+            TxtTrimStart.Text = pos.ToString(@"h\:mm\:ss");
+        else
+            TxtTrimEnd.Text = pos.ToString(@"h\:mm\:ss");
+    }
+
+    // ----- Export: chains all operations via FFmpeg -----
+
+    private async void VideoExport_Execute(object sender, RoutedEventArgs e)
     {
         if (_videoToolsPath == null) return;
 
-        var format = (CmbAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
-        string ext = format switch
-        {
-            "wav" => ".wav",
-            "aac" => ".aac",
-            "flac" => ".flac",
-            _ => ".mp3"
-        };
-        string filterName = format.ToUpperInvariant();
-
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            Filter = $"{filterName}|*{ext}|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + ext
+            Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv",
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_edited"
         };
         if (dlg.ShowDialog() != true) return;
 
-        ShowProcessing("Extracting audio...");
+        // Stop playback
+        VideoPreview.Pause();
+        _isVideoPlaying = false;
+        BtnVideoPlay.Content = "\u25B6";
+
+        ShowProcessing("Exporting video...");
         try
         {
-            await FileToolsService.ExtractAudioAsync(_videoToolsPath, dlg.FileName, CreateProgress());
+            string currentFile = _videoToolsPath;
+            string? tempFile = null;
+
+            // Step 1: Trim (if needed)
+            if (TimeSpan.TryParse(TxtTrimStart.Text.Trim(), out var trimStart) &&
+                TimeSpan.TryParse(TxtTrimEnd.Text.Trim(), out var trimEnd) && trimEnd > trimStart &&
+                (trimStart > TimeSpan.Zero || trimEnd < _videoDuration))
+            {
+                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
+                await FileToolsService.TrimVideoAsync(currentFile, tempFile, trimStart, trimEnd, CreateProgress());
+                if (currentFile != _videoToolsPath) File.Delete(currentFile);
+                currentFile = tempFile;
+            }
+
+            // Step 2: Rotate (if needed)
+            if (_videoAngle != 0)
+            {
+                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
+                await FileToolsService.RotateVideoAsync(currentFile, tempFile, (int)_videoAngle, CreateProgress());
+                if (currentFile != _videoToolsPath) File.Delete(currentFile);
+                currentFile = tempFile;
+            }
+
+            // Step 3: Flip H (if needed)
+            if (_videoFlipH)
+            {
+                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
+                await FileToolsService.FlipVideoAsync(currentFile, tempFile, true, CreateProgress());
+                if (currentFile != _videoToolsPath) File.Delete(currentFile);
+                currentFile = tempFile;
+            }
+
+            // Step 4: Flip V (if needed)
+            if (_videoFlipV)
+            {
+                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
+                await FileToolsService.FlipVideoAsync(currentFile, tempFile, false, CreateProgress());
+                if (currentFile != _videoToolsPath) File.Delete(currentFile);
+                currentFile = tempFile;
+            }
+
+            // Step 5: Crop (if needed)
+            if (int.TryParse(TxtCropVideoW.Text, out int cw) && int.TryParse(TxtCropVideoH.Text, out int ch) &&
+                int.TryParse(TxtCropVideoX.Text, out int cx) && int.TryParse(TxtCropVideoY.Text, out int cy) &&
+                (cw != _videoW || ch != _videoH || cx != 0 || cy != 0))
+            {
+                tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_vexp_{Guid.NewGuid():N}.mp4");
+                await FileToolsService.CropVideoAsync(currentFile, tempFile, cw, ch, cx, cy, CreateProgress());
+                if (currentFile != _videoToolsPath) File.Delete(currentFile);
+                currentFile = tempFile;
+            }
+
+            // Final: copy to output
+            if (currentFile != _videoToolsPath)
+            {
+                File.Copy(currentFile, dlg.FileName, true);
+                File.Delete(currentFile);
+            }
+            else
+            {
+                File.Copy(currentFile, dlg.FileName, true);
+            }
+
+            // Step 6: Extract audio (if checked)
+            string? audioPath = null;
+            if (ChkExtractAudio.IsChecked == true)
+            {
+                var fmt = (CmbAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
+                audioPath = System.IO.Path.ChangeExtension(dlg.FileName, "." + fmt);
+                await FileToolsService.ExtractAudioAsync(_videoToolsPath, audioPath, CreateProgress());
+            }
+
             var info = new FileInfo(dlg.FileName);
-            ShowComplete("Audio extracted!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
+            string detail = $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}";
+            if (audioPath != null) detail += $"\nAudio: {System.IO.Path.GetFileName(audioPath)}";
+            ShowComplete("Video exported!", detail, dlg.FileName);
         }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        catch (Exception ex)
+        {
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
+            System.Windows.MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 }
 
