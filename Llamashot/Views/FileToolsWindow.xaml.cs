@@ -39,10 +39,7 @@ public partial class FileToolsWindow : Window
         ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",              "#AB47BC"),
         ("convert_format", "Convert Format",  "Change image format",                "#EC407A"),
         ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",             "#78909C"),
-        ("trim_video",    "Trim Video",       "Cut start and end of video",         "#F44336"),
-        ("crop_video",    "Crop Video",       "Crop video to a region",             "#E91E63"),
-        ("rotate_video",  "Rotate/Flip Video","Rotate or flip video",               "#9C27B0"),
-        ("extract_audio", "Extract Audio",    "Extract audio from video",           "#00BCD4"),
+        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336"),
     };
 
     // =====================================================================
@@ -131,11 +128,7 @@ public partial class FileToolsWindow : Window
     //  Video tool state
     // =====================================================================
 
-    private string? _trimVideoPath;
-    private string? _cropVideoPath;
-    private int _cropVideoOrigW, _cropVideoOrigH;
-    private string? _rotateVideoPath;
-    private string? _extractAudioPath;
+    private string? _videoToolsPath;
 
     // =====================================================================
     //  File extension lists
@@ -257,10 +250,7 @@ public partial class FileToolsWindow : Window
         _toolPanels["rotate_flip"] = PanelRotateFlip;
         _toolPanels["convert_format"] = PanelConvertFormat;
         _toolPanels["compress_office"] = PanelCompressOffice;
-        _toolPanels["trim_video"] = PanelTrimVideo;
-        _toolPanels["crop_video"] = PanelCropVideo;
-        _toolPanels["rotate_video"] = PanelRotateVideo;
-        _toolPanels["extract_audio"] = PanelExtractAudio;
+        _toolPanels["video_tools"] = PanelVideoTools;
 
         _selectViews["merge_pdf"] = MergeSelectView;
         _selectViews["split_pdf"] = SplitSelectView;
@@ -278,10 +268,7 @@ public partial class FileToolsWindow : Window
         _selectViews["rotate_flip"] = RotateFlipSelectView;
         _selectViews["convert_format"] = ConvertSelectView;
         _selectViews["compress_office"] = CompressOfficeSelectView;
-        _selectViews["trim_video"] = TrimSelectView;
-        _selectViews["crop_video"] = CropVideoSelectView;
-        _selectViews["rotate_video"] = RotateVideoSelectView;
-        _selectViews["extract_audio"] = ExtractAudioSelectView;
+        _selectViews["video_tools"] = VideoSelectView;
 
         _configViews["merge_pdf"] = MergeConfigView;
         _configViews["split_pdf"] = SplitConfigView;
@@ -299,10 +286,7 @@ public partial class FileToolsWindow : Window
         _configViews["rotate_flip"] = RotateFlipConfigView;
         _configViews["convert_format"] = ConvertConfigView;
         _configViews["compress_office"] = CompressOfficeConfigView;
-        _configViews["trim_video"] = TrimConfigView;
-        _configViews["crop_video"] = CropVideoConfigView;
-        _configViews["rotate_video"] = RotateVideoConfigView;
-        _configViews["extract_audio"] = ExtractAudioConfigView;
+        _configViews["video_tools"] = VideoConfigView;
 
         foreach (var (id, title, _, _) in ToolDefs)
             _toolTitles[id] = title;
@@ -421,10 +405,10 @@ public partial class FileToolsWindow : Window
         _resizeSourcePath = null;
         _rotateFlipSourcePath = null;
         _convertSourcePath = null;
-        _trimVideoPath = null;
-        _cropVideoPath = null;
-        _rotateVideoPath = null;
-        _extractAudioPath = null;
+        _videoToolsPath = null;
+        _videoToolsPath = null;
+        _videoToolsPath = null;
+        _videoToolsPath = null;
         _extractPdfPath = null;
         _extractSelectedPages.Clear();
         ExtractPageGrid.Children.Clear();
@@ -2572,42 +2556,75 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  17. Trim Video
+    //  17. Video Tools (unified)
     // =====================================================================
 
-    private void TrimVideo_SelectFiles(object sender, RoutedEventArgs e)
+    private TimeSpan _videoDuration;
+    private int _videoW, _videoH;
+
+    private void VideoTools_SelectFiles(object sender, RoutedEventArgs e)
     {
         if (!CheckFFmpeg()) return;
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Video Files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.webm;*.m4v|All Files|*.*" };
         if (dlg.ShowDialog() != true) return;
-        LoadTrimVideo(dlg.FileName);
+        LoadVideoTools(dlg.FileName);
     }
 
-    private void TrimVideo_SelectDrop(object sender, DragEventArgs e)
+    private void VideoTools_SelectDrop(object sender, DragEventArgs e)
     {
         if (!CheckFFmpeg()) return;
         var files = GetDroppedFiles(e, IsVideoFile);
-        if (files.Length > 0) LoadTrimVideo(files[0]);
+        if (files.Length > 0) LoadVideoTools(files[0]);
     }
 
-    private async void LoadTrimVideo(string path)
+    private async void LoadVideoTools(string path)
     {
-        _trimVideoPath = path;
-        TxtTrimFileName.Text = System.IO.Path.GetFileName(path);
+        _videoToolsPath = path;
+        TxtVideoFileName.Text = System.IO.Path.GetFileName(path);
         try
         {
             var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
-            TxtTrimInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
+            _videoDuration = duration;
+            _videoW = w;
+            _videoH = h;
+            TxtVideoInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
             TxtTrimStart.Text = "0:00:00";
             TxtTrimEnd.Text = duration.ToString(@"h\:mm\:ss");
+            TxtCropVideoW.Text = w.ToString();
+            TxtCropVideoH.Text = h.ToString();
+            TxtCropVideoX.Text = "0";
+            TxtCropVideoY.Text = "0";
         }
-        catch { TxtTrimInfo.Text = "Could not read video info"; }
-        ShowConfigState("trim_video");
+        catch { TxtVideoInfo.Text = "Could not read video info"; }
+        VideoOp_Click(VideoOpTrim, null!);
+        ShowConfigState("video_tools");
+    }
+
+    private void VideoOp_Click(object sender, RoutedEventArgs e)
+    {
+        // Hide all operation panels
+        VideoOpTrimPanel.Visibility = Visibility.Collapsed;
+        VideoOpCropPanel.Visibility = Visibility.Collapsed;
+        VideoOpRotatePanel.Visibility = Visibility.Collapsed;
+        VideoOpAudioPanel.Visibility = Visibility.Collapsed;
+
+        // Reset tab button colors
+        foreach (var btn in new[] { VideoOpTrim, VideoOpCrop, VideoOpRotate, VideoOpAudio })
+            btn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
+
+        // Show selected panel
+        var b = (System.Windows.Controls.Button)sender;
+        b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5"));
+
+        if (b == VideoOpTrim) VideoOpTrimPanel.Visibility = Visibility.Visible;
+        else if (b == VideoOpCrop) VideoOpCropPanel.Visibility = Visibility.Visible;
+        else if (b == VideoOpRotate) VideoOpRotatePanel.Visibility = Visibility.Visible;
+        else if (b == VideoOpAudio) VideoOpAudioPanel.Visibility = Visibility.Visible;
     }
 
     private async void TrimVideo_Execute(object sender, RoutedEventArgs e)
     {
-        if (_trimVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         if (!TimeSpan.TryParse(TxtTrimStart.Text.Trim(), out var start) ||
             !TimeSpan.TryParse(TxtTrimEnd.Text.Trim(), out var end) || end <= start)
         {
@@ -2618,14 +2635,14 @@ public partial class FileToolsWindow : Window
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_trimVideoPath) + "_trimmed"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_trimmed"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Trimming video...");
         try
         {
-            await FileToolsService.TrimVideoAsync(_trimVideoPath, dlg.FileName, start, end, CreateProgress());
+            await FileToolsService.TrimVideoAsync(_videoToolsPath, dlg.FileName, start, end, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video trimmed!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2633,46 +2650,12 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  18. Crop Video
+    //  Crop Video Execute
     // =====================================================================
-
-    private void CropVideo_SelectFiles(object sender, RoutedEventArgs e)
-    {
-        if (!CheckFFmpeg()) return;
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Video Files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.webm;*.m4v|All Files|*.*" };
-        if (dlg.ShowDialog() != true) return;
-        LoadCropVideo(dlg.FileName);
-    }
-
-    private void CropVideo_SelectDrop(object sender, DragEventArgs e)
-    {
-        if (!CheckFFmpeg()) return;
-        var files = GetDroppedFiles(e, IsVideoFile);
-        if (files.Length > 0) LoadCropVideo(files[0]);
-    }
-
-    private async void LoadCropVideo(string path)
-    {
-        _cropVideoPath = path;
-        TxtCropVideoFileName.Text = System.IO.Path.GetFileName(path);
-        try
-        {
-            var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
-            _cropVideoOrigW = w;
-            _cropVideoOrigH = h;
-            TxtCropVideoInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
-            TxtCropVideoW.Text = w.ToString();
-            TxtCropVideoH.Text = h.ToString();
-            TxtCropVideoX.Text = "0";
-            TxtCropVideoY.Text = "0";
-        }
-        catch { TxtCropVideoInfo.Text = "Could not read video info"; }
-        ShowConfigState("crop_video");
-    }
 
     private async void CropVideo_Execute(object sender, RoutedEventArgs e)
     {
-        if (_cropVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         if (!int.TryParse(TxtCropVideoW.Text.Trim(), out int cropW) || cropW <= 0 ||
             !int.TryParse(TxtCropVideoH.Text.Trim(), out int cropH) || cropH <= 0 ||
             !int.TryParse(TxtCropVideoX.Text.Trim(), out int cropX) || cropX < 0 ||
@@ -2685,14 +2668,14 @@ public partial class FileToolsWindow : Window
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_cropVideoPath) + "_cropped"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_cropped"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Cropping video...");
         try
         {
-            await FileToolsService.CropVideoAsync(_cropVideoPath, dlg.FileName, cropW, cropH, cropX, cropY, CreateProgress());
+            await FileToolsService.CropVideoAsync(_videoToolsPath, dlg.FileName, cropW, cropH, cropX, cropY, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video cropped!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2700,51 +2683,23 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  19. Rotate/Flip Video
+    //  Rotate/Flip Video Execute
     // =====================================================================
-
-    private void RotateVideo_SelectFiles(object sender, RoutedEventArgs e)
-    {
-        if (!CheckFFmpeg()) return;
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Video Files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.webm;*.m4v|All Files|*.*" };
-        if (dlg.ShowDialog() != true) return;
-        LoadRotateVideo(dlg.FileName);
-    }
-
-    private void RotateVideo_SelectDrop(object sender, DragEventArgs e)
-    {
-        if (!CheckFFmpeg()) return;
-        var files = GetDroppedFiles(e, IsVideoFile);
-        if (files.Length > 0) LoadRotateVideo(files[0]);
-    }
-
-    private async void LoadRotateVideo(string path)
-    {
-        _rotateVideoPath = path;
-        TxtRotateVideoFileName.Text = System.IO.Path.GetFileName(path);
-        try
-        {
-            var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
-            TxtRotateVideoInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
-        }
-        catch { TxtRotateVideoInfo.Text = "Could not read video info"; }
-        ShowConfigState("rotate_video");
-    }
 
     private async void RotateVideo_CW(object sender, RoutedEventArgs e)
     {
-        if (_rotateVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateVideoPath) + "_rotated"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_rotated"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Rotating video 90\u00B0 CW...");
         try
         {
-            await FileToolsService.RotateVideoAsync(_rotateVideoPath, dlg.FileName, 90, CreateProgress());
+            await FileToolsService.RotateVideoAsync(_videoToolsPath, dlg.FileName, 90, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video rotated!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2753,18 +2708,18 @@ public partial class FileToolsWindow : Window
 
     private async void RotateVideo_CCW(object sender, RoutedEventArgs e)
     {
-        if (_rotateVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateVideoPath) + "_rotated"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_rotated"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Rotating video 90\u00B0 CCW...");
         try
         {
-            await FileToolsService.RotateVideoAsync(_rotateVideoPath, dlg.FileName, 270, CreateProgress());
+            await FileToolsService.RotateVideoAsync(_videoToolsPath, dlg.FileName, 270, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video rotated!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2773,18 +2728,18 @@ public partial class FileToolsWindow : Window
 
     private async void RotateVideo_180(object sender, RoutedEventArgs e)
     {
-        if (_rotateVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateVideoPath) + "_rotated"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_rotated"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Rotating video 180\u00B0...");
         try
         {
-            await FileToolsService.RotateVideoAsync(_rotateVideoPath, dlg.FileName, 180, CreateProgress());
+            await FileToolsService.RotateVideoAsync(_videoToolsPath, dlg.FileName, 180, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video rotated!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2793,18 +2748,18 @@ public partial class FileToolsWindow : Window
 
     private async void FlipVideo_H(object sender, RoutedEventArgs e)
     {
-        if (_rotateVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateVideoPath) + "_flipped"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_flipped"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Flipping video horizontally...");
         try
         {
-            await FileToolsService.FlipVideoAsync(_rotateVideoPath, dlg.FileName, true, CreateProgress());
+            await FileToolsService.FlipVideoAsync(_videoToolsPath, dlg.FileName, true, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video flipped!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2813,18 +2768,18 @@ public partial class FileToolsWindow : Window
 
     private async void FlipVideo_V(object sender, RoutedEventArgs e)
     {
-        if (_rotateVideoPath == null) return;
+        if (_videoToolsPath == null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "MP4|*.mp4|AVI|*.avi|MKV|*.mkv|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_rotateVideoPath) + "_flipped"
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + "_flipped"
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Flipping video vertically...");
         try
         {
-            await FileToolsService.FlipVideoAsync(_rotateVideoPath, dlg.FileName, false, CreateProgress());
+            await FileToolsService.FlipVideoAsync(_videoToolsPath, dlg.FileName, false, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Video flipped!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
@@ -2832,40 +2787,12 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  20. Extract Audio
+    //  Extract Audio Execute
     // =====================================================================
-
-    private void ExtractAudio_SelectFiles(object sender, RoutedEventArgs e)
-    {
-        if (!CheckFFmpeg()) return;
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Video Files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.webm;*.m4v|All Files|*.*" };
-        if (dlg.ShowDialog() != true) return;
-        LoadExtractAudio(dlg.FileName);
-    }
-
-    private void ExtractAudio_SelectDrop(object sender, DragEventArgs e)
-    {
-        if (!CheckFFmpeg()) return;
-        var files = GetDroppedFiles(e, IsVideoFile);
-        if (files.Length > 0) LoadExtractAudio(files[0]);
-    }
-
-    private async void LoadExtractAudio(string path)
-    {
-        _extractAudioPath = path;
-        TxtExtractAudioFileName.Text = System.IO.Path.GetFileName(path);
-        try
-        {
-            var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
-            TxtExtractAudioInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
-        }
-        catch { TxtExtractAudioInfo.Text = "Could not read video info"; }
-        ShowConfigState("extract_audio");
-    }
 
     private async void ExtractAudio_Execute(object sender, RoutedEventArgs e)
     {
-        if (_extractAudioPath == null) return;
+        if (_videoToolsPath == null) return;
 
         var format = (CmbAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
         string ext = format switch
@@ -2880,14 +2807,14 @@ public partial class FileToolsWindow : Window
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = $"{filterName}|*{ext}|All Files|*.*",
-            FileName = System.IO.Path.GetFileNameWithoutExtension(_extractAudioPath) + ext
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_videoToolsPath) + ext
         };
         if (dlg.ShowDialog() != true) return;
 
         ShowProcessing("Extracting audio...");
         try
         {
-            await FileToolsService.ExtractAudioAsync(_extractAudioPath, dlg.FileName, CreateProgress());
+            await FileToolsService.ExtractAudioAsync(_videoToolsPath, dlg.FileName, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Audio extracted!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
