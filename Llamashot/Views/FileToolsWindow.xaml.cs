@@ -2062,6 +2062,7 @@ public partial class FileToolsWindow : Window
     {
         if (CropPreviewImage.Source == null) return;
         var pos = e.GetPosition(CropCanvas);
+        var imgBounds = GetImageDisplayBounds();
 
         // Check if clicking inside existing crop rect (move mode)
         if (!_cropSelectionRect.IsEmpty && _cropSelectionRect.Contains(pos))
@@ -2074,7 +2075,9 @@ public partial class FileToolsWindow : Window
             return;
         }
 
-        // Otherwise start new crop
+        // Only allow starting crop within image bounds
+        if (!imgBounds.Contains(pos)) return;
+
         _cropMode = CropDragMode.Create;
         _cropDragStart = pos;
         _cropSelectionRect = new Rect(pos, new System.Windows.Size(0, 0));
@@ -2095,15 +2098,29 @@ public partial class FileToolsWindow : Window
         }
     }
 
+    private Rect GetImageDisplayBounds()
+    {
+        var (_, _, offsetX, offsetY) = GetImageScale();
+        double canvasW = CropCanvas.ActualWidth;
+        double canvasH = CropCanvas.ActualHeight;
+        double imageAspect = (double)_cropImgWidth / _cropImgHeight;
+        double canvasAspect = canvasW / canvasH;
+        double displayW, displayH;
+        if (imageAspect > canvasAspect) { displayW = canvasW; displayH = canvasW / imageAspect; }
+        else { displayH = canvasH; displayW = canvasH * imageAspect; }
+        return new Rect(offsetX, offsetY, displayW, displayH);
+    }
+
     private void CropCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (!_isDraggingCrop) return;
         var pos = e.GetPosition(CropCanvas);
-        double canvasW = CropCanvas.ActualWidth;
-        double canvasH = CropCanvas.ActualHeight;
 
-        // Clamp to canvas
-        pos = new Point(Math.Max(0, Math.Min(pos.X, canvasW)), Math.Max(0, Math.Min(pos.Y, canvasH)));
+        // Clamp to image display bounds (not full canvas)
+        var imgBounds = GetImageDisplayBounds();
+        pos = new Point(
+            Math.Max(imgBounds.Left, Math.Min(pos.X, imgBounds.Right)),
+            Math.Max(imgBounds.Top, Math.Min(pos.Y, imgBounds.Bottom)));
 
         var dx = pos.X - _cropDragStart.X;
         var dy = pos.Y - _cropDragStart.Y;
@@ -2121,10 +2138,10 @@ public partial class FileToolsWindow : Window
             case CropDragMode.Move:
                 var moved = _cropSelectionRect;
                 moved.Offset(dx, dy);
-                if (moved.Left < 0) moved.X = 0;
-                if (moved.Top < 0) moved.Y = 0;
-                if (moved.Right > canvasW) moved.X = canvasW - moved.Width;
-                if (moved.Bottom > canvasH) moved.Y = canvasH - moved.Height;
+                if (moved.Left < imgBounds.Left) moved.X = imgBounds.Left;
+                if (moved.Top < imgBounds.Top) moved.Y = imgBounds.Top;
+                if (moved.Right > imgBounds.Right) moved.X = imgBounds.Right - moved.Width;
+                if (moved.Bottom > imgBounds.Bottom) moved.Y = imgBounds.Bottom - moved.Height;
                 _cropSelectionRect = moved;
                 _cropDragStart = pos;
                 break;
@@ -2162,6 +2179,11 @@ public partial class FileToolsWindow : Window
                 Math.Min(_cropSelectionRect.Top, _cropSelectionRect.Bottom),
                 Math.Abs(_cropSelectionRect.Width),
                 Math.Abs(_cropSelectionRect.Height));
+
+        // Final clamp to image bounds
+        _cropSelectionRect = Rect.Intersect(_cropSelectionRect, imgBounds);
+        if (_cropSelectionRect.IsEmpty)
+            _cropSelectionRect = new Rect(imgBounds.X, imgBounds.Y, 0, 0);
 
         UpdateCropVisuals();
     }
