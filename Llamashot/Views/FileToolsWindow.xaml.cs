@@ -41,6 +41,7 @@ public partial class FileToolsWindow : Window
         ("convert_format", "Convert Format",  "Change image format",                "#EC407A"),
         ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",             "#78909C"),
         ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336"),
+        ("extract_audio", "Extract Audio",    "Extract audio from video",        "#00BCD4"),
     };
 
     // =====================================================================
@@ -135,6 +136,23 @@ public partial class FileToolsWindow : Window
     private bool _isVideoPlaying;
     private bool _isVideoSeeking;
     private DispatcherTimer? _videoTimer;
+
+    // =====================================================================
+    //  Extract audio state
+    // =====================================================================
+
+    private string? _extractAudioPath;
+
+    // =====================================================================
+    //  Video crop state
+    // =====================================================================
+
+    private bool _isVideoCropMode;
+    private bool _isVideoCropDragging;
+    private Point _videoCropStart;
+    private Rect _videoCropRect = Rect.Empty;
+    private Rectangle? _videoCropSelection;
+    private readonly Rectangle[] _videoCropOverlays = new Rectangle[4];
 
     // =====================================================================
     //  File extension lists
@@ -257,6 +275,7 @@ public partial class FileToolsWindow : Window
         _toolPanels["convert_format"] = PanelConvertFormat;
         _toolPanels["compress_office"] = PanelCompressOffice;
         _toolPanels["video_tools"] = PanelVideoTools;
+        _toolPanels["extract_audio"] = PanelExtractAudio;
 
         _selectViews["merge_pdf"] = MergeSelectView;
         _selectViews["split_pdf"] = SplitSelectView;
@@ -275,6 +294,7 @@ public partial class FileToolsWindow : Window
         _selectViews["convert_format"] = ConvertSelectView;
         _selectViews["compress_office"] = CompressOfficeSelectView;
         _selectViews["video_tools"] = VideoSelectView;
+        _selectViews["extract_audio"] = ExtractAudioSelectView;
 
         _configViews["merge_pdf"] = MergeConfigView;
         _configViews["split_pdf"] = SplitConfigView;
@@ -293,6 +313,7 @@ public partial class FileToolsWindow : Window
         _configViews["convert_format"] = ConvertConfigView;
         _configViews["compress_office"] = CompressOfficeConfigView;
         _configViews["video_tools"] = VideoConfigView;
+        _configViews["extract_audio"] = ExtractAudioConfigView;
 
         foreach (var (id, title, _, _) in ToolDefs)
             _toolTitles[id] = title;
@@ -417,6 +438,11 @@ public partial class FileToolsWindow : Window
         _videoTimer?.Stop();
         VideoPreview.Stop();
         VideoPreview.Source = null;
+        _isVideoCropMode = false;
+        _videoCropRect = Rect.Empty;
+        VideoCropCanvas.Visibility = Visibility.Collapsed;
+        VideoCropCanvas.Children.Clear();
+        _extractAudioPath = null;
         _extractPdfPath = null;
         _extractSelectedPages.Clear();
         ExtractPageGrid.Children.Clear();
@@ -2603,9 +2629,6 @@ public partial class FileToolsWindow : Window
             TxtTrimStart.Text = "0:00:00";
             TxtTrimEnd.Text = duration.ToString(@"h\:mm\:ss");
             TxtTrimDuration.Text = $"({FileToolsService.FormatTimeSpan(duration)})";
-            TxtCropVideoW.Text = w.ToString();
-            TxtCropVideoH.Text = h.ToString();
-            TxtCropVideoX.Text = "0"; TxtCropVideoY.Text = "0";
         }
         catch { TxtVideoInfo.Text = "Could not read video info"; }
 
@@ -2775,11 +2798,27 @@ public partial class FileToolsWindow : Window
                 trimEnd = te;
             }
 
-            // Determine crop
-            int.TryParse(TxtCropVideoW.Text, out int cw);
-            int.TryParse(TxtCropVideoH.Text, out int ch);
-            int.TryParse(TxtCropVideoX.Text, out int cx);
-            int.TryParse(TxtCropVideoY.Text, out int cy);
+            // Determine crop from canvas selection
+            int cw = _videoW, ch = _videoH, cx = 0, cy = 0;
+            if (!_videoCropRect.IsEmpty && _videoCropRect.Width > 10 && _videoCropRect.Height > 10)
+            {
+                double canvasW = VideoCropCanvas.ActualWidth;
+                double canvasH = VideoCropCanvas.ActualHeight;
+                double videoAspect = (double)_videoW / _videoH;
+                double canvasAspect = canvasW / canvasH;
+                double displayW, displayH, offsetX, offsetY;
+                if (videoAspect > canvasAspect)
+                { displayW = canvasW; displayH = canvasW / videoAspect; offsetX = 0; offsetY = (canvasH - displayH) / 2; }
+                else
+                { displayH = canvasH; displayW = canvasH * videoAspect; offsetX = (canvasW - displayW) / 2; offsetY = 0; }
+
+                double scaleX = _videoW / displayW;
+                double scaleY = _videoH / displayH;
+                cx = Math.Max(0, (int)Math.Round((_videoCropRect.X - offsetX) * scaleX));
+                cy = Math.Max(0, (int)Math.Round((_videoCropRect.Y - offsetY) * scaleY));
+                cw = Math.Min((int)Math.Round(_videoCropRect.Width * scaleX), _videoW - cx);
+                ch = Math.Min((int)Math.Round(_videoCropRect.Height * scaleY), _videoH - cy);
+            }
 
             // Single-pass export with all operations combined
             await FileToolsService.ExportVideoAsync(
@@ -2789,18 +2828,8 @@ public partial class FileToolsWindow : Window
                 cw, ch, cx, cy, _videoW, _videoH,
                 CreateProgress());
 
-            // Extract audio (if checked)
-            string? audioPath = null;
-            if (ChkExtractAudio.IsChecked == true)
-            {
-                var fmt = (CmbAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
-                audioPath = System.IO.Path.ChangeExtension(dlg.FileName, "." + fmt);
-                await FileToolsService.ExtractAudioAsync(_videoToolsPath, audioPath, CreateProgress());
-            }
-
             var info = new FileInfo(dlg.FileName);
             string detail = $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}";
-            if (audioPath != null) detail += $"\nAudio: {System.IO.Path.GetFileName(audioPath)}";
             ShowComplete("Video exported!", detail, dlg.FileName);
         }
         catch (Exception ex)
@@ -2808,6 +2837,194 @@ public partial class FileToolsWindow : Window
             ProcessingOverlay.Visibility = Visibility.Collapsed;
             System.Windows.MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    // ----- Video crop handlers -----
+
+    private void VideoCrop_Toggle(object sender, RoutedEventArgs e)
+    {
+        _isVideoCropMode = !_isVideoCropMode;
+        VideoCropCanvas.Visibility = _isVideoCropMode ? Visibility.Visible : Visibility.Collapsed;
+        BtnVideoCropToggle.Background = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(_isVideoCropMode ? "#42A5F5" : "#333"));
+        BtnVideoCropToggle.Foreground = _isVideoCropMode ? Brushes.White :
+            new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC"));
+
+        if (_isVideoCropMode)
+        {
+            // Pause video for crop
+            VideoPreview.Pause();
+            _isVideoPlaying = false;
+            BtnVideoPlay.Content = "\u25B6";
+            InitVideoCropOverlays();
+        }
+        else
+        {
+            VideoCropCanvas.Children.Clear();
+            _videoCropRect = Rect.Empty;
+            _videoCropSelection = null;
+            TxtVideoCropInfo.Text = "";
+        }
+    }
+
+    private void InitVideoCropOverlays()
+    {
+        VideoCropCanvas.Children.Clear();
+        for (int i = 0; i < 4; i++)
+        {
+            _videoCropOverlays[i] = new Rectangle
+            {
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x88, 0, 0, 0))
+            };
+            VideoCropCanvas.Children.Add(_videoCropOverlays[i]);
+        }
+        _videoCropSelection = new Rectangle
+        {
+            Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5")),
+            StrokeThickness = 2,
+            StrokeDashArray = new DoubleCollection { 4, 2 },
+            Fill = Brushes.Transparent
+        };
+        VideoCropCanvas.Children.Add(_videoCropSelection);
+    }
+
+    private void VideoCrop_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _isVideoCropDragging = true;
+        _videoCropStart = e.GetPosition(VideoCropCanvas);
+        VideoCropCanvas.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void VideoCrop_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_isVideoCropDragging) return;
+        var pos = e.GetPosition(VideoCropCanvas);
+        double x = Math.Min(_videoCropStart.X, pos.X);
+        double y = Math.Min(_videoCropStart.Y, pos.Y);
+        double w = Math.Abs(pos.X - _videoCropStart.X);
+        double h = Math.Abs(pos.Y - _videoCropStart.Y);
+
+        // Clamp to canvas
+        double canvasW = VideoCropCanvas.ActualWidth;
+        double canvasH = VideoCropCanvas.ActualHeight;
+        x = Math.Max(0, x); y = Math.Max(0, y);
+        if (x + w > canvasW) w = canvasW - x;
+        if (y + h > canvasH) h = canvasH - y;
+
+        _videoCropRect = new Rect(x, y, w, h);
+        UpdateVideoCropVisuals();
+    }
+
+    private void VideoCrop_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        _isVideoCropDragging = false;
+        VideoCropCanvas.ReleaseMouseCapture();
+    }
+
+    private void UpdateVideoCropVisuals()
+    {
+        if (_videoCropSelection == null || _videoCropRect.IsEmpty) return;
+        var r = _videoCropRect;
+        double cw = VideoCropCanvas.ActualWidth;
+        double ch = VideoCropCanvas.ActualHeight;
+
+        Canvas.SetLeft(_videoCropSelection, r.X);
+        Canvas.SetTop(_videoCropSelection, r.Y);
+        _videoCropSelection.Width = Math.Max(0, r.Width);
+        _videoCropSelection.Height = Math.Max(0, r.Height);
+
+        // Overlay darkening
+        Canvas.SetLeft(_videoCropOverlays[0], 0); Canvas.SetTop(_videoCropOverlays[0], 0);
+        _videoCropOverlays[0].Width = cw; _videoCropOverlays[0].Height = Math.Max(0, r.Y);
+
+        Canvas.SetLeft(_videoCropOverlays[1], 0); Canvas.SetTop(_videoCropOverlays[1], r.Bottom);
+        _videoCropOverlays[1].Width = cw; _videoCropOverlays[1].Height = Math.Max(0, ch - r.Bottom);
+
+        Canvas.SetLeft(_videoCropOverlays[2], 0); Canvas.SetTop(_videoCropOverlays[2], r.Y);
+        _videoCropOverlays[2].Width = Math.Max(0, r.X); _videoCropOverlays[2].Height = Math.Max(0, r.Height);
+
+        Canvas.SetLeft(_videoCropOverlays[3], r.Right); Canvas.SetTop(_videoCropOverlays[3], r.Y);
+        _videoCropOverlays[3].Width = Math.Max(0, cw - r.Right); _videoCropOverlays[3].Height = Math.Max(0, r.Height);
+
+        // Convert to video pixel coordinates
+        double videoAspect = (double)_videoW / _videoH;
+        double canvasAspect = cw / ch;
+        double displayW, displayH, offsetX, offsetY;
+        if (videoAspect > canvasAspect)
+        {
+            displayW = cw; displayH = cw / videoAspect;
+            offsetX = 0; offsetY = (ch - displayH) / 2;
+        }
+        else
+        {
+            displayH = ch; displayW = ch * videoAspect;
+            offsetX = (cw - displayW) / 2; offsetY = 0;
+        }
+
+        double scaleX = _videoW / displayW;
+        double scaleY = _videoH / displayH;
+        int pixX = Math.Max(0, (int)Math.Round((r.X - offsetX) * scaleX));
+        int pixY = Math.Max(0, (int)Math.Round((r.Y - offsetY) * scaleY));
+        int pixW = Math.Min((int)Math.Round(r.Width * scaleX), _videoW - pixX);
+        int pixH = Math.Min((int)Math.Round(r.Height * scaleY), _videoH - pixY);
+
+        TxtVideoCropInfo.Text = pixW > 0 && pixH > 0 ? $"{pixW}x{pixH} at {pixX},{pixY}" : "";
+    }
+
+    // =====================================================================
+    //  18. Extract Audio
+    // =====================================================================
+
+    private void ExtractAudio_SelectFiles(object sender, RoutedEventArgs e)
+    {
+        if (!CheckFFmpeg()) return;
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Video Files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.webm;*.m4v|All Files|*.*" };
+        if (dlg.ShowDialog() != true) return;
+        LoadExtractAudio(dlg.FileName);
+    }
+
+    private void ExtractAudio_SelectDrop(object sender, DragEventArgs e)
+    {
+        if (!CheckFFmpeg()) return;
+        var files = GetDroppedFiles(e, IsVideoFile);
+        if (files.Length > 0) LoadExtractAudio(files[0]);
+    }
+
+    private async void LoadExtractAudio(string path)
+    {
+        _extractAudioPath = path;
+        TxtExtractAudioFileName.Text = System.IO.Path.GetFileName(path);
+        try
+        {
+            var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
+            TxtExtractAudioInfo.Text = $"{w}x{h} | {codec} | Duration: {FileToolsService.FormatTimeSpan(duration)}";
+        }
+        catch { TxtExtractAudioInfo.Text = ""; }
+        ShowConfigState("extract_audio");
+    }
+
+    private async void ExtractAudio_Execute(object sender, RoutedEventArgs e)
+    {
+        if (_extractAudioPath == null) return;
+        var format = (CmbExtAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
+        string ext = format switch { "wav" => ".wav", "aac" => ".aac", "flac" => ".flac", _ => ".mp3" };
+
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = $"{format.ToUpperInvariant()}|*{ext}|All Files|*.*",
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_extractAudioPath) + ext
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        ShowProcessing("Extracting audio...");
+        try
+        {
+            await FileToolsService.ExtractAudioAsync(_extractAudioPath, dlg.FileName, CreateProgress());
+            var info = new FileInfo(dlg.FileName);
+            ShowComplete("Audio extracted!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
+        }
+        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
     }
 }
 

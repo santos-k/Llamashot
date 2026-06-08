@@ -1220,21 +1220,26 @@
 
                 <!-- Row 1: Video preview with rotate/flip transforms -->
                 <Border Grid.Row="1" Background="#000" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
-                        ClipToBounds="True" Margin="0,0,0,6">
+                        Margin="0,0,0,6">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
                     </Border.Effect>
-                    <MediaElement x:Name="VideoPreview" LoadedBehavior="Manual" UnloadedBehavior="Stop"
-                                  Stretch="Uniform" MediaOpened="VideoPreview_MediaOpened"
-                                  MediaEnded="VideoPreview_MediaEnded"
-                                  RenderTransformOrigin="0.5,0.5">
-                        <MediaElement.RenderTransform>
-                            <TransformGroup>
-                                <ScaleTransform x:Name="VideoFlipTransform" ScaleX="1" ScaleY="1"/>
-                                <RotateTransform x:Name="VideoRotateTransform" Angle="0"/>
-                            </TransformGroup>
-                        </MediaElement.RenderTransform>
-                    </MediaElement>
+                    <Grid ClipToBounds="True">
+                        <MediaElement x:Name="VideoPreview" LoadedBehavior="Manual" UnloadedBehavior="Stop"
+                                      Stretch="Uniform" MediaOpened="VideoPreview_MediaOpened"
+                                      MediaEnded="VideoPreview_MediaEnded">
+                            <MediaElement.LayoutTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="VideoFlipTransform" ScaleX="1" ScaleY="1"/>
+                                    <RotateTransform x:Name="VideoRotateTransform" Angle="0"/>
+                                </TransformGroup>
+                            </MediaElement.LayoutTransform>
+                        </MediaElement>
+                        <Canvas x:Name="VideoCropCanvas" Background="Transparent" Visibility="Collapsed"
+                                MouseLeftButtonDown="VideoCrop_MouseDown"
+                                MouseMove="VideoCrop_MouseMove"
+                                MouseLeftButtonUp="VideoCrop_MouseUp"/>
+                    </Grid>
                 </Border>
 
                 <!-- Row 2: Playback controls -->
@@ -1295,8 +1300,6 @@
                             <ColumnDefinition Width="Auto"/>  <!-- Rotate/Flip -->
                             <ColumnDefinition Width="Auto"/>  <!-- Separator -->
                             <ColumnDefinition Width="Auto"/>  <!-- Crop -->
-                            <ColumnDefinition Width="Auto"/>  <!-- Separator -->
-                            <ColumnDefinition Width="Auto"/>  <!-- Extract audio checkbox -->
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
@@ -1320,35 +1323,13 @@
                         <!-- Separator -->
                         <Border Grid.Column="1" Width="1" Background="#444" Margin="12,2"/>
 
-                        <!-- Crop inputs -->
+                        <!-- Crop toggle -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal">
-                            <TextBlock Text="Crop:" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBox x:Name="TxtCropVideoW" Width="50" Height="26" Padding="4,2" FontSize="11"
-                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" ToolTip="Width"/>
-                            <TextBlock Text="x" Foreground="#666" VerticalAlignment="Center" Margin="3,0"/>
-                            <TextBox x:Name="TxtCropVideoH" Width="50" Height="26" Padding="4,2" FontSize="11"
-                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" ToolTip="Height"/>
-                            <TextBlock Text="at" Foreground="#666" VerticalAlignment="Center" Margin="4,0"/>
-                            <TextBox x:Name="TxtCropVideoX" Width="40" Height="26" Padding="4,2" FontSize="11"
-                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" ToolTip="X"/>
-                            <TextBlock Text="," Foreground="#666" VerticalAlignment="Center" Margin="2,0"/>
-                            <TextBox x:Name="TxtCropVideoY" Width="40" Height="26" Padding="4,2" FontSize="11"
-                                     Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" ToolTip="Y"/>
-                        </StackPanel>
-
-                        <!-- Separator -->
-                        <Border Grid.Column="3" Width="1" Background="#444" Margin="12,2"/>
-
-                        <!-- Extract audio option -->
-                        <StackPanel Grid.Column="4" Orientation="Horizontal">
-                            <CheckBox x:Name="ChkExtractAudio" Content="Also extract audio as" Foreground="#CCC" FontSize="12"
-                                      VerticalAlignment="Center" Cursor="Hand" Margin="0,0,6,0"/>
-                            <ComboBox x:Name="CmbAudioFormat" Width="65" Height="26" FontSize="11" SelectedIndex="0">
-                                <ComboBoxItem Content="MP3"/>
-                                <ComboBoxItem Content="WAV"/>
-                                <ComboBoxItem Content="AAC"/>
-                                <ComboBoxItem Content="FLAC"/>
-                            </ComboBox>
+                            <Button x:Name="BtnVideoCropToggle" Content="&#x2702; Crop" Width="70" Height="30" FontSize="12"
+                                    Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                    Click="VideoCrop_Toggle" ToolTip="Toggle crop selection"/>
+                            <TextBlock x:Name="TxtVideoCropInfo" Text="" Foreground="#42A5F5" FontSize="11"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -1365,6 +1346,50 @@
                             Cursor="Hand" Click="VideoExport_Execute"
                             Template="{StaticResource RoundedButton}"/>
                 </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- ====================== PanelExtractAudio ====================== -->
+        <Grid x:Name="PanelExtractAudio" Grid.Row="1" Visibility="Collapsed">
+            <Border x:Name="ExtractAudioSelectView" AllowDrop="True"
+                          Drop="ExtractAudio_SelectDrop" DragOver="Generic_DragOver"
+                          Background="Transparent">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="Extract Audio" FontSize="28" FontWeight="Bold" Foreground="#EEE"
+                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Extract audio track from a video file" FontSize="14" Foreground="#888"
+                               HorizontalAlignment="Center" Margin="0,0,0,40"/>
+                    <Button Content="Select video file" Width="280" Height="50"
+                            FontSize="16" FontWeight="SemiBold" Foreground="White"
+                            Background="#00BCD4" Cursor="Hand" Click="ExtractAudio_SelectFiles"
+                            Margin="0,0,0,16" Template="{StaticResource RoundedButton}"/>
+                    <TextBlock Text="or drop a video here" FontSize="12" Foreground="#666"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Grid x:Name="ExtractAudioConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,8">
+                    <TextBlock x:Name="TxtExtractAudioFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Name="TxtExtractAudioInfo" Text="" Foreground="#888" FontSize="12"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="400">
+                    <TextBlock Text="Output format:" Foreground="#CCC" FontSize="15" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                    <ComboBox x:Name="CmbExtAudioFormat" Width="150" Height="34" FontSize="13" SelectedIndex="0" HorizontalAlignment="Center">
+                        <ComboBoxItem Content="MP3"/>
+                        <ComboBoxItem Content="WAV"/>
+                        <ComboBoxItem Content="AAC"/>
+                        <ComboBoxItem Content="FLAC"/>
+                    </ComboBox>
+                </StackPanel>
+                <Button Grid.Row="2" Content="Extract Audio &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                        FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#00BCD4"
+                        HorizontalAlignment="Center" Cursor="Hand" Click="ExtractAudio_Execute"
+                        Template="{StaticResource RoundedButton}"/>
             </Grid>
         </Grid>
 
