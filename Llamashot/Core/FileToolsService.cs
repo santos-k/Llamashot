@@ -886,6 +886,192 @@ public static class FileToolsService
     public static string FormatTimeSpan(TimeSpan ts) =>
         ts.TotalHours >= 1 ? ts.ToString(@"h\:mm\:ss") : ts.ToString(@"m\:ss");
 
+    public static bool IsYtDlpAvailable()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("yt-dlp", "--version")
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit(5000);
+            return proc?.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
+    public static async Task<(string title, string duration, string thumbnail, bool isPlaylist, int videoCount)> GetYouTubeInfoAsync(string url)
+    {
+        return await Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo("yt-dlp",
+                $"--dump-single-json --no-download \"{url}\"")
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            using var proc = Process.Start(psi)!;
+            string json = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(30000);
+
+            // Basic JSON parsing without a JSON library
+            string title = ExtractJsonString(json, "title") ?? "Unknown";
+            string duration = "";
+            bool isPlaylist = json.Contains("\"_type\": \"playlist\"") || json.Contains("\"_type\":\"playlist\"");
+            int videoCount = 1;
+
+            if (isPlaylist)
+            {
+                // Count entries
+                int count = 0;
+                int idx = 0;
+                while ((idx = json.IndexOf("\"url\":", idx + 1)) >= 0) count++;
+                videoCount = Math.Max(count, 1);
+                title = ExtractJsonString(json, "title") ?? "Playlist";
+            }
+            else
+            {
+                var durMatch = Regex.Match(json, @"""duration"":\s*(\d+\.?\d*)");
+                if (durMatch.Success && double.TryParse(durMatch.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double secs))
+                    duration = FormatTimeSpan(TimeSpan.FromSeconds(secs));
+            }
+
+            string thumbnail = ExtractJsonString(json, "thumbnail") ?? "";
+            return (title, duration, thumbnail, isPlaylist, videoCount);
+        });
+    }
+
+    private static string? ExtractJsonString(string json, string key)
+    {
+        var match = Regex.Match(json, $"\"{key}\":\\s*\"([^\"]+)\"");
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
+    public static async Task<string[]> DownloadYouTubeVideoAsync(string url, string outputDir, string quality, IProgress<(int percent, string status)>? progress = null)
+    {
+        Directory.CreateDirectory(outputDir);
+        var outputFiles = new List<string>();
+
+        await Task.Run(() =>
+        {
+            string formatArg = quality switch
+            {
+                "best" => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\"",
+                "720p" => "-f \"bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best\"",
+                "480p" => "-f \"bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best\"",
+                "360p" => "-f \"bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best\"",
+                _ => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\""
+            };
+
+            var psi = new ProcessStartInfo("yt-dlp",
+                $"{formatArg} --merge-output-format mp4 -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{url}\"")
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+
+            using var proc = Process.Start(psi)!;
+
+            proc.OutputDataReceived += (s, e) =>
+            {
+                if (e.Data == null) return;
+                // Parse progress: "[download]  45.2% of ~50MiB at 2.5MiB/s ETA 00:15"
+                var match = Regex.Match(e.Data, @"\[download\]\s+(\d+\.?\d*)%");
+                if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pct))
+                    progress?.Report(((int)pct, e.Data.Trim()));
+                // Capture destination filename
+                var destMatch = Regex.Match(e.Data, @"\[download\] Destination: (.+)$");
+                if (destMatch.Success) outputFiles.Add(destMatch.Groups[1].Value.Trim());
+                var mergeMatch = Regex.Match(e.Data, @"\[Merger\] Merging formats into ""(.+)""");
+                if (mergeMatch.Success)
+                {
+                    outputFiles.Clear();
+                    outputFiles.Add(mergeMatch.Groups[1].Value.Trim());
+                }
+                // Already downloaded
+                var alreadyMatch = Regex.Match(e.Data, @"has already been downloaded");
+                if (alreadyMatch.Success)
+                    progress?.Report((100, "Already downloaded"));
+            };
+            proc.BeginOutputReadLine();
+            proc.WaitForExit();
+
+            if (proc.ExitCode != 0)
+                throw new Exception("yt-dlp download failed");
+        });
+
+        // If no files captured from output, scan the directory
+        if (outputFiles.Count == 0)
+            outputFiles.AddRange(Directory.GetFiles(outputDir, "*.mp4").OrderByDescending(File.GetCreationTime).Take(1));
+
+        return outputFiles.ToArray();
+    }
+
+    public static async Task<string[]> DownloadYouTubeAudioAsync(string url, string outputDir, bool embedThumbnail, IProgress<(int percent, string status)>? progress = null)
+    {
+        Directory.CreateDirectory(outputDir);
+        var outputFiles = new List<string>();
+
+        await Task.Run(() =>
+        {
+            string thumbArg = embedThumbnail ? "--embed-thumbnail" : "";
+            var psi = new ProcessStartInfo("yt-dlp",
+                $"-x --audio-format mp3 --audio-quality 0 {thumbArg} -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{url}\"")
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+
+            using var proc = Process.Start(psi)!;
+
+            proc.OutputDataReceived += (s, e) =>
+            {
+                if (e.Data == null) return;
+                var match = Regex.Match(e.Data, @"\[download\]\s+(\d+\.?\d*)%");
+                if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pct))
+                    progress?.Report(((int)pct, e.Data.Trim()));
+                var destMatch = Regex.Match(e.Data, @"\[download\] Destination: (.+)$");
+                if (destMatch.Success) outputFiles.Add(destMatch.Groups[1].Value.Trim());
+            };
+            proc.BeginOutputReadLine();
+            proc.WaitForExit();
+
+            if (proc.ExitCode != 0)
+                throw new Exception("yt-dlp audio download failed");
+        });
+
+        if (outputFiles.Count == 0)
+            outputFiles.AddRange(Directory.GetFiles(outputDir, "*.mp3").OrderByDescending(File.GetCreationTime).Take(1));
+
+        return outputFiles.ToArray();
+    }
+
+    public static async Task ExtractAudioWithThumbnailAsync(string videoPath, string outputPath, IProgress<int>? progress = null)
+    {
+        var info = await GetVideoInfoAsync(videoPath);
+        string ext = Path.GetExtension(outputPath).ToLowerInvariant();
+
+        // First extract a thumbnail frame at 1 second
+        string tempThumb = Path.Combine(Path.GetTempPath(), $"llamashot_thumb_{Guid.NewGuid():N}.jpg");
+        try
+        {
+            await RunFFmpegAsync($"-ss 1 -i \"{videoPath}\" -vframes 1 -q:v 2 \"{tempThumb}\"", null, null);
+
+            // Now extract audio with embedded thumbnail
+            if (ext == ".mp3")
+            {
+                // MP3 supports ID3 album art
+                await RunFFmpegAsync(
+                    $"-i \"{videoPath}\" -i \"{tempThumb}\" -map 0:a -map 1:0 -c:a libmp3lame -q:a 0 -id3v2_version 3 -metadata:s:v title=\"Album cover\" -metadata:s:v comment=\"Cover (front)\" \"{outputPath}\"",
+                    info.duration, progress);
+            }
+            else
+            {
+                // For other formats, just extract audio without thumbnail
+                string codec = ext switch
+                {
+                    ".wav" => "", ".aac" => "-acodec aac", ".flac" => "-acodec flac",
+                    _ => "-acodec libmp3lame -q:a 0"
+                };
+                await RunFFmpegAsync($"-i \"{videoPath}\" -vn {codec} \"{outputPath}\"", info.duration, progress);
+            }
+        }
+        finally
+        {
+            try { File.Delete(tempThumb); } catch { }
+        }
+    }
+
     public static bool IsImageExtension(string ext) =>
         ext.ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".gif" or ".tiff" or ".tif" or ".webp" or ".ico";
 

@@ -42,6 +42,7 @@ public partial class FileToolsWindow : Window
         ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",             "#78909C"),
         ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336"),
         ("extract_audio", "Extract Audio",    "Extract audio from video",        "#00BCD4"),
+        ("youtube_dl",    "YouTube Download", "Download video or audio from URL",  "#FF0000"),
     };
 
     // =====================================================================
@@ -142,6 +143,13 @@ public partial class FileToolsWindow : Window
     // =====================================================================
 
     private string? _extractAudioPath;
+
+    // =====================================================================
+    //  YouTube download state
+    // =====================================================================
+
+    private string? _ytUrl;
+    private bool _ytIsPlaylist;
 
     // =====================================================================
     //  Video crop state
@@ -276,6 +284,7 @@ public partial class FileToolsWindow : Window
         _toolPanels["compress_office"] = PanelCompressOffice;
         _toolPanels["video_tools"] = PanelVideoTools;
         _toolPanels["extract_audio"] = PanelExtractAudio;
+        _toolPanels["youtube_dl"] = PanelYouTubeDl;
 
         _selectViews["merge_pdf"] = MergeSelectView;
         _selectViews["split_pdf"] = SplitSelectView;
@@ -295,6 +304,7 @@ public partial class FileToolsWindow : Window
         _selectViews["compress_office"] = CompressOfficeSelectView;
         _selectViews["video_tools"] = VideoSelectView;
         _selectViews["extract_audio"] = ExtractAudioSelectView;
+        _selectViews["youtube_dl"] = YtSelectView;
 
         _configViews["merge_pdf"] = MergeConfigView;
         _configViews["split_pdf"] = SplitConfigView;
@@ -314,6 +324,7 @@ public partial class FileToolsWindow : Window
         _configViews["compress_office"] = CompressOfficeConfigView;
         _configViews["video_tools"] = VideoConfigView;
         _configViews["extract_audio"] = ExtractAudioConfigView;
+        _configViews["youtube_dl"] = YtConfigView;
 
         foreach (var (id, title, _, _) in ToolDefs)
             _toolTitles[id] = title;
@@ -443,6 +454,10 @@ public partial class FileToolsWindow : Window
         VideoCropCanvas.Visibility = Visibility.Collapsed;
         VideoCropCanvas.Children.Clear();
         _extractAudioPath = null;
+        _ytUrl = null;
+        _ytIsPlaylist = false;
+        YtProgressPanel.Visibility = Visibility.Collapsed;
+        TxtYtUrl.Text = "";
         _extractPdfPath = null;
         _extractSelectedPages.Clear();
         ExtractPageGrid.Children.Clear();
@@ -3020,11 +3035,118 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Extracting audio...");
         try
         {
-            await FileToolsService.ExtractAudioAsync(_extractAudioPath, dlg.FileName, CreateProgress());
+            if (ChkExtAudioThumb.IsChecked == true)
+                await FileToolsService.ExtractAudioWithThumbnailAsync(_extractAudioPath, dlg.FileName, CreateProgress());
+            else
+                await FileToolsService.ExtractAudioAsync(_extractAudioPath, dlg.FileName, CreateProgress());
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Audio extracted!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
         catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+    }
+
+    // =====================================================================
+    //  YouTube Download
+    // =====================================================================
+
+    private async void Yt_Fetch(object sender, RoutedEventArgs e)
+    {
+        string url = TxtYtUrl.Text.Trim();
+        if (string.IsNullOrEmpty(url))
+        {
+            MessageBox.Show("Enter a YouTube URL.", "Input Required", MessageBoxButton.OK);
+            return;
+        }
+
+        if (!FileToolsService.IsYtDlpAvailable())
+        {
+            MessageBox.Show("yt-dlp is required for YouTube downloads.\n\nInstall yt-dlp and add it to your system PATH:\nhttps://github.com/yt-dlp/yt-dlp",
+                "yt-dlp Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        _ytUrl = url;
+        TxtYtTitle.Text = "Fetching info...";
+        TxtYtDetail.Text = "";
+        TxtYtType.Text = "";
+        ShowConfigState("youtube_dl");
+
+        try
+        {
+            var (title, duration, thumbnail, isPlaylist, videoCount) = await FileToolsService.GetYouTubeInfoAsync(url);
+            _ytIsPlaylist = isPlaylist;
+            TxtYtTitle.Text = title;
+            TxtYtDetail.Text = isPlaylist ? $"{videoCount} videos" : (duration.Length > 0 ? $"Duration: {duration}" : "");
+            TxtYtType.Text = isPlaylist ? "PLAYLIST" : "VIDEO";
+        }
+        catch (Exception ex)
+        {
+            TxtYtTitle.Text = "Could not fetch info";
+            TxtYtDetail.Text = ex.Message;
+        }
+    }
+
+    private void YtMode_Changed(object sender, RoutedEventArgs e)
+    {
+        if (YtVideoOptions == null || YtAudioOptions == null) return;
+        bool isVideo = RbYtVideo.IsChecked == true;
+        YtVideoOptions.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
+        YtAudioOptions.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private async void Yt_Download(object sender, RoutedEventArgs e)
+    {
+        if (_ytUrl == null) return;
+
+        // Choose output folder
+        var folderDlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Select download folder" };
+        if (folderDlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        BtnYtDownload.IsEnabled = false;
+        YtProgressPanel.Visibility = Visibility.Visible;
+        YtProgress.Value = 0;
+        TxtYtProgress.Text = "Starting download...";
+
+        try
+        {
+            bool isVideo = RbYtVideo.IsChecked == true;
+
+            if (isVideo)
+            {
+                var quality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "best";
+                var progress = new Progress<(int percent, string status)>(p =>
+                {
+                    YtProgress.Value = p.percent;
+                    TxtYtProgress.Text = p.status;
+                });
+                var files = await FileToolsService.DownloadYouTubeVideoAsync(_ytUrl, folderDlg.SelectedPath, quality, progress);
+                YtProgressPanel.Visibility = Visibility.Collapsed;
+                string fileList = files.Length > 0 ? string.Join("\n", files.Select(System.IO.Path.GetFileName)) : "Download complete";
+                ShowComplete("Download complete!", fileList, files.Length > 0 ? files[0] : null, folderDlg.SelectedPath);
+            }
+            else
+            {
+                bool embedThumb = ChkYtEmbedThumb.IsChecked == true;
+                var progress = new Progress<(int percent, string status)>(p =>
+                {
+                    YtProgress.Value = p.percent;
+                    TxtYtProgress.Text = p.status;
+                });
+                var files = await FileToolsService.DownloadYouTubeAudioAsync(_ytUrl, folderDlg.SelectedPath, embedThumb, progress);
+                YtProgressPanel.Visibility = Visibility.Collapsed;
+                string fileList = files.Length > 0 ? string.Join("\n", files.Select(System.IO.Path.GetFileName)) : "Download complete";
+                ShowComplete("Audio downloaded!", fileList, files.Length > 0 ? files[0] : null, folderDlg.SelectedPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            YtProgressPanel.Visibility = Visibility.Collapsed;
+            MessageBox.Show($"Download failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            BtnYtDownload.IsEnabled = true;
+        }
     }
 }
 

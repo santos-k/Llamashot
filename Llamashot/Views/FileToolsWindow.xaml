@@ -1385,10 +1385,121 @@
                         <ComboBoxItem Content="AAC"/>
                         <ComboBoxItem Content="FLAC"/>
                     </ComboBox>
+                    <CheckBox x:Name="ChkExtAudioThumb" Content="Embed video thumbnail as album art"
+                              Foreground="#CCC" FontSize="12" IsChecked="True" Cursor="Hand" Margin="0,12,0,0"/>
                 </StackPanel>
                 <Button Grid.Row="2" Content="Extract Audio &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
                         FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#00BCD4"
                         HorizontalAlignment="Center" Cursor="Hand" Click="ExtractAudio_Execute"
+                        Template="{StaticResource RoundedButton}"/>
+            </Grid>
+        </Grid>
+
+        <!-- ====================== PanelYouTubeDl ====================== -->
+        <Grid x:Name="PanelYouTubeDl" Grid.Row="1" Visibility="Collapsed">
+            <Border x:Name="YtSelectView" Background="Transparent">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="YouTube Download" FontSize="28" FontWeight="Bold" Foreground="#EEE"
+                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Download video or audio from YouTube" FontSize="14" Foreground="#888"
+                               HorizontalAlignment="Center" Margin="0,0,0,40"/>
+                    <!-- URL input -->
+                    <Grid Width="500" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtYtUrl" Height="44" Padding="14,10" FontSize="14"
+                                 Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="2"
+                                 VerticalContentAlignment="Center">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Style.Triggers>
+                                        <Trigger Property="Text" Value="">
+                                            <Setter Property="Background" Value="#252528"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <Button Grid.Column="1" Content="Fetch &#x2192;" Width="90" Height="44"
+                                FontSize="14" FontWeight="SemiBold" Foreground="White" Background="#FF0000"
+                                Cursor="Hand" Click="Yt_Fetch" Margin="8,0,0,0"
+                                Template="{StaticResource RoundedButton}"/>
+                    </Grid>
+                    <TextBlock Text="Paste a YouTube URL (video or playlist)" FontSize="12" Foreground="#666"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Config state -->
+            <Grid x:Name="YtConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Video info -->
+                <Border Background="#252528" CornerRadius="6" Padding="16,12" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="TxtYtTitle" Text="" Foreground="#EEE" FontSize="16" FontWeight="SemiBold"
+                                       TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="TxtYtDetail" Text="" Foreground="#888" FontSize="12"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" x:Name="TxtYtType" Text="" Foreground="#FF0000" FontSize="13"
+                                   FontWeight="SemiBold" VerticalAlignment="Top" Margin="16,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Download options -->
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
+                    <!-- Download mode -->
+                    <TextBlock Text="Download as:" Foreground="#CCC" FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <RadioButton x:Name="RbYtVideo" Content="Video (MP4)" Foreground="#CCC" FontSize="13"
+                                     IsChecked="True" GroupName="YtMode" Margin="0,0,24,0" Cursor="Hand"
+                                     Checked="YtMode_Changed"/>
+                        <RadioButton x:Name="RbYtAudio" Content="Audio (MP3)" Foreground="#CCC" FontSize="13"
+                                     GroupName="YtMode" Cursor="Hand"
+                                     Checked="YtMode_Changed"/>
+                    </StackPanel>
+
+                    <!-- Video quality (visible when video mode) -->
+                    <StackPanel x:Name="YtVideoOptions" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <TextBlock Text="Quality:" Foreground="#888" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="CmbYtQuality" Width="120" Height="30" FontSize="12" SelectedIndex="0">
+                            <ComboBoxItem Content="Best"/>
+                            <ComboBoxItem Content="720p"/>
+                            <ComboBoxItem Content="480p"/>
+                            <ComboBoxItem Content="360p"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Audio options (visible when audio mode) -->
+                    <StackPanel x:Name="YtAudioOptions" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <CheckBox x:Name="ChkYtEmbedThumb" Content="Embed thumbnail as album art"
+                                  Foreground="#CCC" FontSize="12" IsChecked="True" Cursor="Hand"/>
+                    </StackPanel>
+
+                    <!-- Download progress (hidden until download starts) -->
+                    <StackPanel x:Name="YtProgressPanel" Visibility="Collapsed" Margin="0,0,0,16">
+                        <ProgressBar x:Name="YtProgress" Height="6" Minimum="0" Maximum="100"
+                                     Foreground="#FF0000" Background="#333" BorderThickness="0" Margin="0,0,0,6"/>
+                        <TextBlock x:Name="TxtYtProgress" Text="" Foreground="#888" FontSize="11"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Download button -->
+                <Button Grid.Row="2" x:Name="BtnYtDownload" Content="Download &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                        FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#FF0000"
+                        HorizontalAlignment="Center" Cursor="Hand" Click="Yt_Download"
                         Template="{StaticResource RoundedButton}"/>
             </Grid>
         </Grid>
