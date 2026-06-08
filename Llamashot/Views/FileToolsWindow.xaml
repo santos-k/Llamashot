@@ -1242,55 +1242,97 @@
                     </Grid>
                 </Border>
 
-                <!-- Row 2: Playback controls -->
-                <Grid Grid.Row="2" Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="BtnVideoPlay" Content="&#x25B6;" FontSize="18" Width="36" Height="36"
-                            Background="Transparent" Foreground="White" BorderThickness="0" Cursor="Hand"
-                            Click="VideoPlay_Click" VerticalAlignment="Center"/>
-                    <!-- Seek bar -->
-                    <Grid x:Name="VideoSeekContainer" Grid.Column="1" Height="24" Background="Transparent"
-                          Cursor="Hand" Margin="10,0"
-                          MouseLeftButtonDown="VideoSeek_MouseDown" MouseMove="VideoSeek_MouseMove"
-                          MouseLeftButtonUp="VideoSeek_MouseUp" VerticalAlignment="Center">
-                        <Border Background="#44FFFFFF" Height="4" CornerRadius="2" VerticalAlignment="Center"/>
-                        <Border x:Name="VideoSeekProgress" Background="#42A5F5" Height="4" CornerRadius="2"
-                                VerticalAlignment="Center" HorizontalAlignment="Left" Width="0"/>
-                        <!-- Trim region highlight -->
-                        <Border x:Name="VideoTrimRegion" Background="#3342A5F5" Height="8" CornerRadius="2"
-                                VerticalAlignment="Center" HorizontalAlignment="Left" Width="0" Margin="0,0,0,0"/>
-                        <Ellipse x:Name="VideoSeekThumb" Width="14" Height="14" Fill="White"
-                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-7,0,0,0"/>
-                    </Grid>
-                    <TextBlock x:Name="TxtVideoTime" Grid.Column="2" Foreground="#AAA" FontSize="12"
-                               VerticalAlignment="Center" Text="0:00 / 0:00"/>
-                </Grid>
+                <!-- Row 2: Visual timeline with trim handles -->
+                <Border Grid.Row="2" Background="#252528" CornerRadius="6" Padding="8,6" Margin="0,0,0,4">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                <!-- Row 3: Trim controls -->
-                <Grid Grid.Row="3" Margin="0,0,0,8">
+                        <!-- Timeline bar with trim handles -->
+                        <Grid x:Name="VideoTimelineContainer" Height="40" Background="Transparent" Cursor="Hand"
+                              MouseLeftButtonDown="VideoTimeline_MouseDown"
+                              MouseMove="VideoTimeline_MouseMove"
+                              MouseLeftButtonUp="VideoTimeline_MouseUp">
+                            <!-- Full track background -->
+                            <Border Background="#333" CornerRadius="4" Height="36" VerticalAlignment="Center"/>
+
+                            <!-- Selected trim region (red gradient) -->
+                            <Border x:Name="VtTrimRegion" CornerRadius="4" Height="36" VerticalAlignment="Center"
+                                    HorizontalAlignment="Left">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#E53935" Offset="0"/>
+                                        <GradientStop Color="#C62828" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+
+                            <!-- Left trim handle -->
+                            <Border x:Name="VtHandleLeft" Width="14" Height="40" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center" Cursor="SizeWE" Background="#E53935" CornerRadius="3,0,0,3">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Border Width="2" Height="14" Background="White" CornerRadius="1" Margin="0,0,0,2"/>
+                                    <Border Width="2" Height="14" Background="White" CornerRadius="1"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Right trim handle -->
+                            <Border x:Name="VtHandleRight" Width="14" Height="40" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center" Cursor="SizeWE" Background="#E53935" CornerRadius="0,3,3,0">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Border Width="2" Height="14" Background="White" CornerRadius="1" Margin="0,0,0,2"/>
+                                    <Border Width="2" Height="14" Background="White" CornerRadius="1"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Playhead -->
+                            <Border x:Name="VtPlayhead" Width="3" Height="44" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center" Background="White" CornerRadius="1" IsHitTestVisible="False">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="4" ShadowDepth="0" Opacity="0.5" Color="Black"/>
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
+
+                        <!-- Time labels row -->
+                        <Grid Grid.Row="1" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="VtStartLabel" Text="00:00:00" Foreground="#E53935" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="VtDurationLabel" Grid.Column="1" Text="" Foreground="#888" FontSize="12"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="VtEndLabel" Grid.Column="2" Text="00:00:00" Foreground="#E53935" FontSize="12" FontWeight="SemiBold"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- Row 3: Playback controls -->
+                <Grid Grid.Row="3" Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="90"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="90"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Trim:" Foreground="#42A5F5" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBlock Text="Start" Grid.Column="1" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                    <TextBox x:Name="TxtTrimStart" Grid.Column="2" Height="26" Padding="6,2" FontSize="12"
-                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
-                    <TextBlock Text="End" Grid.Column="3" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="10,0,4,0"/>
-                    <TextBox x:Name="TxtTrimEnd" Grid.Column="4" Height="26" Padding="6,2" FontSize="12"
-                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
-                    <TextBlock x:Name="TxtTrimDuration" Grid.Column="5" Foreground="#666" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                    <Button Content="Set to current" Grid.Column="6" Height="26" Padding="8,0" FontSize="11"
-                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="VideoSetTrimToCurrent"/>
+                    <Button x:Name="BtnVideoPlay" Content="&#x25B6;" FontSize="20" Width="40" Height="40"
+                            Background="#333" Foreground="White" BorderThickness="0" Cursor="Hand"
+                            Click="VideoPlay_Click" Template="{StaticResource RoundedButton21}"/>
+                    <TextBlock x:Name="TxtVideoTime" Grid.Column="1" Foreground="#AAA" FontSize="13"
+                               VerticalAlignment="Center" Margin="12,0,0,0" Text="0:00 / 0:00"/>
+                    <!-- Set trim to current position buttons -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal">
+                        <Button Content="Set Start" Height="28" Padding="10,0" FontSize="11"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="VideoSetTrimStart" Margin="0,0,6,0"/>
+                        <Button Content="Set End" Height="28" Padding="10,0" FontSize="11"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="VideoSetTrimEnd"/>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Row 4: Tool bar -->

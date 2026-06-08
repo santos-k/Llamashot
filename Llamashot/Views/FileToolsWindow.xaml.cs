@@ -136,8 +136,11 @@ public partial class FileToolsWindow : Window
     private double _videoAngle = 0;
     private bool _videoFlipH = false, _videoFlipV = false;
     private bool _isVideoPlaying;
-    private bool _isVideoSeeking;
     private DispatcherTimer? _videoTimer;
+    private double _videoTrimStartPct = 0;
+    private double _videoTrimEndPct = 1;
+    private enum VtDragMode { None, Left, Right, Seek }
+    private VtDragMode _vtDragMode = VtDragMode.None;
 
     // =====================================================================
     //  Extract audio state
@@ -452,6 +455,8 @@ public partial class FileToolsWindow : Window
         _videoToolsPath = null;
         _videoAngle = 0; _videoFlipH = false; _videoFlipV = false;
         _isVideoPlaying = false;
+        _videoTrimStartPct = 0;
+        _videoTrimEndPct = 1;
         _videoTimer?.Stop();
         VideoPreview.Stop();
         VideoPreview.Source = null;
@@ -2652,15 +2657,15 @@ public partial class FileToolsWindow : Window
         TxtVideoTransform.Text = "";
         TxtVideoFileName.Text = System.IO.Path.GetFileName(path);
 
+        _videoTrimStartPct = 0;
+        _videoTrimEndPct = 1;
+
         try
         {
             var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
             _videoDuration = duration;
             _videoW = w; _videoH = h;
             TxtVideoInfo.Text = $"{w}x{h} | {codec} | {FileToolsService.FormatTimeSpan(duration)}";
-            TxtTrimStart.Text = "0:00:00";
-            TxtTrimEnd.Text = duration.ToString(@"h\:mm\:ss");
-            TxtTrimDuration.Text = $"({FileToolsService.FormatTimeSpan(duration)})";
         }
         catch { TxtVideoInfo.Text = "Could not read video info"; }
 
@@ -2678,6 +2683,7 @@ public partial class FileToolsWindow : Window
         _videoTimer.Start();
 
         ShowConfigState("video_tools");
+        Dispatcher.BeginInvoke(() => UpdateVideoTimeline(), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     // ----- Video playback handlers -----
@@ -2705,44 +2711,118 @@ public partial class FileToolsWindow : Window
 
     private void VideoTimer_Tick(object? sender, EventArgs e)
     {
-        if (_isVideoSeeking || _videoDuration.TotalSeconds <= 0) return;
+        if (_vtDragMode != VtDragMode.None || _videoDuration.TotalSeconds <= 0) return;
         var pos = VideoPreview.Position;
         double pct = pos.TotalSeconds / _videoDuration.TotalSeconds;
-        double barW = VideoSeekContainer.ActualWidth;
-        VideoSeekProgress.Width = Math.Max(0, pct * barW);
-        VideoSeekThumb.Margin = new Thickness(pct * barW - 7, 0, 0, 0);
+        UpdateVideoPlayhead(pct);
+
+        // Auto-stop at trim end during playback
+        if (_isVideoPlaying && pct >= _videoTrimEndPct)
+        {
+            VideoPreview.Pause();
+            _isVideoPlaying = false;
+            BtnVideoPlay.Content = "\u25B6";
+            VideoPreview.Position = TimeSpan.FromSeconds(_videoTrimEndPct * _videoDuration.TotalSeconds);
+            UpdateVideoPlayhead(_videoTrimEndPct);
+        }
 
         string cur = FileToolsService.FormatTimeSpan(pos);
         string total = FileToolsService.FormatTimeSpan(_videoDuration);
         TxtVideoTime.Text = $"{cur} / {total}";
     }
 
-    private void VideoSeek_MouseDown(object sender, MouseButtonEventArgs e)
+    // ----- Visual timeline handlers -----
+
+    private void UpdateVideoTimeline()
     {
-        _isVideoSeeking = true;
-        VideoSeekContainer.CaptureMouse();
-        SeekToPosition(e.GetPosition(VideoSeekContainer).X);
+        double containerW = VideoTimelineContainer.ActualWidth;
+        if (containerW <= 0) return;
+
+        double leftX = _videoTrimStartPct * containerW;
+        double rightX = _videoTrimEndPct * containerW;
+
+        // Position trim region
+        VtTrimRegion.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
+        VtTrimRegion.Width = Math.Max(0, rightX - leftX);
+        VtTrimRegion.Margin = new Thickness(leftX, 0, 0, 0);
+
+        // Position handles
+        VtHandleLeft.Margin = new Thickness(leftX - 7, 0, 0, 0);
+        VtHandleRight.Margin = new Thickness(rightX - 7, 0, 0, 0);
+
+        // Update labels
+        if (_videoDuration.TotalSeconds > 0)
+        {
+            var startTs = TimeSpan.FromSeconds(_videoTrimStartPct * _videoDuration.TotalSeconds);
+            var endTs = TimeSpan.FromSeconds(_videoTrimEndPct * _videoDuration.TotalSeconds);
+            var dur = endTs - startTs;
+            VtStartLabel.Text = startTs.ToString(@"hh\:mm\:ss");
+            VtEndLabel.Text = endTs.ToString(@"hh\:mm\:ss");
+            VtDurationLabel.Text = $"\u23F1 {FileToolsService.FormatTimeSpan(dur)}";
+        }
     }
 
-    private void VideoSeek_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    private void VideoTimeline_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_isVideoSeeking) SeekToPosition(e.GetPosition(VideoSeekContainer).X);
+        var pos = e.GetPosition(VideoTimelineContainer);
+        double containerW = VideoTimelineContainer.ActualWidth;
+        if (containerW <= 0) return;
+
+        double leftX = _videoTrimStartPct * containerW;
+        double rightX = _videoTrimEndPct * containerW;
+
+        if (Math.Abs(pos.X - leftX) < 18)
+            _vtDragMode = VtDragMode.Left;
+        else if (Math.Abs(pos.X - rightX) < 18)
+            _vtDragMode = VtDragMode.Right;
+        else
+        {
+            _vtDragMode = VtDragMode.Seek;
+            double pct = Math.Max(0, Math.Min(1, pos.X / containerW));
+            VideoPreview.Position = TimeSpan.FromSeconds(pct * _videoDuration.TotalSeconds);
+            UpdateVideoPlayhead(pct);
+        }
+
+        VideoTimelineContainer.CaptureMouse();
+        e.Handled = true;
     }
 
-    private void VideoSeek_MouseUp(object sender, MouseButtonEventArgs e)
+    private void VideoTimeline_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        _isVideoSeeking = false;
-        VideoSeekContainer.ReleaseMouseCapture();
+        if (_vtDragMode == VtDragMode.None) return;
+        double containerW = VideoTimelineContainer.ActualWidth;
+        if (containerW <= 0) return;
+
+        double pct = Math.Max(0, Math.Min(1, e.GetPosition(VideoTimelineContainer).X / containerW));
+
+        if (_vtDragMode == VtDragMode.Left)
+        {
+            _videoTrimStartPct = Math.Min(pct, _videoTrimEndPct - 0.01);
+            UpdateVideoTimeline();
+        }
+        else if (_vtDragMode == VtDragMode.Right)
+        {
+            _videoTrimEndPct = Math.Max(pct, _videoTrimStartPct + 0.01);
+            UpdateVideoTimeline();
+        }
+        else if (_vtDragMode == VtDragMode.Seek)
+        {
+            VideoPreview.Position = TimeSpan.FromSeconds(pct * _videoDuration.TotalSeconds);
+            UpdateVideoPlayhead(pct);
+        }
     }
 
-    private void SeekToPosition(double x)
+    private void VideoTimeline_MouseUp(object sender, MouseButtonEventArgs e)
     {
-        double barW = VideoSeekContainer.ActualWidth;
-        if (barW <= 0) return;
-        double pct = Math.Max(0, Math.Min(1, x / barW));
-        VideoPreview.Position = TimeSpan.FromSeconds(pct * _videoDuration.TotalSeconds);
-        VideoSeekProgress.Width = pct * barW;
-        VideoSeekThumb.Margin = new Thickness(pct * barW - 7, 0, 0, 0);
+        _vtDragMode = VtDragMode.None;
+        VideoTimelineContainer.ReleaseMouseCapture();
+    }
+
+    private void UpdateVideoPlayhead(double pct)
+    {
+        double containerW = VideoTimelineContainer.ActualWidth;
+        if (containerW <= 0) return;
+        VtPlayhead.Margin = new Thickness(pct * containerW - 1, 0, 0, 0);
     }
 
     // ----- Rotate/Flip handlers (live preview) -----
@@ -2788,15 +2868,18 @@ public partial class FileToolsWindow : Window
 
     // ----- Set trim to current position -----
 
-    private void VideoSetTrimToCurrent(object sender, RoutedEventArgs e)
+    private void VideoSetTrimStart(object sender, RoutedEventArgs e)
     {
-        var pos = VideoPreview.Position;
-        // If trim start is at zero, set start. Otherwise set end.
-        if (TxtTrimStart.Text == "0:00:00" || TxtTrimStart.Text == "0:00" ||
-            (TimeSpan.TryParse(TxtTrimStart.Text, out var ts) && ts == TimeSpan.Zero))
-            TxtTrimStart.Text = pos.ToString(@"h\:mm\:ss");
-        else
-            TxtTrimEnd.Text = pos.ToString(@"h\:mm\:ss");
+        if (_videoDuration.TotalSeconds <= 0) return;
+        _videoTrimStartPct = VideoPreview.Position.TotalSeconds / _videoDuration.TotalSeconds;
+        UpdateVideoTimeline();
+    }
+
+    private void VideoSetTrimEnd(object sender, RoutedEventArgs e)
+    {
+        if (_videoDuration.TotalSeconds <= 0) return;
+        _videoTrimEndPct = VideoPreview.Position.TotalSeconds / _videoDuration.TotalSeconds;
+        UpdateVideoTimeline();
     }
 
     // ----- Export: chains all operations via FFmpeg -----
@@ -2822,12 +2905,10 @@ public partial class FileToolsWindow : Window
         {
             // Determine trim
             TimeSpan? trimStart = null, trimEnd = null;
-            if (TimeSpan.TryParse(TxtTrimStart.Text.Trim(), out var ts) &&
-                TimeSpan.TryParse(TxtTrimEnd.Text.Trim(), out var te) && te > ts &&
-                (ts > TimeSpan.Zero || te < _videoDuration - TimeSpan.FromSeconds(0.5)))
+            if (_videoTrimStartPct > 0.001 || _videoTrimEndPct < 0.999)
             {
-                trimStart = ts;
-                trimEnd = te;
+                trimStart = TimeSpan.FromSeconds(_videoTrimStartPct * _videoDuration.TotalSeconds);
+                trimEnd = TimeSpan.FromSeconds(_videoTrimEndPct * _videoDuration.TotalSeconds);
             }
 
             // Determine crop from canvas selection
