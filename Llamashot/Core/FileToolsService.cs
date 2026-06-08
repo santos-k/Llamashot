@@ -890,7 +890,7 @@ public static class FileToolsService
     {
         try
         {
-            var psi = new ProcessStartInfo("yt-dlp", "--version")
+            var psi = new ProcessStartInfo(FindYtDlpPath(), "--version")
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
             using var proc = Process.Start(psi);
             proc?.WaitForExit(5000);
@@ -899,15 +899,27 @@ public static class FileToolsService
         catch { return false; }
     }
 
+    private static string FindYtDlpPath()
+    {
+        // Check standard WinGet links directory
+        string wingetLinks = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft", "WinGet", "Links");
+        string ytdlpPath = Path.Combine(wingetLinks, "yt-dlp.exe");
+        if (File.Exists(ytdlpPath)) return ytdlpPath;
+        return "yt-dlp"; // fallback to PATH
+    }
+
     public static async Task<List<(string title, string duration, string url, string thumbnail)>> FetchYouTubeVideosAsync(string inputUrl)
     {
         var results = new List<(string title, string duration, string url, string thumbnail)>();
+        string ytdlp = FindYtDlpPath();
+        string sep = "|||";
 
         await Task.Run(() =>
         {
-            // Use --flat-playlist to get entries without downloading, --print for structured output
-            var psi = new ProcessStartInfo("yt-dlp",
-                $"--flat-playlist --print \"%(title)s\\t%(duration_string)s\\t%(url)s\\t%(thumbnail)s\" --no-warnings \"{inputUrl}\"")
+            // Use --flat-playlist with a unique separator (tabs are unreliable across process boundaries)
+            var psi = new ProcessStartInfo(ytdlp,
+                $"--flat-playlist --print \"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s\" --no-warnings \"{inputUrl}\"")
             {
                 RedirectStandardOutput = true, RedirectStandardError = true,
                 UseShellExecute = false, CreateNoWindow = true
@@ -918,8 +930,8 @@ public static class FileToolsService
 
             foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var parts = line.Split('\t');
-                if (parts.Length >= 3)
+                var parts = line.Split(sep);
+                if (parts.Length >= 1)
                 {
                     string title = parts[0].Trim();
                     string duration = parts.Length >= 2 ? parts[1].Trim() : "";
@@ -927,17 +939,21 @@ public static class FileToolsService
                     string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
                     if (title == "NA") title = "Untitled";
                     if (duration == "NA") duration = "";
+                    if (url == "NA") url = "";
                     if (thumb == "NA") thumb = "";
-                    if (!string.IsNullOrEmpty(url))
-                        results.Add((title, duration, url, thumb));
+                    // For playlist entries without webpage_url, construct from video id
+                    if (string.IsNullOrEmpty(url) && line.Contains("youtube.com"))
+                        url = inputUrl;
+                    if (!string.IsNullOrEmpty(title) && title != "Untitled")
+                        results.Add((title, duration, !string.IsNullOrEmpty(url) ? url : inputUrl, thumb));
                 }
             }
 
             // If no results from flat-playlist (single video), try direct
             if (results.Count == 0)
             {
-                var psi2 = new ProcessStartInfo("yt-dlp",
-                    $"--print \"%(title)s\\t%(duration_string)s\\t%(webpage_url)s\\t%(thumbnail)s\" --no-download --no-warnings \"{inputUrl}\"")
+                var psi2 = new ProcessStartInfo(ytdlp,
+                    $"--print \"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s\" --no-download --no-warnings \"{inputUrl}\"")
                 {
                     RedirectStandardOutput = true, RedirectStandardError = true,
                     UseShellExecute = false, CreateNoWindow = true
@@ -948,7 +964,7 @@ public static class FileToolsService
 
                 if (!string.IsNullOrEmpty(output2))
                 {
-                    var parts = output2.Split('\t');
+                    var parts = output2.Split(sep);
                     string title = parts.Length >= 1 ? parts[0].Trim() : "Unknown";
                     string duration = parts.Length >= 2 ? parts[1].Trim() : "";
                     string url = parts.Length >= 3 ? parts[2].Trim() : inputUrl;
@@ -986,7 +1002,7 @@ public static class FileToolsService
                 args = $"{formatArg} --merge-output-format mp4 -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{videoUrl}\"";
             }
 
-            var psi = new ProcessStartInfo("yt-dlp", args)
+            var psi = new ProcessStartInfo(FindYtDlpPath(), args)
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
 
             using var proc = Process.Start(psi)!;
