@@ -1995,23 +1995,25 @@ public partial class FileToolsWindow : Window
             _cropImgHeight = bmp.PixelHeight;
             TxtCropImgSize.Text = $"{_cropImgWidth} x {_cropImgHeight}";
             CreateCropHandles();
-            TxtCropInfo.Text = "Draw a crop area on the image";
+            TxtCropInfo.Text = "Drag handles to adjust crop area";
         }
         catch { /* ignore */ }
     }
+
+    private readonly System.Windows.Shapes.Line[] _cropGridLines = new System.Windows.Shapes.Line[4];
 
     private void CreateCropHandles()
     {
         CropCanvas.Children.Clear();
 
-        // Create 4 overlay rectangles
+        // Create 4 overlay rectangles (darkening outside crop)
         for (int i = 0; i < 4; i++)
         {
             _cropOverlays[i] = new Rectangle { Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xAA, 0, 0, 0)) };
             CropCanvas.Children.Add(_cropOverlays[i]);
         }
 
-        // Create crop rectangle
+        // Create crop rectangle border
         _cropRect = new Rectangle
         {
             Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#42A5F5")),
@@ -2021,7 +2023,19 @@ public partial class FileToolsWindow : Window
         };
         CropCanvas.Children.Add(_cropRect);
 
-        // Create 8 handles (small white squares with blue border)
+        // Create rule-of-thirds grid lines (2 horizontal + 2 vertical)
+        for (int i = 0; i < 4; i++)
+        {
+            _cropGridLines[i] = new System.Windows.Shapes.Line
+            {
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)),
+                StrokeThickness = 1,
+                IsHitTestVisible = false
+            };
+            CropCanvas.Children.Add(_cropGridLines[i]);
+        }
+
+        // Create 8 handles
         var cursors = new[] { Cursors.SizeNWSE, Cursors.SizeNS, Cursors.SizeNESW, Cursors.SizeWE, Cursors.SizeWE, Cursors.SizeNESW, Cursors.SizeNS, Cursors.SizeNWSE };
         var modes = new[] { CropDragMode.ResizeTL, CropDragMode.ResizeTC, CropDragMode.ResizeTR, CropDragMode.ResizeML, CropDragMode.ResizeMR, CropDragMode.ResizeBL, CropDragMode.ResizeBC, CropDragMode.ResizeBR };
 
@@ -2042,8 +2056,16 @@ public partial class FileToolsWindow : Window
             _cropHandles[i] = handle;
         }
 
-        // Initialize with empty selection
-        _cropSelectionRect = Rect.Empty;
+        // Default selection = full image (set after layout)
+        Dispatcher.BeginInvoke(() =>
+        {
+            var imgBounds = GetImageDisplayBounds();
+            if (imgBounds.Width > 0 && imgBounds.Height > 0)
+            {
+                _cropSelectionRect = imgBounds;
+                UpdateCropVisuals();
+            }
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void ClearCropVisuals()
@@ -2243,6 +2265,27 @@ public partial class FileToolsWindow : Window
             _cropHandles[i].Visibility = r.Width > 10 && r.Height > 10 ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        // Rule-of-thirds grid lines
+        bool showGrid = r.Width > 30 && r.Height > 30;
+        for (int i = 0; i < 4; i++)
+        {
+            if (_cropGridLines[i] == null) continue;
+            _cropGridLines[i].Visibility = showGrid ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (showGrid)
+        {
+            // Vertical lines at 1/3 and 2/3
+            _cropGridLines[0].X1 = r.X + r.Width / 3; _cropGridLines[0].Y1 = r.Y;
+            _cropGridLines[0].X2 = r.X + r.Width / 3; _cropGridLines[0].Y2 = r.Bottom;
+            _cropGridLines[1].X1 = r.X + r.Width * 2 / 3; _cropGridLines[1].Y1 = r.Y;
+            _cropGridLines[1].X2 = r.X + r.Width * 2 / 3; _cropGridLines[1].Y2 = r.Bottom;
+            // Horizontal lines at 1/3 and 2/3
+            _cropGridLines[2].X1 = r.X; _cropGridLines[2].Y1 = r.Y + r.Height / 3;
+            _cropGridLines[2].X2 = r.Right; _cropGridLines[2].Y2 = r.Y + r.Height / 3;
+            _cropGridLines[3].X1 = r.X; _cropGridLines[3].Y1 = r.Y + r.Height * 2 / 3;
+            _cropGridLines[3].X2 = r.Right; _cropGridLines[3].Y2 = r.Y + r.Height * 2 / 3;
+        }
+
         // Update info text with image-space coordinates
         var (scaleX, scaleY, offsetX, offsetY) = GetImageScale();
         int imgX = Math.Max(0, (int)Math.Round((r.X - offsetX) * scaleX));
@@ -2254,9 +2297,10 @@ public partial class FileToolsWindow : Window
 
     private void Crop_Reset(object sender, RoutedEventArgs e)
     {
-        _cropSelectionRect = Rect.Empty;
+        // Reset to full image selection
+        var imgBounds = GetImageDisplayBounds();
+        _cropSelectionRect = imgBounds.Width > 0 ? imgBounds : Rect.Empty;
         CreateCropHandles();
-        TxtCropInfo.Text = "Draw a crop area on the image";
     }
 
     private (double scaleX, double scaleY, double offsetX, double offsetY) GetImageScale()
