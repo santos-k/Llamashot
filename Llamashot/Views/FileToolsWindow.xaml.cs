@@ -22,28 +22,28 @@ public partial class FileToolsWindow : Window
     //  Tool card definitions
     // =====================================================================
 
-    private static readonly (string id, string title, string desc, string color)[] ToolDefs =
+    private static readonly (string id, string title, string desc, string color, string icon)[] ToolDefs =
     {
-        ("merge_pdf",      "Merge PDF",       "Combine multiple PDFs into one",     "#E53935"),
-        ("split_pdf",      "Split PDF",       "Extract pages from PDF",             "#FF7043"),
-        ("compress_pdf",   "Compress PDF",    "Reduce PDF file size",               "#EF5350"),
-        ("pdf_to_images",  "PDF to Images",   "Convert pages to JPG/PNG",           "#F44336"),
-        ("images_to_pdf",  "Images to PDF",   "Combine images into PDF",            "#E91E63"),
-        ("rotate_pdf",     "Rotate PDF",      "Rotate PDF pages",                   "#FFA726"),
-        ("watermark",      "Watermark PDF",   "Add text watermark",                 "#7E57C2"),
-        ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                 "#5C6BC0"),
-        ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",       "#FF8A65"),
-        ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",             "#A1887F"),
-        ("compress_image", "Compress Image",  "Reduce image file size",             "#26C6DA"),
-        ("resize_image",   "Resize Image",    "Change dimensions",                  "#26A69A"),
-        ("crop_image",     "Crop Image",      "Crop to selection",                  "#42A5F5"),
-        ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",              "#AB47BC"),
-        ("convert_format", "Convert Format",  "Change image format",                "#EC407A"),
-        ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",             "#78909C"),
-        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336"),
-        ("extract_audio", "Extract Audio",    "Extract audio from video",        "#00BCD4"),
-        ("trim_audio",    "Trim Audio",       "Cut start and end of audio",      "#009688"),
-        ("youtube_dl",    "YouTube Download", "Download video or audio from URL",  "#FF0000"),
+        ("merge_pdf",      "Merge PDF",       "Combine multiple PDFs into one",      "#E53935", "\u229E"),
+        ("split_pdf",      "Split PDF",       "Extract pages from PDF",              "#FF7043", "\u2016"),
+        ("compress_pdf",   "Compress PDF",    "Reduce PDF file size",                "#EF5350", "\u2B07"),
+        ("pdf_to_images",  "PDF to Images",   "Convert pages to JPG/PNG",            "#F44336", "\u29C9"),
+        ("images_to_pdf",  "Images to PDF",   "Combine images into PDF",             "#E91E63", "\u2B1C"),
+        ("rotate_pdf",     "Rotate PDF",      "Rotate PDF pages",                    "#FFA726", "\u21BB"),
+        ("watermark",      "Watermark PDF",   "Add text watermark",                  "#7E57C2", "\u2666"),
+        ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                  "#5C6BC0", "#"),
+        ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",        "#FF8A65", "\u2398"),
+        ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",              "#A1887F", "\u2295"),
+        ("compress_image", "Compress Image",  "Reduce image file size",              "#26C6DA", "\u2B07"),
+        ("resize_image",   "Resize Image",    "Change dimensions",                   "#26A69A", "\u2922"),
+        ("crop_image",     "Crop Image",      "Crop to selection",                   "#42A5F5", "\u2702"),
+        ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",               "#AB47BC", "\u21BA"),
+        ("convert_format", "Convert Format",  "Change image format",                 "#EC407A", "\u21C4"),
+        ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",              "#78909C", "\u2263"),
+        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336", "\u25B6"),
+        ("extract_audio", "Extract Audio",    "Extract audio from video",            "#00BCD4", "\u266B"),
+        ("trim_audio",    "Trim Audio",       "Cut start and end of audio",          "#009688", "\u2702"),
+        ("youtube_dl",    "YouTube Download", "Download video or audio from URL",    "#FF0000", "\u25B6"),
     };
 
     // =====================================================================
@@ -201,69 +201,119 @@ public partial class FileToolsWindow : Window
 
     private void CreateToolCards()
     {
-        foreach (var (id, title, desc, color) in ToolDefs)
+        foreach (var (id, title, desc, color, icon) in ToolDefs)
         {
+            var accentColor = (Color)ColorConverter.ConvertFromString(color);
+            var accentBrush = new SolidColorBrush(accentColor);
+
             var card = new Border
             {
-                Width = 190,
-                Height = 100,
-                Margin = new Thickness(8),
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#252528")),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
-                CornerRadius = new CornerRadius(6),
+                MinWidth = 250,
+                Height = 72,
+                Margin = new Thickness(6),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1E1E24")),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x44, accentColor.R, accentColor.G, accentColor.B)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
                 Cursor = Cursors.Hand,
-                Tag = id
+                Tag = id,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    BlurRadius = 8, ShadowDepth = 2, Opacity = 0.3, Color = Colors.Black
+                },
+                RenderTransformOrigin = new Point(0.5, 0.5),
+                RenderTransform = new ScaleTransform(1, 1)
             };
 
-            var stack = new StackPanel { Margin = new Thickness(14, 12, 12, 12) };
-            stack.Children.Add(new TextBlock
+            // Horizontal layout: Icon | Title+Desc | Arrow
+            var grid = new Grid { Margin = new Thickness(12, 0, 12, 0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // Icon: rounded square with gradient background
+            var iconBorder = new Border
             {
-                Text = title,
-                Foreground = Brushes.White,
-                FontSize = 14,
-                FontWeight = FontWeights.SemiBold
+                Width = 44, Height = 44,
+                CornerRadius = new CornerRadius(12),
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = new LinearGradientBrush(
+                    System.Windows.Media.Color.FromArgb(0x33, accentColor.R, accentColor.G, accentColor.B),
+                    System.Windows.Media.Color.FromArgb(0x11, accentColor.R, accentColor.G, accentColor.B),
+                    45)
+            };
+            iconBorder.Child = new TextBlock
+            {
+                Text = icon, FontSize = 20, Foreground = accentBrush,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                FontWeight = FontWeights.Bold
+            };
+            Grid.SetColumn(iconBorder, 0);
+            grid.Children.Add(iconBorder);
+
+            // Title + Description
+            var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
+            textStack.Children.Add(new TextBlock
+            {
+                Text = title, Foreground = Brushes.White, FontSize = 14, FontWeight = FontWeights.SemiBold
             });
-            stack.Children.Add(new TextBlock
+            textStack.Children.Add(new TextBlock
             {
                 Text = desc,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 6, 0, 0)
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#777")),
+                FontSize = 11, Margin = new Thickness(0, 2, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
             });
-            card.Child = stack;
+            Grid.SetColumn(textStack, 1);
+            grid.Children.Add(textStack);
 
-            card.Effect = new System.Windows.Media.Effects.DropShadowEffect
+            // Arrow
+            var arrow = new TextBlock
             {
-                BlurRadius = 10, ShadowDepth = 3, Opacity = 0.4, Color = Colors.Black
+                Text = "\u276F", FontSize = 16,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#555")),
+                VerticalAlignment = VerticalAlignment.Center
             };
+            Grid.SetColumn(arrow, 2);
+            grid.Children.Add(arrow);
 
-            card.RenderTransformOrigin = new Point(0.5, 0.5);
-            card.RenderTransform = new ScaleTransform(1, 1);
+            card.Child = grid;
 
             card.MouseLeftButtonDown += Card_Click;
             card.MouseEnter += (s, _) =>
             {
                 var b = (Border)s;
-                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2E2E34"));
-                ((ScaleTransform)b.RenderTransform).ScaleX = 1.04;
-                ((ScaleTransform)b.RenderTransform).ScaleY = 1.04;
-                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).BlurRadius = 18;
-                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).Opacity = 0.6;
+                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282830"));
+                b.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x88, accentColor.R, accentColor.G, accentColor.B));
+                ((ScaleTransform)b.RenderTransform).ScaleX = 1.02;
+                ((ScaleTransform)b.RenderTransform).ScaleY = 1.02;
             };
             card.MouseLeave += (s, _) =>
             {
                 var b = (Border)s;
-                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#252528"));
+                b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1E1E24"));
+                b.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x44, accentColor.R, accentColor.G, accentColor.B));
                 ((ScaleTransform)b.RenderTransform).ScaleX = 1.0;
                 ((ScaleTransform)b.RenderTransform).ScaleY = 1.0;
-                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).BlurRadius = 10;
-                ((System.Windows.Media.Effects.DropShadowEffect)b.Effect).Opacity = 0.4;
             };
 
             CardPanel.Children.Add(card);
         }
+
+        // Auto-adjust card widths on resize
+        CardPanel.SizeChanged += (s, e) => AdjustCardWidths();
+        Loaded += (s, e) => AdjustCardWidths();
+    }
+
+    private void AdjustCardWidths()
+    {
+        double availW = CardPanel.ActualWidth;
+        if (availW <= 0) return;
+        int cols = Math.Max(1, (int)(availW / 280));
+        double cardW = (availW - cols * 12) / cols; // 12 = margin per card (6*2)
+        foreach (var child in CardPanel.Children)
+            if (child is Border b) b.Width = cardW;
     }
 
     // =====================================================================
@@ -335,7 +385,7 @@ public partial class FileToolsWindow : Window
         _configViews["trim_audio"] = TrimAudioConfigView;
         _configViews["youtube_dl"] = YtConfigView;
 
-        foreach (var (id, title, _, _) in ToolDefs)
+        foreach (var (id, title, _, _, _) in ToolDefs)
             _toolTitles[id] = title;
     }
 
