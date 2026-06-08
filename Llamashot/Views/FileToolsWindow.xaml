@@ -115,10 +115,40 @@
         <!--  Row 1: Content                                                  -->
         <!-- ================================================================ -->
 
-        <!-- Home Panel: card grid -->
-        <ScrollViewer x:Name="HomePanel" Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <WrapPanel x:Name="CardPanel" Margin="20,16" HorizontalAlignment="Center"/>
-        </ScrollViewer>
+        <!-- Home Panel: search + card grid -->
+        <Grid x:Name="HomePanel" Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <!-- Search + Sort bar -->
+            <Grid Margin="24,12,24,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TxtToolSearch" Height="36" Padding="12,6" FontSize="13"
+                         Background="#1E1E24" Foreground="#EEE" BorderBrush="#333" BorderThickness="1"
+                         VerticalContentAlignment="Center" TextChanged="ToolSearch_Changed">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox"/>
+                    </TextBox.Style>
+                </TextBox>
+                <TextBlock Text="&#x1F50D; Search tools..." Foreground="#555" FontSize="13"
+                           VerticalAlignment="Center" Margin="14,0,0,0" IsHitTestVisible="False"
+                           x:Name="TxtSearchPlaceholder"/>
+                <ComboBox x:Name="CmbToolSort" Grid.Column="1" Width="140" Height="36" FontSize="12"
+                          SelectedIndex="0" Margin="10,0,0,0" SelectionChanged="ToolSort_Changed">
+                    <ComboBoxItem Content="Group by category"/>
+                    <ComboBoxItem Content="Sort A-Z"/>
+                    <ComboBoxItem Content="Sort Z-A"/>
+                </ComboBox>
+            </Grid>
+            <!-- Card container -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="CardPanel" Margin="20,8,20,16"/>
+            </ScrollViewer>
+        </Grid>
 
         <!-- ====================== 1. PanelMergePdf ====================== -->
         <Grid x:Name="PanelMergePdf" Grid.Row="1" Visibility="Collapsed">
