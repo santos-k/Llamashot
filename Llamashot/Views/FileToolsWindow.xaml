@@ -1413,35 +1413,106 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
-            <Grid x:Name="TrimAudioConfigView" Visibility="Collapsed" Margin="24,12">
+            <Grid x:Name="TrimAudioConfigView" Visibility="Collapsed" Margin="16,8">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>   <!-- File info -->
+                    <RowDefinition Height="Auto"/>   <!-- Waveform -->
+                    <RowDefinition Height="Auto"/>   <!-- Playback + trim times -->
+                    <RowDefinition Height="*"/>      <!-- Spacer -->
+                    <RowDefinition Height="Auto"/>   <!-- Trim button -->
                 </Grid.RowDefinitions>
-                <StackPanel Margin="0,0,0,8">
-                    <TextBlock x:Name="TxtTrimAudioFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <TextBlock x:Name="TxtTrimAudioInfo" Text="" Foreground="#888" FontSize="12"/>
+
+                <!-- File info -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock x:Name="TxtTrimAudioFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,16,0"/>
+                    <TextBlock x:Name="TxtTrimAudioInfo" Text="" Foreground="#888" FontSize="12" VerticalAlignment="Center"/>
                 </StackPanel>
-                <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="120"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Start:" Foreground="#CCC" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <TextBox x:Name="TxtTrimAudioStart" Grid.Column="1" Height="32" Padding="8,4" FontSize="14"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
-                        <TextBlock Text="End:" Grid.Column="2" Foreground="#CCC" FontSize="14" VerticalAlignment="Center" Margin="20,0,10,0"/>
-                        <TextBox x:Name="TxtTrimAudioEnd" Grid.Column="3" Height="32" Padding="8,4" FontSize="14"
-                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
+
+                <!-- Waveform display with trim handles -->
+                <Border Grid.Row="1" Background="#111" CornerRadius="4" BorderBrush="#333" BorderThickness="1"
+                        Margin="0,0,0,8" Height="180" ClipToBounds="True">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.25" Color="Black"/>
+                    </Border.Effect>
+                    <Grid x:Name="WaveformContainer">
+                        <!-- Waveform image -->
+                        <Image x:Name="WaveformImage" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality"
+                               VerticalAlignment="Center"/>
+
+                        <!-- Canvas for selection overlay + handles + playhead -->
+                        <Canvas x:Name="WaveformCanvas" Background="Transparent"
+                                MouseLeftButtonDown="Waveform_MouseDown"
+                                MouseMove="Waveform_MouseMove"
+                                MouseLeftButtonUp="Waveform_MouseUp">
+                            <!-- Selection region (green overlay) -->
+                            <Rectangle x:Name="WfSelection" Fill="#334CAF50" Height="180"
+                                       Canvas.Left="0" Canvas.Top="0"/>
+
+                            <!-- Left trim handle -->
+                            <Border x:Name="WfHandleLeft" Width="12" Height="180" Canvas.Left="0" Canvas.Top="0"
+                                    Background="#884CAF50" Cursor="SizeWE" BorderBrush="#4CAF50" BorderThickness="2,0,0,0">
+                                <Border Width="4" Height="30" Background="#4CAF50" CornerRadius="2"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <!-- Right trim handle -->
+                            <Border x:Name="WfHandleRight" Width="12" Height="180" Canvas.Left="0" Canvas.Top="0"
+                                    Background="#884CAF50" Cursor="SizeWE" BorderBrush="#4CAF50" BorderThickness="0,0,2,0">
+                                <Border Width="4" Height="30" Background="#4CAF50" CornerRadius="2"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <!-- Playhead -->
+                            <Border x:Name="WfPlayhead" Width="2" Height="180" Canvas.Left="0" Canvas.Top="0"
+                                    Background="White" IsHitTestVisible="False"/>
+
+                            <!-- Left darkening (outside selection) -->
+                            <Rectangle x:Name="WfDarkenLeft" Fill="#AA000000" Height="180"
+                                       Canvas.Left="0" Canvas.Top="0" IsHitTestVisible="False"/>
+                            <!-- Right darkening -->
+                            <Rectangle x:Name="WfDarkenRight" Fill="#AA000000" Height="180"
+                                       Canvas.Top="0" IsHitTestVisible="False"/>
+                        </Canvas>
+
+                        <!-- Loading indicator for waveform -->
+                        <TextBlock x:Name="TxtWfLoading" Text="Generating waveform..." Foreground="#888" FontSize="13"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock Text="Format: HH:MM:SS (e.g. 0:00:05 to 0:01:30)" Foreground="#666" FontSize="11"
-                               HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                </StackPanel>
-                <Button Grid.Row="2" Content="Trim Audio &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                </Border>
+
+                <!-- Playback controls + trim times -->
+                <Grid Grid.Row="2" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>  <!-- Play button -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Current time -->
+                        <ColumnDefinition Width="*"/>     <!-- Spacer -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Start label -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Start input -->
+                        <ColumnDefinition Width="Auto"/>  <!-- End label -->
+                        <ColumnDefinition Width="Auto"/>  <!-- End input -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Duration -->
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BtnAudioPlay" Content="&#x25B6;" FontSize="18" Width="36" Height="36"
+                            Background="Transparent" Foreground="White" BorderThickness="0" Cursor="Hand"
+                            Click="AudioPlay_Click"/>
+                    <TextBlock x:Name="TxtAudioPlayTime" Grid.Column="1" Text="0:00" Foreground="#888" FontSize="12"
+                               VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    <TextBlock Text="Start:" Grid.Column="3" Foreground="#4CAF50" FontSize="12" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBox x:Name="TxtTrimAudioStart" Grid.Column="4" Width="80" Height="26" Padding="6,2" FontSize="12"
+                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"
+                             LostFocus="TrimAudioTime_Changed"/>
+                    <TextBlock Text="End:" Grid.Column="5" Foreground="#4CAF50" FontSize="12" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="12,0,4,0"/>
+                    <TextBox x:Name="TxtTrimAudioEnd" Grid.Column="6" Width="80" Height="26" Padding="6,2" FontSize="12"
+                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"
+                             LostFocus="TrimAudioTime_Changed"/>
+                    <TextBlock x:Name="TxtTrimAudioDuration" Grid.Column="7" Text="" Foreground="#666" FontSize="11"
+                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                </Grid>
+
+                <!-- Trim button -->
+                <Button Grid.Row="4" Content="Trim Audio &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
                         FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#009688"
                         HorizontalAlignment="Center" Cursor="Hand" Click="TrimAudio_Execute"
                         Template="{StaticResource RoundedButton}"/>

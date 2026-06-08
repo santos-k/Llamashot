@@ -812,6 +812,15 @@ public static class FileToolsService
         await RunFFmpegAsync($"-i \"{inputPath}\" -ss {startStr} -to {endStr} -c copy \"{outputPath}\"", duration, progress);
     }
 
+    public static async Task<string> GenerateWaveformAsync(string audioPath, int width = 1400, int height = 150)
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"llamashot_wf_{Guid.NewGuid():N}.png");
+        await RunFFmpegAsync(
+            $"-i \"{audioPath}\" -filter_complex \"showwavespic=s={width}x{height}:colors=#4CAF50|#4CAF50:scale=sqrt\" -frames:v 1 \"{outputPath}\"",
+            null, null);
+        return outputPath;
+    }
+
     public static async Task<TimeSpan> GetAudioDurationAsync(string path)
     {
         var info = await GetVideoInfoAsync(path); // ffprobe works for audio too

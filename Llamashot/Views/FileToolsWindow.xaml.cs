@@ -461,6 +461,13 @@ public partial class FileToolsWindow : Window
         VideoCropCanvas.Children.Clear();
         _extractAudioPath = null;
         _trimAudioPath = null;
+        _audioTrimStartPct = 0;
+        _audioTrimEndPct = 1;
+        _isAudioPlaying = false;
+        _audioPlayTimer?.Stop();
+        if (_audioPlayer != null) { _audioPlayer.Stop(); _audioPlayer.Source = null; }
+        WaveformImage.Source = null;
+        if (_waveformTempPath != null) { try { File.Delete(_waveformTempPath); } catch { } _waveformTempPath = null; }
         _ytUrl = null;
         _ytVideos.Clear();
         _ytCancelSource?.Cancel();
@@ -3060,6 +3067,15 @@ public partial class FileToolsWindow : Window
     // =====================================================================
 
     private string? _trimAudioPath;
+    private TimeSpan _audioDuration;
+    private double _audioTrimStartPct = 0; // 0-1 percentage of duration
+    private double _audioTrimEndPct = 1;
+    private enum WfDragMode { None, Left, Right, Seek }
+    private WfDragMode _wfDragMode = WfDragMode.None;
+    private MediaElement? _audioPlayer;
+    private DispatcherTimer? _audioPlayTimer;
+    private bool _isAudioPlaying;
+    private string? _waveformTempPath;
 
     private void TrimAudio_SelectFiles(object sender, RoutedEventArgs e)
     {
@@ -3083,15 +3099,220 @@ public partial class FileToolsWindow : Window
     {
         _trimAudioPath = path;
         TxtTrimAudioFileName.Text = System.IO.Path.GetFileName(path);
+        TxtWfLoading.Visibility = Visibility.Visible;
+        WaveformImage.Source = null;
+        _audioTrimStartPct = 0;
+        _audioTrimEndPct = 1;
+        _isAudioPlaying = false;
+
         try
         {
-            var duration = await FileToolsService.GetAudioDurationAsync(path);
-            TxtTrimAudioInfo.Text = $"Duration: {FileToolsService.FormatTimeSpan(duration)}";
+            _audioDuration = await FileToolsService.GetAudioDurationAsync(path);
+            TxtTrimAudioInfo.Text = $"Duration: {FileToolsService.FormatTimeSpan(_audioDuration)}";
             TxtTrimAudioStart.Text = "0:00:00";
-            TxtTrimAudioEnd.Text = duration.ToString(@"h\:mm\:ss");
+            TxtTrimAudioEnd.Text = _audioDuration.ToString(@"h\:mm\:ss");
+            UpdateTrimDurationText();
         }
         catch { TxtTrimAudioInfo.Text = "Could not read audio info"; }
+
         ShowConfigState("trim_audio");
+
+        // Generate waveform image async
+        try
+        {
+            int wfWidth = Math.Max(800, (int)WaveformContainer.ActualWidth);
+            if (wfWidth < 100) wfWidth = 1400;
+            _waveformTempPath = await FileToolsService.GenerateWaveformAsync(path, wfWidth, 150);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(_waveformTempPath);
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            WaveformImage.Source = bmp;
+            TxtWfLoading.Visibility = Visibility.Collapsed;
+
+            // Init audio player for playback
+            if (_audioPlayer == null)
+            {
+                _audioPlayer = new MediaElement
+                {
+                    LoadedBehavior = MediaState.Manual,
+                    Volume = 1
+                };
+                // Add to visual tree (hidden)
+                WaveformContainer.Children.Add(_audioPlayer);
+                _audioPlayer.Visibility = Visibility.Collapsed;
+            }
+            _audioPlayer.Source = new Uri(path);
+            _audioPlayer.Play();
+            _audioPlayer.Pause();
+
+            _audioPlayTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            _audioPlayTimer.Tick -= AudioPlayTimer_Tick;
+            _audioPlayTimer.Tick += AudioPlayTimer_Tick;
+
+            UpdateWaveformHandles();
+        }
+        catch
+        {
+            TxtWfLoading.Text = "Could not generate waveform";
+        }
+    }
+
+    private void UpdateWaveformHandles()
+    {
+        double canvasW = WaveformCanvas.ActualWidth;
+        if (canvasW <= 0) canvasW = WaveformContainer.ActualWidth;
+        if (canvasW <= 0) return;
+
+        double leftX = _audioTrimStartPct * canvasW;
+        double rightX = _audioTrimEndPct * canvasW;
+
+        // Selection rectangle
+        Canvas.SetLeft(WfSelection, leftX);
+        WfSelection.Width = Math.Max(0, rightX - leftX);
+
+        // Handles
+        Canvas.SetLeft(WfHandleLeft, leftX - 6);
+        Canvas.SetLeft(WfHandleRight, rightX - 6);
+
+        // Darkening
+        Canvas.SetLeft(WfDarkenLeft, 0);
+        WfDarkenLeft.Width = Math.Max(0, leftX);
+        Canvas.SetLeft(WfDarkenRight, rightX);
+        WfDarkenRight.Width = Math.Max(0, canvasW - rightX);
+
+        // Update text inputs from percentages
+        if (_audioDuration.TotalSeconds > 0)
+        {
+            var startTs = TimeSpan.FromSeconds(_audioTrimStartPct * _audioDuration.TotalSeconds);
+            var endTs = TimeSpan.FromSeconds(_audioTrimEndPct * _audioDuration.TotalSeconds);
+            TxtTrimAudioStart.Text = startTs.ToString(@"h\:mm\:ss");
+            TxtTrimAudioEnd.Text = endTs.ToString(@"h\:mm\:ss");
+            UpdateTrimDurationText();
+        }
+    }
+
+    private void UpdateTrimDurationText()
+    {
+        if (TimeSpan.TryParse(TxtTrimAudioStart.Text, out var s) && TimeSpan.TryParse(TxtTrimAudioEnd.Text, out var e) && e > s)
+            TxtTrimAudioDuration.Text = $"Duration: {FileToolsService.FormatTimeSpan(e - s)}";
+        else
+            TxtTrimAudioDuration.Text = "";
+    }
+
+    private void Waveform_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(WaveformCanvas);
+        double canvasW = WaveformCanvas.ActualWidth;
+        if (canvasW <= 0) return;
+
+        double leftX = _audioTrimStartPct * canvasW;
+        double rightX = _audioTrimEndPct * canvasW;
+
+        // Check if clicking near left handle (within 15px)
+        if (Math.Abs(pos.X - leftX) < 15)
+            _wfDragMode = WfDragMode.Left;
+        else if (Math.Abs(pos.X - rightX) < 15)
+            _wfDragMode = WfDragMode.Right;
+        else
+        {
+            // Click to seek
+            _wfDragMode = WfDragMode.Seek;
+            SeekAudioToPosition(pos.X / canvasW);
+        }
+
+        WaveformCanvas.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void Waveform_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_wfDragMode == WfDragMode.None) return;
+        double canvasW = WaveformCanvas.ActualWidth;
+        if (canvasW <= 0) return;
+
+        double pct = Math.Max(0, Math.Min(1, e.GetPosition(WaveformCanvas).X / canvasW));
+
+        if (_wfDragMode == WfDragMode.Left)
+        {
+            _audioTrimStartPct = Math.Min(pct, _audioTrimEndPct - 0.01);
+            UpdateWaveformHandles();
+        }
+        else if (_wfDragMode == WfDragMode.Right)
+        {
+            _audioTrimEndPct = Math.Max(pct, _audioTrimStartPct + 0.01);
+            UpdateWaveformHandles();
+        }
+        else if (_wfDragMode == WfDragMode.Seek)
+        {
+            SeekAudioToPosition(pct);
+        }
+    }
+
+    private void Waveform_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        _wfDragMode = WfDragMode.None;
+        WaveformCanvas.ReleaseMouseCapture();
+    }
+
+    private void AudioPlay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_audioPlayer == null) return;
+        if (_isAudioPlaying)
+        {
+            _audioPlayer.Pause();
+            _audioPlayTimer?.Stop();
+            BtnAudioPlay.Content = "\u25B6";
+        }
+        else
+        {
+            _audioPlayer.Play();
+            _audioPlayTimer?.Start();
+            BtnAudioPlay.Content = "\u23F8";
+        }
+        _isAudioPlaying = !_isAudioPlaying;
+    }
+
+    private void AudioPlayTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_audioPlayer == null || _audioDuration.TotalSeconds <= 0) return;
+        double pct = _audioPlayer.Position.TotalSeconds / _audioDuration.TotalSeconds;
+        double canvasW = WaveformCanvas.ActualWidth;
+        if (canvasW > 0)
+            Canvas.SetLeft(WfPlayhead, pct * canvasW);
+        TxtAudioPlayTime.Text = FileToolsService.FormatTimeSpan(_audioPlayer.Position);
+
+        // Stop at trim end
+        if (pct >= _audioTrimEndPct)
+        {
+            _audioPlayer.Pause();
+            _audioPlayTimer?.Stop();
+            _isAudioPlaying = false;
+            BtnAudioPlay.Content = "\u25B6";
+        }
+    }
+
+    private void SeekAudioToPosition(double pct)
+    {
+        if (_audioPlayer == null || _audioDuration.TotalSeconds <= 0) return;
+        _audioPlayer.Position = TimeSpan.FromSeconds(pct * _audioDuration.TotalSeconds);
+        double canvasW = WaveformCanvas.ActualWidth;
+        if (canvasW > 0)
+            Canvas.SetLeft(WfPlayhead, pct * canvasW);
+        TxtAudioPlayTime.Text = FileToolsService.FormatTimeSpan(_audioPlayer.Position);
+    }
+
+    private void TrimAudioTime_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_audioDuration.TotalSeconds <= 0) return;
+        if (TimeSpan.TryParse(TxtTrimAudioStart.Text, out var start))
+            _audioTrimStartPct = Math.Max(0, Math.Min(1, start.TotalSeconds / _audioDuration.TotalSeconds));
+        if (TimeSpan.TryParse(TxtTrimAudioEnd.Text, out var end))
+            _audioTrimEndPct = Math.Max(0, Math.Min(1, end.TotalSeconds / _audioDuration.TotalSeconds));
+        if (_audioTrimEndPct <= _audioTrimStartPct) _audioTrimEndPct = _audioTrimStartPct + 0.01;
+        UpdateWaveformHandles();
     }
 
     private async void TrimAudio_Execute(object sender, RoutedEventArgs e)
