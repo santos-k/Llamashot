@@ -3067,13 +3067,24 @@ public partial class FileToolsWindow : Window
 
         _ytUrl = url;
         _ytVideos.Clear();
-        TxtYtTitle.Text = "Fetching video info...";
-        TxtYtDetail.Text = "";
-        ShowConfigState("youtube_dl");
+
+        // Show spinner on select view
+        YtSpinner.Visibility = Visibility.Visible;
+        TxtYtSpinner.Text = "Fetching video info...";
+        var spinAnim = new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(1))
+        { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+        YtSpinnerRotate.BeginAnimation(System.Windows.Media.Animation.Storyboard.TargetPropertyProperty, null);
+        YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, spinAnim);
 
         try
         {
             var videos = await FileToolsService.FetchYouTubeVideosAsync(url);
+
+            // Stop spinner, show config
+            YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+            YtSpinner.Visibility = Visibility.Collapsed;
+            ShowConfigState("youtube_dl");
+
             TxtYtTitle.Text = videos.Count == 1 ? videos[0].title : $"Playlist \u2014 {videos.Count} videos";
             TxtYtDetail.Text = $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} found";
 
@@ -3116,6 +3127,9 @@ public partial class FileToolsWindow : Window
         }
         catch (Exception ex)
         {
+            YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+            YtSpinner.Visibility = Visibility.Collapsed;
+            ShowConfigState("youtube_dl");
             TxtYtTitle.Text = "Failed to fetch";
             TxtYtDetail.Text = ex.Message;
         }
