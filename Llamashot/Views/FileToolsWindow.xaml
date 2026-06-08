@@ -1395,6 +1395,59 @@
             </Grid>
         </Grid>
 
+        <!-- ====================== PanelTrimAudio ====================== -->
+        <Grid x:Name="PanelTrimAudio" Grid.Row="1" Visibility="Collapsed">
+            <Border x:Name="TrimAudioSelectView" AllowDrop="True"
+                          Drop="TrimAudio_SelectDrop" DragOver="Generic_DragOver"
+                          Background="Transparent">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="Trim Audio" FontSize="28" FontWeight="Bold" Foreground="#EEE"
+                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Cut the start and end of your audio file" FontSize="14" Foreground="#888"
+                               HorizontalAlignment="Center" Margin="0,0,0,40"/>
+                    <Button Content="Select audio file" Width="280" Height="50"
+                            FontSize="16" FontWeight="SemiBold" Foreground="White"
+                            Background="#009688" Cursor="Hand" Click="TrimAudio_SelectFiles"
+                            Margin="0,0,0,16" Template="{StaticResource RoundedButton}"/>
+                    <TextBlock Text="or drop an audio file here" FontSize="12" Foreground="#666"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Grid x:Name="TrimAudioConfigView" Visibility="Collapsed" Margin="24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,8">
+                    <TextBlock x:Name="TxtTrimAudioFileName" Text="" Foreground="#CCC" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Name="TxtTrimAudioInfo" Text="" Foreground="#888" FontSize="12"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Start:" Foreground="#CCC" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBox x:Name="TxtTrimAudioStart" Grid.Column="1" Height="32" Padding="8,4" FontSize="14"
+                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
+                        <TextBlock Text="End:" Grid.Column="2" Foreground="#CCC" FontSize="14" VerticalAlignment="Center" Margin="20,0,10,0"/>
+                        <TextBox x:Name="TxtTrimAudioEnd" Grid.Column="3" Height="32" Padding="8,4" FontSize="14"
+                                 Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0:00:00"/>
+                    </Grid>
+                    <TextBlock Text="Format: HH:MM:SS (e.g. 0:00:05 to 0:01:30)" Foreground="#666" FontSize="11"
+                               HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                </StackPanel>
+                <Button Grid.Row="2" Content="Trim Audio &#x2192;" Width="280" Height="50" Margin="0,4,0,12"
+                        FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#009688"
+                        HorizontalAlignment="Center" Cursor="Hand" Click="TrimAudio_Execute"
+                        Template="{StaticResource RoundedButton}"/>
+            </Grid>
+        </Grid>
+
         <!-- ====================== PanelYouTubeDl ====================== -->
         <Grid x:Name="PanelYouTubeDl" Grid.Row="1" Visibility="Collapsed">
             <Border x:Name="YtSelectView" Background="Transparent">

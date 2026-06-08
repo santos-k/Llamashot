@@ -804,6 +804,23 @@ public static class FileToolsService
         await RunFFmpegAsync($"-i \"{inputPath}\" -ss {startStr} -to {endStr} -c copy \"{outputPath}\"", duration, progress);
     }
 
+    public static async Task TrimAudioAsync(string inputPath, string outputPath, TimeSpan start, TimeSpan end, IProgress<int>? progress = null)
+    {
+        string startStr = start.ToString(@"hh\:mm\:ss\.ff");
+        string endStr = end.ToString(@"hh\:mm\:ss\.ff");
+        var duration = end - start;
+        await RunFFmpegAsync($"-i \"{inputPath}\" -ss {startStr} -to {endStr} -c copy \"{outputPath}\"", duration, progress);
+    }
+
+    public static async Task<TimeSpan> GetAudioDurationAsync(string path)
+    {
+        var info = await GetVideoInfoAsync(path); // ffprobe works for audio too
+        return info.duration;
+    }
+
+    public static bool IsAudioExtension(string ext) =>
+        ext.ToLowerInvariant() is ".mp3" or ".wav" or ".flac" or ".aac" or ".m4a" or ".ogg" or ".wma" or ".opus";
+
     public static async Task CropVideoAsync(string inputPath, string outputPath, int cropW, int cropH, int cropX, int cropY, IProgress<int>? progress = null)
     {
         var info = await GetVideoInfoAsync(inputPath);

@@ -42,6 +42,7 @@ public partial class FileToolsWindow : Window
         ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",             "#78909C"),
         ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336"),
         ("extract_audio", "Extract Audio",    "Extract audio from video",        "#00BCD4"),
+        ("trim_audio",    "Trim Audio",       "Cut start and end of audio",      "#009688"),
         ("youtube_dl",    "YouTube Download", "Download video or audio from URL",  "#FF0000"),
     };
 
@@ -286,6 +287,7 @@ public partial class FileToolsWindow : Window
         _toolPanels["compress_office"] = PanelCompressOffice;
         _toolPanels["video_tools"] = PanelVideoTools;
         _toolPanels["extract_audio"] = PanelExtractAudio;
+        _toolPanels["trim_audio"] = PanelTrimAudio;
         _toolPanels["youtube_dl"] = PanelYouTubeDl;
 
         _selectViews["merge_pdf"] = MergeSelectView;
@@ -306,6 +308,7 @@ public partial class FileToolsWindow : Window
         _selectViews["compress_office"] = CompressOfficeSelectView;
         _selectViews["video_tools"] = VideoSelectView;
         _selectViews["extract_audio"] = ExtractAudioSelectView;
+        _selectViews["trim_audio"] = TrimAudioSelectView;
         _selectViews["youtube_dl"] = YtSelectView;
 
         _configViews["merge_pdf"] = MergeConfigView;
@@ -326,6 +329,7 @@ public partial class FileToolsWindow : Window
         _configViews["compress_office"] = CompressOfficeConfigView;
         _configViews["video_tools"] = VideoConfigView;
         _configViews["extract_audio"] = ExtractAudioConfigView;
+        _configViews["trim_audio"] = TrimAudioConfigView;
         _configViews["youtube_dl"] = YtConfigView;
 
         foreach (var (id, title, _, _) in ToolDefs)
@@ -456,6 +460,7 @@ public partial class FileToolsWindow : Window
         VideoCropCanvas.Visibility = Visibility.Collapsed;
         VideoCropCanvas.Children.Clear();
         _extractAudioPath = null;
+        _trimAudioPath = null;
         _ytUrl = null;
         _ytVideos.Clear();
         _ytCancelSource?.Cancel();
@@ -3048,6 +3053,73 @@ public partial class FileToolsWindow : Window
             ShowComplete("Audio extracted!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
         }
         catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+    }
+
+    // =====================================================================
+    //  Trim Audio
+    // =====================================================================
+
+    private string? _trimAudioPath;
+
+    private void TrimAudio_SelectFiles(object sender, RoutedEventArgs e)
+    {
+        if (!CheckFFmpeg()) return;
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Audio Files|*.mp3;*.wav;*.flac;*.aac;*.m4a;*.ogg;*.wma;*.opus|All Files|*.*"
+        };
+        if (dlg.ShowDialog() != true) return;
+        LoadTrimAudio(dlg.FileName);
+    }
+
+    private void TrimAudio_SelectDrop(object sender, DragEventArgs e)
+    {
+        if (!CheckFFmpeg()) return;
+        var files = GetDroppedFiles(e, f => FileToolsService.IsAudioExtension(System.IO.Path.GetExtension(f)));
+        if (files.Length > 0) LoadTrimAudio(files[0]);
+    }
+
+    private async void LoadTrimAudio(string path)
+    {
+        _trimAudioPath = path;
+        TxtTrimAudioFileName.Text = System.IO.Path.GetFileName(path);
+        try
+        {
+            var duration = await FileToolsService.GetAudioDurationAsync(path);
+            TxtTrimAudioInfo.Text = $"Duration: {FileToolsService.FormatTimeSpan(duration)}";
+            TxtTrimAudioStart.Text = "0:00:00";
+            TxtTrimAudioEnd.Text = duration.ToString(@"h\:mm\:ss");
+        }
+        catch { TxtTrimAudioInfo.Text = "Could not read audio info"; }
+        ShowConfigState("trim_audio");
+    }
+
+    private async void TrimAudio_Execute(object sender, RoutedEventArgs e)
+    {
+        if (_trimAudioPath == null) return;
+        if (!TimeSpan.TryParse(TxtTrimAudioStart.Text.Trim(), out var start) ||
+            !TimeSpan.TryParse(TxtTrimAudioEnd.Text.Trim(), out var end) || end <= start)
+        {
+            MessageBox.Show("Enter valid start and end times.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        string ext = System.IO.Path.GetExtension(_trimAudioPath);
+        var dlg = new SaveFileDialog
+        {
+            Filter = $"Audio|*{ext}|MP3|*.mp3|WAV|*.wav|All Files|*.*",
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_trimAudioPath) + "_trimmed"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        ShowProcessing("Trimming audio...");
+        try
+        {
+            await FileToolsService.TrimAudioAsync(_trimAudioPath, dlg.FileName, start, end, CreateProgress());
+            var info = new FileInfo(dlg.FileName);
+            ShowComplete("Audio trimmed!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
+        }
+        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; MessageBox.Show(ex.Message); }
     }
 
     // =====================================================================
