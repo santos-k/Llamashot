@@ -3087,18 +3087,25 @@ public partial class FileToolsWindow : Window
                     ThumbnailUrl = thumbnail
                 };
 
-                // Load thumbnail from URL
-                if (!string.IsNullOrEmpty(thumbnail))
+                // Build thumbnail URL — use YouTube thumbnail from video ID if not provided
+                string thumbUrl = thumbnail;
+                if (string.IsNullOrEmpty(thumbUrl))
+                {
+                    var idMatch = System.Text.RegularExpressions.Regex.Match(
+                        videoUrl, @"(?:v=|youtu\.be/|/embed/)([a-zA-Z0-9_-]{11})");
+                    if (idMatch.Success)
+                        thumbUrl = $"https://i.ytimg.com/vi/{idMatch.Groups[1].Value}/mqdefault.jpg";
+                }
+                if (!string.IsNullOrEmpty(thumbUrl))
                 {
                     try
                     {
+                        // Don't use CacheOption.OnLoad for remote URLs — let WPF download async
                         var bmp = new BitmapImage();
                         bmp.BeginInit();
-                        bmp.UriSource = new Uri(thumbnail);
-                        bmp.DecodePixelWidth = 120;
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.UriSource = new Uri(thumbUrl);
+                        bmp.DecodePixelWidth = 160;
                         bmp.EndInit();
-                        if (bmp.CanFreeze) bmp.Freeze();
                         item.Thumbnail = bmp;
                     }
                     catch { }
