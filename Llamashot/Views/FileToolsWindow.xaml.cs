@@ -148,8 +148,9 @@ public partial class FileToolsWindow : Window
     //  YouTube download state
     // =====================================================================
 
+    private readonly ObservableCollection<YtVideoItem> _ytVideos = new();
+    private CancellationTokenSource? _ytCancelSource;
     private string? _ytUrl;
-    private bool _ytIsPlaylist;
 
     // =====================================================================
     //  Video crop state
@@ -187,6 +188,7 @@ public partial class FileToolsWindow : Window
         CompressImgList.ItemsSource = _compressImgFiles;
         CompressOfficeList.ItemsSource = _compressOfficeFiles;
         InsertImageList.ItemsSource = _insertImages;
+        YtVideoList.ItemsSource = _ytVideos;
     }
 
     // =====================================================================
@@ -455,9 +457,12 @@ public partial class FileToolsWindow : Window
         VideoCropCanvas.Children.Clear();
         _extractAudioPath = null;
         _ytUrl = null;
-        _ytIsPlaylist = false;
-        YtProgressPanel.Visibility = Visibility.Collapsed;
+        _ytVideos.Clear();
+        _ytCancelSource?.Cancel();
+        _ytCancelSource = null;
+        BtnYtStop.Visibility = Visibility.Collapsed;
         TxtYtUrl.Text = "";
+        TxtYtOverallProgress.Text = "";
         _extractPdfPath = null;
         _extractSelectedPages.Clear();
         ExtractPageGrid.Children.Clear();
@@ -3052,101 +3057,152 @@ public partial class FileToolsWindow : Window
     private async void Yt_Fetch(object sender, RoutedEventArgs e)
     {
         string url = TxtYtUrl.Text.Trim();
-        if (string.IsNullOrEmpty(url))
-        {
-            MessageBox.Show("Enter a YouTube URL.", "Input Required", MessageBoxButton.OK);
-            return;
-        }
-
+        if (string.IsNullOrEmpty(url)) { MessageBox.Show("Enter a YouTube URL."); return; }
         if (!FileToolsService.IsYtDlpAvailable())
         {
-            MessageBox.Show("yt-dlp is required for YouTube downloads.\n\nInstall yt-dlp and add it to your system PATH:\nhttps://github.com/yt-dlp/yt-dlp",
+            MessageBox.Show("yt-dlp is required.\n\nInstall: https://github.com/yt-dlp/yt-dlp",
                 "yt-dlp Required", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         _ytUrl = url;
-        TxtYtTitle.Text = "Fetching info...";
+        _ytVideos.Clear();
+        TxtYtTitle.Text = "Fetching video info...";
         TxtYtDetail.Text = "";
-        TxtYtType.Text = "";
         ShowConfigState("youtube_dl");
 
         try
         {
-            var (title, duration, thumbnail, isPlaylist, videoCount) = await FileToolsService.GetYouTubeInfoAsync(url);
-            _ytIsPlaylist = isPlaylist;
-            TxtYtTitle.Text = title;
-            TxtYtDetail.Text = isPlaylist ? $"{videoCount} videos" : (duration.Length > 0 ? $"Duration: {duration}" : "");
-            TxtYtType.Text = isPlaylist ? "PLAYLIST" : "VIDEO";
+            var videos = await FileToolsService.FetchYouTubeVideosAsync(url);
+            TxtYtTitle.Text = videos.Count == 1 ? videos[0].title : $"Playlist \u2014 {videos.Count} videos";
+            TxtYtDetail.Text = $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} found";
+
+            foreach (var (title, duration, videoUrl, thumbnail) in videos)
+            {
+                var item = new YtVideoItem
+                {
+                    Title = title,
+                    Duration = duration,
+                    VideoUrl = videoUrl,
+                    ThumbnailUrl = thumbnail
+                };
+
+                // Load thumbnail from URL
+                if (!string.IsNullOrEmpty(thumbnail))
+                {
+                    try
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(thumbnail);
+                        bmp.DecodePixelWidth = 120;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        if (bmp.CanFreeze) bmp.Freeze();
+                        item.Thumbnail = bmp;
+                    }
+                    catch { }
+                }
+
+                _ytVideos.Add(item);
+            }
         }
         catch (Exception ex)
         {
-            TxtYtTitle.Text = "Could not fetch info";
+            TxtYtTitle.Text = "Failed to fetch";
             TxtYtDetail.Text = ex.Message;
         }
     }
 
     private void YtMode_Changed(object sender, RoutedEventArgs e)
     {
-        if (YtVideoOptions == null || YtAudioOptions == null) return;
-        bool isVideo = RbYtVideo.IsChecked == true;
+        if (YtVideoOptions == null || ChkYtEmbedThumb == null) return;
+        bool isVideo = RbYtVideo?.IsChecked == true;
         YtVideoOptions.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
-        YtAudioOptions.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
+        ChkYtEmbedThumb.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void Yt_Download(object sender, RoutedEventArgs e)
     {
-        if (_ytUrl == null) return;
+        var selected = _ytVideos.Where(v => v.IsSelected).ToList();
+        if (selected.Count == 0) { MessageBox.Show("Select at least one video."); return; }
 
-        // Choose output folder
         var folderDlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Select download folder" };
         if (folderDlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
         BtnYtDownload.IsEnabled = false;
-        YtProgressPanel.Visibility = Visibility.Visible;
-        YtProgress.Value = 0;
-        TxtYtProgress.Text = "Starting download...";
+        BtnYtStop.Visibility = Visibility.Visible;
+        _ytCancelSource = new CancellationTokenSource();
+
+        bool isAudio = RbYtAudio.IsChecked == true;
+        string quality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "best";
+        bool embedThumb = ChkYtEmbedThumb.IsChecked == true;
+
+        int total = selected.Count;
+        int completed = 0;
 
         try
         {
-            bool isVideo = RbYtVideo.IsChecked == true;
+            foreach (var video in selected)
+            {
+                if (_ytCancelSource.Token.IsCancellationRequested)
+                {
+                    video.Status = "Cancelled";
+                    continue;
+                }
 
-            if (isVideo)
-            {
-                var quality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "best";
-                var progress = new Progress<(int percent, string status)>(p =>
+                video.Status = "Downloading";
+                video.Progress = 0;
+                TxtYtOverallProgress.Text = $"Downloading {completed + 1} of {total}...";
+
+                try
                 {
-                    YtProgress.Value = p.percent;
-                    TxtYtProgress.Text = p.status;
-                });
-                var files = await FileToolsService.DownloadYouTubeVideoAsync(_ytUrl, folderDlg.SelectedPath, quality, progress);
-                YtProgressPanel.Visibility = Visibility.Collapsed;
-                string fileList = files.Length > 0 ? string.Join("\n", files.Select(System.IO.Path.GetFileName)) : "Download complete";
-                ShowComplete("Download complete!", fileList, files.Length > 0 ? files[0] : null, folderDlg.SelectedPath);
-            }
-            else
-            {
-                bool embedThumb = ChkYtEmbedThumb.IsChecked == true;
-                var progress = new Progress<(int percent, string status)>(p =>
+                    var progress = new Progress<(int percent, string status)>(p =>
+                    {
+                        video.Progress = p.percent;
+                    });
+
+                    await FileToolsService.DownloadSingleVideoAsync(
+                        video.VideoUrl, folderDlg.SelectedPath, quality, isAudio, embedThumb, progress);
+
+                    video.Status = "Downloaded";
+                    video.Progress = 100;
+                    completed++;
+                }
+                catch
                 {
-                    YtProgress.Value = p.percent;
-                    TxtYtProgress.Text = p.status;
-                });
-                var files = await FileToolsService.DownloadYouTubeAudioAsync(_ytUrl, folderDlg.SelectedPath, embedThumb, progress);
-                YtProgressPanel.Visibility = Visibility.Collapsed;
-                string fileList = files.Length > 0 ? string.Join("\n", files.Select(System.IO.Path.GetFileName)) : "Download complete";
-                ShowComplete("Audio downloaded!", fileList, files.Length > 0 ? files[0] : null, folderDlg.SelectedPath);
+                    video.Status = "Error";
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            YtProgressPanel.Visibility = Visibility.Collapsed;
-            MessageBox.Show($"Download failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+            // Mark remaining as cancelled if stopped
+            foreach (var v in selected.Where(v => v.Status == "Pending"))
+                v.Status = "Cancelled";
+
+            TxtYtOverallProgress.Text = $"Done \u2014 {completed} of {total} downloaded";
         }
         finally
         {
             BtnYtDownload.IsEnabled = true;
+            BtnYtStop.Visibility = Visibility.Collapsed;
+            _ytCancelSource = null;
         }
+    }
+
+    private void Yt_Stop(object sender, RoutedEventArgs e)
+    {
+        _ytCancelSource?.Cancel();
+        TxtYtOverallProgress.Text = "Stopping...";
+    }
+
+    private void Yt_SelectAll(object sender, RoutedEventArgs e)
+    {
+        foreach (var v in _ytVideos) v.IsSelected = true;
+    }
+
+    private void Yt_DeselectAll(object sender, RoutedEventArgs e)
+    {
+        foreach (var v in _ytVideos) v.IsSelected = false;
     }
 }
 
@@ -3173,4 +3229,42 @@ public class FileItem : INotifyPropertyChanged
 
     private void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+// =========================================================================
+//  YouTube video item for download list
+// =========================================================================
+
+public class YtVideoItem : INotifyPropertyChanged
+{
+    private bool _isSelected = true;
+    private string _status = "Pending";
+    private int _progress;
+
+    public bool IsSelected { get => _isSelected; set { _isSelected = value; OnPropertyChanged(); } }
+    public string Title { get; set; } = "";
+    public string Duration { get; set; } = "";
+    public string VideoUrl { get; set; } = "";
+    public string ThumbnailUrl { get; set; } = "";
+    public BitmapImage? Thumbnail { get; set; }
+    public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
+    public int Progress { get => _progress; set { _progress = value; OnPropertyChanged(); } }
+
+    // Status color for display
+    public System.Windows.Media.Brush StatusColor => Status switch
+    {
+        "Downloaded" => new SolidColorBrush((Color)System.Windows.Media.ColorConverter.ConvertFromString("#4CAF50")),
+        "Downloading" => new SolidColorBrush((Color)System.Windows.Media.ColorConverter.ConvertFromString("#42A5F5")),
+        "Error" => new SolidColorBrush((Color)System.Windows.Media.ColorConverter.ConvertFromString("#EF5350")),
+        "Cancelled" => new SolidColorBrush((Color)System.Windows.Media.ColorConverter.ConvertFromString("#888")),
+        _ => new SolidColorBrush((Color)System.Windows.Media.ColorConverter.ConvertFromString("#666"))
+    };
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        if (name == nameof(Status))
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StatusColor)));
+    }
 }

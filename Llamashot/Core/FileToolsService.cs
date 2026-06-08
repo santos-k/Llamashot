@@ -899,141 +899,117 @@ public static class FileToolsService
         catch { return false; }
     }
 
-    public static async Task<(string title, string duration, string thumbnail, bool isPlaylist, int videoCount)> GetYouTubeInfoAsync(string url)
+    public static async Task<List<(string title, string duration, string url, string thumbnail)>> FetchYouTubeVideosAsync(string inputUrl)
     {
-        return await Task.Run(() =>
+        var results = new List<(string title, string duration, string url, string thumbnail)>();
+
+        await Task.Run(() =>
         {
+            // Use --flat-playlist to get entries without downloading, --print for structured output
             var psi = new ProcessStartInfo("yt-dlp",
-                $"--dump-single-json --no-download \"{url}\"")
-            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            using var proc = Process.Start(psi)!;
-            string json = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(30000);
-
-            // Basic JSON parsing without a JSON library
-            string title = ExtractJsonString(json, "title") ?? "Unknown";
-            string duration = "";
-            bool isPlaylist = json.Contains("\"_type\": \"playlist\"") || json.Contains("\"_type\":\"playlist\"");
-            int videoCount = 1;
-
-            if (isPlaylist)
+                $"--flat-playlist --print \"%(title)s\\t%(duration_string)s\\t%(url)s\\t%(thumbnail)s\" --no-warnings \"{inputUrl}\"")
             {
-                // Count entries
-                int count = 0;
-                int idx = 0;
-                while ((idx = json.IndexOf("\"url\":", idx + 1)) >= 0) count++;
-                videoCount = Math.Max(count, 1);
-                title = ExtractJsonString(json, "title") ?? "Playlist";
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(60000);
+
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length >= 3)
+                {
+                    string title = parts[0].Trim();
+                    string duration = parts.Length >= 2 ? parts[1].Trim() : "";
+                    string url = parts.Length >= 3 ? parts[2].Trim() : "";
+                    string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
+                    if (title == "NA") title = "Untitled";
+                    if (duration == "NA") duration = "";
+                    if (thumb == "NA") thumb = "";
+                    if (!string.IsNullOrEmpty(url))
+                        results.Add((title, duration, url, thumb));
+                }
+            }
+
+            // If no results from flat-playlist (single video), try direct
+            if (results.Count == 0)
+            {
+                var psi2 = new ProcessStartInfo("yt-dlp",
+                    $"--print \"%(title)s\\t%(duration_string)s\\t%(webpage_url)s\\t%(thumbnail)s\" --no-download --no-warnings \"{inputUrl}\"")
+                {
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                    UseShellExecute = false, CreateNoWindow = true
+                };
+                using var proc2 = Process.Start(psi2)!;
+                string output2 = proc2.StandardOutput.ReadToEnd().Trim();
+                proc2.WaitForExit(30000);
+
+                if (!string.IsNullOrEmpty(output2))
+                {
+                    var parts = output2.Split('\t');
+                    string title = parts.Length >= 1 ? parts[0].Trim() : "Unknown";
+                    string duration = parts.Length >= 2 ? parts[1].Trim() : "";
+                    string url = parts.Length >= 3 ? parts[2].Trim() : inputUrl;
+                    string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
+                    results.Add((title, duration, url, thumb));
+                }
+            }
+        });
+
+        return results;
+    }
+
+    public static async Task<string?> DownloadSingleVideoAsync(string videoUrl, string outputDir, string quality, bool audioOnly, bool embedThumbnail, IProgress<(int percent, string status)>? progress = null)
+    {
+        Directory.CreateDirectory(outputDir);
+        string? outputFile = null;
+
+        await Task.Run(() =>
+        {
+            string args;
+            if (audioOnly)
+            {
+                string thumbArg = embedThumbnail ? "--embed-thumbnail" : "";
+                args = $"-x --audio-format mp3 --audio-quality 0 {thumbArg} -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{videoUrl}\"";
             }
             else
             {
-                var durMatch = Regex.Match(json, @"""duration"":\s*(\d+\.?\d*)");
-                if (durMatch.Success && double.TryParse(durMatch.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double secs))
-                    duration = FormatTimeSpan(TimeSpan.FromSeconds(secs));
+                string formatArg = quality switch
+                {
+                    "720p" => "-f \"bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best\"",
+                    "480p" => "-f \"bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best\"",
+                    "360p" => "-f \"bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best\"",
+                    _ => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\""
+                };
+                args = $"{formatArg} --merge-output-format mp4 -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{videoUrl}\"";
             }
 
-            string thumbnail = ExtractJsonString(json, "thumbnail") ?? "";
-            return (title, duration, thumbnail, isPlaylist, videoCount);
-        });
-    }
-
-    private static string? ExtractJsonString(string json, string key)
-    {
-        var match = Regex.Match(json, $"\"{key}\":\\s*\"([^\"]+)\"");
-        return match.Success ? match.Groups[1].Value : null;
-    }
-
-    public static async Task<string[]> DownloadYouTubeVideoAsync(string url, string outputDir, string quality, IProgress<(int percent, string status)>? progress = null)
-    {
-        Directory.CreateDirectory(outputDir);
-        var outputFiles = new List<string>();
-
-        await Task.Run(() =>
-        {
-            string formatArg = quality switch
-            {
-                "best" => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\"",
-                "720p" => "-f \"bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best\"",
-                "480p" => "-f \"bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best\"",
-                "360p" => "-f \"bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best\"",
-                _ => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\""
-            };
-
-            var psi = new ProcessStartInfo("yt-dlp",
-                $"{formatArg} --merge-output-format mp4 -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{url}\"")
+            var psi = new ProcessStartInfo("yt-dlp", args)
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
 
             using var proc = Process.Start(psi)!;
-
             proc.OutputDataReceived += (s, e) =>
             {
                 if (e.Data == null) return;
-                // Parse progress: "[download]  45.2% of ~50MiB at 2.5MiB/s ETA 00:15"
                 var match = Regex.Match(e.Data, @"\[download\]\s+(\d+\.?\d*)%");
                 if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pct))
                     progress?.Report(((int)pct, e.Data.Trim()));
-                // Capture destination filename
+
                 var destMatch = Regex.Match(e.Data, @"\[download\] Destination: (.+)$");
-                if (destMatch.Success) outputFiles.Add(destMatch.Groups[1].Value.Trim());
+                if (destMatch.Success) outputFile = destMatch.Groups[1].Value.Trim();
                 var mergeMatch = Regex.Match(e.Data, @"\[Merger\] Merging formats into ""(.+)""");
-                if (mergeMatch.Success)
-                {
-                    outputFiles.Clear();
-                    outputFiles.Add(mergeMatch.Groups[1].Value.Trim());
-                }
-                // Already downloaded
-                var alreadyMatch = Regex.Match(e.Data, @"has already been downloaded");
-                if (alreadyMatch.Success)
-                    progress?.Report((100, "Already downloaded"));
+                if (mergeMatch.Success) outputFile = mergeMatch.Groups[1].Value.Trim();
             };
             proc.BeginOutputReadLine();
             proc.WaitForExit();
 
             if (proc.ExitCode != 0)
-                throw new Exception("yt-dlp download failed");
+                throw new Exception("Download failed");
         });
 
-        // If no files captured from output, scan the directory
-        if (outputFiles.Count == 0)
-            outputFiles.AddRange(Directory.GetFiles(outputDir, "*.mp4").OrderByDescending(File.GetCreationTime).Take(1));
-
-        return outputFiles.ToArray();
-    }
-
-    public static async Task<string[]> DownloadYouTubeAudioAsync(string url, string outputDir, bool embedThumbnail, IProgress<(int percent, string status)>? progress = null)
-    {
-        Directory.CreateDirectory(outputDir);
-        var outputFiles = new List<string>();
-
-        await Task.Run(() =>
-        {
-            string thumbArg = embedThumbnail ? "--embed-thumbnail" : "";
-            var psi = new ProcessStartInfo("yt-dlp",
-                $"-x --audio-format mp3 --audio-quality 0 {thumbArg} -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{url}\"")
-            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-
-            using var proc = Process.Start(psi)!;
-
-            proc.OutputDataReceived += (s, e) =>
-            {
-                if (e.Data == null) return;
-                var match = Regex.Match(e.Data, @"\[download\]\s+(\d+\.?\d*)%");
-                if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pct))
-                    progress?.Report(((int)pct, e.Data.Trim()));
-                var destMatch = Regex.Match(e.Data, @"\[download\] Destination: (.+)$");
-                if (destMatch.Success) outputFiles.Add(destMatch.Groups[1].Value.Trim());
-            };
-            proc.BeginOutputReadLine();
-            proc.WaitForExit();
-
-            if (proc.ExitCode != 0)
-                throw new Exception("yt-dlp audio download failed");
-        });
-
-        if (outputFiles.Count == 0)
-            outputFiles.AddRange(Directory.GetFiles(outputDir, "*.mp3").OrderByDescending(File.GetCreationTime).Take(1));
-
-        return outputFiles.ToArray();
+        return outputFile;
     }
 
     public static async Task ExtractAudioWithThumbnailAsync(string videoPath, string outputPath, IProgress<int>? progress = null)
