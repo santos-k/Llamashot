@@ -24,6 +24,7 @@ public partial class FileToolsWindow : Window
 
     private static readonly (string id, string title, string desc, string color, string icon, string category)[] ToolDefs =
     {
+        ("pdf_editor",     "PDF Editor",      "All-in-one PDF workspace",            "#00897B", "\u2630", "PDF Tools"),
         ("merge_pdf",      "Merge PDF",       "Combine multiple PDFs into one",      "#E53935", "\u229E", "PDF Tools"),
         ("split_pdf",      "Split PDF",       "Extract pages from PDF",              "#FF7043", "\u2016", "PDF Tools"),
         ("compress_pdf",   "Compress PDF",    "Reduce PDF file size",                "#EF5350", "\u2B07", "PDF Tools"),
@@ -66,6 +67,12 @@ public partial class FileToolsWindow : Window
     // =====================================================================
     //  Observable collections
     // =====================================================================
+
+    private readonly ObservableCollection<FileItem> _pdfEditorFiles = new();
+    private readonly List<PdfEditorFileEntry> _pdfEditorEntries = new();
+    private string _pdfEditorActiveTool = "merge";
+    private readonly HashSet<PdfEditorPageEntry> _peSelectedPages = new();
+    private int _peInsertAfterGlobal = -1; // -1 = not set
 
     private readonly ObservableCollection<FileItem> _mergePdfFiles = new();
     private readonly ObservableCollection<FileItem> _imgToPdfFiles = new();
@@ -187,6 +194,7 @@ public partial class FileToolsWindow : Window
         CreateToolCards();
         InitPanelMap();
 
+        PdfEditorFileList.ItemsSource = _pdfEditorFiles;
         MergePdfList.ItemsSource = _mergePdfFiles;
         ImgToPdfList.ItemsSource = _imgToPdfFiles;
         CompressImgList.ItemsSource = _compressImgFiles;
@@ -380,6 +388,7 @@ public partial class FileToolsWindow : Window
 
     private void InitPanelMap()
     {
+        _toolPanels["pdf_editor"] = PanelPdfEditor;
         _toolPanels["merge_pdf"] = PanelMergePdf;
         _toolPanels["split_pdf"] = PanelSplitPdf;
         _toolPanels["compress_pdf"] = PanelCompressPdf;
@@ -401,6 +410,7 @@ public partial class FileToolsWindow : Window
         _toolPanels["trim_audio"] = PanelTrimAudio;
         _toolPanels["youtube_dl"] = PanelYouTubeDl;
 
+        _selectViews["pdf_editor"] = PdfEditorSelectView;
         _selectViews["merge_pdf"] = MergeSelectView;
         _selectViews["split_pdf"] = SplitSelectView;
         _selectViews["compress_pdf"] = CompressPdfSelectView;
@@ -422,6 +432,7 @@ public partial class FileToolsWindow : Window
         _selectViews["trim_audio"] = TrimAudioSelectView;
         _selectViews["youtube_dl"] = YtSelectView;
 
+        _configViews["pdf_editor"] = PdfEditorConfigView;
         _configViews["merge_pdf"] = MergeConfigView;
         _configViews["split_pdf"] = SplitConfigView;
         _configViews["compress_pdf"] = CompressPdfConfigView;
@@ -544,6 +555,11 @@ public partial class FileToolsWindow : Window
             cv.Visibility = Visibility.Collapsed;
 
         // Clear collections
+        _pdfEditorFiles.Clear();
+        _pdfEditorEntries.Clear();
+        _peSelectedPages.Clear();
+        _peInsertAfterGlobal = -1;
+        PdfEditorPageGrid.Children.Clear();
         _mergePdfFiles.Clear();
         _imgToPdfFiles.Clear();
         _compressImgFiles.Clear();
@@ -820,6 +836,829 @@ public partial class FileToolsWindow : Window
     {
         for (int i = 0; i < list.Count; i++)
             list[i].Index = i + 1;
+    }
+
+    // =====================================================================
+    //  0. PDF Editor (unified workspace)
+    // =====================================================================
+
+    private void PdfEditor_SelectFiles(object sender, RoutedEventArgs e)
+    {
+        var dlg = CreatePdfOpenDialog(true);
+        if (dlg.ShowDialog() != true) return;
+        AddPdfEditorFiles(dlg.FileNames);
+        ShowConfigState("pdf_editor");
+    }
+
+    private void PdfEditor_SelectDrop(object sender, DragEventArgs e)
+    {
+        var files = GetDroppedFiles(e, IsPdfFile);
+        if (files.Length == 0) return;
+        AddPdfEditorFiles(files);
+        ShowConfigState("pdf_editor");
+    }
+
+    private void PdfEditor_AddMoreFiles(object sender, RoutedEventArgs e)
+    {
+        var dlg = CreatePdfOpenDialog(true);
+        if (dlg.ShowDialog() == true)
+            AddPdfEditorFiles(dlg.FileNames);
+    }
+
+    private void PdfEditor_RemoveFile(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string path) return;
+        var fi = _pdfEditorFiles.FirstOrDefault(f => f.FilePath == path);
+        if (fi != null) _pdfEditorFiles.Remove(fi);
+        RenumberList(_pdfEditorFiles);
+
+        var entry = _pdfEditorEntries.FirstOrDefault(en => en.FilePath == path);
+        if (entry != null)
+        {
+            if (entry.GroupBorder != null) PdfEditorPageGrid.Children.Remove(entry.GroupBorder);
+            _pdfEditorEntries.Remove(entry);
+        }
+        UpdatePdfEditorStats();
+    }
+
+    private async void AddPdfEditorFiles(string[] paths)
+    {
+        foreach (var path in paths)
+        {
+            if (_pdfEditorFiles.Any(f => f.FilePath == path)) continue;
+
+            int pages = 0;
+            try { pages = await FileToolsService.GetPdfPageCountAsync(path); } catch { }
+            var info = new FileInfo(path);
+
+            _pdfEditorFiles.Add(new FileItem
+            {
+                Index = _pdfEditorFiles.Count + 1,
+                FilePath = path,
+                FileName = System.IO.Path.GetFileName(path),
+                FileSize = $"{pages} pages",
+                Extra = FileToolsService.FormatFileSize(info.Length)
+            });
+
+            var entry = new PdfEditorFileEntry
+            {
+                FilePath = path,
+                FileName = System.IO.Path.GetFileName(path),
+                PageCount = pages,
+                FileSize = info.Length
+            };
+            _pdfEditorEntries.Add(entry);
+
+            await RenderPdfEditorThumbnails(entry);
+        }
+        UpdatePdfEditorStats();
+    }
+
+    private async Task RenderPdfEditorThumbnails(PdfEditorFileEntry entry)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(entry.FilePath);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            uint pageCount = pdfDoc.PageCount;
+
+            // Build group border
+            var groupBorder = new Border
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#252528")),
+                CornerRadius = new CornerRadius(8),
+                Margin = new Thickness(0, 0, 0, 12),
+                Padding = new Thickness(12)
+            };
+
+            var groupStack = new StackPanel();
+
+            // Header row
+            var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            var headerText = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+            headerText.Children.Add(new TextBlock
+            {
+                Text = entry.FileName, Foreground = Brushes.White, FontSize = 13, FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            headerText.Children.Add(new TextBlock
+            {
+                Text = $"  ({pageCount} pages)", Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
+                FontSize = 11, VerticalAlignment = VerticalAlignment.Center
+            });
+            headerGrid.Children.Add(headerText);
+            groupStack.Children.Add(headerGrid);
+
+            // WrapPanel for thumbnails
+            var wrapPanel = new WrapPanel();
+            int globalPageIdx = _pdfEditorEntries.Where(e2 => e2 != entry).SelectMany(e2 => e2.Pages).Count();
+
+            for (uint i = 0; i < pageCount; i++)
+            {
+                using var page = pdfDoc.GetPage(i);
+                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                var options = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 150 };
+                await page.RenderToStreamAsync(stream, options);
+                stream.Seek(0);
+
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.StreamSource = stream.AsStreamForRead();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+
+                int globalIdx = GetPdfEditorGlobalIndex(entry, (int)i);
+                var pageEntry = new PdfEditorPageEntry
+                {
+                    OriginalIndex = (int)i,
+                    GlobalIndex = globalIdx,
+                    Thumbnail = bmp,
+                    Rotation = 0,
+                    IsDeleted = false,
+                    SourceFile = entry.FilePath
+                };
+                entry.Pages.Add(pageEntry);
+
+                // Build thumbnail border
+                var thumbBorder = new Border
+                {
+                    Width = 120, Height = 170, Margin = new Thickness(4),
+                    CornerRadius = new CornerRadius(6),
+                    BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444")),
+                    BorderThickness = new Thickness(1),
+                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1A1A1E")),
+                    ClipToBounds = true,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        BlurRadius = 4, ShadowDepth = 1, Opacity = 0.25, Color = Colors.Black
+                    }
+                };
+
+                var thumbGrid = new Grid();
+
+                var img = new System.Windows.Controls.Image
+                {
+                    Source = bmp, Stretch = Stretch.Uniform, Margin = new Thickness(2),
+                    RenderTransformOrigin = new Point(0.5, 0.5),
+                    RenderTransform = new RotateTransform(0)
+                };
+                thumbGrid.Children.Add(img);
+
+                // Page number label
+                var labelBorder = new Border
+                {
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xCC, 0, 0, 0)),
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                    Padding = new Thickness(0, 2, 0, 2)
+                };
+                labelBorder.Child = new TextBlock
+                {
+                    Text = $"Page {i + 1}",
+                    Foreground = Brushes.White, FontSize = 10,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                };
+                thumbGrid.Children.Add(labelBorder);
+
+                thumbBorder.Child = thumbGrid;
+                thumbBorder.Cursor = Cursors.Hand;
+
+                // Click: tool-dependent action
+                var clickPageEntry = pageEntry;
+                var clickThumb = thumbBorder;
+                var clickImg = img;
+                thumbBorder.MouseLeftButtonDown += (s, ev) =>
+                {
+                    if (_pdfEditorActiveTool is "extract")
+                        PeTogglePageSelection(clickPageEntry);
+                    else if (_pdfEditorActiveTool == "rotate")
+                        PeTogglePageSelection(clickPageEntry);
+                    else if (_pdfEditorActiveTool == "delete")
+                        PdfEditorPage_Delete(clickPageEntry, clickThumb);
+                    else if (_pdfEditorActiveTool == "reorder")
+                        PeReorder_SelectPage(clickPageEntry);
+                    ev.Handled = true;
+                };
+
+                pageEntry.ThumbnailBorder = thumbBorder;
+
+                // Add insertion point button BEFORE this thumbnail (for Insert tool)
+                var insertBtn = BuildPeInsertionPoint(globalPageIdx);
+                wrapPanel.Children.Add(insertBtn);
+                wrapPanel.Children.Add(thumbBorder);
+                globalPageIdx++;
+            }
+
+            // Final insertion point after last page in this group
+            var lastInsertBtn = BuildPeInsertionPoint(globalPageIdx);
+            wrapPanel.Children.Add(lastInsertBtn);
+
+            groupStack.Children.Add(wrapPanel);
+
+            // "+ Add Page" button at bottom of group
+            var addPageBtn = new System.Windows.Controls.Button
+            {
+                Content = "+ Add Page",
+                FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC")),
+                Background = Brushes.Transparent, BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC")),
+                BorderThickness = new Thickness(1), Cursor = Cursors.Hand,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                Height = 32, Margin = new Thickness(0, 6, 0, 4)
+            };
+            addPageBtn.Click += (s, _) => PeInsert_Pdf(s, new RoutedEventArgs());
+            groupStack.Children.Add(addPageBtn);
+
+            groupBorder.Child = groupStack;
+            entry.GroupBorder = groupBorder;
+            PdfEditorPageGrid.Children.Add(groupBorder);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"PDF Editor thumbnail error: {ex.Message}");
+        }
+    }
+
+    private Border BuildPeInsertionPoint(int afterGlobalIndex)
+    {
+        var btn = new Border
+        {
+            Width = 24, Height = 120,
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            Margin = new Thickness(0, 25, 0, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            ToolTip = "Click to set insertion point here"
+        };
+        var line = new Border
+        {
+            Width = 3, Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333")),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            CornerRadius = new CornerRadius(2)
+        };
+        var circle = new Border
+        {
+            Width = 20, Height = 20, CornerRadius = new CornerRadius(10),
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333")),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        circle.Child = new TextBlock
+        {
+            Text = "+", Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
+            FontSize = 14, FontWeight = FontWeights.Bold,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, -2, 0, 0)
+        };
+        var grid = new Grid();
+        grid.Children.Add(line);
+        grid.Children.Add(circle);
+        btn.Child = grid;
+
+        int capturedIdx = afterGlobalIndex;
+        btn.MouseLeftButtonDown += (s, ev) =>
+        {
+            // Highlight this insertion point
+            _peInsertAfterGlobal = capturedIdx;
+            // Visual feedback
+            circle.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+            ((TextBlock)circle.Child).Foreground = Brushes.White;
+            line.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+            TxtPeInsertPos.Text = $"Insert after page {capturedIdx}";
+            ev.Handled = true;
+        };
+
+        // Show/hide based on insert tool - initially show only the circle marker
+        btn.MouseEnter += (s, _) =>
+        {
+            circle.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+            ((TextBlock)circle.Child).Foreground = Brushes.White;
+            line.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+        };
+        btn.MouseLeave += (s, _) =>
+        {
+            if (_peInsertAfterGlobal != capturedIdx)
+            {
+                circle.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
+                ((TextBlock)circle.Child).Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888"));
+                line.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
+            }
+        };
+
+        return btn;
+    }
+
+    private int GetPdfEditorGlobalIndex(PdfEditorFileEntry targetEntry, int localIndex)
+    {
+        int global = 1;
+        foreach (var entry in _pdfEditorEntries)
+        {
+            if (entry == targetEntry) return global + localIndex;
+            global += entry.Pages.Count(p => !p.IsDeleted);
+        }
+        return global + localIndex;
+    }
+
+    private void UpdatePdfEditorStats()
+    {
+        int totalPages = _pdfEditorEntries.SelectMany(e => e.Pages).Count(p => !p.IsDeleted);
+        long totalSize = _pdfEditorEntries.Sum(e => e.FileSize);
+        string sizeText = FileToolsService.FormatFileSize(totalSize);
+
+        TxtPdfEditorFileCount.Text = $"Files ({_pdfEditorEntries.Count})";
+        TxtPdfEditorTotalPages.Text = $"Total: {totalPages} pages";
+        TxtPdfEditorTotalSize.Text = $"Size: {sizeText}";
+        TxtPdfEditorBottomPages.Text = totalPages.ToString();
+        TxtPdfEditorBottomSize.Text = sizeText;
+    }
+
+    private void PdfEditorPage_Rotate(PdfEditorPageEntry pageEntry, System.Windows.Controls.Image img)
+    {
+        pageEntry.Rotation = (pageEntry.Rotation + 90) % 360;
+        ((RotateTransform)img.RenderTransform).Angle = pageEntry.Rotation;
+    }
+
+    private void PdfEditorPage_Delete(PdfEditorPageEntry pageEntry, Border thumbBorder)
+    {
+        if (pageEntry.IsDeleted)
+        {
+            // Restore
+            pageEntry.IsDeleted = false;
+            thumbBorder.Opacity = 1.0;
+        }
+        else
+        {
+            // Delete
+            pageEntry.IsDeleted = true;
+            thumbBorder.Opacity = 0.3;
+        }
+        UpdatePdfEditorStats();
+    }
+
+    private void PdfEditorToolSelect_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string tool)
+            SelectPdfEditorTool(tool);
+    }
+
+    private void SelectPdfEditorTool(string tool)
+    {
+        _pdfEditorActiveTool = tool;
+        _peSelectedPages.Clear();
+        _peInsertAfterGlobal = -1;
+
+        // Reset all sidebar buttons
+        System.Windows.Controls.Button[] sidebarButtons =
+        {
+            BtnPeTool_merge, BtnPeTool_split, BtnPeTool_extract, BtnPeTool_insert,
+            BtnPeTool_delete, BtnPeTool_rotate, BtnPeTool_reorder, BtnPeTool_compress, BtnPeTool_crop
+        };
+        foreach (var btn in sidebarButtons)
+        {
+            btn.Background = Brushes.Transparent;
+            btn.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#AAA"));
+        }
+
+        var activeBtn = tool switch
+        {
+            "merge" => BtnPeTool_merge, "split" => BtnPeTool_split,
+            "extract" => BtnPeTool_extract, "insert" => BtnPeTool_insert,
+            "delete" => BtnPeTool_delete, "rotate" => BtnPeTool_rotate,
+            "reorder" => BtnPeTool_reorder, "compress" => BtnPeTool_compress,
+            "crop" => BtnPeTool_crop, _ => BtnPeTool_merge
+        };
+        activeBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00897B"));
+        activeBtn.Foreground = Brushes.White;
+
+        var (title, subtitle, buttonText) = tool switch
+        {
+            "merge" => ("Merge PDF", "Combine all files into one PDF", "Merge PDF \u2192"),
+            "split" => ("Split PDF", "Enter page range to extract from first file", "Split PDF \u2192"),
+            "extract" => ("Extract Pages", "Click pages to select, then extract", "Extract Selected \u2192"),
+            "insert" => ("Insert Pages", "Click + to set position, then insert a file", "Save PDF \u2192"),
+            "delete" => ("Delete Pages", "Click pages to mark/unmark for deletion", "Save Without Deleted \u2192"),
+            "rotate" => ("Rotate Pages", "Select pages, then use rotation buttons above", "Save Rotated PDF \u2192"),
+            "reorder" => ("Reorder Pages", "Select a page, then move it with buttons above", "Save Reordered \u2192"),
+            "compress" => ("Compress PDF", "Choose quality level and compress", "Compress PDF \u2192"),
+            "crop" => ("Crop Pages", "Set crop margins (points) to trim all pages", "Crop PDF \u2192"),
+            _ => ("Merge PDF", "Combine all files into one PDF", "Merge PDF \u2192")
+        };
+        TxtPdfEditorToolTitle.Text = title;
+        TxtPdfEditorToolSubtitle.Text = subtitle;
+        BtnPdfEditorAction.Content = buttonText;
+
+        // Show/hide tool-specific bars
+        bool showBar = tool is "extract" or "split" or "rotate" or "compress" or "insert" or "reorder" or "crop";
+        PdfEditorToolBar.Visibility = showBar ? Visibility.Visible : Visibility.Collapsed;
+        PeBarExtract.Visibility = tool == "extract" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarSplit.Visibility = tool == "split" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarRotate.Visibility = tool == "rotate" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarCompress.Visibility = tool == "compress" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarInsert.Visibility = tool == "insert" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarReorder.Visibility = tool == "reorder" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarCrop.Visibility = tool == "crop" ? Visibility.Visible : Visibility.Collapsed;
+
+        // Update thumbnail overlays for the active tool
+        UpdatePePageOverlays();
+    }
+
+    private void UpdatePePageOverlays()
+    {
+        var teal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+        var border444 = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
+
+        foreach (var entry in _pdfEditorEntries)
+            foreach (var pg in entry.Pages)
+            {
+                if (pg.ThumbnailBorder == null) continue;
+                // Reset border
+                pg.ThumbnailBorder.BorderBrush = _peSelectedPages.Contains(pg) ? teal : border444;
+                pg.ThumbnailBorder.BorderThickness = _peSelectedPages.Contains(pg) ? new Thickness(3) : new Thickness(1);
+                pg.ThumbnailBorder.Opacity = pg.IsDeleted ? 0.3 : 1.0;
+            }
+    }
+
+    private void PeTogglePageSelection(PdfEditorPageEntry pg)
+    {
+        if (pg.ThumbnailBorder == null) return;
+        var teal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+        var border444 = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
+
+        if (_peSelectedPages.Contains(pg))
+        {
+            _peSelectedPages.Remove(pg);
+            pg.ThumbnailBorder.BorderBrush = border444;
+            pg.ThumbnailBorder.BorderThickness = new Thickness(1);
+        }
+        else
+        {
+            _peSelectedPages.Add(pg);
+            pg.ThumbnailBorder.BorderBrush = teal;
+            pg.ThumbnailBorder.BorderThickness = new Thickness(3);
+        }
+
+        if (_pdfEditorActiveTool == "extract")
+            TxtPeExtractCount.Text = $"{_peSelectedPages.Count} pages selected";
+        if (_pdfEditorActiveTool == "rotate")
+            TxtPeRotateCount.Text = $"{_peSelectedPages.Count} selected";
+    }
+
+    // Extract tool buttons
+    private void PeExtract_SelectAll(object sender, RoutedEventArgs e)
+    {
+        foreach (var en in _pdfEditorEntries)
+            foreach (var pg in en.Pages.Where(p => !p.IsDeleted))
+                _peSelectedPages.Add(pg);
+        UpdatePePageOverlays();
+        TxtPeExtractCount.Text = $"{_peSelectedPages.Count} pages selected";
+    }
+    private void PeExtract_DeselectAll(object sender, RoutedEventArgs e)
+    {
+        _peSelectedPages.Clear();
+        UpdatePePageOverlays();
+        TxtPeExtractCount.Text = "0 pages selected";
+    }
+
+    // Rotate tool buttons
+    private void PeRotate_Left(object sender, RoutedEventArgs e) => PeRotateSelected(270);
+    private void PeRotate_Right(object sender, RoutedEventArgs e) => PeRotateSelected(90);
+    private void PeRotate_180(object sender, RoutedEventArgs e) => PeRotateSelected(180);
+
+    private void PeRotateSelected(int degrees)
+    {
+        foreach (var pg in _peSelectedPages)
+        {
+            pg.Rotation = (pg.Rotation + degrees) % 360;
+            if (pg.ThumbnailBorder?.Child is Grid g)
+            {
+                var img = g.Children.OfType<System.Windows.Controls.Image>().FirstOrDefault();
+                if (img != null)
+                    ((RotateTransform)img.RenderTransform).Angle = pg.Rotation;
+            }
+        }
+    }
+
+    // Insert tool buttons
+    private void PeInsert_Pdf(object sender, RoutedEventArgs e)
+    {
+        if (_peInsertAfterGlobal < 0 && _pdfEditorEntries.Count > 0)
+        {
+            // Default: insert at end
+            _peInsertAfterGlobal = _pdfEditorEntries.SelectMany(en => en.Pages).Count();
+        }
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf" };
+        if (dlg.ShowDialog() != true) return;
+        AddPdfEditorFiles(new[] { dlg.FileName });
+    }
+    private void PeInsert_Image(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show("Select images to insert as PDF pages.\nImages will be converted to PDF pages.", "Insert Image", MessageBoxButton.OK, MessageBoxImage.Information);
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All|*.*",
+            Multiselect = true
+        };
+        if (dlg.ShowDialog() != true) return;
+        AddPdfEditorFiles(dlg.FileNames);
+    }
+
+    private List<PdfEditorPageEntry> ParsePeSplitRange()
+    {
+        var result = new List<PdfEditorPageEntry>();
+        var allPages = _pdfEditorEntries.SelectMany(en => en.Pages).Where(p => !p.IsDeleted).ToList();
+        if (allPages.Count == 0) return result;
+
+        string rangeText = TxtPeSplitRange.Text.Trim();
+        if (string.IsNullOrEmpty(rangeText)) return result;
+
+        foreach (var part in rangeText.Split(','))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.Contains('-'))
+            {
+                var bounds = trimmed.Split('-');
+                if (bounds.Length == 2 && int.TryParse(bounds[0].Trim(), out int from) && int.TryParse(bounds[1].Trim(), out int to))
+                {
+                    for (int p = from; p <= to && p <= allPages.Count; p++)
+                        if (p >= 1) result.Add(allPages[p - 1]);
+                }
+            }
+            else if (int.TryParse(trimmed, out int single) && single >= 1 && single <= allPages.Count)
+            {
+                result.Add(allPages[single - 1]);
+            }
+        }
+        return result;
+    }
+
+    // Reorder methods
+    private PdfEditorPageEntry? _peReorderSelected;
+
+    private void PeReorder_SelectPage(PdfEditorPageEntry pg)
+    {
+        // Deselect previous
+        if (_peReorderSelected?.ThumbnailBorder != null)
+        {
+            _peReorderSelected.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
+            _peReorderSelected.ThumbnailBorder.BorderThickness = new Thickness(1);
+        }
+        _peReorderSelected = pg;
+        if (pg.ThumbnailBorder != null)
+        {
+            pg.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+            pg.ThumbnailBorder.BorderThickness = new Thickness(3);
+        }
+        TxtPeReorderInfo.Text = $"Page selected (from {System.IO.Path.GetFileName(pg.SourceFile)})";
+    }
+
+    private List<PdfEditorPageEntry> GetAllActivePages()
+        => _pdfEditorEntries.SelectMany(e => e.Pages).Where(p => !p.IsDeleted).ToList();
+
+    private void PeReorder_MoveLeft(object sender, RoutedEventArgs e) => PeReorderMove(-1);
+    private void PeReorder_MoveRight(object sender, RoutedEventArgs e) => PeReorderMove(1);
+
+    private void PeReorder_ToFront(object sender, RoutedEventArgs e)
+    {
+        if (_peReorderSelected == null) return;
+        var all = GetAllActivePages();
+        int idx = all.IndexOf(_peReorderSelected);
+        if (idx <= 0) return;
+        PeReorderMove(-idx);
+    }
+
+    private void PeReorder_ToBack(object sender, RoutedEventArgs e)
+    {
+        if (_peReorderSelected == null) return;
+        var all = GetAllActivePages();
+        int idx = all.IndexOf(_peReorderSelected);
+        if (idx < 0 || idx >= all.Count - 1) return;
+        PeReorderMove(all.Count - 1 - idx);
+    }
+
+    private void PeReorderMove(int delta)
+    {
+        if (_peReorderSelected == null) return;
+        // Find the page in its parent entry and swap
+        var entry = _pdfEditorEntries.FirstOrDefault(e => e.Pages.Contains(_peReorderSelected));
+        if (entry == null) return;
+
+        int idx = entry.Pages.IndexOf(_peReorderSelected);
+        int newIdx = idx + delta;
+        if (newIdx < 0 || newIdx >= entry.Pages.Count) return;
+
+        // Swap in list
+        (entry.Pages[idx], entry.Pages[newIdx]) = (entry.Pages[newIdx], entry.Pages[idx]);
+
+        // Rebuild the wrap panel for this entry
+        RebuildPeGroupThumbnails(entry);
+        TxtPeReorderInfo.Text = $"Moved to position {newIdx + 1}";
+    }
+
+    private void RebuildPeGroupThumbnails(PdfEditorFileEntry entry)
+    {
+        if (entry.GroupBorder?.Child is not StackPanel groupStack) return;
+        // Find the WrapPanel (first child that is WrapPanel)
+        var wp = groupStack.Children.OfType<WrapPanel>().FirstOrDefault();
+        if (wp == null) return;
+        wp.Children.Clear();
+
+        int globalBase = _pdfEditorEntries.Where(e => e != entry).TakeWhile(e => _pdfEditorEntries.IndexOf(e) < _pdfEditorEntries.IndexOf(entry)).SelectMany(e => e.Pages).Count();
+        int localIdx = 0;
+
+        foreach (var pg in entry.Pages)
+        {
+            if (pg.ThumbnailBorder == null) continue;
+            var insertPt = BuildPeInsertionPoint(globalBase + localIdx);
+            wp.Children.Add(insertPt);
+            wp.Children.Add(pg.ThumbnailBorder);
+            localIdx++;
+        }
+        var lastPt = BuildPeInsertionPoint(globalBase + localIdx);
+        wp.Children.Add(lastPt);
+
+        // Re-select
+        if (_peReorderSelected?.ThumbnailBorder != null)
+        {
+            _peReorderSelected.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+            _peReorderSelected.ThumbnailBorder.BorderThickness = new Thickness(3);
+        }
+    }
+
+    private async void PdfEditor_Execute(object sender, RoutedEventArgs e)
+    {
+        if (_pdfEditorEntries.Count == 0) return;
+
+        // Determine which pages to process based on tool
+        List<PdfEditorPageEntry> activePages;
+        if (_pdfEditorActiveTool == "extract")
+        {
+            activePages = _peSelectedPages.Where(p => !p.IsDeleted).ToList();
+            if (activePages.Count == 0)
+            {
+                MessageBox.Show("Select pages to extract first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        else if (_pdfEditorActiveTool == "split")
+        {
+            // Parse range from TxtPeSplitRange
+            activePages = ParsePeSplitRange();
+            if (activePages.Count == 0)
+            {
+                MessageBox.Show("Enter a valid page range (e.g. 1-5, 10-20).", "Invalid Range", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        else
+        {
+            activePages = _pdfEditorEntries.SelectMany(en => en.Pages).Where(p => !p.IsDeleted).ToList();
+        }
+
+        if (activePages.Count == 0)
+        {
+            MessageBox.Show("No pages to process.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // Compress quality override
+        int compressQuality = 95;
+        if (_pdfEditorActiveTool == "compress")
+        {
+            compressQuality = CmbPeCompressQuality.SelectedIndex switch
+            {
+                0 => 90, 1 => 70, 2 => 50, 3 => 30, _ => 70
+            };
+        }
+
+        var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "PDF|*.pdf", FileName = "output.pdf" };
+        if (dlg.ShowDialog() != true) return;
+
+        string actionLabel = _pdfEditorActiveTool switch
+        {
+            "merge" => "Merging",
+            "split" => "Splitting",
+            "extract" => "Extracting",
+            "delete" => "Removing deleted pages",
+            "rotate" => "Rotating",
+            "reorder" => "Reordering",
+            "compress" => "Compressing",
+            "crop" => "Cropping",
+            _ => "Processing"
+        };
+        ShowProcessing($"{actionLabel} PDF...");
+
+        try
+        {
+            string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_pe_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                var tempImages = new List<string>();
+                int total = activePages.Count;
+                int done = 0;
+                var progress = CreateProgress();
+
+                foreach (var pg in activePages)
+                {
+                    var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(pg.SourceFile);
+                    var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(storageFile);
+                    using var page = pdfDoc.GetPage((uint)pg.OriginalIndex);
+
+                    using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                    var renderOpts = new Windows.Data.Pdf.PdfPageRenderOptions
+                    {
+                        DestinationWidth = (uint)(page.Size.Width * 150 / 72)
+                    };
+                    await page.RenderToStreamAsync(stream, renderOpts);
+                    stream.Seek(0);
+
+                    var bmpImg = new BitmapImage();
+                    bmpImg.BeginInit();
+                    bmpImg.StreamSource = stream.AsStreamForRead();
+                    bmpImg.CacheOption = BitmapCacheOption.OnLoad;
+                    bmpImg.EndInit();
+                    bmpImg.Freeze();
+
+                    string tempFile = System.IO.Path.Combine(tempDir, $"page_{done:D5}.jpg");
+                    int rotation = pg.Rotation;
+
+                    // Parse crop margins if crop tool
+                    int cropTop = 0, cropBottom = 0, cropLeft = 0, cropRight = 0;
+                    if (_pdfEditorActiveTool == "crop")
+                    {
+                        int.TryParse(TxtPeCropTop.Text, out cropTop);
+                        int.TryParse(TxtPeCropBottom.Text, out cropBottom);
+                        int.TryParse(TxtPeCropLeft.Text, out cropLeft);
+                        int.TryParse(TxtPeCropRight.Text, out cropRight);
+                        // Convert points to pixels at render DPI
+                        double scale = (double)renderOpts.DestinationWidth / page.Size.Width;
+                        cropTop = (int)(cropTop * scale);
+                        cropBottom = (int)(cropBottom * scale);
+                        cropLeft = (int)(cropLeft * scale);
+                        cropRight = (int)(cropRight * scale);
+                    }
+
+                    var thread = new System.Threading.Thread(() =>
+                    {
+                        BitmapSource finalBmp = bmpImg;
+                        if (rotation != 0)
+                        {
+                            finalBmp = new TransformedBitmap(bmpImg, new RotateTransform(rotation));
+                            finalBmp.Freeze();
+                        }
+
+                        // Apply crop if needed
+                        if (cropTop > 0 || cropBottom > 0 || cropLeft > 0 || cropRight > 0)
+                        {
+                            int w = finalBmp.PixelWidth;
+                            int h = finalBmp.PixelHeight;
+                            int cx = Math.Max(0, cropLeft);
+                            int cy = Math.Max(0, cropTop);
+                            int cw = Math.Max(1, w - cropLeft - cropRight);
+                            int ch = Math.Max(1, h - cropTop - cropBottom);
+                            if (cx + cw > w) cw = w - cx;
+                            if (cy + ch > h) ch = h - cy;
+                            if (cw > 0 && ch > 0)
+                            {
+                                finalBmp = new CroppedBitmap(finalBmp, new Int32Rect(cx, cy, cw, ch));
+                                finalBmp.Freeze();
+                            }
+                        }
+
+                        var encoder = new JpegBitmapEncoder { QualityLevel = compressQuality };
+                        encoder.Frames.Add(BitmapFrame.Create(finalBmp));
+                        using var fs = new FileStream(tempFile, FileMode.Create);
+                        encoder.Save(fs);
+                    });
+                    thread.SetApartmentState(System.Threading.ApartmentState.STA);
+                    thread.Start();
+                    thread.Join();
+
+                    tempImages.Add(tempFile);
+                    done++;
+                    progress.Report(done * 50 / total);
+                }
+
+                var imgProgress = new Progress<int>(v => progress.Report(50 + v / 2));
+                await FileToolsService.ImagesToPdfAsync(tempImages.ToArray(), dlg.FileName, imgProgress);
+
+                var outputInfo = new FileInfo(dlg.FileName);
+                ShowComplete($"PDF saved successfully!",
+                    $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {activePages.Count} pages \u2014 {FileToolsService.FormatFileSize(outputInfo.Length)}",
+                    dlg.FileName);
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, true); } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            FadeOut(ProcessingOverlay);
+            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     // =====================================================================
@@ -4389,6 +5228,31 @@ public class AudioTrimItem
     public TextBlock? TxtPlayTime { get; set; }
     public System.Windows.Controls.Button? BtnPlay { get; set; }
     public MediaElement? Player { get; set; }
+}
+
+// =========================================================================
+//  PDF Editor data classes
+// =========================================================================
+
+public class PdfEditorFileEntry
+{
+    public string FilePath { get; set; } = "";
+    public string FileName { get; set; } = "";
+    public int PageCount { get; set; }
+    public long FileSize { get; set; }
+    public List<PdfEditorPageEntry> Pages { get; set; } = new();
+    public Border? GroupBorder { get; set; }
+}
+
+public class PdfEditorPageEntry
+{
+    public int OriginalIndex { get; set; }  // 0-based in source
+    public int GlobalIndex { get; set; }     // 1-based across all files
+    public BitmapImage? Thumbnail { get; set; }
+    public int Rotation { get; set; }        // 0, 90, 180, 270
+    public bool IsDeleted { get; set; }
+    public string SourceFile { get; set; } = "";
+    public Border? ThumbnailBorder { get; set; }
 }
 
 // =========================================================================

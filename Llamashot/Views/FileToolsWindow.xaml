@@ -150,6 +150,324 @@
             </ScrollViewer>
         </Grid>
 
+        <!-- ====================== 0. PanelPdfEditor ====================== -->
+        <Grid x:Name="PanelPdfEditor" Grid.Row="1" Visibility="Collapsed">
+            <!-- SelectView: file open / drop zone -->
+            <Border x:Name="PdfEditorSelectView" AllowDrop="True"
+                    Drop="PdfEditor_SelectDrop" DragOver="Generic_DragOver"
+                    Background="Transparent">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="PDF Editor" FontSize="28" FontWeight="Bold" Foreground="#EEE"
+                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="All-in-one PDF workspace — merge, split, extract, rotate &amp; more"
+                               FontSize="14" Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,40"/>
+                    <Button Content="Open PDF files" Width="280" Height="50"
+                            FontSize="16" FontWeight="SemiBold" Foreground="White"
+                            Background="#00897B" Cursor="Hand" Click="PdfEditor_SelectFiles"
+                            Margin="0,0,0,16" Template="{StaticResource RoundedButton}"/>
+                    <TextBlock Text="or drop PDFs here" FontSize="12" Foreground="#666"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ConfigView: 3-column layout -->
+            <Grid x:Name="PdfEditorConfigView" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="210"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Column 0: Tool sidebar -->
+                <Border Background="#161619" BorderBrush="#333" BorderThickness="0,0,1,0">
+                    <StackPanel Margin="0,8">
+                        <TextBlock Text="Tools" Foreground="#888" FontSize="11" FontWeight="SemiBold"
+                                   Margin="12,4,0,8"/>
+                        <Button x:Name="BtnPeTool_merge" Tag="merge" Click="PdfEditorToolSelect_Click"
+                                Background="#00897B" Foreground="White" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x229E;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Merge PDF" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_split" Tag="split" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x2016;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Split PDF" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_extract" Tag="extract" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x2398;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Extract Pages" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_insert" Tag="insert" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x2295;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Insert Pages" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_delete" Tag="delete" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x2716;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Delete Pages" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_rotate" Tag="rotate" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x21BB;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Rotate PDF" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_reorder" Tag="reorder" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x21C5;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Reorder Pages" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_compress" Tag="compress" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x2B07;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Compress PDF" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnPeTool_crop" Tag="crop" Click="PdfEditorToolSelect_Click"
+                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x2702;" FontSize="14" VerticalAlignment="Center" Width="20"/>
+                                <TextBlock Text="Crop Pages" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Column 1: File list panel -->
+                <Border Grid.Column="1" Background="#1A1A1E" BorderBrush="#333" BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="TxtPdfEditorFileCount" Text="Files (0)" Foreground="#CCC"
+                                   FontSize="13" FontWeight="SemiBold" Margin="12,10,12,6"/>
+                        <ListBox x:Name="PdfEditorFileList" Grid.Row="1" Background="Transparent"
+                                 BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderBrush" Value="#2A2A2E"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="8,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#x2807;" Foreground="#555" FontSize="14"
+                                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <Border Grid.Column="1" Width="22" Height="26" Background="#EF5350"
+                                                CornerRadius="3" VerticalAlignment="Center" Margin="0,0,8,0">
+                                            <TextBlock Text="PDF" Foreground="White" FontSize="7"
+                                                       FontWeight="Bold" HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding FileName}" Foreground="#CCC" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding FileSize}" Foreground="#888" FontSize="9"/>
+                                                <TextBlock Text=" &#x2022; " Foreground="#555" FontSize="9"/>
+                                                <TextBlock Text="{Binding Extra}" Foreground="#888" FontSize="9"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Button Grid.Column="3" Content="&#x2715;" Width="20" Height="20"
+                                                FontSize="10" Background="Transparent" Foreground="#EF5350"
+                                                BorderThickness="0" Cursor="Hand" VerticalAlignment="Center"
+                                                Click="PdfEditor_RemoveFile" Tag="{Binding FilePath}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Grid.Row="2" Margin="12,6,12,10">
+                            <Border Height="1" Background="#333" Margin="0,0,0,6"/>
+                            <TextBlock x:Name="TxtPdfEditorTotalPages" Text="Total: 0 pages"
+                                       Foreground="#888" FontSize="10"/>
+                            <TextBlock x:Name="TxtPdfEditorTotalSize" Text="Size: 0 MB"
+                                       Foreground="#666" FontSize="10" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Column 2: Main workspace area -->
+                <Grid Grid.Column="2" Background="#1E1E22">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>   <!-- Header -->
+                        <RowDefinition Height="Auto"/>   <!-- Tool controls bar -->
+                        <RowDefinition Height="*"/>      <!-- Thumbnails -->
+                        <RowDefinition Height="Auto"/>   <!-- Bottom bar -->
+                    </Grid.RowDefinitions>
+
+                    <!-- Header bar -->
+                    <Border Background="#252528" Padding="16,10" BorderBrush="#333" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock x:Name="TxtPdfEditorToolTitle" Text="Merge PDF"
+                                           Foreground="#EEE" FontSize="16" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="TxtPdfEditorToolSubtitle"
+                                           Text="Combine all files into one PDF"
+                                           Foreground="#888" FontSize="11" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <Button Content="+ Add Files" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Background="#00897B" Foreground="White" FontSize="12" Padding="14,6"
+                                    BorderThickness="0" Cursor="Hand" Click="PdfEditor_AddMoreFiles"
+                                    Template="{StaticResource RoundedButton21}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Tool-specific controls bar (hidden when not needed) -->
+                    <Border x:Name="PdfEditorToolBar" Grid.Row="1" Background="#1E2130" Padding="12,8"
+                            BorderBrush="#333" BorderThickness="0,0,0,1" Visibility="Collapsed">
+                        <Grid>
+                            <!-- Extract: Select All / Deselect -->
+                            <StackPanel x:Name="PeBarExtract" Orientation="Horizontal" Visibility="Collapsed">
+                                <Button Content="Select All" Padding="12,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeExtract_SelectAll" Margin="0,0,6,0"/>
+                                <Button Content="Deselect All" Padding="12,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeExtract_DeselectAll" Margin="0,0,12,0"/>
+                                <TextBlock x:Name="TxtPeExtractCount" Text="0 pages selected" Foreground="#4DB6AC"
+                                           FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <!-- Split: Range inputs -->
+                            <StackPanel x:Name="PeBarSplit" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="Page range:" Foreground="#CCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox x:Name="TxtPeSplitRange" Width="200" Height="28" Padding="6,2" FontSize="12"
+                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444"
+                                         ToolTip="e.g. 1-5, 10-20, 35-40"/>
+                                <TextBlock Text="(e.g. 1-5, 10-20)" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            </StackPanel>
+                            <!-- Rotate: Angle buttons -->
+                            <StackPanel x:Name="PeBarRotate" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="Click pages to select, then:" Foreground="#888" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <Button Content="&#x21BA; 90&#x00B0; Left" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeRotate_Left" Margin="0,0,4,0"/>
+                                <Button Content="&#x21BB; 90&#x00B0; Right" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeRotate_Right" Margin="0,0,4,0"/>
+                                <Button Content="180&#x00B0;" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeRotate_180" Margin="0,0,12,0"/>
+                                <TextBlock x:Name="TxtPeRotateCount" Text="0 selected" Foreground="#4DB6AC"
+                                           FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <!-- Compress: Quality -->
+                            <StackPanel x:Name="PeBarCompress" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="Quality:" Foreground="#CCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ComboBox x:Name="CmbPeCompressQuality" Width="180" Height="28" FontSize="12" SelectedIndex="1">
+                                    <ComboBoxItem Content="High (90% quality)"/>
+                                    <ComboBoxItem Content="Medium (70% quality)"/>
+                                    <ComboBoxItem Content="Low (50% quality)"/>
+                                    <ComboBoxItem Content="Extreme (30% quality)"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <!-- Insert: file source -->
+                            <StackPanel x:Name="PeBarInsert" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="Click + between pages to set insertion point, then:" Foreground="#888"
+                                           FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <Button Content="Insert PDF" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeInsert_Pdf" Margin="0,0,4,0"/>
+                                <Button Content="Insert Image" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeInsert_Image" Margin="0,0,12,0"/>
+                                <TextBlock x:Name="TxtPeInsertPos" Text="" Foreground="#4DB6AC"
+                                           FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <!-- Reorder: move buttons -->
+                            <StackPanel x:Name="PeBarReorder" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="Select a page, then:" Foreground="#888" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <Button Content="&#x25C0; Move Left" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_MoveLeft" Margin="0,0,4,0"/>
+                                <Button Content="Move Right &#x25B6;" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_MoveRight" Margin="0,0,4,0"/>
+                                <Button Content="&#x25B2; To Front" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_ToFront" Margin="0,0,4,0"/>
+                                <Button Content="&#x25BC; To Back" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_ToBack" Margin="0,0,12,0"/>
+                                <TextBlock x:Name="TxtPeReorderInfo" Text="Click a page to select" Foreground="#4DB6AC"
+                                           FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <!-- Crop: margins -->
+                            <StackPanel x:Name="PeBarCrop" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="Crop margins (pt):" Foreground="#888" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="Top" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox x:Name="TxtPeCropTop" Width="45" Height="24" Padding="4,1" FontSize="11"
+                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" Margin="0,0,8,0"/>
+                                <TextBlock Text="Bottom" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox x:Name="TxtPeCropBottom" Width="45" Height="24" Padding="4,1" FontSize="11"
+                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" Margin="0,0,8,0"/>
+                                <TextBlock Text="Left" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox x:Name="TxtPeCropLeft" Width="45" Height="24" Padding="4,1" FontSize="11"
+                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" Margin="0,0,8,0"/>
+                                <TextBlock Text="Right" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox x:Name="TxtPeCropRight" Width="45" Height="24" Padding="4,1" FontSize="11"
+                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Page thumbnail grid -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Padding="8">
+                        <StackPanel x:Name="PdfEditorPageGrid" Margin="8"/>
+                    </ScrollViewer>
+
+                    <!-- Bottom bar -->
+                    <Border Grid.Row="3" Background="#252528" Padding="16,10" BorderBrush="#333"
+                            BorderThickness="0,1,0,0">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Total Pages: " Foreground="#888" FontSize="12"/>
+                                <TextBlock x:Name="TxtPdfEditorBottomPages" Text="0" Foreground="#4DB6AC"
+                                           FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock Text="    Estimated Size: " Foreground="#888" FontSize="12"/>
+                                <TextBlock x:Name="TxtPdfEditorBottomSize" Text="0 MB" Foreground="#4DB6AC"
+                                           FontSize="12" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <Button x:Name="BtnPdfEditorAction" Content="Merge PDF" HorizontalAlignment="Right"
+                                    Background="#00897B" Foreground="White" FontSize="14" FontWeight="SemiBold"
+                                    Padding="24,8" Cursor="Hand" Click="PdfEditor_Execute"
+                                    Template="{StaticResource RoundedButton21}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
         <!-- ====================== 1. PanelMergePdf ====================== -->
         <Grid x:Name="PanelMergePdf" Grid.Row="1" Visibility="Collapsed">
             <Border x:Name="MergeSelectView" AllowDrop="True"
