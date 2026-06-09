@@ -2862,7 +2862,101 @@ public partial class FileToolsWindow : Window
         _videoTimer.Start();
 
         ShowConfigState("video_tools");
+        SelectVideoTool("trim");
         Dispatcher.BeginInvoke(() => UpdateVideoTimeline(), System.Windows.Threading.DispatcherPriority.Loaded);
+
+        // Populate info panel
+        TxtVideoDetailInfo.Text = $"File: {System.IO.Path.GetFileName(path)}\n" +
+            $"Path: {path}\n" +
+            $"Resolution: {_videoW}x{_videoH}\n" +
+            $"Duration: {FileToolsService.FormatTimeSpan(_videoDuration)}\n" +
+            $"Size: {FileToolsService.FormatFileSize(new FileInfo(path).Length)}";
+    }
+
+    // ----- Video tool sidebar selection -----
+
+    private string _videoActiveTool = "trim";
+    private static readonly string[] _videoToolNames = { "trim", "crop", "rotate", "flip", "info" };
+
+    private void VideoToolSelect_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string tool)
+            SelectVideoTool(tool);
+    }
+
+    private void SelectVideoTool(string tool)
+    {
+        _videoActiveTool = tool;
+        var teal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+        var gray = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888888"));
+        var activeBg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1A2A2A"));
+        var transp = Brushes.Transparent;
+
+        // Highlight sidebar buttons
+        var buttons = new Dictionary<string, System.Windows.Controls.Button>
+        {
+            ["trim"] = BtnToolTrim, ["crop"] = BtnToolCrop, ["rotate"] = BtnToolRotate,
+            ["flip"] = BtnToolFlip, ["info"] = BtnToolInfo
+        };
+        foreach (var (id, btn) in buttons)
+        {
+            bool active = id == tool;
+            btn.Background = active ? activeBg : transp;
+            var sp = btn.Content as StackPanel;
+            if (sp != null)
+                foreach (var child in sp.Children.OfType<TextBlock>())
+                    child.Foreground = active ? teal : gray;
+        }
+
+        // Toggle crop mode based on tool
+        if (tool == "crop" && !_isVideoCropMode)
+            ActivateVideoCrop();
+        else if (tool != "crop" && _isVideoCropMode)
+            DeactivateVideoCrop();
+
+        // Show/hide right panel sections (info hidden unless selected; others always visible)
+        VideoPropInfo.Visibility = tool == "info" ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ActivateVideoCrop()
+    {
+        if (_isVideoCropMode) return;
+        _isVideoCropMode = true;
+        VideoCropCanvas.Visibility = Visibility.Visible;
+        InitVideoCropOverlays();
+        BtnVideoCropToggle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+    }
+
+    private void DeactivateVideoCrop()
+    {
+        if (!_isVideoCropMode) return;
+        _isVideoCropMode = false;
+        VideoCropCanvas.Visibility = Visibility.Collapsed;
+        VideoCropCanvas.Children.Clear();
+        _videoCropSelection = null;
+        _videoCropRect = Rect.Empty;
+        BtnVideoCropToggle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC"));
+    }
+
+    private void VideoCropReset_Click(object sender, MouseButtonEventArgs e)
+    {
+        _videoCropRect = Rect.Empty;
+        if (_isVideoCropMode)
+        {
+            DeactivateVideoCrop();
+            if (_videoActiveTool == "crop") ActivateVideoCrop();
+        }
+        TxtVideoCropInfo.Text = "";
+        TxtVideoCropX.Text = "0"; TxtVideoCropY.Text = "0";
+        TxtVideoCropW.Text = _videoW.ToString(); TxtVideoCropH.Text = _videoH.ToString();
+    }
+
+    private void VideoRotateReset_Click(object sender, MouseButtonEventArgs e)
+    {
+        _videoAngle = 0;
+        VideoRotateTransform.Angle = 0;
+        TxtVideoAngle.Text = "0\u00B0";
+        UpdateVideoTransformText();
     }
 
     // ----- Video playback handlers -----
@@ -2938,6 +3032,8 @@ public partial class FileToolsWindow : Window
             VtStartLabel.Text = startTs.ToString(@"hh\:mm\:ss");
             VtEndLabel.Text = endTs.ToString(@"hh\:mm\:ss");
             VtDurationLabel.Text = $"\u23F1 {FileToolsService.FormatTimeSpan(dur)}";
+            TxtVtStartTime.Text = FormatMs(startTs);
+            TxtVtDuration.Text = FormatMs(dur);
         }
     }
 
@@ -3043,6 +3139,12 @@ public partial class FileToolsWindow : Window
         if (_videoFlipH) parts.Add("Flip H");
         if (_videoFlipV) parts.Add("Flip V");
         TxtVideoTransform.Text = parts.Count > 0 ? string.Join(" + ", parts) : "";
+        TxtVideoAngle.Text = $"{_videoAngle}\u00B0";
+        // Highlight active flip buttons
+        var teal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+        var normal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC"));
+        BtnVideoFlipH.Foreground = _videoFlipH ? teal : normal;
+        BtnVideoFlipV.Foreground = _videoFlipV ? teal : normal;
     }
 
     // ----- Set trim to current position -----
@@ -3135,28 +3237,10 @@ public partial class FileToolsWindow : Window
 
     private void VideoCrop_Toggle(object sender, RoutedEventArgs e)
     {
-        _isVideoCropMode = !_isVideoCropMode;
-        VideoCropCanvas.Visibility = _isVideoCropMode ? Visibility.Visible : Visibility.Collapsed;
-        BtnVideoCropToggle.Background = new SolidColorBrush(
-            (Color)ColorConverter.ConvertFromString(_isVideoCropMode ? "#42A5F5" : "#333"));
-        BtnVideoCropToggle.Foreground = _isVideoCropMode ? Brushes.White :
-            new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC"));
-
         if (_isVideoCropMode)
-        {
-            // Pause video for crop
-            VideoPreview.Pause();
-            _isVideoPlaying = false;
-            BtnVideoPlay.Content = "\u25B6";
-            InitVideoCropOverlays();
-        }
+            DeactivateVideoCrop();
         else
-        {
-            VideoCropCanvas.Children.Clear();
-            _videoCropRect = Rect.Empty;
-            _videoCropSelection = null;
-            TxtVideoCropInfo.Text = "";
-        }
+            ActivateVideoCrop();
     }
 
     private void InitVideoCropOverlays()
@@ -3262,6 +3346,10 @@ public partial class FileToolsWindow : Window
         int pixH = Math.Min((int)Math.Round(r.Height * scaleY), _videoH - pixY);
 
         TxtVideoCropInfo.Text = pixW > 0 && pixH > 0 ? $"{pixW}x{pixH} at {pixX},{pixY}" : "";
+        TxtVideoCropX.Text = pixX.ToString();
+        TxtVideoCropY.Text = pixY.ToString();
+        TxtVideoCropW.Text = Math.Max(0, pixW).ToString();
+        TxtVideoCropH.Text = Math.Max(0, pixH).ToString();
     }
 
     // =====================================================================
