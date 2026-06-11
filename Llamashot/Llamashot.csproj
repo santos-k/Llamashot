@@ -18,6 +18,7 @@
     <Version>8.3.1</Version>
     <AssemblyVersion>8.3.1</AssemblyVersion>
     <FileVersion>8.3.1</FileVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

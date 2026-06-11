@@ -39,6 +39,9 @@ internal static class Program
         try { Spike_PdfSharpVectorText(); }
         catch (Exception e) { Check("spike", false, e.ToString()); }
 
+        try { Test_Segments(); }
+        catch (Exception e) { Check("Detector finds H+V segments", false, e.ToString()); }
+
         Sb.AppendLine($"\n=== {Pass} passed, {Fail} failed ===");
         File.WriteAllText(Path.Combine(Dir, "results.txt"), Sb.ToString());
         return Fail == 0 ? 0 : 1;
@@ -107,4 +110,21 @@ internal static class Program
     }
 
     static bool ContainsTokenInStreams(PdfDocument doc) => false;
+
+    // Task 5: Line-segment extraction
+    static void Test_Segments()
+    {
+        using var bmp = new System.Drawing.Bitmap(400, 300);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.Clear(System.Drawing.Color.White);
+            using var pen = new System.Drawing.Pen(System.Drawing.Color.Black, 2);
+            g.DrawLine(pen, 50, 100, 350, 100);
+            g.DrawRectangle(pen, 50, 150, 80, 40);
+        }
+        var seg = Llamashot.Core.FillSignDetector.ExtractSegments(bmp, 0.1);
+        bool hasH = seg.Horizontal.Exists(s => s.Length > 250);
+        bool hasV = seg.Vertical.Exists(s => s.Length > 30);
+        Check("Detector finds H+V segments", hasH && hasV, $"H={seg.Horizontal.Count} V={seg.Vertical.Count}");
+    }
 }
