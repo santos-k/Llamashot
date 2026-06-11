@@ -661,6 +661,14 @@ public partial class FileToolsWindow : Window
         _rfAngle = 0; _rfFlipH = false; _rfFlipV = false;
         RfRotateTransform.Angle = 0;
         RfFlipTransform.ScaleX = 1; RfFlipTransform.ScaleY = 1;
+
+        // Reset Fill & Sign
+        _fsPdfPath = null;
+        _fsElements.Clear();
+        _fsRegionCache.Clear();
+        _fsCurrentPage = 0;
+        if (FillSignSelectView != null) FillSignSelectView.Visibility = Visibility.Visible;
+        if (FillSignWorkspace != null) FillSignWorkspace.Visibility = Visibility.Collapsed;
     }
 
     // =====================================================================
@@ -730,6 +738,7 @@ public partial class FileToolsWindow : Window
         "extract_audio"   => _extractAudioFiles.Count > 0,
         "trim_audio"      => _trimAudioFiles.Count > 0,
         "youtube_dl"      => _ytVideos.Count > 0 || _ytCancelSource != null,
+        "fill_sign"       => _fsElements.Count > 0,
         _ => false,
     };
 
@@ -2951,6 +2960,31 @@ public partial class FileToolsWindow : Window
             var c = dlg.Color;
             _fsColor = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
             FsColorSwatch.Background = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+        }
+    }
+
+    private async void FillSign_Save(object sender, RoutedEventArgs e)
+    {
+        if (_fsPdfPath == null || _fsElements.Count == 0) return;
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "PDF files|*.pdf",
+            FileName = System.IO.Path.GetFileNameWithoutExtension(_fsPdfPath) + "_filled.pdf"
+        };
+        if (dlg.ShowDialog() != true) return;
+        string outPath = dlg.FileName;
+        string src = _fsPdfPath;
+        var elements = new List<Llamashot.Models.FillElement>(_fsElements);
+        ShowProcessing("Saving filled PDF...");
+        try
+        {
+            await Task.Run(() => Llamashot.Core.FillSignExporter.Export(src, elements, outPath));
+            ShowComplete("Saved", System.IO.Path.GetFileName(outPath), outPath);
+        }
+        catch (Exception ex)
+        {
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
+            MessageBox.Show($"Failed to save: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -6314,6 +6348,17 @@ public partial class FileToolsWindow : Window
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (_currentToolId == "image_editor") IeHandleKeyDown(e);
+
+        if (_currentToolId == "fill_sign"
+            && e.Key == Key.Z
+            && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+            && _fsElements.Count > 0)
+        {
+            _fsElements.RemoveAt(_fsElements.Count - 1);
+            _ = FsRenderCurrentPage();
+            e.Handled = true;
+            return;
+        }
     }
 
     private void Yt_DeselectAll(object sender, RoutedEventArgs e)
