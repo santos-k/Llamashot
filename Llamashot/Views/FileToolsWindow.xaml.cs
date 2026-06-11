@@ -187,6 +187,11 @@ public partial class FileToolsWindow : Window
     private const int FsDpi = 150;
     private readonly List<Llamashot.Models.FillElement> _fsElements = new();
     private readonly Dictionary<int, List<Llamashot.Core.DetectedRegion>> _fsRegionCache = new();
+    private string _fsMode = "select";
+    private string _fsFont = "Arial";
+    private double _fsSize = 12;
+    private bool _fsBold, _fsItalic;
+    private string _fsColor = "#000000";
 
     // =====================================================================
     //  File extension lists
@@ -2642,7 +2647,10 @@ public partial class FileToolsWindow : Window
         for (int i = FillSignOverlay.Children.Count - 1; i >= 0; i--)
             if (FillSignOverlay.Children[i] != FillSignHover)
                 FillSignOverlay.Children.RemoveAt(i);
-        // element visuals re-added in the element-tool group (Task 13+)
+        // Rebuild visuals for the current page (Tasks 13/14/17).
+        foreach (var el in _fsElements)
+            if (el.Page == _fsCurrentPage)
+                FsAddElementVisual(el, focus: false);
     }
 
     private async Task FsEnsureRegions(int page)
@@ -2709,7 +2717,154 @@ public partial class FileToolsWindow : Window
         else FillSignHover.Visibility = Visibility.Collapsed;
     }
 
-    private void FsOverlay_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) { }
+    private void FsOverlay_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_fsMode is not ("text" or "datetime" or "check")) return;
+        var p = e.GetPosition(FillSignOverlay);
+
+        // Snap to a detected region if the cursor is over one.
+        double x = p.X, y = p.Y, w = 0, h = 0;
+        bool snapped = false;
+        if (_fsRegionCache.TryGetValue(_fsCurrentPage, out var regions))
+            foreach (var r in regions)
+                if (p.X >= r.X && p.X <= r.X + r.W && p.Y >= r.Y && p.Y <= r.Y + r.H)
+                { x = r.X; y = r.Y; w = r.W; h = r.H; snapped = true; break; }
+
+        if (!snapped)
+        {
+            h = _fsSize * FsDpi / 72.0 * 1.4;
+            w = _fsMode == "check" ? h : 160;
+        }
+        else { w = Math.Max(8, w); h = Math.Max(8, h); }
+
+        var (ptX, ptY, ptW, ptH) = Llamashot.Core.FillSignGeometry.PixelRectToPointRect(x, y, w, h, FsDpi);
+        var el = new Llamashot.Models.FillElement
+        {
+            Page = _fsCurrentPage,
+            Type = _fsMode switch
+            {
+                "datetime" => Llamashot.Models.FillElementType.DateTime,
+                "check"    => Llamashot.Models.FillElementType.Check,
+                _          => Llamashot.Models.FillElementType.Text
+            },
+            X = ptX, Y = ptY, Width = ptW, Height = ptH,
+            Text = _fsMode == "datetime" ? DateTime.Now.ToString("dd/MM/yyyy") : _fsMode == "check" ? "✓" : "",
+            FontFamily = _fsFont, FontSize = _fsSize, Bold = _fsBold, Italic = _fsItalic, ColorHex = _fsColor
+        };
+        // For check, size font to the box height.
+        if (_fsMode == "check") el.FontSize = Math.Max(8, Llamashot.Core.FillSignGeometry.PixelsToPoints(h, FsDpi));
+        _fsElements.Add(el);
+        FsAddElementVisual(el, focus: _fsMode != "check");
+    }
+
+    private void FsAddElementVisual(Llamashot.Models.FillElement el, bool focus = false)
+    {
+        double pxX = Llamashot.Core.FillSignGeometry.PointsToPixels(el.X, FsDpi);
+        double pxY = Llamashot.Core.FillSignGeometry.PointsToPixels(el.Y, FsDpi);
+        double pxW = Llamashot.Core.FillSignGeometry.PointsToPixels(el.Width, FsDpi);
+        double pxH = Llamashot.Core.FillSignGeometry.PointsToPixels(el.Height, FsDpi);
+
+        switch (el.Type)
+        {
+            case Llamashot.Models.FillElementType.Text:
+            case Llamashot.Models.FillElementType.DateTime:
+            case Llamashot.Models.FillElementType.Check:
+            {
+                var tb = new System.Windows.Controls.TextBox
+                {
+                    Text = el.Text,
+                    Width = pxW > 0 ? pxW : 160,
+                    MinHeight = pxH > 0 ? pxH : el.FontSize * FsDpi / 72.0 * 1.4,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3B82F6")),
+                    Background = new SolidColorBrush(Color.FromArgb(20, 59, 130, 246)),
+                    Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(el.ColorHex)),
+                    FontFamily = new System.Windows.Media.FontFamily(el.FontFamily),
+                    FontSize = el.FontSize * FsDpi / 72.0,
+                    FontWeight = el.Bold ? FontWeights.Bold : FontWeights.Normal,
+                    FontStyle = el.Italic ? FontStyles.Italic : FontStyles.Normal,
+                    Padding = new Thickness(0), Tag = el,
+                    TextAlignment = el.Type == Llamashot.Models.FillElementType.Check ? TextAlignment.Center : TextAlignment.Left
+                };
+                tb.TextChanged += (_, _) => el.Text = tb.Text;
+                System.Windows.Controls.Canvas.SetLeft(tb, pxX);
+                System.Windows.Controls.Canvas.SetTop(tb, pxY);
+                FsEnableDrag(tb, el);
+                FillSignOverlay.Children.Add(tb);
+                if (focus) { tb.Focus(); tb.CaretIndex = tb.Text.Length; }
+                break;
+            }
+            default:
+                break; // Signature/Stamp visuals added by a later task group
+        }
+    }
+
+    private void FsEnableDrag(FrameworkElement fe, Llamashot.Models.FillElement el)
+    {
+        bool dragging = false; System.Windows.Point start = default; double ox = 0, oy = 0;
+        fe.MouseRightButtonDown += (s, e) =>
+        {
+            FillSignOverlay.Children.Remove(fe);
+            _fsElements.Remove(el);
+            e.Handled = true;
+        };
+        fe.PreviewMouseLeftButtonDown += (s, e) =>
+        {
+            if (_fsMode != "select") return; // only drag in Select mode
+            dragging = true;
+            start = e.GetPosition(FillSignOverlay);
+            ox = System.Windows.Controls.Canvas.GetLeft(fe);
+            oy = System.Windows.Controls.Canvas.GetTop(fe);
+            fe.CaptureMouse(); e.Handled = true;
+        };
+        fe.PreviewMouseMove += (s, e) =>
+        {
+            if (!dragging) return;
+            var pos = e.GetPosition(FillSignOverlay);
+            double nx = ox + (pos.X - start.X), ny = oy + (pos.Y - start.Y);
+            System.Windows.Controls.Canvas.SetLeft(fe, nx);
+            System.Windows.Controls.Canvas.SetTop(fe, ny);
+            el.X = Llamashot.Core.FillSignGeometry.PixelsToPoints(nx, FsDpi);
+            el.Y = Llamashot.Core.FillSignGeometry.PixelsToPoints(ny, FsDpi);
+        };
+        fe.PreviewMouseLeftButtonUp += (s, e) => { if (dragging) { dragging = false; fe.ReleaseMouseCapture(); } };
+    }
+
+    // =====================================================================
+    //  Fill & Sign — toolbar handlers (Tasks 13/14/17)
+    // =====================================================================
+
+    private void FsMode_Click(object sender, RoutedEventArgs e)
+    {
+        _fsMode = (string)((FrameworkElement)sender).Tag;
+    }
+
+    private void FsFont_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (FsFontCombo.SelectedItem is System.Windows.Controls.ComboBoxItem it) _fsFont = (string)it.Content;
+        else if (FsFontCombo.SelectedItem is string s) _fsFont = s;
+    }
+
+    private void FsSize_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        string? v = (FsSizeCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content as string
+                    ?? FsSizeCombo.SelectedItem as string;
+        if (double.TryParse(v, out var d) && d > 0) _fsSize = d;
+    }
+
+    private void FsBold_Click(object sender, RoutedEventArgs e) => _fsBold = !_fsBold;
+    private void FsItalic_Click(object sender, RoutedEventArgs e) => _fsItalic = !_fsItalic;
+
+    private void FsColor_Click(object sender, RoutedEventArgs e)
+    {
+        using var dlg = new System.Windows.Forms.ColorDialog();
+        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            var c = dlg.Color;
+            _fsColor = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            FsColorSwatch.Background = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+        }
+    }
 
     // =====================================================================
     //  11. Compress Image

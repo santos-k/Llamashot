@@ -1238,11 +1238,64 @@
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" x:Name="FillSignToolbar" Background="#26262B" Height="48">
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
-                <Button x:Name="FsBtnPrev" Content="‹ Prev" Click="FsPrevPage" Margin="2,0" Padding="8,4"/>
-                <TextBlock x:Name="FsPageLabel" Foreground="White" VerticalAlignment="Center" Margin="8,0" Text="Page 1 / 1"/>
-                <Button x:Name="FsBtnNext" Content="Next ›" Click="FsNextPage" Margin="2,0" Padding="8,4"/>
+            <Border Grid.Row="0" x:Name="FillSignToolbar" Background="#26262B">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,6">
+                <!-- Mode toggle buttons -->
+                <Button Content="Select" Tag="select" Click="FsMode_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="8,4" Margin="2,0" FontSize="12" Cursor="Hand"/>
+                <Button Content="Text" Tag="text" Click="FsMode_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="8,4" Margin="2,0" FontSize="12" Cursor="Hand"/>
+                <Button Content="Check" Tag="check" Click="FsMode_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="8,4" Margin="2,0" FontSize="12" Cursor="Hand"/>
+                <Button Content="Date" Tag="datetime" Click="FsMode_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="8,4" Margin="2,0" FontSize="12" Cursor="Hand"/>
+                <!-- Separator -->
+                <Border Width="1" Background="#444" Margin="8,2"/>
+                <!-- Font family -->
+                <ComboBox x:Name="FsFontCombo" Width="130" Height="26" FontSize="11"
+                          SelectionChanged="FsFont_Changed" Margin="2,0">
+                  <ComboBoxItem Content="Arial" IsSelected="True"/>
+                  <ComboBoxItem Content="Times New Roman"/>
+                  <ComboBoxItem Content="Courier New"/>
+                </ComboBox>
+                <!-- Font size -->
+                <ComboBox x:Name="FsSizeCombo" Width="52" Height="26" FontSize="11"
+                          SelectionChanged="FsSize_Changed" Margin="2,0">
+                  <ComboBoxItem Content="8"/>
+                  <ComboBoxItem Content="10"/>
+                  <ComboBoxItem Content="11"/>
+                  <ComboBoxItem Content="12" IsSelected="True"/>
+                  <ComboBoxItem Content="14"/>
+                  <ComboBoxItem Content="16"/>
+                  <ComboBoxItem Content="18"/>
+                  <ComboBoxItem Content="24"/>
+                  <ComboBoxItem Content="32"/>
+                </ComboBox>
+                <!-- Bold / Italic -->
+                <Button x:Name="FsBoldBtn" Content="B" Click="FsBold_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="7,4" Margin="2,0" FontSize="13" FontWeight="Bold" Cursor="Hand"/>
+                <Button x:Name="FsItalicBtn" Content="I" Click="FsItalic_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="7,4" Margin="2,0" FontSize="13" FontStyle="Italic" Cursor="Hand"/>
+                <!-- Color picker -->
+                <Button Content="Color" Click="FsColor_Click"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        Padding="8,4" Margin="6,0,2,0" FontSize="12" Cursor="Hand"/>
+                <Border x:Name="FsColorSwatch" Width="20" Height="20" Background="Black"
+                        BorderBrush="#555" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <!-- Separator -->
+                <Border Width="1" Background="#444" Margin="4,2"/>
+                <!-- Navigation -->
+                <Button x:Name="FsBtnPrev" Content="‹ Prev" Click="FsPrevPage" Margin="4,0,2,0" Padding="8,4"
+                        Background="#333" Foreground="White" BorderThickness="0" FontSize="12" Cursor="Hand"/>
+                <TextBlock x:Name="FsPageLabel" Foreground="White" VerticalAlignment="Center" Margin="8,0" Text="Page 1 / 1" FontSize="12"/>
+                <Button x:Name="FsBtnNext" Content="Next ›" Click="FsNextPage" Margin="2,0" Padding="8,4"
+                        Background="#333" Foreground="White" BorderThickness="0" FontSize="12" Cursor="Hand"/>
               </StackPanel>
             </Border>
             <Grid Grid.Row="1">
