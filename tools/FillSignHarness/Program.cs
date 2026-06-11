@@ -48,6 +48,9 @@ internal static class Program
         try { Test_ExportText(); }
         catch (Exception e) { Check("Export writes selectable text", false, e.ToString()); }
 
+        try { Test_ExportImage(); }
+        catch (Exception e) { Check("Export embeds signature image", false, e.ToString()); }
+
         Sb.AppendLine($"\n=== {Pass} passed, {Fail} failed ===");
         File.WriteAllText(Path.Combine(Dir, "results.txt"), Sb.ToString());
         return Fail == 0 ? 0 : 1;
@@ -130,6 +133,29 @@ internal static class Program
         var bytes = System.IO.File.ReadAllBytes(outPath);
         bool present = System.Text.Encoding.ASCII.GetString(bytes).Contains("SANTOSH-FILL-XYZ");
         Check("Export writes selectable text", System.IO.File.Exists(outPath) && present, $"out={bytes.Length}b present={present}");
+    }
+
+    // Task 8: Image embedding test
+    static void Test_ExportImage()
+    {
+        string sig = System.IO.Path.Combine(Dir, "sig.png");
+        using (var b = new System.Drawing.Bitmap(200, 80))
+        {
+            using var g = System.Drawing.Graphics.FromImage(b);
+            g.Clear(System.Drawing.Color.Transparent);
+            using var pen = new System.Drawing.Pen(System.Drawing.Color.Blue, 3);
+            g.DrawCurve(pen, new[] { new System.Drawing.Point(5, 60), new System.Drawing.Point(60, 10), new System.Drawing.Point(120, 70), new System.Drawing.Point(195, 20) });
+            b.Save(sig, System.Drawing.Imaging.ImageFormat.Png);
+        }
+        string src = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fixtures", "137.pdf"));
+        string outPath = System.IO.Path.Combine(Dir, "export_image.pdf");
+        var els = new System.Collections.Generic.List<Llamashot.Models.FillElement>
+        {
+            new() { Page=0, Type=Llamashot.Models.FillElementType.Signature, X=90, Y=380, Width=120, Height=48, ImagePath=sig }
+        };
+        Llamashot.Core.FillSignExporter.Export(src, els, outPath);
+        using var d = PdfSharp.Pdf.IO.PdfReader.Open(outPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        Check("Export embeds signature image", System.IO.File.Exists(outPath) && d.Pages.Count >= 1, $"pages={d.Pages.Count} size={new System.IO.FileInfo(outPath).Length}b");
     }
 
     // Task 6: Region classification
