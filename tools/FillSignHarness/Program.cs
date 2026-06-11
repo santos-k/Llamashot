@@ -45,6 +45,9 @@ internal static class Program
         try { Test_Regions(); }
         catch (Exception e) { Check("Detector classifies regions", false, e.ToString()); }
 
+        try { Test_ExportText(); }
+        catch (Exception e) { Check("Export writes selectable text", false, e.ToString()); }
+
         Sb.AppendLine($"\n=== {Pass} passed, {Fail} failed ===");
         File.WriteAllText(Path.Combine(Dir, "results.txt"), Sb.ToString());
         return Fail == 0 ? 0 : 1;
@@ -113,6 +116,21 @@ internal static class Program
     }
 
     static bool ContainsTokenInStreams(PdfDocument doc) => false;
+
+    // Task 7: Vector text export
+    static void Test_ExportText()
+    {
+        string src = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fixtures", "137.pdf"));
+        string outPath = System.IO.Path.Combine(Dir, "export_text.pdf");
+        var els = new System.Collections.Generic.List<Llamashot.Models.FillElement>
+        {
+            new() { Page=1, Type=Llamashot.Models.FillElementType.Text, X=120, Y=110, Width=200, Height=16, Text="SANTOSH-FILL-XYZ", FontFamily="Arial", FontSize=11, ColorHex="#000000" }
+        };
+        Llamashot.Core.FillSignExporter.Export(src, els, outPath);
+        var bytes = System.IO.File.ReadAllBytes(outPath);
+        bool present = System.Text.Encoding.ASCII.GetString(bytes).Contains("SANTOSH-FILL-XYZ");
+        Check("Export writes selectable text", System.IO.File.Exists(outPath) && present, $"out={bytes.Length}b present={present}");
+    }
 
     // Task 6: Region classification
     static void Test_Regions()
