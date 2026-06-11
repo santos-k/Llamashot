@@ -23,11 +23,58 @@ internal static class Program
     static int Main()
     {
         Directory.CreateDirectory(Dir);
+
+        try { Test_RenderPage(); }
+        catch (Exception e) { Check("Render page 0 @150dpi", false, e.ToString()); }
+
+        try { Test_PageSizePoints(); }
+        catch (Exception e) { Check("Page size in points", false, e.ToString()); }
+
+        try { Test_FillElementModel(); }
+        catch (Exception e) { Check("FillElement holds values", false, e.ToString()); }
+
+        try { Test_Geometry(); }
+        catch (Exception e) { Check("Geometry px<->pt round-trip", false, e.ToString()); }
+
         try { Spike_PdfSharpVectorText(); }
         catch (Exception e) { Check("spike", false, e.ToString()); }
+
         Sb.AppendLine($"\n=== {Pass} passed, {Fail} failed ===");
         File.WriteAllText(Path.Combine(Dir, "results.txt"), Sb.ToString());
         return Fail == 0 ? 0 : 1;
+    }
+
+    // Task 2: Page render utility
+    static void Test_RenderPage()
+    {
+        string src = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fixtures", "137.pdf"));
+        var bmp = Llamashot.Core.FillSignRender.RenderPageToBitmapAsync(src, 0, 150).GetAwaiter().GetResult();
+        Check("Render page 0 @150dpi", bmp != null && bmp.Width > 1000 && bmp.Height > 1000, $"{bmp?.Width}x{bmp?.Height}");
+    }
+
+    static void Test_PageSizePoints()
+    {
+        string src = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fixtures", "137.pdf"));
+        var (wPt, hPt, rotation) = Llamashot.Core.FillSignRender.GetPageSizeAsync(src, 0).GetAwaiter().GetResult();
+        Check("Page size in points", wPt > 200 && wPt < 1000, $"w={wPt} h={hPt}");
+    }
+
+    // Task 3: FillElement model
+    static void Test_FillElementModel()
+    {
+        var el = new Llamashot.Models.FillElement { Page = 0, Type = Llamashot.Models.FillElementType.Text, X = 100, Y = 200, Width = 150, Height = 18, Text = "Santosh", FontFamily = "Arial", FontSize = 12, ColorHex = "#000000" };
+        Check("FillElement holds values", el.Type == Llamashot.Models.FillElementType.Text && el.Text == "Santosh", $"x={el.X}");
+    }
+
+    // Task 4: Geometry
+    static void Test_Geometry()
+    {
+        double px = Llamashot.Core.FillSignGeometry.PointsToPixels(72, 150);
+        double pt = Llamashot.Core.FillSignGeometry.PixelsToPoints(150, 150);
+        bool ok = System.Math.Abs(px - 150) < 0.01 && System.Math.Abs(pt - 72) < 0.01;
+        var (rx, ry, rw, rh) = Llamashot.Core.FillSignGeometry.PixelRectToPointRect(208.33, 416.66, 100, 50, 150);
+        ok &= System.Math.Abs(rx - 100) < 0.1 && System.Math.Abs(ry - 200) < 0.1;
+        Check("Geometry px<->pt round-trip", ok, $"px={px:F2} pt={pt:F2} rx={rx:F2} ry={ry:F2}");
     }
 
     static void Spike_PdfSharpVectorText()
