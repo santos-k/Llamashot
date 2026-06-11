@@ -7,7 +7,8 @@
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A1E">
+        Background="#1A1A1E"
+        KeyDown="Window_KeyDown">
 
     <Window.Resources>
         <!-- Rounded button template (reusable) -->
@@ -43,6 +44,20 @@
                     <Setter TargetName="border" Property="Opacity" Value="0.9"/>
                 </Trigger>
             </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Slider style for smooth clickable sliders -->
+        <Style TargetType="Slider">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        </Style>
+
+        <!-- Tool sidebar button template -->
+        <ControlTemplate x:Key="PeToolButton" TargetType="Button">
+            <Border Background="{TemplateBinding Background}" CornerRadius="8"
+                    Padding="{TemplateBinding Padding}">
+                <ContentPresenter VerticalAlignment="Center"/>
+            </Border>
         </ControlTemplate>
 
         <!-- File list item template (with index, name, extra, size, remove button) -->
@@ -152,319 +167,473 @@
 
         <!-- ====================== 0. PanelPdfEditor ====================== -->
         <Grid x:Name="PanelPdfEditor" Grid.Row="1" Visibility="Collapsed">
-            <!-- SelectView: file open / drop zone -->
+            <!-- SelectView -->
             <Border x:Name="PdfEditorSelectView" AllowDrop="True"
                     Drop="PdfEditor_SelectDrop" DragOver="Generic_DragOver"
                     Background="Transparent">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <TextBlock Text="PDF Editor" FontSize="28" FontWeight="Bold" Foreground="#EEE"
                                HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="All-in-one PDF workspace — merge, split, extract, rotate &amp; more"
+                    <TextBlock Text="Open a PDF to edit &#x2014; reorder, extract, insert, rotate &amp; more"
                                FontSize="14" Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,40"/>
-                    <Button Content="Open PDF files" Width="280" Height="50"
+                    <Button Content="Open PDF file" Width="280" Height="50"
                             FontSize="16" FontWeight="SemiBold" Foreground="White"
-                            Background="#00897B" Cursor="Hand" Click="PdfEditor_SelectFiles"
+                            Background="#00897B" Cursor="Hand" Click="PdfEditor_SelectFile"
                             Margin="0,0,0,16" Template="{StaticResource RoundedButton}"/>
-                    <TextBlock Text="or drop PDFs here" FontSize="12" Foreground="#666"
+                    <TextBlock Text="or drop a PDF here" FontSize="12" Foreground="#666"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
-            <!-- ConfigView: 3-column layout -->
+            <!-- ConfigView: Editor layout -->
             <Grid x:Name="PdfEditorConfigView" Visibility="Collapsed">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="130"/>
-                    <ColumnDefinition Width="210"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <!-- Column 0: Tool sidebar -->
-                <Border Background="#161619" BorderBrush="#333" BorderThickness="0,0,1,0">
-                    <StackPanel Margin="0,8">
-                        <TextBlock Text="Tools" Foreground="#888" FontSize="11" FontWeight="SemiBold"
-                                   Margin="12,4,0,8"/>
-                        <Button x:Name="BtnPeTool_merge" Tag="merge" Click="PdfEditorToolSelect_Click"
-                                Background="#00897B" Foreground="White" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x229E;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Merge PDF" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_split" Tag="split" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x2016;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Split PDF" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_extract" Tag="extract" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x2398;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Extract Pages" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_insert" Tag="insert" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x2295;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Insert Pages" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_delete" Tag="delete" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x2716;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Delete Pages" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_rotate" Tag="rotate" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x21BB;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Rotate PDF" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_reorder" Tag="reorder" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x21C5;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Reorder Pages" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_compress" Tag="compress" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x2B07;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Compress PDF" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="BtnPeTool_crop" Tag="crop" Click="PdfEditorToolSelect_Click"
-                                Background="Transparent" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" HorizontalContentAlignment="Left" Height="34" Padding="10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x2702;" FontSize="14" VerticalAlignment="Center" Width="20"/>
-                                <TextBlock Text="Crop Pages" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </Border>
-
-                <!-- Column 1: File list panel -->
-                <Border Grid.Column="1" Background="#1A1A1E" BorderBrush="#333" BorderThickness="0,0,1,0">
+                <!-- Row 0: Top Header -->
+                <Border Background="#1E1E22" Padding="12,8" BorderBrush="#2A2A2E" BorderThickness="0,0,0,1">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock x:Name="TxtPdfEditorFileCount" Text="Files (0)" Foreground="#CCC"
-                                   FontSize="13" FontWeight="SemiBold" Margin="12,10,12,6"/>
-                        <ListBox x:Name="PdfEditorFileList" Grid.Row="1" Background="Transparent"
-                                 BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderBrush" Value="#2A2A2E"/>
-                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="8,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="&#x2807;" Foreground="#555" FontSize="14"
-                                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <Border Grid.Column="1" Width="22" Height="26" Background="#EF5350"
-                                                CornerRadius="3" VerticalAlignment="Center" Margin="0,0,8,0">
-                                            <TextBlock Text="PDF" Foreground="White" FontSize="7"
-                                                       FontWeight="Bold" HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding FileName}" Foreground="#CCC" FontSize="11"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding FileSize}" Foreground="#888" FontSize="9"/>
-                                                <TextBlock Text=" &#x2022; " Foreground="#555" FontSize="9"/>
-                                                <TextBlock Text="{Binding Extra}" Foreground="#888" FontSize="9"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <Button Grid.Column="3" Content="&#x2715;" Width="20" Height="20"
-                                                FontSize="10" Background="Transparent" Foreground="#EF5350"
-                                                BorderThickness="0" Cursor="Hand" VerticalAlignment="Center"
-                                                Click="PdfEditor_RemoveFile" Tag="{Binding FilePath}"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <StackPanel Grid.Row="2" Margin="12,6,12,10">
-                            <Border Height="1" Background="#333" Margin="0,0,0,6"/>
-                            <TextBlock x:Name="TxtPdfEditorTotalPages" Text="Total: 0 pages"
-                                       Foreground="#888" FontSize="10"/>
-                            <TextBlock x:Name="TxtPdfEditorTotalSize" Text="Size: 0 MB"
-                                       Foreground="#666" FontSize="10" Margin="0,2,0,0"/>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <Border Width="34" Height="34" CornerRadius="7" Background="#E53935"
+                                    VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Text="PDF" FontSize="9" FontWeight="Bold" Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="PDF Tools" Foreground="#EEE" FontSize="15" FontWeight="SemiBold"/>
+                                <TextBlock Text="Edit your PDF with ease" Foreground="#666" FontSize="10"/>
+                            </StackPanel>
                         </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock x:Name="TxtPeFileName" Text="document.pdf" Foreground="#EEE"
+                                       FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtPeFileInfo" Text="" Foreground="#666"
+                                       FontSize="11" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,12,0"
+                                    VerticalAlignment="Center">
+                            <Button x:Name="BtnPeUndo" Content="&#x21B6; Undo" Padding="8,5" FontSize="11"
+                                    Background="Transparent" Foreground="#666" BorderThickness="0"
+                                    Cursor="Hand" Click="PeUndo_Click" IsEnabled="False"/>
+                            <Button x:Name="BtnPeRedo" Content="&#x21B7; Redo" Padding="8,5" FontSize="11"
+                                    Background="Transparent" Foreground="#666" BorderThickness="0"
+                                    Cursor="Hand" Click="PeRedo_Click" IsEnabled="False"/>
+                        </StackPanel>
+                        <Button Grid.Column="3" Content="Save" Padding="14,6" FontSize="12"
+                                Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                Cursor="Hand" Click="PeSave_Click" Margin="0,0,8,0"/>
+                        <Button Grid.Column="4" Content="Save As" Padding="16,6" FontSize="12" FontWeight="SemiBold"
+                                Background="#E53935" Foreground="White" BorderThickness="0"
+                                Cursor="Hand" Click="PeSaveAs_Click"
+                                Template="{StaticResource RoundedButton21}"/>
                     </Grid>
                 </Border>
 
-                <!-- Column 2: Main workspace area -->
-                <Grid Grid.Column="2" Background="#1E1E22">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>   <!-- Header -->
-                        <RowDefinition Height="Auto"/>   <!-- Tool controls bar -->
-                        <RowDefinition Height="*"/>      <!-- Thumbnails -->
-                        <RowDefinition Height="Auto"/>   <!-- Bottom bar -->
-                    </Grid.RowDefinitions>
+                <!-- Row 1: Main (3 columns) -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="240"/>
+                    </Grid.ColumnDefinitions>
 
-                    <!-- Header bar -->
-                    <Border Background="#252528" Padding="16,10" BorderBrush="#333" BorderThickness="0,0,0,1">
-                        <Grid>
-                            <StackPanel>
-                                <TextBlock x:Name="TxtPdfEditorToolTitle" Text="Merge PDF"
-                                           Foreground="#EEE" FontSize="16" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="TxtPdfEditorToolSubtitle"
-                                           Text="Combine all files into one PDF"
-                                           Foreground="#888" FontSize="11" Margin="0,2,0,0"/>
+                    <!-- Col 0: Tool sidebar -->
+                    <Border Background="#161619" BorderBrush="#2A2A2E" BorderThickness="0,0,1,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="6,12,6,8">
+                                <TextBlock Text="TOOLS" Foreground="#666" FontSize="10" FontWeight="Bold"
+                                           Margin="10,0,0,12"/>
+                                <Button x:Name="BtnPeTool_reorder" Tag="reorder" Click="PeToolSelect_Click"
+                                        Background="#E53935" Foreground="White" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x21C5;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Reorder" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Drag &amp; drop pages" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_extract" Tag="extract" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x2398;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Extract Pages" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Extract selected pages" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_insert" Tag="insert" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x2295;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Insert Pages" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Insert from PDF or image" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_delete" Tag="delete" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x2716;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Delete Pages" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Remove pages from PDF" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_rotate" Tag="rotate" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x21BB;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Rotate Pages" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Rotate one or more pages" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_crop" Tag="crop" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x2702;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Crop Pages" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Crop page margins" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_split" Tag="split" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x2016;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Split PDF" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Split into multiple files" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BtnPeTool_compress" Tag="compress" Click="PeToolSelect_Click"
+                                        Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                        Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1"
+                                        Template="{StaticResource PeToolButton}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x2B07;" FontSize="14" VerticalAlignment="Center" Width="22"/>
+                                            <TextBlock Text="Compress PDF" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Reduce PDF file size" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
-                            <Button Content="+ Add Files" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                    Background="#00897B" Foreground="White" FontSize="12" Padding="14,6"
-                                    BorderThickness="0" Cursor="Hand" Click="PdfEditor_AddMoreFiles"
-                                    Template="{StaticResource RoundedButton21}"/>
-                        </Grid>
+                        </ScrollViewer>
                     </Border>
 
-                    <!-- Tool-specific controls bar (hidden when not needed) -->
-                    <Border x:Name="PdfEditorToolBar" Grid.Row="1" Background="#1E2130" Padding="12,8"
-                            BorderBrush="#333" BorderThickness="0,0,0,1" Visibility="Collapsed">
-                        <Grid>
-                            <!-- Extract: Select All / Deselect -->
-                            <StackPanel x:Name="PeBarExtract" Orientation="Horizontal" Visibility="Collapsed">
-                                <Button Content="Select All" Padding="12,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeExtract_SelectAll" Margin="0,0,6,0"/>
-                                <Button Content="Deselect All" Padding="12,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeExtract_DeselectAll" Margin="0,0,12,0"/>
-                                <TextBlock x:Name="TxtPeExtractCount" Text="0 pages selected" Foreground="#4DB6AC"
-                                           FontSize="12" VerticalAlignment="Center"/>
+                    <!-- Col 1: Main workspace -->
+                    <Grid Grid.Column="1" Background="#1E1E22">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <!-- View controls bar -->
+                        <Border Background="#252528" Padding="16,8" BorderBrush="#333" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtPeToolTitle" Text="Reorder Pages"
+                                               FontSize="15" FontWeight="SemiBold" Foreground="#EEE"/>
+                                    <TextBlock x:Name="TxtPeToolSubtitle" Text="Drag pages to reorder"
+                                               FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <Border Background="#1A1A1E" CornerRadius="6" Margin="0,0,16,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button x:Name="BtnPeViewThumbs" Content="&#x229E; Thumbnails"
+                                                    Padding="10,5" FontSize="11" Background="#333" Foreground="#EEE"
+                                                    BorderThickness="0" Cursor="Hand"/>
+                                            <Button x:Name="BtnPeViewList" Content="&#x2630; List"
+                                                    Padding="10,5" FontSize="11" Background="Transparent" Foreground="#888"
+                                                    BorderThickness="0" Cursor="Hand"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Button Content="-" Width="24" Height="24" FontSize="14"
+                                            Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand"
+                                            Click="PeZoom_Out"/>
+                                    <Slider x:Name="SldPeZoom" Width="100" Minimum="80" Maximum="250" Value="150"
+                                            VerticalAlignment="Center" Margin="6,0"
+                                            ValueChanged="PeZoom_Changed"/>
+                                    <Button Content="+" Width="24" Height="24" FontSize="14"
+                                            Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand"
+                                            Click="PeZoom_In"/>
+                                    <ComboBox x:Name="CmbPeFit" Width="70" Height="26" FontSize="11"
+                                              Margin="12,0,0,0" SelectedIndex="0">
+                                        <ComboBoxItem Content="Fit"/>
+                                        <ComboBoxItem Content="100%"/>
+                                        <ComboBoxItem Content="150%"/>
+                                        <ComboBoxItem Content="200%"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <!-- Tool-specific controls bar -->
+                        <Border x:Name="PeToolBar" Grid.Row="1" Background="#1E2130" Padding="12,8"
+                                BorderBrush="#333" BorderThickness="0,0,0,1" Visibility="Collapsed">
+                            <Grid>
+                                <StackPanel x:Name="PeBarExtract" Orientation="Horizontal" Visibility="Collapsed">
+                                    <Button Content="Select All" Padding="12,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                            BorderBrush="#444" Cursor="Hand" Click="PeExtract_SelectAll" Margin="0,0,6,0"/>
+                                    <Button Content="Deselect All" Padding="12,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                            BorderBrush="#444" Cursor="Hand" Click="PeExtract_DeselectAll" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="TxtPeExtractCount" Text="0 pages selected" Foreground="#4DB6AC"
+                                               FontSize="12" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel x:Name="PeBarSplit" Orientation="Horizontal" Visibility="Collapsed">
+                                    <TextBlock Text="Page range:" Foreground="#CCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBox x:Name="TxtPeSplitRange" Width="200" Height="28" Padding="6,2" FontSize="12"
+                                             Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444"
+                                             ToolTip="e.g. 1-5, 10-20, 35-40"/>
+                                    <TextBlock Text="(e.g. 1-5, 10-20)" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                </StackPanel>
+                                <StackPanel x:Name="PeBarReorder" Orientation="Horizontal" Visibility="Collapsed">
+                                    <TextBlock Text="Select a page, then:" Foreground="#888" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <Button Content="&#x25C0; Move Left" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                            BorderBrush="#444" Cursor="Hand" Click="PeReorder_MoveLeft" Margin="0,0,4,0"/>
+                                    <Button Content="Move Right &#x25B6;" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                            BorderBrush="#444" Cursor="Hand" Click="PeReorder_MoveRight" Margin="0,0,4,0"/>
+                                    <Button Content="&#x25B2; To Front" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                            BorderBrush="#444" Cursor="Hand" Click="PeReorder_ToFront" Margin="0,0,4,0"/>
+                                    <Button Content="&#x25BC; To Back" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
+                                            BorderBrush="#444" Cursor="Hand" Click="PeReorder_ToBack" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="TxtPeReorderInfo" Text="Click a page to select" Foreground="#4DB6AC"
+                                               FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel x:Name="PeBarCompress" Orientation="Horizontal" Visibility="Collapsed">
+                                    <TextBlock Text="Quality:" Foreground="#CCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <ComboBox x:Name="CmbPeCompressQuality" Width="180" Height="28" FontSize="12" SelectedIndex="1">
+                                        <ComboBoxItem Content="High (90% quality)"/>
+                                        <ComboBoxItem Content="Medium (70% quality)"/>
+                                        <ComboBoxItem Content="Low (50% quality)"/>
+                                        <ComboBoxItem Content="Extreme (30% quality)"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel x:Name="PeBarDelete" Orientation="Horizontal" Visibility="Collapsed">
+                                    <TextBlock Text="Click pages to mark for deletion" Foreground="#888" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="TxtPeDeleteCount" Text="0 pages marked" Foreground="#EF5350"
+                                               FontSize="12" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <!-- Page thumbnails -->
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <Border x:Name="PeSelectionBar" Background="#1E2130" Padding="12,6"
+                                        BorderBrush="#333" BorderThickness="0,0,0,1" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock x:Name="TxtPeSelectionCount" Text="0 Pages Selected"
+                                                   Foreground="#4DB6AC" FontSize="12" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                        <Button Content="Delete" Padding="10,3" FontSize="11" Background="#333"
+                                                Foreground="#EF5350" BorderBrush="#444" Cursor="Hand"
+                                                Click="PeSelection_Delete" Margin="0,0,4,0"/>
+                                        <Button Content="Rotate" Padding="10,3" FontSize="11" Background="#333"
+                                                Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                                Click="PeSelection_Rotate" Margin="0,0,4,0"/>
+                                        <Button Content="Extract" Padding="10,3" FontSize="11" Background="#333"
+                                                Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                                Click="PeSelection_Extract"/>
+                                    </StackPanel>
+                                </Border>
+                                <WrapPanel x:Name="PePageGrid" Margin="16,12"/>
+                                <Border Margin="16,4,16,16" CornerRadius="8" Background="#1E1E22"
+                                        AllowDrop="True" Drop="PeInsertZone_Drop" DragOver="Generic_DragOver">
+                                    <Grid>
+                                        <Rectangle RadiusX="8" RadiusY="8" Stroke="#44E53935" StrokeThickness="2"
+                                                   StrokeDashArray="6 4"/>
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24,20">
+                                            <TextBlock Text="&#x2295;" FontSize="28" Foreground="#E53935"
+                                                       HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <TextBlock Text="Insert Pages Here" FontSize="14" Foreground="#888"
+                                                       HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                                            <TextBlock Text="Drag &amp; drop pages to insert" FontSize="11"
+                                                       Foreground="#666" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
-                            <!-- Split: Range inputs -->
-                            <StackPanel x:Name="PeBarSplit" Orientation="Horizontal" Visibility="Collapsed">
-                                <TextBlock Text="Page range:" Foreground="#CCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBox x:Name="TxtPeSplitRange" Width="200" Height="28" Padding="6,2" FontSize="12"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444"
-                                         ToolTip="e.g. 1-5, 10-20, 35-40"/>
-                                <TextBlock Text="(e.g. 1-5, 10-20)" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                            </StackPanel>
-                            <!-- Rotate: Angle buttons -->
-                            <StackPanel x:Name="PeBarRotate" Orientation="Horizontal" Visibility="Collapsed">
-                                <TextBlock Text="Click pages to select, then:" Foreground="#888" FontSize="11"
-                                           VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <Button Content="&#x21BA; 90&#x00B0; Left" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeRotate_Left" Margin="0,0,4,0"/>
-                                <Button Content="&#x21BB; 90&#x00B0; Right" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeRotate_Right" Margin="0,0,4,0"/>
-                                <Button Content="180&#x00B0;" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeRotate_180" Margin="0,0,12,0"/>
-                                <TextBlock x:Name="TxtPeRotateCount" Text="0 selected" Foreground="#4DB6AC"
-                                           FontSize="11" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <!-- Compress: Quality -->
-                            <StackPanel x:Name="PeBarCompress" Orientation="Horizontal" Visibility="Collapsed">
-                                <TextBlock Text="Quality:" Foreground="#CCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <ComboBox x:Name="CmbPeCompressQuality" Width="180" Height="28" FontSize="12" SelectedIndex="1">
-                                    <ComboBoxItem Content="High (90% quality)"/>
-                                    <ComboBoxItem Content="Medium (70% quality)"/>
-                                    <ComboBoxItem Content="Low (50% quality)"/>
-                                    <ComboBoxItem Content="Extreme (30% quality)"/>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Col 2: Properties panel -->
+                    <Border Grid.Column="2" Background="#1A1A1E" BorderBrush="#2A2A2E" BorderThickness="1,0,0,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="16,16">
+                                <TextBlock Text="PAGE PROPERTIES" Foreground="#888" FontSize="10"
+                                           FontWeight="Bold" Margin="0,0,0,16"/>
+                                <!-- Rotate -->
+                                <TextBlock Text="Rotate" Foreground="#CCC" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <Grid Margin="0,0,0,20">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="&#x21BA;" Padding="0,8" FontSize="18"
+                                            Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                            Cursor="Hand" Click="PeProp_RotateLeft" Margin="0,0,4,0"
+                                            ToolTip="Rotate 90 left"/>
+                                    <Button Grid.Column="1" Content="&#x21BB;" Padding="0,8" FontSize="18"
+                                            Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                            Cursor="Hand" Click="PeProp_RotateRight" Margin="0,0,4,0"
+                                            ToolTip="Rotate 90 right"/>
+                                    <Button Grid.Column="2" Content="180&#x00B0;" Padding="0,8" FontSize="12"
+                                            Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                            Cursor="Hand" Click="PeProp_Rotate180"
+                                            ToolTip="Rotate 180"/>
+                                </Grid>
+                                <!-- Page Size -->
+                                <TextBlock Text="Page Size" Foreground="#CCC" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <ComboBox x:Name="CmbPePageSize" Height="30" FontSize="12" Margin="0,0,0,20"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Content="A4 (210 x 297 mm)"/>
+                                    <ComboBoxItem Content="Letter (216 x 279 mm)"/>
+                                    <ComboBoxItem Content="Legal (216 x 356 mm)"/>
+                                    <ComboBoxItem Content="A3 (297 x 420 mm)"/>
+                                    <ComboBoxItem Content="A5 (148 x 210 mm)"/>
+                                </ComboBox>
+                                <!-- Orientation -->
+                                <TextBlock Text="Orientation" Foreground="#CCC" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <ComboBox x:Name="CmbPeOrientation" Height="30" FontSize="12" Margin="0,0,0,20"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Content="Portrait"/>
+                                    <ComboBoxItem Content="Landscape"/>
+                                </ComboBox>
+                                <!-- Margins -->
+                                <TextBlock Text="Margins" Foreground="#CCC" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Top" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="TxtPeMarginTop" Height="28" Padding="6,3" FontSize="11"
+                                                 Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Text="20 mm"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Bottom" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="TxtPeMarginBottom" Height="28" Padding="6,3" FontSize="11"
+                                                 Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Text="20 mm"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,0,0,20">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Left" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="TxtPeMarginLeft" Height="28" Padding="6,3" FontSize="11"
+                                                 Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Text="20 mm"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Right" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="TxtPeMarginRight" Height="28" Padding="6,3" FontSize="11"
+                                                 Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Text="20 mm"/>
+                                    </StackPanel>
+                                </Grid>
+                                <!-- Crop Page -->
+                                <Button Content="Crop Page" Padding="0,10" FontSize="12"
+                                        Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                        Cursor="Hand" Click="PeProp_CropPage" Margin="0,0,0,20"
+                                        HorizontalContentAlignment="Center"/>
+                                <!-- Apply to -->
+                                <TextBlock Text="Apply to" Foreground="#CCC" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <ComboBox x:Name="CmbPeApplyTo" Height="30" FontSize="12" SelectedIndex="0">
+                                    <ComboBoxItem Content="This Page"/>
+                                    <ComboBoxItem Content="Selected Pages"/>
+                                    <ComboBoxItem Content="All Pages"/>
                                 </ComboBox>
                             </StackPanel>
-                            <!-- Insert: file source -->
-                            <StackPanel x:Name="PeBarInsert" Orientation="Horizontal" Visibility="Collapsed">
-                                <TextBlock Text="Click + between pages to set insertion point, then:" Foreground="#888"
-                                           FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <Button Content="Insert PDF" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeInsert_Pdf" Margin="0,0,4,0"/>
-                                <Button Content="Insert Image" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeInsert_Image" Margin="0,0,12,0"/>
-                                <TextBlock x:Name="TxtPeInsertPos" Text="" Foreground="#4DB6AC"
-                                           FontSize="11" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <!-- Reorder: move buttons -->
-                            <StackPanel x:Name="PeBarReorder" Orientation="Horizontal" Visibility="Collapsed">
-                                <TextBlock Text="Select a page, then:" Foreground="#888" FontSize="11"
-                                           VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <Button Content="&#x25C0; Move Left" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_MoveLeft" Margin="0,0,4,0"/>
-                                <Button Content="Move Right &#x25B6;" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_MoveRight" Margin="0,0,4,0"/>
-                                <Button Content="&#x25B2; To Front" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_ToFront" Margin="0,0,4,0"/>
-                                <Button Content="&#x25BC; To Back" Padding="10,4" FontSize="11" Background="#333" Foreground="#CCC"
-                                        BorderBrush="#444" Cursor="Hand" Click="PeReorder_ToBack" Margin="0,0,12,0"/>
-                                <TextBlock x:Name="TxtPeReorderInfo" Text="Click a page to select" Foreground="#4DB6AC"
-                                           FontSize="11" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <!-- Crop: margins -->
-                            <StackPanel x:Name="PeBarCrop" Orientation="Horizontal" Visibility="Collapsed">
-                                <TextBlock Text="Crop margins (pt):" Foreground="#888" FontSize="11"
-                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="Top" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBox x:Name="TxtPeCropTop" Width="45" Height="24" Padding="4,1" FontSize="11"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" Margin="0,0,8,0"/>
-                                <TextBlock Text="Bottom" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBox x:Name="TxtPeCropBottom" Width="45" Height="24" Padding="4,1" FontSize="11"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" Margin="0,0,8,0"/>
-                                <TextBlock Text="Left" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBox x:Name="TxtPeCropLeft" Width="45" Height="24" Padding="4,1" FontSize="11"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0" Margin="0,0,8,0"/>
-                                <TextBlock Text="Right" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBox x:Name="TxtPeCropRight" Width="45" Height="24" Padding="4,1" FontSize="11"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="0"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- Page thumbnail grid -->
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled" Padding="8">
-                        <StackPanel x:Name="PdfEditorPageGrid" Margin="8"/>
-                    </ScrollViewer>
-
-                    <!-- Bottom bar -->
-                    <Border Grid.Row="3" Background="#252528" Padding="16,10" BorderBrush="#333"
-                            BorderThickness="0,1,0,0">
-                        <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Total Pages: " Foreground="#888" FontSize="12"/>
-                                <TextBlock x:Name="TxtPdfEditorBottomPages" Text="0" Foreground="#4DB6AC"
-                                           FontSize="12" FontWeight="SemiBold"/>
-                                <TextBlock Text="    Estimated Size: " Foreground="#888" FontSize="12"/>
-                                <TextBlock x:Name="TxtPdfEditorBottomSize" Text="0 MB" Foreground="#4DB6AC"
-                                           FontSize="12" FontWeight="SemiBold"/>
-                            </StackPanel>
-                            <Button x:Name="BtnPdfEditorAction" Content="Merge PDF" HorizontalAlignment="Right"
-                                    Background="#00897B" Foreground="White" FontSize="14" FontWeight="SemiBold"
-                                    Padding="24,8" Cursor="Hand" Click="PdfEditor_Execute"
-                                    Template="{StaticResource RoundedButton21}"/>
-                        </Grid>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
+
+                <!-- Row 2: Bottom bar -->
+                <Border Grid.Row="2" Background="#1A1A1E" Padding="12,8" BorderBrush="#2A2A2E"
+                        BorderThickness="0,1,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Page" Foreground="#888" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox x:Name="TxtPeCurrentPage" Width="35" Height="24" Padding="4,2"
+                                     FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444"
+                                     HorizontalContentAlignment="Center" Text="1"/>
+                            <TextBlock Text=" / " Foreground="#666" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtPeTotalPages" Text="0" Foreground="#888"
+                                       FontSize="12" VerticalAlignment="Center"/>
+                            <Button Content="&#x25C0;&#x2502;" Padding="6,3" FontSize="10"
+                                    Background="Transparent" Foreground="#888" BorderThickness="0"
+                                    Cursor="Hand" Click="PeNav_First" Margin="12,0,2,0" ToolTip="First page"/>
+                            <Button Content="&#x25C0;" Padding="6,3" FontSize="10"
+                                    Background="Transparent" Foreground="#888" BorderThickness="0"
+                                    Cursor="Hand" Click="PeNav_Prev" Margin="0,0,2,0" ToolTip="Previous page"/>
+                            <Button Content="&#x25B6;" Padding="6,3" FontSize="10"
+                                    Background="Transparent" Foreground="#888" BorderThickness="0"
+                                    Cursor="Hand" Click="PeNav_Next" Margin="0,0,2,0" ToolTip="Next page"/>
+                            <Button Content="&#x2502;&#x25B6;" Padding="6,3" FontSize="10"
+                                    Background="Transparent" Foreground="#888" BorderThickness="0"
+                                    Cursor="Hand" Click="PeNav_Last" ToolTip="Last page"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Button Content="+ Add Blank Page" Padding="12,5" FontSize="11" Background="Transparent"
+                                    Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="PeAdd_BlankPage"/>
+                            <Button Content="+ Add from PDF" Padding="12,5" FontSize="11" Background="Transparent"
+                                    Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="PeAdd_FromPdf"/>
+                            <Button Content="+ Add from Image" Padding="12,5" FontSize="11" Background="Transparent"
+                                    Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="PeAdd_FromImage"/>
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="Save PDF" Padding="20,8" FontSize="13" FontWeight="SemiBold"
+                                Background="#E53935" Foreground="White" Cursor="Hand"
+                                Click="PeSaveAs_Click" Template="{StaticResource RoundedButton21}"/>
+                    </Grid>
+                </Border>
             </Grid>
         </Grid>
 
@@ -1053,6 +1222,51 @@
             </ScrollViewer>
         </Grid>
 
+        <!-- ====================== Fill &amp; Sign ====================== -->
+        <Grid x:Name="PanelFillSign" Grid.Row="1" Visibility="Collapsed">
+          <Border x:Name="FillSignSelectView" AllowDrop="True" Drop="FillSign_SelectDrop" DragOver="Generic_DragOver" Background="Transparent">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="Fill &amp; Sign" FontSize="26" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+              <TextBlock Text="Fill forms, sign, stamp a PDF" Foreground="#9AA" FontSize="13" HorizontalAlignment="Center" Margin="0,6,0,24"/>
+              <Button Content="Select PDF file" Click="FillSign_SelectFiles" Template="{StaticResource RoundedButton}" Background="#26A69A" Foreground="White" Padding="34,14" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+              <TextBlock Text="or drop a PDF here" Foreground="#667" FontSize="12" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+            </StackPanel>
+          </Border>
+
+          <Grid x:Name="FillSignWorkspace" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" x:Name="FillSignToolbar" Background="#26262B" Height="48">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                <Button x:Name="FsBtnPrev" Content="‹ Prev" Click="FsPrevPage" Margin="2,0" Padding="8,4"/>
+                <TextBlock x:Name="FsPageLabel" Foreground="White" VerticalAlignment="Center" Margin="8,0" Text="Page 1 / 1"/>
+                <Button x:Name="FsBtnNext" Content="Next ›" Click="FsNextPage" Margin="2,0" Padding="8,4"/>
+              </StackPanel>
+            </Border>
+            <Grid Grid.Row="1">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="130"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Background="#1E1E22">
+                <StackPanel x:Name="FillSignThumbs" Margin="6"/>
+              </ScrollViewer>
+              <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#161619">
+                <Grid x:Name="FillSignPageHost" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <Image x:Name="FillSignPageImage" Stretch="None"/>
+                  <Canvas x:Name="FillSignOverlay" Background="Transparent"
+                          MouseMove="FsOverlay_MouseMove" MouseLeftButtonDown="FsOverlay_Click">
+                    <Rectangle x:Name="FillSignHover" Visibility="Collapsed" IsHitTestVisible="False"
+                               Stroke="#3B82F6" StrokeThickness="1.5" Fill="#223B82F6"/>
+                  </Canvas>
+                </Grid>
+              </ScrollViewer>
+            </Grid>
+          </Grid>
+        </Grid>
+
         <!-- ====================== 11. PanelCompressImage ====================== -->
         <Grid x:Name="PanelCompressImage" Grid.Row="1" Visibility="Collapsed">
             <Border x:Name="CompressImgSelectView" AllowDrop="True"
@@ -1441,6 +1655,316 @@
                             HorizontalAlignment="Center" Cursor="Hand" Click="Convert_Execute"
                             Template="{StaticResource RoundedButton}"/>
                 </StackPanel>
+            </Grid>
+        </Grid>
+
+
+        <!-- ====================== PanelImageEditor ====================== -->
+        <Grid x:Name="PanelImageEditor" Grid.Row="1" Visibility="Collapsed">
+            <Border x:Name="ImgEditorSelectView" AllowDrop="True"
+                    Drop="ImgEditor_SelectDrop" DragOver="Generic_DragOver" Background="Transparent">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="Image Editor" FontSize="28" FontWeight="Bold" Foreground="#EEE"
+                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Open an image to edit &#x2014; crop, resize, rotate, adjust &amp; more"
+                               FontSize="14" Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,40"/>
+                    <Button Content="Open Image" Width="280" Height="50" FontSize="16" FontWeight="SemiBold"
+                            Foreground="White" Background="#7C4DFF" Cursor="Hand" Click="ImgEditor_SelectFile"
+                            Margin="0,0,0,16" Template="{StaticResource RoundedButton}"/>
+                    <TextBlock Text="or drop an image here" FontSize="12" Foreground="#666" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Grid x:Name="ImgEditorConfigView" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <!-- Header -->
+                <Border Background="#1E1E22" Padding="12,8" BorderBrush="#2A2A2E" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <Border Width="34" Height="34" CornerRadius="7" Background="#7C4DFF" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Text="&#x2B1C;" FontSize="14" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Image Tool" Foreground="#EEE" FontSize="15" FontWeight="SemiBold"/>
+                                <TextBlock Text="Edit single image with ease" Foreground="#666" FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal">
+                            <TextBlock x:Name="TxtIeFileName" Text="image.jpg" Foreground="#EEE" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtIeFileInfo" Text="" Foreground="#666" FontSize="11" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <Button Content="&#x21B6; Undo" Padding="8,5" FontSize="11" Background="Transparent"
+                                    Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="IeUndo_Click" ToolTip="Ctrl+Z"/>
+                            <Button Content="&#x21B7; Redo" Padding="8,5" FontSize="11" Background="Transparent"
+                                    Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="IeRedo_Click" ToolTip="Ctrl+Y"/>
+                        </StackPanel>
+                        <Button Grid.Column="3" Content="Reset All" Padding="14,6" FontSize="12"
+                                Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                Cursor="Hand" Click="IeReset_Click" Margin="0,0,8,0"/>
+                        <Button Grid.Column="4" Content="Save Image" Padding="16,6" FontSize="12" FontWeight="SemiBold"
+                                Background="#7C4DFF" Foreground="White" BorderThickness="0"
+                                Cursor="Hand" Click="IeSave_Click" Template="{StaticResource RoundedButton21}"/>
+                    </Grid>
+                </Border>
+                <!-- Main -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/><ColumnDefinition Width="*"/><ColumnDefinition Width="260"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Sidebar -->
+                    <Border Background="#161619" BorderBrush="#2A2A2E" BorderThickness="0,0,1,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="6,12,6,8">
+                                <TextBlock Text="TOOLS" Foreground="#666" FontSize="10" FontWeight="Bold" Margin="10,0,0,12"/>
+                                <Button x:Name="BtnIeTool_crop" Tag="crop" Click="IeToolSelect_Click" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x2702;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Crop" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Crop image to desired area" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_resize" Tag="resize" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x2922;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Resize" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Change image dimensions" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_rotateflip" Tag="rotateflip" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x21BA;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Rotate &amp; Flip" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Rotate or flip image" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_adjust" Tag="adjust" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x2263;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Adjust" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Brightness, contrast, etc." FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_filters" Tag="filters" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x2666;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Filters" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Apply beautiful filters" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_watermark" Tag="watermark" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x00A9;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Watermark" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Add text or image watermark" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_compress" Tag="compress" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x2B07;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Compress" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Reduce image file size" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                                <Button x:Name="BtnIeTool_convert" Tag="convert" Click="IeToolSelect_Click" Background="Transparent" Foreground="#AAA" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x21C4;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Convert" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Convert to other formats" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                    <!-- Canvas with scrollviewer -->
+                    <Grid Grid.Column="1" Background="#111114">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Border Background="#252528" Padding="8,6" BorderBrush="#333" BorderThickness="0,0,0,1">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="-" Width="28" Height="28" FontSize="16" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="IeZoom_Out" ToolTip="Zoom out"/>
+                                <TextBlock x:Name="TxtIeZoom" Text="Fit" Foreground="#EEE" FontSize="12" VerticalAlignment="Center" Margin="10,0,10,0" Width="40" TextAlignment="Center"/>
+                                <Button Content="+" Width="28" Height="28" FontSize="16" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="IeZoom_In" ToolTip="Zoom in"/>
+                                <Border Width="1" Background="#444" Margin="12,4"/>
+                                <Button Content="&#x2922;" Width="28" Height="28" FontSize="14" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Click="IeZoom_Fit" ToolTip="Fit to window"/>
+                            </StackPanel>
+                        </Border>
+                        <ScrollViewer x:Name="IeScrollViewer" Grid.Row="1"
+                                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                      Background="#111114"
+                                      HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+                                <Grid.LayoutTransform>
+                                    <ScaleTransform x:Name="IeZoomTransform" ScaleX="1" ScaleY="1"/>
+                                </Grid.LayoutTransform>
+                                <Image x:Name="IePreviewImage" Stretch="Uniform"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       RenderTransformOrigin="0.5,0.5">
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <RotateTransform x:Name="IeRotateTransform" Angle="0"/>
+                                            <ScaleTransform x:Name="IeFlipTransform" ScaleX="1" ScaleY="1"/>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
+                                </Image>
+                                <Canvas x:Name="IeCanvas" ClipToBounds="True" Background="Transparent"
+                                        MouseLeftButtonDown="IeCanvas_MouseDown"
+                                        MouseMove="IeCanvas_MouseMove"
+                                        MouseLeftButtonUp="IeCanvas_MouseUp"/>
+                            </Grid>
+                        </ScrollViewer>
+                    </Grid>
+                    <!-- Right panel -->
+                    <Border Grid.Column="2" Background="#1A1A1E" BorderBrush="#2A2A2E" BorderThickness="1,0,0,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <!-- CROP -->
+                                <StackPanel x:Name="IeSecCrop" Margin="16,16">
+                                    <TextBlock Text="CROP" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Ratio" Foreground="#888" FontSize="11" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="CmbIeCropRatio" Height="28" FontSize="11" SelectedIndex="0" Margin="0,0,0,12" SelectionChanged="IeCropRatio_Changed">
+                                        <ComboBoxItem Content="Custom"/><ComboBoxItem Content="1:1"/><ComboBoxItem Content="4:3"/><ComboBoxItem Content="16:9"/><ComboBoxItem Content="3:2"/>
+                                    </ComboBox>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="W" Foreground="#888" FontSize="10" Margin="0,0,0,4"/><TextBox x:Name="TxtIeCropW" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="H" Foreground="#888" FontSize="10" Margin="0,0,0,4"/><TextBox x:Name="TxtIeCropH" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444"/></StackPanel>
+                                    </Grid>
+                                    <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="X" Foreground="#888" FontSize="10" Margin="0,0,0,4"/><TextBox x:Name="TxtIeCropX" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Text="0"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="Y" Foreground="#888" FontSize="10" Margin="0,0,0,4"/><TextBox x:Name="TxtIeCropY" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Text="0"/></StackPanel>
+                                    </Grid>
+                                    <Button Content="Apply Crop" Padding="0,8" FontSize="12" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeCrop_Apply" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}"/>
+                                </StackPanel>
+                                <!-- RESIZE -->
+                                <StackPanel x:Name="IeSecResize" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="RESIZE" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="Width" Foreground="#888" FontSize="10" Margin="0,0,0,4"/><TextBox x:Name="TxtIeResizeW" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" TextChanged="IeResizeW_Changed"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="Height" Foreground="#888" FontSize="10" Margin="0,0,0,4"/><TextBox x:Name="TxtIeResizeH" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" TextChanged="IeResizeH_Changed"/></StackPanel>
+                                    </Grid>
+                                    <CheckBox x:Name="ChkIeResizeLock" Content="Lock aspect ratio" Foreground="#CCC" FontSize="11" IsChecked="True" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Percentage" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeResizePct" Minimum="10" Maximum="400" Value="100" ValueChanged="IeResizePct_Changed"/>
+                                        <TextBlock x:Name="TxtIeResizePct" Grid.Column="1" Text="100%" Foreground="#CCC" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
+                                    </Grid>
+                                    <Button Content="Apply Resize" Padding="0,8" FontSize="12" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeResize_Apply" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}"/>
+                                </StackPanel>
+                                <!-- ROTATE & FLIP -->
+                                <StackPanel x:Name="IeSecRotateFlip" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="ROTATE &amp; FLIP" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Button Content="&#x21BA; Rotate Left" Padding="0,8" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeRotate_Left" Margin="0,0,4,0"/>
+                                        <Button Grid.Column="1" Content="&#x21BB; Rotate Right" Padding="0,8" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeRotate_Right"/>
+                                    </Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Button Content="&#x21C6; Flip H" Padding="0,8" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFlip_H" Margin="0,0,4,0"/>
+                                        <Button Grid.Column="1" Content="&#x21C5; Flip V" Padding="0,8" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFlip_V"/>
+                                    </Grid>
+                                </StackPanel>
+                                <!-- ADJUST -->
+                                <StackPanel x:Name="IeSecAdjust" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="ADJUST" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Brightness" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeBrightness" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeBrightVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Contrast" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeContrast" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeContrastVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Saturation" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeSaturation" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeSatVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Exposure" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeExposure" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeExposureVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Highlights" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeHighlights" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeHighlightsVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Shadows" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeShadows" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeShadowsVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Temperature" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeTemperature" Minimum="-100" Maximum="100" Value="0" ValueChanged="IeAdjust_Changed"/>
+                                        <TextBlock x:Name="TxtIeTempVal" Grid.Column="1" Text="0" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <Button Content="Apply Adjustments" Padding="0,8" FontSize="12" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeAdjust_Apply" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <!-- FILTERS -->
+                                <StackPanel x:Name="IeSecFilters" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="FILTERS" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="Grayscale" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="grayscale"/>
+                                        <Button Content="Sepia" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="sepia"/>
+                                        <Button Content="Invert" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="invert"/>
+                                        <Button Content="Warm" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="warm"/>
+                                        <Button Content="Cool" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="cool"/>
+                                        <Button Content="Vintage" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="vintage"/>
+                                        <Button Content="HDR" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="hdr"/>
+                                        <Button Content="B&amp;W High" Padding="10,6" Margin="0,0,6,6" FontSize="11" Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Click="IeFilter_Click" Tag="bw_high_contrast"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                                <!-- WATERMARK -->
+                                <StackPanel x:Name="IeSecWatermark" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="WATERMARK" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Text" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtIeWatermarkText" Height="28" Padding="6,3" FontSize="11" Background="#2A2A30" Foreground="#EEE" BorderBrush="#444" Margin="0,0,0,10" Text="&#x00A9; Copyright"/>
+                                    <TextBlock Text="Color" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbIeWmColor" Height="28" FontSize="11" SelectedIndex="0" Margin="0,0,0,10">
+                                        <ComboBoxItem Content="White"/><ComboBoxItem Content="Black"/><ComboBoxItem Content="Red"/><ComboBoxItem Content="Yellow"/>
+                                    </ComboBox>
+                                    <TextBlock Text="Font Size" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeWmFontSize" Minimum="12" Maximum="120" Value="36"/>
+                                        <TextBlock x:Name="TxtIeWmFontVal" Grid.Column="1" Text="36" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Opacity" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeWmOpacity" Minimum="10" Maximum="100" Value="50"/>
+                                        <TextBlock x:Name="TxtIeWmOpacVal" Grid.Column="1" Text="50%" Foreground="#888" FontSize="10" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Position" Foreground="#888" FontSize="10" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="CmbIeWmPosition" Height="28" FontSize="11" SelectedIndex="4" Margin="0,0,0,12">
+                                        <ComboBoxItem Content="Top Left"/><ComboBoxItem Content="Top Center"/><ComboBoxItem Content="Top Right"/>
+                                        <ComboBoxItem Content="Center Left"/><ComboBoxItem Content="Center"/><ComboBoxItem Content="Center Right"/>
+                                        <ComboBoxItem Content="Bottom Left"/><ComboBoxItem Content="Bottom Center"/><ComboBoxItem Content="Bottom Right"/>
+                                    </ComboBox>
+                                    <Button Content="Apply Watermark" Padding="0,8" FontSize="12" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeWatermark_Apply" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}"/>
+                                </StackPanel>
+                                <!-- COMPRESS -->
+                                <StackPanel x:Name="IeSecCompress" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="COMPRESS" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Quality" Foreground="#CCC" FontSize="11" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="36"/></Grid.ColumnDefinitions>
+                                        <Slider x:Name="SldIeCompressQuality" Minimum="10" Maximum="100" Value="85" ValueChanged="IeCompress_QualityChanged"/>
+                                        <TextBlock x:Name="TxtIeCompressQuality" Grid.Column="1" Text="85%" Foreground="#CCC" FontSize="11" VerticalAlignment="Center" TextAlignment="Right"/>
+                                    </Grid>
+                                    <Border Background="#252528" CornerRadius="6" Padding="12,10" Margin="0,0,0,12">
+                                        <StackPanel>
+                                            <Grid><TextBlock Text="Original:" Foreground="#888" FontSize="11"/><TextBlock x:Name="TxtIeCompressOrigSize" Text="0 MB" Foreground="#CCC" FontSize="11" HorizontalAlignment="Right"/></Grid>
+                                            <Grid Margin="0,4,0,0"><TextBlock Text="Estimated:" Foreground="#888" FontSize="11"/><TextBlock x:Name="TxtIeCompressEstSize" Text="0 MB" Foreground="#4DB6AC" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"/></Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Button Content="Apply Compression" Padding="0,8" FontSize="12" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeCompress_Apply" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}"/>
+                                </StackPanel>
+                                <!-- CONVERT -->
+                                <StackPanel x:Name="IeSecConvert" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="CONVERT" Foreground="#888" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Output Format" Foreground="#CCC" FontSize="11" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="CmbIeConvertFormat" Height="28" FontSize="11" SelectedIndex="0" Margin="0,0,0,12" SelectionChanged="IeConvertFormat_Changed">
+                                        <ComboBoxItem Content="PNG"/><ComboBoxItem Content="JPG"/><ComboBoxItem Content="BMP"/><ComboBoxItem Content="TIFF"/><ComboBoxItem Content="GIF"/>
+                                    </ComboBox>
+                                    <TextBlock Text="JPEG Quality (for JPG)" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                    <Slider x:Name="SldIeConvertQuality" Minimum="10" Maximum="100" Value="90" Margin="0,0,0,8" ValueChanged="IeCompress_QualityChanged"/>
+                                    <Border Background="#252528" CornerRadius="6" Padding="12,10" Margin="0,0,0,12">
+                                        <TextBlock x:Name="TxtIeConvertEstSize" Text="" Foreground="#4DB6AC" FontSize="11" FontWeight="SemiBold"/>
+                                    </Border>
+                                    <Button Content="Save As Format" Padding="0,8" FontSize="12" Background="#7C4DFF" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeConvert_Save" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+                <!-- Bottom -->
+                <Border Grid.Row="2" Background="#1A1A1E" Padding="12,8" BorderBrush="#2A2A2E" BorderThickness="0,1,0,0">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="HISTORY" Foreground="#888" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                            <TextBlock x:Name="TxtIeCurrentSize" Text="" Foreground="#666" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Content="Original" Padding="10,5" FontSize="11" Background="Transparent" Foreground="#7C4DFF"
+                                    BorderThickness="0" Cursor="Hand" Click="IeShowOriginal_Click" Margin="0,0,6,0"/>
+                            <Button x:Name="BtnIeCompare" Content="Compare" Padding="10,5" FontSize="11"
+                                    Background="#2A2A30" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                    Cursor="Hand" PreviewMouseLeftButtonDown="IeCompare_Down" PreviewMouseLeftButtonUp="IeCompare_Up"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </Grid>
         </Grid>
 

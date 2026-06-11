@@ -35,6 +35,8 @@ public partial class FileToolsWindow : Window
         ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                  "#5C6BC0", "#",      "PDF Tools"),
         ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",        "#FF8A65", "\u2398", "PDF Tools"),
         ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",              "#A1887F", "\u2295", "PDF Tools"),
+        ("fill_sign",      "Fill & Sign",     "Fill forms, sign, stamp a PDF",       "#26A69A", "\u270d", "PDF Tools"),
+        ("image_editor",   "Image Editor",    "All-in-one image editor",             "#7C4DFF", "\u2B1C", "Image Tools"),
         ("compress_image", "Compress Image",  "Reduce image file size",              "#26C6DA", "\u2B07", "Image Tools"),
         ("resize_image",   "Resize Image",    "Change dimensions",                   "#26A69A", "\u2922", "Image Tools"),
         ("crop_image",     "Crop Image",      "Crop to selection",                   "#42A5F5", "\u2702", "Image Tools"),
@@ -63,16 +65,17 @@ public partial class FileToolsWindow : Window
     private string? _currentToolId;
     private string? _lastOutputPath;
     private string? _lastOutputDir;
+    private bool _suppressUnsavedPrompt;
 
     // =====================================================================
     //  Observable collections
     // =====================================================================
 
-    private readonly ObservableCollection<FileItem> _pdfEditorFiles = new();
-    private readonly List<PdfEditorFileEntry> _pdfEditorEntries = new();
-    private string _pdfEditorActiveTool = "merge";
+    private string? _pePdfPath;
+    private readonly List<PdfEditorPageEntry> _pePages = new();
+    private string _pdfEditorActiveTool = "reorder";
     private readonly HashSet<PdfEditorPageEntry> _peSelectedPages = new();
-    private int _peInsertAfterGlobal = -1; // -1 = not set
+    private double _peThumbSize = 150;
 
     private readonly ObservableCollection<FileItem> _mergePdfFiles = new();
     private readonly ObservableCollection<FileItem> _imgToPdfFiles = new();
@@ -175,6 +178,17 @@ public partial class FileToolsWindow : Window
     private readonly Rectangle[] _videoCropOverlays = new Rectangle[4];
 
     // =====================================================================
+    //  Fill & Sign state
+    // =====================================================================
+
+    private string? _fsPdfPath;
+    private int _fsCurrentPage;
+    private int _fsPageCount;
+    private const int FsDpi = 150;
+    private readonly List<Llamashot.Models.FillElement> _fsElements = new();
+    private readonly Dictionary<int, List<Llamashot.Core.DetectedRegion>> _fsRegionCache = new();
+
+    // =====================================================================
     //  File extension lists
     // =====================================================================
 
@@ -194,7 +208,6 @@ public partial class FileToolsWindow : Window
         CreateToolCards();
         InitPanelMap();
 
-        PdfEditorFileList.ItemsSource = _pdfEditorFiles;
         MergePdfList.ItemsSource = _mergePdfFiles;
         ImgToPdfList.ItemsSource = _imgToPdfFiles;
         CompressImgList.ItemsSource = _compressImgFiles;
@@ -399,11 +412,13 @@ public partial class FileToolsWindow : Window
         _toolPanels["page_numbers"] = PanelPageNumbers;
         _toolPanels["extract_pages"] = PanelExtractPages;
         _toolPanels["insert_pages"] = PanelInsertPages;
+        _toolPanels["fill_sign"] = PanelFillSign;
         _toolPanels["compress_image"] = PanelCompressImage;
         _toolPanels["resize_image"] = PanelResizeImage;
         _toolPanels["crop_image"] = PanelCropImage;
         _toolPanels["rotate_flip"] = PanelRotateFlip;
         _toolPanels["convert_format"] = PanelConvertFormat;
+        _toolPanels["image_editor"] = PanelImageEditor;
         _toolPanels["compress_office"] = PanelCompressOffice;
         _toolPanels["video_tools"] = PanelVideoTools;
         _toolPanels["extract_audio"] = PanelExtractAudio;
@@ -421,11 +436,13 @@ public partial class FileToolsWindow : Window
         _selectViews["page_numbers"] = PageNumSelectView;
         _selectViews["extract_pages"] = ExtractSelectView;
         _selectViews["insert_pages"] = InsertSelectView;
+        _selectViews["fill_sign"] = FillSignSelectView;
         _selectViews["compress_image"] = CompressImgSelectView;
         _selectViews["resize_image"] = ResizeSelectView;
         _selectViews["crop_image"] = CropSelectView;
         _selectViews["rotate_flip"] = RotateFlipSelectView;
         _selectViews["convert_format"] = ConvertSelectView;
+        _selectViews["image_editor"] = ImgEditorSelectView;
         _selectViews["compress_office"] = CompressOfficeSelectView;
         _selectViews["video_tools"] = VideoSelectView;
         _selectViews["extract_audio"] = ExtractAudioSelectView;
@@ -448,6 +465,7 @@ public partial class FileToolsWindow : Window
         _configViews["crop_image"] = CropConfigView;
         _configViews["rotate_flip"] = RotateFlipConfigView;
         _configViews["convert_format"] = ConvertConfigView;
+        _configViews["image_editor"] = ImgEditorConfigView;
         _configViews["compress_office"] = CompressOfficeConfigView;
         _configViews["video_tools"] = VideoConfigView;
         _configViews["extract_audio"] = ExtractAudioConfigView;
@@ -555,11 +573,10 @@ public partial class FileToolsWindow : Window
             cv.Visibility = Visibility.Collapsed;
 
         // Clear collections
-        _pdfEditorFiles.Clear();
-        _pdfEditorEntries.Clear();
+        _pePdfPath = null;
+        _pePages.Clear();
         _peSelectedPages.Clear();
-        _peInsertAfterGlobal = -1;
-        PdfEditorPageGrid.Children.Clear();
+        PePageGrid.Children.Clear();
         _mergePdfFiles.Clear();
         _imgToPdfFiles.Clear();
         _compressImgFiles.Clear();
@@ -576,6 +593,9 @@ public partial class FileToolsWindow : Window
         _resizeSourcePath = null;
         _rotateFlipSourcePath = null;
         _convertSourcePath = null;
+        _ieImagePath = null;
+        _ieOriginalImage = null;
+        _ieRotation = 0; _ieFlipH = false; _ieFlipV = false;
         _videoToolsPath = null;
         _videoAngle = 0; _videoFlipH = false; _videoFlipV = false;
         _isVideoPlaying = false;
@@ -656,7 +676,12 @@ public partial class FileToolsWindow : Window
 
     private void Complete_StartOver(object sender, MouseButtonEventArgs e)
     {
-        FadeOut(CompleteOverlay, 200, () => GoBack_Click(sender, new RoutedEventArgs()));
+        FadeOut(CompleteOverlay, 200, () =>
+        {
+            _suppressUnsavedPrompt = true;
+            GoBack_Click(sender, new RoutedEventArgs());
+            _suppressUnsavedPrompt = false;
+        });
     }
 
     // =====================================================================
@@ -676,8 +701,55 @@ public partial class FileToolsWindow : Window
         });
     }
 
+    private bool HasUnsavedWork() => _currentToolId switch
+    {
+        "pdf_editor"      => _pePdfPath != null,
+        "merge_pdf"       => _mergePdfFiles.Count > 0,
+        "split_pdf"       => _splitPdfPath != null,
+        "compress_pdf"    => _compressPdfPath != null,
+        "pdf_to_images"   => _pdfToImgPath != null,
+        "images_to_pdf"   => _imgToPdfFiles.Count > 0,
+        "rotate_pdf"      => _rotatePdfPath != null,
+        "watermark"       => _watermarkPdfPath != null,
+        "page_numbers"    => _pageNumPdfPath != null,
+        "extract_pages"   => _extractPdfPath != null,
+        "insert_pages"    => _insertBasePath != null,
+        "image_editor"    => _ieImagePath != null,
+        "compress_image"  => _compressImgFiles.Count > 0,
+        "resize_image"    => _resizeSourcePath != null,
+        "crop_image"      => _cropSourcePath != null,
+        "rotate_flip"     => _rotateFlipSourcePath != null,
+        "convert_format"  => _convertSourcePath != null,
+        "compress_office" => _compressOfficeFiles.Count > 0,
+        "video_tools"     => _videoToolsPath != null,
+        "extract_audio"   => _extractAudioFiles.Count > 0,
+        "trim_audio"      => _trimAudioFiles.Count > 0,
+        "youtube_dl"      => _ytVideos.Count > 0 || _ytCancelSource != null,
+        _ => false,
+    };
+
+    private bool ConfirmDiscardWork()
+    {
+        if (_suppressUnsavedPrompt || CompleteOverlay.Visibility == Visibility.Visible || !HasUnsavedWork())
+            return true;
+        return ConfirmDialog.Show(this, "Unsaved Changes",
+            "You have unsaved changes. If you leave now, your work will be lost.");
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!ConfirmDiscardWork())
+        {
+            e.Cancel = true;
+            return;
+        }
+        base.OnClosing(e);
+    }
+
     private void GoBack_Click(object sender, RoutedEventArgs e)
     {
+        if (!ConfirmDiscardWork()) return;
+
         // Hide overlays immediately
         CompleteOverlay.Visibility = Visibility.Collapsed;
         CompleteOverlay.Opacity = 1;
@@ -839,14 +911,14 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
-    //  0. PDF Editor (unified workspace)
+    //  0. PDF Editor (single-document workspace)
     // =====================================================================
 
-    private void PdfEditor_SelectFiles(object sender, RoutedEventArgs e)
+    private void PdfEditor_SelectFile(object sender, RoutedEventArgs e)
     {
-        var dlg = CreatePdfOpenDialog(true);
+        var dlg = CreatePdfOpenDialog(false);
         if (dlg.ShowDialog() != true) return;
-        AddPdfEditorFiles(dlg.FileNames);
+        _ = PeLoadPdf(dlg.FileName);
         ShowConfigState("pdf_editor");
     }
 
@@ -854,111 +926,27 @@ public partial class FileToolsWindow : Window
     {
         var files = GetDroppedFiles(e, IsPdfFile);
         if (files.Length == 0) return;
-        AddPdfEditorFiles(files);
+        _ = PeLoadPdf(files[0]);
         ShowConfigState("pdf_editor");
     }
 
-    private void PdfEditor_AddMoreFiles(object sender, RoutedEventArgs e)
+    private async Task PeLoadPdf(string path)
     {
-        var dlg = CreatePdfOpenDialog(true);
-        if (dlg.ShowDialog() == true)
-            AddPdfEditorFiles(dlg.FileNames);
-    }
+        _pePdfPath = path;
+        _pePages.Clear();
+        _peSelectedPages.Clear();
+        PePageGrid.Children.Clear();
 
-    private void PdfEditor_RemoveFile(object sender, RoutedEventArgs e)
-    {
-        if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string path) return;
-        var fi = _pdfEditorFiles.FirstOrDefault(f => f.FilePath == path);
-        if (fi != null) _pdfEditorFiles.Remove(fi);
-        RenumberList(_pdfEditorFiles);
-
-        var entry = _pdfEditorEntries.FirstOrDefault(en => en.FilePath == path);
-        if (entry != null)
-        {
-            if (entry.GroupBorder != null) PdfEditorPageGrid.Children.Remove(entry.GroupBorder);
-            _pdfEditorEntries.Remove(entry);
-        }
-        UpdatePdfEditorStats();
-    }
-
-    private async void AddPdfEditorFiles(string[] paths)
-    {
-        foreach (var path in paths)
-        {
-            if (_pdfEditorFiles.Any(f => f.FilePath == path)) continue;
-
-            int pages = 0;
-            try { pages = await FileToolsService.GetPdfPageCountAsync(path); } catch { }
-            var info = new FileInfo(path);
-
-            _pdfEditorFiles.Add(new FileItem
-            {
-                Index = _pdfEditorFiles.Count + 1,
-                FilePath = path,
-                FileName = System.IO.Path.GetFileName(path),
-                FileSize = $"{pages} pages",
-                Extra = FileToolsService.FormatFileSize(info.Length)
-            });
-
-            var entry = new PdfEditorFileEntry
-            {
-                FilePath = path,
-                FileName = System.IO.Path.GetFileName(path),
-                PageCount = pages,
-                FileSize = info.Length
-            };
-            _pdfEditorEntries.Add(entry);
-
-            await RenderPdfEditorThumbnails(entry);
-        }
-        UpdatePdfEditorStats();
-    }
-
-    private async Task RenderPdfEditorThumbnails(PdfEditorFileEntry entry)
-    {
         try
         {
-            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(entry.FilePath);
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
             var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
-            uint pageCount = pdfDoc.PageCount;
 
-            // Build group border
-            var groupBorder = new Border
-            {
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#252528")),
-                CornerRadius = new CornerRadius(8),
-                Margin = new Thickness(0, 0, 0, 12),
-                Padding = new Thickness(12)
-            };
-
-            var groupStack = new StackPanel();
-
-            // Header row
-            var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            var headerText = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
-            headerText.Children.Add(new TextBlock
-            {
-                Text = entry.FileName, Foreground = Brushes.White, FontSize = 13, FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center
-            });
-            headerText.Children.Add(new TextBlock
-            {
-                Text = $"  ({pageCount} pages)", Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
-                FontSize = 11, VerticalAlignment = VerticalAlignment.Center
-            });
-            headerGrid.Children.Add(headerText);
-            groupStack.Children.Add(headerGrid);
-
-            // WrapPanel for thumbnails
-            var wrapPanel = new WrapPanel();
-            int globalPageIdx = _pdfEditorEntries.Where(e2 => e2 != entry).SelectMany(e2 => e2.Pages).Count();
-
-            for (uint i = 0; i < pageCount; i++)
+            for (uint i = 0; i < pdfDoc.PageCount; i++)
             {
                 using var page = pdfDoc.GetPage(i);
                 using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-                var options = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 150 };
-                await page.RenderToStreamAsync(stream, options);
+                await page.RenderToStreamAsync(stream, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 200 });
                 stream.Seek(0);
 
                 var bmp = new BitmapImage();
@@ -968,251 +956,161 @@ public partial class FileToolsWindow : Window
                 bmp.EndInit();
                 bmp.Freeze();
 
-                int globalIdx = GetPdfEditorGlobalIndex(entry, (int)i);
-                var pageEntry = new PdfEditorPageEntry
+                _pePages.Add(new PdfEditorPageEntry
                 {
                     OriginalIndex = (int)i,
-                    GlobalIndex = globalIdx,
+                    GlobalIndex = (int)i + 1,
                     Thumbnail = bmp,
-                    Rotation = 0,
-                    IsDeleted = false,
-                    SourceFile = entry.FilePath
-                };
-                entry.Pages.Add(pageEntry);
-
-                // Build thumbnail border
-                var thumbBorder = new Border
-                {
-                    Width = 120, Height = 170, Margin = new Thickness(4),
-                    CornerRadius = new CornerRadius(6),
-                    BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444")),
-                    BorderThickness = new Thickness(1),
-                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1A1A1E")),
-                    ClipToBounds = true,
-                    Effect = new System.Windows.Media.Effects.DropShadowEffect
-                    {
-                        BlurRadius = 4, ShadowDepth = 1, Opacity = 0.25, Color = Colors.Black
-                    }
-                };
-
-                var thumbGrid = new Grid();
-
-                var img = new System.Windows.Controls.Image
-                {
-                    Source = bmp, Stretch = Stretch.Uniform, Margin = new Thickness(2),
-                    RenderTransformOrigin = new Point(0.5, 0.5),
-                    RenderTransform = new RotateTransform(0)
-                };
-                thumbGrid.Children.Add(img);
-
-                // Page number label
-                var labelBorder = new Border
-                {
-                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xCC, 0, 0, 0)),
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-                    Padding = new Thickness(0, 2, 0, 2)
-                };
-                labelBorder.Child = new TextBlock
-                {
-                    Text = $"Page {i + 1}",
-                    Foreground = Brushes.White, FontSize = 10,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
-                };
-                thumbGrid.Children.Add(labelBorder);
-
-                thumbBorder.Child = thumbGrid;
-                thumbBorder.Cursor = Cursors.Hand;
-
-                // Click: tool-dependent action
-                var clickPageEntry = pageEntry;
-                var clickThumb = thumbBorder;
-                var clickImg = img;
-                thumbBorder.MouseLeftButtonDown += (s, ev) =>
-                {
-                    if (_pdfEditorActiveTool is "extract")
-                        PeTogglePageSelection(clickPageEntry);
-                    else if (_pdfEditorActiveTool == "rotate")
-                        PeTogglePageSelection(clickPageEntry);
-                    else if (_pdfEditorActiveTool == "delete")
-                        PdfEditorPage_Delete(clickPageEntry, clickThumb);
-                    else if (_pdfEditorActiveTool == "reorder")
-                        PeReorder_SelectPage(clickPageEntry);
-                    ev.Handled = true;
-                };
-
-                pageEntry.ThumbnailBorder = thumbBorder;
-
-                // Add insertion point button BEFORE this thumbnail (for Insert tool)
-                var insertBtn = BuildPeInsertionPoint(globalPageIdx);
-                wrapPanel.Children.Add(insertBtn);
-                wrapPanel.Children.Add(thumbBorder);
-                globalPageIdx++;
+                    SourceFile = path
+                });
             }
 
-            // Final insertion point after last page in this group
-            var lastInsertBtn = BuildPeInsertionPoint(globalPageIdx);
-            wrapPanel.Children.Add(lastInsertBtn);
-
-            groupStack.Children.Add(wrapPanel);
-
-            // "+ Add Page" button at bottom of group
-            var addPageBtn = new System.Windows.Controls.Button
-            {
-                Content = "+ Add Page",
-                FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC")),
-                Background = Brushes.Transparent, BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC")),
-                BorderThickness = new Thickness(1), Cursor = Cursors.Hand,
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-                Height = 32, Margin = new Thickness(0, 6, 0, 4)
-            };
-            addPageBtn.Click += (s, _) => PeInsert_Pdf(s, new RoutedEventArgs());
-            groupStack.Children.Add(addPageBtn);
-
-            groupBorder.Child = groupStack;
-            entry.GroupBorder = groupBorder;
-            PdfEditorPageGrid.Children.Add(groupBorder);
+            PeRenderPageGrid();
+            PeUpdateInfo();
+            SelectPeTool("reorder");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"PDF Editor thumbnail error: {ex.Message}");
+            MessageBox.Show($"Failed to load PDF: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private Border BuildPeInsertionPoint(int afterGlobalIndex)
+    private void PeRenderPageGrid()
     {
-        var btn = new Border
-        {
-            Width = 24, Height = 120,
-            Background = Brushes.Transparent,
-            Cursor = Cursors.Hand,
-            Margin = new Thickness(0, 25, 0, 0),
-            VerticalAlignment = VerticalAlignment.Top,
-            ToolTip = "Click to set insertion point here"
-        };
-        var line = new Border
-        {
-            Width = 3, Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333")),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Stretch,
-            CornerRadius = new CornerRadius(2)
-        };
-        var circle = new Border
-        {
-            Width = 20, Height = 20, CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333")),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        circle.Child = new TextBlock
-        {
-            Text = "+", Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
-            FontSize = 14, FontWeight = FontWeights.Bold,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, -2, 0, 0)
-        };
-        var grid = new Grid();
-        grid.Children.Add(line);
-        grid.Children.Add(circle);
-        btn.Child = grid;
+        PePageGrid.Children.Clear();
+        double thumbW = _peThumbSize;
 
-        int capturedIdx = afterGlobalIndex;
-        btn.MouseLeftButtonDown += (s, ev) =>
+        for (int i = 0; i < _pePages.Count; i++)
         {
-            // Highlight this insertion point
-            _peInsertAfterGlobal = capturedIdx;
-            // Visual feedback
-            circle.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-            ((TextBlock)circle.Child).Foreground = Brushes.White;
-            line.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-            TxtPeInsertPos.Text = $"Insert after page {capturedIdx}";
-            ev.Handled = true;
-        };
+            var pg = _pePages[i];
+            if (pg.IsDeleted && _pdfEditorActiveTool != "delete") continue;
 
-        // Show/hide based on insert tool - initially show only the circle marker
-        btn.MouseEnter += (s, _) =>
-        {
-            circle.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-            ((TextBlock)circle.Child).Foreground = Brushes.White;
-            line.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-        };
-        btn.MouseLeave += (s, _) =>
-        {
-            if (_peInsertAfterGlobal != capturedIdx)
+            var thumbBorder = new Border
             {
-                circle.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
-                ((TextBlock)circle.Child).Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888"));
-                line.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
-            }
-        };
+                Width = thumbW, Margin = new Thickness(6),
+                CornerRadius = new CornerRadius(6),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                    _peSelectedPages.Contains(pg) ? "#E53935" : "#444")),
+                BorderThickness = _peSelectedPages.Contains(pg) ? new Thickness(3) : new Thickness(1),
+                Background = Brushes.White, ClipToBounds = true, Cursor = Cursors.Hand,
+                Opacity = pg.IsDeleted ? 0.3 : 1.0,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    { BlurRadius = 6, ShadowDepth = 2, Opacity = 0.2, Color = Colors.Black }
+            };
 
-        return btn;
-    }
+            var img = new System.Windows.Controls.Image
+            {
+                Source = pg.Thumbnail, Stretch = Stretch.Uniform,
+                RenderTransformOrigin = new Point(0.5, 0.5),
+                RenderTransform = new RotateTransform(pg.Rotation)
+            };
+            thumbBorder.Child = img;
 
-    private int GetPdfEditorGlobalIndex(PdfEditorFileEntry targetEntry, int localIndex)
-    {
-        int global = 1;
-        foreach (var entry in _pdfEditorEntries)
-        {
-            if (entry == targetEntry) return global + localIndex;
-            global += entry.Pages.Count(p => !p.IsDeleted);
+            var outerStack = new StackPanel { Margin = new Thickness(2) };
+            outerStack.Children.Add(thumbBorder);
+            outerStack.Children.Add(new TextBlock
+            {
+                Text = (i + 1).ToString(),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
+                FontSize = 11, HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 4, 0, 0)
+            });
+
+            pg.ThumbnailBorder = thumbBorder;
+            var clickPg = pg;
+            thumbBorder.MouseLeftButtonDown += (s, ev) => { PePageClick(clickPg); ev.Handled = true; };
+
+            PePageGrid.Children.Add(outerStack);
         }
-        return global + localIndex;
+
+        TxtPeTotalPages.Text = _pePages.Count(p => !p.IsDeleted).ToString();
     }
 
-    private void UpdatePdfEditorStats()
+    private void PePageClick(PdfEditorPageEntry pg)
     {
-        int totalPages = _pdfEditorEntries.SelectMany(e => e.Pages).Count(p => !p.IsDeleted);
-        long totalSize = _pdfEditorEntries.Sum(e => e.FileSize);
-        string sizeText = FileToolsService.FormatFileSize(totalSize);
-
-        TxtPdfEditorFileCount.Text = $"Files ({_pdfEditorEntries.Count})";
-        TxtPdfEditorTotalPages.Text = $"Total: {totalPages} pages";
-        TxtPdfEditorTotalSize.Text = $"Size: {sizeText}";
-        TxtPdfEditorBottomPages.Text = totalPages.ToString();
-        TxtPdfEditorBottomSize.Text = sizeText;
-    }
-
-    private void PdfEditorPage_Rotate(PdfEditorPageEntry pageEntry, System.Windows.Controls.Image img)
-    {
-        pageEntry.Rotation = (pageEntry.Rotation + 90) % 360;
-        ((RotateTransform)img.RenderTransform).Angle = pageEntry.Rotation;
-    }
-
-    private void PdfEditorPage_Delete(PdfEditorPageEntry pageEntry, Border thumbBorder)
-    {
-        if (pageEntry.IsDeleted)
+        switch (_pdfEditorActiveTool)
         {
-            // Restore
-            pageEntry.IsDeleted = false;
-            thumbBorder.Opacity = 1.0;
+            case "reorder":
+                PeReorder_SelectPage(pg);
+                break;
+            case "extract":
+            case "rotate":
+            case "crop":
+            case "insert":
+            case "split":
+            case "compress":
+                PeToggleSelection(pg);
+                break;
+            case "delete":
+                pg.IsDeleted = !pg.IsDeleted;
+                if (pg.ThumbnailBorder != null) pg.ThumbnailBorder.Opacity = pg.IsDeleted ? 0.3 : 1.0;
+                TxtPeDeleteCount.Text = $"{_pePages.Count(p => p.IsDeleted)} pages marked";
+                PeUpdateInfo();
+                break;
+        }
+    }
+
+    private void PeToggleSelection(PdfEditorPageEntry pg)
+    {
+        if (pg.ThumbnailBorder == null) return;
+        var sel = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E53935"));
+        var unsel = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
+
+        if (_peSelectedPages.Contains(pg))
+        {
+            _peSelectedPages.Remove(pg);
+            pg.ThumbnailBorder.BorderBrush = unsel;
+            pg.ThumbnailBorder.BorderThickness = new Thickness(1);
         }
         else
         {
-            // Delete
-            pageEntry.IsDeleted = true;
-            thumbBorder.Opacity = 0.3;
+            _peSelectedPages.Add(pg);
+            pg.ThumbnailBorder.BorderBrush = sel;
+            pg.ThumbnailBorder.BorderThickness = new Thickness(3);
         }
-        UpdatePdfEditorStats();
+        PeUpdateSelectionBar();
+
+        if (_pdfEditorActiveTool == "extract")
+            TxtPeExtractCount.Text = $"{_peSelectedPages.Count} pages selected";
     }
 
-    private void PdfEditorToolSelect_Click(object sender, RoutedEventArgs e)
+    private void PeUpdateSelectionBar()
+    {
+        if (_peSelectedPages.Count > 0)
+        {
+            PeSelectionBar.Visibility = Visibility.Visible;
+            TxtPeSelectionCount.Text = $"{_peSelectedPages.Count} Pages Selected";
+        }
+        else
+            PeSelectionBar.Visibility = Visibility.Collapsed;
+    }
+
+    private void PeUpdateInfo()
+    {
+        if (_pePdfPath == null) return;
+        int activePages = _pePages.Count(p => !p.IsDeleted);
+        TxtPeFileName.Text = System.IO.Path.GetFileName(_pePdfPath);
+        TxtPeFileInfo.Text = $"{activePages} pages \u2022 {FileToolsService.FormatFileSize(new FileInfo(_pePdfPath).Length)}";
+        TxtPeTotalPages.Text = activePages.ToString();
+    }
+
+    private void PeToolSelect_Click(object sender, RoutedEventArgs e)
     {
         if (sender is System.Windows.Controls.Button btn && btn.Tag is string tool)
-            SelectPdfEditorTool(tool);
+            SelectPeTool(tool);
     }
 
-    private void SelectPdfEditorTool(string tool)
+    private void SelectPeTool(string tool)
     {
         _pdfEditorActiveTool = tool;
         _peSelectedPages.Clear();
-        _peInsertAfterGlobal = -1;
+        _peReorderSelected = null;
 
-        // Reset all sidebar buttons
         System.Windows.Controls.Button[] sidebarButtons =
         {
-            BtnPeTool_merge, BtnPeTool_split, BtnPeTool_extract, BtnPeTool_insert,
-            BtnPeTool_delete, BtnPeTool_rotate, BtnPeTool_reorder, BtnPeTool_compress, BtnPeTool_crop
+            BtnPeTool_reorder, BtnPeTool_extract, BtnPeTool_insert,
+            BtnPeTool_delete, BtnPeTool_rotate, BtnPeTool_crop,
+            BtnPeTool_split, BtnPeTool_compress
         };
         foreach (var btn in sidebarButtons)
         {
@@ -1222,182 +1120,132 @@ public partial class FileToolsWindow : Window
 
         var activeBtn = tool switch
         {
-            "merge" => BtnPeTool_merge, "split" => BtnPeTool_split,
-            "extract" => BtnPeTool_extract, "insert" => BtnPeTool_insert,
-            "delete" => BtnPeTool_delete, "rotate" => BtnPeTool_rotate,
-            "reorder" => BtnPeTool_reorder, "compress" => BtnPeTool_compress,
-            "crop" => BtnPeTool_crop, _ => BtnPeTool_merge
+            "reorder" => BtnPeTool_reorder, "extract" => BtnPeTool_extract,
+            "insert" => BtnPeTool_insert, "delete" => BtnPeTool_delete,
+            "rotate" => BtnPeTool_rotate, "crop" => BtnPeTool_crop,
+            "split" => BtnPeTool_split, "compress" => BtnPeTool_compress,
+            _ => BtnPeTool_reorder
         };
-        activeBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00897B"));
+        activeBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E53935"));
         activeBtn.Foreground = Brushes.White;
 
-        var (title, subtitle, buttonText) = tool switch
+        var (title, subtitle) = tool switch
         {
-            "merge" => ("Merge PDF", "Combine all files into one PDF", "Merge PDF \u2192"),
-            "split" => ("Split PDF", "Enter page range to extract from first file", "Split PDF \u2192"),
-            "extract" => ("Extract Pages", "Click pages to select, then extract", "Extract Selected \u2192"),
-            "insert" => ("Insert Pages", "Click + to set position, then insert a file", "Save PDF \u2192"),
-            "delete" => ("Delete Pages", "Click pages to mark/unmark for deletion", "Save Without Deleted \u2192"),
-            "rotate" => ("Rotate Pages", "Select pages, then use rotation buttons above", "Save Rotated PDF \u2192"),
-            "reorder" => ("Reorder Pages", "Select a page, then move it with buttons above", "Save Reordered \u2192"),
-            "compress" => ("Compress PDF", "Choose quality level and compress", "Compress PDF \u2192"),
-            "crop" => ("Crop Pages", "Set crop margins (points) to trim all pages", "Crop PDF \u2192"),
-            _ => ("Merge PDF", "Combine all files into one PDF", "Merge PDF \u2192")
+            "reorder" => ("Reorder Pages", "Drag pages to reorder"),
+            "extract" => ("Extract Pages", "Select pages and extract to new PDF"),
+            "insert" => ("Insert Pages", "Add pages from PDF or image"),
+            "delete" => ("Delete Pages", "Click pages to mark for deletion"),
+            "rotate" => ("Rotate Pages", "Select pages, then use rotate buttons"),
+            "crop" => ("Crop Pages", "Set crop margins and apply"),
+            "split" => ("Split PDF", "Enter page range to split"),
+            "compress" => ("Compress PDF", "Choose quality and compress"),
+            _ => ("Reorder Pages", "Drag pages to reorder")
         };
-        TxtPdfEditorToolTitle.Text = title;
-        TxtPdfEditorToolSubtitle.Text = subtitle;
-        BtnPdfEditorAction.Content = buttonText;
+        TxtPeToolTitle.Text = title;
+        TxtPeToolSubtitle.Text = subtitle;
 
-        // Show/hide tool-specific bars
-        bool showBar = tool is "extract" or "split" or "rotate" or "compress" or "insert" or "reorder" or "crop";
-        PdfEditorToolBar.Visibility = showBar ? Visibility.Visible : Visibility.Collapsed;
+        bool showBar = tool is "extract" or "split" or "reorder" or "compress" or "delete";
+        PeToolBar.Visibility = showBar ? Visibility.Visible : Visibility.Collapsed;
         PeBarExtract.Visibility = tool == "extract" ? Visibility.Visible : Visibility.Collapsed;
         PeBarSplit.Visibility = tool == "split" ? Visibility.Visible : Visibility.Collapsed;
-        PeBarRotate.Visibility = tool == "rotate" ? Visibility.Visible : Visibility.Collapsed;
-        PeBarCompress.Visibility = tool == "compress" ? Visibility.Visible : Visibility.Collapsed;
-        PeBarInsert.Visibility = tool == "insert" ? Visibility.Visible : Visibility.Collapsed;
         PeBarReorder.Visibility = tool == "reorder" ? Visibility.Visible : Visibility.Collapsed;
-        PeBarCrop.Visibility = tool == "crop" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarCompress.Visibility = tool == "compress" ? Visibility.Visible : Visibility.Collapsed;
+        PeBarDelete.Visibility = tool == "delete" ? Visibility.Visible : Visibility.Collapsed;
+        PeSelectionBar.Visibility = Visibility.Collapsed;
 
-        // Update thumbnail overlays for the active tool
-        UpdatePePageOverlays();
+        PeRenderPageGrid();
     }
 
-    private void UpdatePePageOverlays()
+    // Properties panel
+    private void PeProp_RotateLeft(object sender, RoutedEventArgs e) => PeRotateTarget(270);
+    private void PeProp_RotateRight(object sender, RoutedEventArgs e) => PeRotateTarget(90);
+    private void PeProp_Rotate180(object sender, RoutedEventArgs e) => PeRotateTarget(180);
+
+    private void PeRotateTarget(int degrees)
     {
-        var teal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-        var border444 = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
-
-        foreach (var entry in _pdfEditorEntries)
-            foreach (var pg in entry.Pages)
-            {
-                if (pg.ThumbnailBorder == null) continue;
-                // Reset border
-                pg.ThumbnailBorder.BorderBrush = _peSelectedPages.Contains(pg) ? teal : border444;
-                pg.ThumbnailBorder.BorderThickness = _peSelectedPages.Contains(pg) ? new Thickness(3) : new Thickness(1);
-                pg.ThumbnailBorder.Opacity = pg.IsDeleted ? 0.3 : 1.0;
-            }
-    }
-
-    private void PeTogglePageSelection(PdfEditorPageEntry pg)
-    {
-        if (pg.ThumbnailBorder == null) return;
-        var teal = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-        var border444 = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
-
-        if (_peSelectedPages.Contains(pg))
+        var targets = GetPeTargetPages();
+        foreach (var pg in targets)
         {
-            _peSelectedPages.Remove(pg);
-            pg.ThumbnailBorder.BorderBrush = border444;
-            pg.ThumbnailBorder.BorderThickness = new Thickness(1);
+            pg.Rotation = (pg.Rotation + degrees) % 360;
+            if (pg.ThumbnailBorder?.Child is System.Windows.Controls.Image img)
+                ((RotateTransform)img.RenderTransform).Angle = pg.Rotation;
         }
-        else
+    }
+
+    private List<PdfEditorPageEntry> GetPeTargetPages()
+    {
+        int scope = CmbPeApplyTo.SelectedIndex;
+        return scope switch
         {
-            _peSelectedPages.Add(pg);
-            pg.ThumbnailBorder.BorderBrush = teal;
-            pg.ThumbnailBorder.BorderThickness = new Thickness(3);
+            1 => _peSelectedPages.ToList(),
+            2 => _pePages.Where(p => !p.IsDeleted).ToList(),
+            _ => _peSelectedPages.Count > 0 ? _peSelectedPages.Take(1).ToList() : new()
+        };
+    }
+
+    private void PeProp_CropPage(object sender, RoutedEventArgs e)
+    {
+        var targets = GetPeTargetPages();
+        if (targets.Count == 0)
+        {
+            MessageBox.Show("Select pages to crop.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
         }
-
-        if (_pdfEditorActiveTool == "extract")
-            TxtPeExtractCount.Text = $"{_peSelectedPages.Count} pages selected";
-        if (_pdfEditorActiveTool == "rotate")
-            TxtPeRotateCount.Text = $"{_peSelectedPages.Count} selected";
+        MessageBox.Show($"Crop will be applied to {targets.Count} page(s) when saving.", "Crop Pages", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    // Extract tool buttons
-    private void PeExtract_SelectAll(object sender, RoutedEventArgs e)
+    // Selection bar quick actions
+    private void PeSelection_Delete(object sender, RoutedEventArgs e)
     {
-        foreach (var en in _pdfEditorEntries)
-            foreach (var pg in en.Pages.Where(p => !p.IsDeleted))
-                _peSelectedPages.Add(pg);
-        UpdatePePageOverlays();
-        TxtPeExtractCount.Text = $"{_peSelectedPages.Count} pages selected";
-    }
-    private void PeExtract_DeselectAll(object sender, RoutedEventArgs e)
-    {
+        foreach (var pg in _peSelectedPages.ToList())
+        {
+            pg.IsDeleted = true;
+            if (pg.ThumbnailBorder != null) pg.ThumbnailBorder.Opacity = 0.3;
+        }
         _peSelectedPages.Clear();
-        UpdatePePageOverlays();
-        TxtPeExtractCount.Text = "0 pages selected";
+        PeUpdateSelectionBar();
+        PeUpdateInfo();
     }
 
-    // Rotate tool buttons
-    private void PeRotate_Left(object sender, RoutedEventArgs e) => PeRotateSelected(270);
-    private void PeRotate_Right(object sender, RoutedEventArgs e) => PeRotateSelected(90);
-    private void PeRotate_180(object sender, RoutedEventArgs e) => PeRotateSelected(180);
-
-    private void PeRotateSelected(int degrees)
+    private void PeSelection_Rotate(object sender, RoutedEventArgs e)
     {
         foreach (var pg in _peSelectedPages)
         {
-            pg.Rotation = (pg.Rotation + degrees) % 360;
-            if (pg.ThumbnailBorder?.Child is Grid g)
-            {
-                var img = g.Children.OfType<System.Windows.Controls.Image>().FirstOrDefault();
-                if (img != null)
-                    ((RotateTransform)img.RenderTransform).Angle = pg.Rotation;
-            }
+            pg.Rotation = (pg.Rotation + 90) % 360;
+            if (pg.ThumbnailBorder?.Child is System.Windows.Controls.Image img)
+                ((RotateTransform)img.RenderTransform).Angle = pg.Rotation;
         }
     }
 
-    // Insert tool buttons
-    private void PeInsert_Pdf(object sender, RoutedEventArgs e)
+    private void PeSelection_Extract(object sender, RoutedEventArgs e)
     {
-        if (_peInsertAfterGlobal < 0 && _pdfEditorEntries.Count > 0)
-        {
-            // Default: insert at end
-            _peInsertAfterGlobal = _pdfEditorEntries.SelectMany(en => en.Pages).Count();
-        }
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf" };
-        if (dlg.ShowDialog() != true) return;
-        AddPdfEditorFiles(new[] { dlg.FileName });
-    }
-    private void PeInsert_Image(object sender, RoutedEventArgs e)
-    {
-        MessageBox.Show("Select images to insert as PDF pages.\nImages will be converted to PDF pages.", "Insert Image", MessageBoxButton.OK, MessageBoxImage.Information);
-        var dlg = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All|*.*",
-            Multiselect = true
-        };
-        if (dlg.ShowDialog() != true) return;
-        AddPdfEditorFiles(dlg.FileNames);
+        if (_peSelectedPages.Count == 0) return;
+        var saved = _peSelectedPages.ToList();
+        SelectPeTool("extract");
+        foreach (var pg in saved) PeToggleSelection(pg);
     }
 
-    private List<PdfEditorPageEntry> ParsePeSplitRange()
+    // Extract tool
+    private void PeExtract_SelectAll(object sender, RoutedEventArgs e)
     {
-        var result = new List<PdfEditorPageEntry>();
-        var allPages = _pdfEditorEntries.SelectMany(en => en.Pages).Where(p => !p.IsDeleted).ToList();
-        if (allPages.Count == 0) return result;
-
-        string rangeText = TxtPeSplitRange.Text.Trim();
-        if (string.IsNullOrEmpty(rangeText)) return result;
-
-        foreach (var part in rangeText.Split(','))
-        {
-            var trimmed = part.Trim();
-            if (trimmed.Contains('-'))
-            {
-                var bounds = trimmed.Split('-');
-                if (bounds.Length == 2 && int.TryParse(bounds[0].Trim(), out int from) && int.TryParse(bounds[1].Trim(), out int to))
-                {
-                    for (int p = from; p <= to && p <= allPages.Count; p++)
-                        if (p >= 1) result.Add(allPages[p - 1]);
-                }
-            }
-            else if (int.TryParse(trimmed, out int single) && single >= 1 && single <= allPages.Count)
-            {
-                result.Add(allPages[single - 1]);
-            }
-        }
-        return result;
+        foreach (var pg in _pePages.Where(p => !p.IsDeleted))
+            _peSelectedPages.Add(pg);
+        PeRenderPageGrid();
+        TxtPeExtractCount.Text = $"{_peSelectedPages.Count} pages selected";
     }
 
-    // Reorder methods
+    private void PeExtract_DeselectAll(object sender, RoutedEventArgs e)
+    {
+        _peSelectedPages.Clear();
+        PeRenderPageGrid();
+        TxtPeExtractCount.Text = "0 pages selected";
+    }
+
+    // Reorder
     private PdfEditorPageEntry? _peReorderSelected;
 
     private void PeReorder_SelectPage(PdfEditorPageEntry pg)
     {
-        // Deselect previous
         if (_peReorderSelected?.ThumbnailBorder != null)
         {
             _peReorderSelected.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444"));
@@ -1406,14 +1254,11 @@ public partial class FileToolsWindow : Window
         _peReorderSelected = pg;
         if (pg.ThumbnailBorder != null)
         {
-            pg.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
+            pg.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E53935"));
             pg.ThumbnailBorder.BorderThickness = new Thickness(3);
         }
-        TxtPeReorderInfo.Text = $"Page selected (from {System.IO.Path.GetFileName(pg.SourceFile)})";
+        TxtPeReorderInfo.Text = $"Page {_pePages.IndexOf(pg) + 1} selected";
     }
-
-    private List<PdfEditorPageEntry> GetAllActivePages()
-        => _pdfEditorEntries.SelectMany(e => e.Pages).Where(p => !p.IsDeleted).ToList();
 
     private void PeReorder_MoveLeft(object sender, RoutedEventArgs e) => PeReorderMove(-1);
     private void PeReorder_MoveRight(object sender, RoutedEventArgs e) => PeReorderMove(1);
@@ -1421,244 +1266,339 @@ public partial class FileToolsWindow : Window
     private void PeReorder_ToFront(object sender, RoutedEventArgs e)
     {
         if (_peReorderSelected == null) return;
-        var all = GetAllActivePages();
-        int idx = all.IndexOf(_peReorderSelected);
-        if (idx <= 0) return;
-        PeReorderMove(-idx);
+        int idx = _pePages.IndexOf(_peReorderSelected);
+        if (idx > 0) PeReorderMove(-idx);
     }
 
     private void PeReorder_ToBack(object sender, RoutedEventArgs e)
     {
         if (_peReorderSelected == null) return;
-        var all = GetAllActivePages();
-        int idx = all.IndexOf(_peReorderSelected);
-        if (idx < 0 || idx >= all.Count - 1) return;
-        PeReorderMove(all.Count - 1 - idx);
+        int idx = _pePages.IndexOf(_peReorderSelected);
+        if (idx >= 0 && idx < _pePages.Count - 1) PeReorderMove(_pePages.Count - 1 - idx);
     }
 
     private void PeReorderMove(int delta)
     {
         if (_peReorderSelected == null) return;
-        // Find the page in its parent entry and swap
-        var entry = _pdfEditorEntries.FirstOrDefault(e => e.Pages.Contains(_peReorderSelected));
-        if (entry == null) return;
-
-        int idx = entry.Pages.IndexOf(_peReorderSelected);
+        int idx = _pePages.IndexOf(_peReorderSelected);
         int newIdx = idx + delta;
-        if (newIdx < 0 || newIdx >= entry.Pages.Count) return;
-
-        // Swap in list
-        (entry.Pages[idx], entry.Pages[newIdx]) = (entry.Pages[newIdx], entry.Pages[idx]);
-
-        // Rebuild the wrap panel for this entry
-        RebuildPeGroupThumbnails(entry);
+        if (newIdx < 0 || newIdx >= _pePages.Count) return;
+        _pePages.RemoveAt(idx);
+        _pePages.Insert(newIdx, _peReorderSelected);
+        PeRenderPageGrid();
+        if (_peReorderSelected.ThumbnailBorder != null)
+        {
+            _peReorderSelected.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E53935"));
+            _peReorderSelected.ThumbnailBorder.BorderThickness = new Thickness(3);
+        }
         TxtPeReorderInfo.Text = $"Moved to position {newIdx + 1}";
     }
 
-    private void RebuildPeGroupThumbnails(PdfEditorFileEntry entry)
+    // Page navigation
+    private void PeNav_First(object sender, RoutedEventArgs e) => TxtPeCurrentPage.Text = "1";
+    private void PeNav_Prev(object sender, RoutedEventArgs e)
     {
-        if (entry.GroupBorder?.Child is not StackPanel groupStack) return;
-        // Find the WrapPanel (first child that is WrapPanel)
-        var wp = groupStack.Children.OfType<WrapPanel>().FirstOrDefault();
-        if (wp == null) return;
-        wp.Children.Clear();
+        if (int.TryParse(TxtPeCurrentPage.Text, out int pg) && pg > 1) TxtPeCurrentPage.Text = (pg - 1).ToString();
+    }
+    private void PeNav_Next(object sender, RoutedEventArgs e)
+    {
+        int total = _pePages.Count(p => !p.IsDeleted);
+        if (int.TryParse(TxtPeCurrentPage.Text, out int pg) && pg < total) TxtPeCurrentPage.Text = (pg + 1).ToString();
+    }
+    private void PeNav_Last(object sender, RoutedEventArgs e) => TxtPeCurrentPage.Text = _pePages.Count(p => !p.IsDeleted).ToString();
 
-        int globalBase = _pdfEditorEntries.Where(e => e != entry).TakeWhile(e => _pdfEditorEntries.IndexOf(e) < _pdfEditorEntries.IndexOf(entry)).SelectMany(e => e.Pages).Count();
-        int localIdx = 0;
+    // Add pages
+    private void PeAdd_BlankPage(object sender, RoutedEventArgs e)
+    {
+        var rtb = new RenderTargetBitmap(200, 283, 96, 96, PixelFormats.Pbgra32);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen()) dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 200, 283));
+        rtb.Render(dv);
+        rtb.Freeze();
 
-        foreach (var pg in entry.Pages)
+        var bmpImg = new BitmapImage();
+        using (var ms = new MemoryStream())
         {
-            if (pg.ThumbnailBorder == null) continue;
-            var insertPt = BuildPeInsertionPoint(globalBase + localIdx);
-            wp.Children.Add(insertPt);
-            wp.Children.Add(pg.ThumbnailBorder);
-            localIdx++;
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(rtb));
+            enc.Save(ms);
+            ms.Position = 0;
+            bmpImg.BeginInit();
+            bmpImg.StreamSource = ms;
+            bmpImg.CacheOption = BitmapCacheOption.OnLoad;
+            bmpImg.EndInit();
+            bmpImg.Freeze();
         }
-        var lastPt = BuildPeInsertionPoint(globalBase + localIdx);
-        wp.Children.Add(lastPt);
 
-        // Re-select
-        if (_peReorderSelected?.ThumbnailBorder != null)
+        _pePages.Add(new PdfEditorPageEntry { OriginalIndex = -1, GlobalIndex = _pePages.Count + 1, Thumbnail = bmpImg, SourceFile = "" });
+        PeRenderPageGrid();
+        PeUpdateInfo();
+    }
+
+    private async void PeAdd_FromPdf(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf" };
+        if (dlg.ShowDialog() != true) return;
+        await PeInsertPdfPages(dlg.FileName);
+    }
+
+    private void PeAdd_FromImage(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
         {
-            _peReorderSelected.ThumbnailBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4DB6AC"));
-            _peReorderSelected.ThumbnailBorder.BorderThickness = new Thickness(3);
+            Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All|*.*",
+            Multiselect = true
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        foreach (var imgPath in dlg.FileNames)
+        {
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(imgPath);
+                bmp.DecodePixelWidth = 200;
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+                _pePages.Add(new PdfEditorPageEntry { OriginalIndex = -1, GlobalIndex = _pePages.Count + 1, Thumbnail = bmp, SourceFile = imgPath });
+            }
+            catch { }
+        }
+        PeRenderPageGrid();
+        PeUpdateInfo();
+    }
+
+    private async void PeInsertZone_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+        foreach (var f in files)
+        {
+            var ext = System.IO.Path.GetExtension(f).ToLowerInvariant();
+            if (ext == ".pdf") await PeInsertPdfPages(f);
+            else if (ImageExtensions.Contains(ext))
+            {
+                try
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(f);
+                    bmp.DecodePixelWidth = 200;
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    _pePages.Add(new PdfEditorPageEntry { OriginalIndex = -1, GlobalIndex = _pePages.Count + 1, Thumbnail = bmp, SourceFile = f });
+                }
+                catch { }
+            }
+        }
+        PeRenderPageGrid();
+        PeUpdateInfo();
+    }
+
+    private async Task PeInsertPdfPages(string path)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            for (uint i = 0; i < pdfDoc.PageCount; i++)
+            {
+                using var page = pdfDoc.GetPage(i);
+                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                await page.RenderToStreamAsync(stream, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 200 });
+                stream.Seek(0);
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.StreamSource = stream.AsStreamForRead();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+                _pePages.Add(new PdfEditorPageEntry { OriginalIndex = (int)i, GlobalIndex = _pePages.Count + 1, Thumbnail = bmp, SourceFile = path });
+            }
+            PeRenderPageGrid();
+            PeUpdateInfo();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"PDF insert error: {ex.Message}");
         }
     }
 
-    private async void PdfEditor_Execute(object sender, RoutedEventArgs e)
+    // Zoom
+    private void PeZoom_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_pdfEditorEntries.Count == 0) return;
+        if (SldPeZoom == null) return;
+        _peThumbSize = SldPeZoom.Value;
+        if (_pePages.Count > 0) PeRenderPageGrid();
+    }
+    private void PeZoom_Out(object sender, RoutedEventArgs e) => SldPeZoom.Value = Math.Max(SldPeZoom.Minimum, SldPeZoom.Value - 20);
+    private void PeZoom_In(object sender, RoutedEventArgs e) => SldPeZoom.Value = Math.Min(SldPeZoom.Maximum, SldPeZoom.Value + 20);
 
-        // Determine which pages to process based on tool
-        List<PdfEditorPageEntry> activePages;
+    // Undo/Redo stubs
+    private void PeUndo_Click(object sender, RoutedEventArgs e) { }
+    private void PeRedo_Click(object sender, RoutedEventArgs e) { }
+
+    // Save
+    private void PeSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pePdfPath == null) return;
+        _ = PeExecuteSave(_pePdfPath);
+    }
+
+    private void PeSaveAs_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "PDF|*.pdf",
+            FileName = _pePdfPath != null ? System.IO.Path.GetFileName(_pePdfPath) : "output.pdf"
+        };
+        if (dlg.ShowDialog() != true) return;
+        _ = PeExecuteSave(dlg.FileName);
+    }
+
+    private async Task PeExecuteSave(string outputPath)
+    {
+        var activePages = _pePages.Where(p => !p.IsDeleted).ToList();
+
         if (_pdfEditorActiveTool == "extract")
         {
             activePages = _peSelectedPages.Where(p => !p.IsDeleted).ToList();
-            if (activePages.Count == 0)
-            {
-                MessageBox.Show("Select pages to extract first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            if (activePages.Count == 0) { MessageBox.Show("Select pages to extract first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         }
         else if (_pdfEditorActiveTool == "split")
         {
-            // Parse range from TxtPeSplitRange
             activePages = ParsePeSplitRange();
-            if (activePages.Count == 0)
-            {
-                MessageBox.Show("Enter a valid page range (e.g. 1-5, 10-20).", "Invalid Range", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-        }
-        else
-        {
-            activePages = _pdfEditorEntries.SelectMany(en => en.Pages).Where(p => !p.IsDeleted).ToList();
+            if (activePages.Count == 0) { MessageBox.Show("Enter a valid page range.", "Invalid Range", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         }
 
-        if (activePages.Count == 0)
-        {
-            MessageBox.Show("No pages to process.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        if (activePages.Count == 0) { MessageBox.Show("No pages to save.", "Info", MessageBoxButton.OK, MessageBoxImage.Information); return; }
 
-        // Compress quality override
         int compressQuality = 95;
         if (_pdfEditorActiveTool == "compress")
+            compressQuality = CmbPeCompressQuality.SelectedIndex switch { 0 => 90, 1 => 70, 2 => 50, 3 => 30, _ => 70 };
+
+        int cropTop = 0, cropBottom = 0, cropLeft = 0, cropRight = 0;
+        if (_pdfEditorActiveTool == "crop")
         {
-            compressQuality = CmbPeCompressQuality.SelectedIndex switch
-            {
-                0 => 90, 1 => 70, 2 => 50, 3 => 30, _ => 70
-            };
+            int.TryParse(TxtPeMarginTop.Text.Replace("mm", "").Trim(), out cropTop);
+            int.TryParse(TxtPeMarginBottom.Text.Replace("mm", "").Trim(), out cropBottom);
+            int.TryParse(TxtPeMarginLeft.Text.Replace("mm", "").Trim(), out cropLeft);
+            int.TryParse(TxtPeMarginRight.Text.Replace("mm", "").Trim(), out cropRight);
+            cropTop = (int)(cropTop * 3); cropBottom = (int)(cropBottom * 3);
+            cropLeft = (int)(cropLeft * 3); cropRight = (int)(cropRight * 3);
         }
 
-        var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "PDF|*.pdf", FileName = "output.pdf" };
-        if (dlg.ShowDialog() != true) return;
-
-        string actionLabel = _pdfEditorActiveTool switch
-        {
-            "merge" => "Merging",
-            "split" => "Splitting",
-            "extract" => "Extracting",
-            "delete" => "Removing deleted pages",
-            "rotate" => "Rotating",
-            "reorder" => "Reordering",
-            "compress" => "Compressing",
-            "crop" => "Cropping",
-            _ => "Processing"
-        };
-        ShowProcessing($"{actionLabel} PDF...");
-
+        ShowProcessing("Saving PDF...");
         try
         {
             string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"llamashot_pe_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
-
             try
             {
                 var tempImages = new List<string>();
-                int total = activePages.Count;
-                int done = 0;
+                int total = activePages.Count, done = 0;
                 var progress = CreateProgress();
 
                 foreach (var pg in activePages)
                 {
-                    var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(pg.SourceFile);
-                    var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(storageFile);
-                    using var page = pdfDoc.GetPage((uint)pg.OriginalIndex);
-
-                    using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-                    var renderOpts = new Windows.Data.Pdf.PdfPageRenderOptions
+                    BitmapSource srcBmp;
+                    if (string.IsNullOrEmpty(pg.SourceFile))
+                        srcBmp = pg.Thumbnail!;
+                    else if (pg.OriginalIndex < 0 && !pg.SourceFile.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
                     {
-                        DestinationWidth = (uint)(page.Size.Width * 150 / 72)
-                    };
-                    await page.RenderToStreamAsync(stream, renderOpts);
-                    stream.Seek(0);
-
-                    var bmpImg = new BitmapImage();
-                    bmpImg.BeginInit();
-                    bmpImg.StreamSource = stream.AsStreamForRead();
-                    bmpImg.CacheOption = BitmapCacheOption.OnLoad;
-                    bmpImg.EndInit();
-                    bmpImg.Freeze();
+                        var imgBmp = new BitmapImage();
+                        imgBmp.BeginInit();
+                        imgBmp.UriSource = new Uri(pg.SourceFile);
+                        imgBmp.CacheOption = BitmapCacheOption.OnLoad;
+                        imgBmp.EndInit();
+                        imgBmp.Freeze();
+                        srcBmp = imgBmp;
+                    }
+                    else
+                    {
+                        var sf = await Windows.Storage.StorageFile.GetFileFromPathAsync(pg.SourceFile);
+                        var pd = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(sf);
+                        using var page = pd.GetPage((uint)pg.OriginalIndex);
+                        using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                        await page.RenderToStreamAsync(stream, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = (uint)(page.Size.Width * 150 / 72) });
+                        stream.Seek(0);
+                        var bmpImg = new BitmapImage();
+                        bmpImg.BeginInit();
+                        bmpImg.StreamSource = stream.AsStreamForRead();
+                        bmpImg.CacheOption = BitmapCacheOption.OnLoad;
+                        bmpImg.EndInit();
+                        bmpImg.Freeze();
+                        srcBmp = bmpImg;
+                    }
 
                     string tempFile = System.IO.Path.Combine(tempDir, $"page_{done:D5}.jpg");
-                    int rotation = pg.Rotation;
-
-                    // Parse crop margins if crop tool
-                    int cropTop = 0, cropBottom = 0, cropLeft = 0, cropRight = 0;
-                    if (_pdfEditorActiveTool == "crop")
-                    {
-                        int.TryParse(TxtPeCropTop.Text, out cropTop);
-                        int.TryParse(TxtPeCropBottom.Text, out cropBottom);
-                        int.TryParse(TxtPeCropLeft.Text, out cropLeft);
-                        int.TryParse(TxtPeCropRight.Text, out cropRight);
-                        // Convert points to pixels at render DPI
-                        double scale = (double)renderOpts.DestinationWidth / page.Size.Width;
-                        cropTop = (int)(cropTop * scale);
-                        cropBottom = (int)(cropBottom * scale);
-                        cropLeft = (int)(cropLeft * scale);
-                        cropRight = (int)(cropRight * scale);
-                    }
+                    int rot = pg.Rotation;
+                    int cT = cropTop, cB = cropBottom, cL = cropLeft, cR = cropRight;
 
                     var thread = new System.Threading.Thread(() =>
                     {
-                        BitmapSource finalBmp = bmpImg;
-                        if (rotation != 0)
+                        BitmapSource finalBmp = srcBmp;
+                        if (rot != 0) { finalBmp = new TransformedBitmap(srcBmp, new RotateTransform(rot)); finalBmp.Freeze(); }
+                        if (cT > 0 || cB > 0 || cL > 0 || cR > 0)
                         {
-                            finalBmp = new TransformedBitmap(bmpImg, new RotateTransform(rotation));
-                            finalBmp.Freeze();
+                            int w = finalBmp.PixelWidth, h = finalBmp.PixelHeight;
+                            int cx = Math.Max(0, cL), cy = Math.Max(0, cT);
+                            int cw = Math.Max(1, w - cL - cR), ch = Math.Max(1, h - cT - cB);
+                            if (cx + cw > w) cw = w - cx; if (cy + ch > h) ch = h - cy;
+                            if (cw > 0 && ch > 0) { finalBmp = new CroppedBitmap(finalBmp, new Int32Rect(cx, cy, cw, ch)); finalBmp.Freeze(); }
                         }
-
-                        // Apply crop if needed
-                        if (cropTop > 0 || cropBottom > 0 || cropLeft > 0 || cropRight > 0)
-                        {
-                            int w = finalBmp.PixelWidth;
-                            int h = finalBmp.PixelHeight;
-                            int cx = Math.Max(0, cropLeft);
-                            int cy = Math.Max(0, cropTop);
-                            int cw = Math.Max(1, w - cropLeft - cropRight);
-                            int ch = Math.Max(1, h - cropTop - cropBottom);
-                            if (cx + cw > w) cw = w - cx;
-                            if (cy + ch > h) ch = h - cy;
-                            if (cw > 0 && ch > 0)
-                            {
-                                finalBmp = new CroppedBitmap(finalBmp, new Int32Rect(cx, cy, cw, ch));
-                                finalBmp.Freeze();
-                            }
-                        }
-
-                        var encoder = new JpegBitmapEncoder { QualityLevel = compressQuality };
-                        encoder.Frames.Add(BitmapFrame.Create(finalBmp));
+                        var enc = new JpegBitmapEncoder { QualityLevel = compressQuality };
+                        enc.Frames.Add(BitmapFrame.Create(finalBmp));
                         using var fs = new FileStream(tempFile, FileMode.Create);
-                        encoder.Save(fs);
+                        enc.Save(fs);
                     });
                     thread.SetApartmentState(System.Threading.ApartmentState.STA);
                     thread.Start();
                     thread.Join();
-
                     tempImages.Add(tempFile);
                     done++;
                     progress.Report(done * 50 / total);
                 }
 
                 var imgProgress = new Progress<int>(v => progress.Report(50 + v / 2));
-                await FileToolsService.ImagesToPdfAsync(tempImages.ToArray(), dlg.FileName, imgProgress);
-
-                var outputInfo = new FileInfo(dlg.FileName);
-                ShowComplete($"PDF saved successfully!",
-                    $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {activePages.Count} pages \u2014 {FileToolsService.FormatFileSize(outputInfo.Length)}",
-                    dlg.FileName);
+                await FileToolsService.ImagesToPdfAsync(tempImages.ToArray(), outputPath, imgProgress);
+                var outputInfo = new FileInfo(outputPath);
+                ShowComplete("PDF saved successfully!",
+                    $"{System.IO.Path.GetFileName(outputPath)} \u2014 {activePages.Count} pages \u2014 {FileToolsService.FormatFileSize(outputInfo.Length)}",
+                    outputPath);
             }
-            finally
-            {
-                try { Directory.Delete(tempDir, true); } catch { }
-            }
+            finally { try { Directory.Delete(tempDir, true); } catch { } }
         }
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private List<PdfEditorPageEntry> ParsePeSplitRange()
+    {
+        var result = new List<PdfEditorPageEntry>();
+        var allPages = _pePages.Where(p => !p.IsDeleted).ToList();
+        if (allPages.Count == 0) return result;
+        string rangeText = TxtPeSplitRange.Text.Trim();
+        if (string.IsNullOrEmpty(rangeText)) return result;
+        foreach (var part in rangeText.Split(','))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.Contains('-'))
+            {
+                var bounds = trimmed.Split('-');
+                if (bounds.Length == 2 && int.TryParse(bounds[0].Trim(), out int from) && int.TryParse(bounds[1].Trim(), out int to))
+                    for (int p = from; p <= to && p <= allPages.Count; p++) if (p >= 1) result.Add(allPages[p - 1]);
+            }
+            else if (int.TryParse(trimmed, out int single) && single >= 1 && single <= allPages.Count)
+                result.Add(allPages[single - 1]);
+        }
+        return result;
     }
 
     // =====================================================================
@@ -2643,6 +2583,135 @@ public partial class FileToolsWindow : Window
     }
 
     // =====================================================================
+    //  Fill & Sign — load handlers (Task 10)
+    // =====================================================================
+
+    private void FillSign_SelectFiles(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF files|*.pdf" };
+        if (dlg.ShowDialog() == true) _ = FsLoadPdf(dlg.FileName);
+    }
+
+    private void FillSign_SelectDrop(object sender, DragEventArgs e)
+    {
+        var files = GetDroppedFiles(e, p => p.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+        if (files.Length > 0) _ = FsLoadPdf(files[0]);
+    }
+
+    private async Task FsLoadPdf(string path)
+    {
+        _fsPdfPath = path;
+        _fsElements.Clear();
+        _fsRegionCache.Clear();
+        _fsCurrentPage = 0;
+        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+        var pdf = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+        _fsPageCount = (int)pdf.PageCount;
+        FillSignSelectView.Visibility = Visibility.Collapsed;
+        FillSignWorkspace.Visibility = Visibility.Visible;
+        await FsRenderCurrentPage();
+        FsBuildThumbnails();
+    }
+
+    // =====================================================================
+    //  Fill & Sign — render, navigation, thumbnails (Task 11)
+    // =====================================================================
+
+    private async Task FsRenderCurrentPage()
+    {
+        if (_fsPdfPath == null) return;
+        using var bmp = await Llamashot.Core.FillSignRender.RenderPageToBitmapAsync(_fsPdfPath, _fsCurrentPage, FsDpi);
+        var bi = new BitmapImage();
+        using (var ms = new MemoryStream())
+        {
+            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            ms.Position = 0;
+            bi.BeginInit(); bi.StreamSource = ms; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); bi.Freeze();
+        }
+        FillSignPageImage.Source = bi;
+        FillSignOverlay.Width = bi.PixelWidth;
+        FillSignOverlay.Height = bi.PixelHeight;
+        FsPageLabel.Text = $"Page {_fsCurrentPage + 1} / {_fsPageCount}";
+        FsRenderOverlayElements();
+        await FsEnsureRegions(_fsCurrentPage);
+    }
+
+    private void FsRenderOverlayElements()
+    {
+        // Remove element visuals but keep the hover rectangle (added in XAML).
+        for (int i = FillSignOverlay.Children.Count - 1; i >= 0; i--)
+            if (FillSignOverlay.Children[i] != FillSignHover)
+                FillSignOverlay.Children.RemoveAt(i);
+        // element visuals re-added in the element-tool group (Task 13+)
+    }
+
+    private async Task FsEnsureRegions(int page)
+    {
+        if (_fsRegionCache.ContainsKey(page) || _fsPdfPath == null) return;
+        string path = _fsPdfPath;
+        var regions = await Task.Run(async () =>
+        {
+            using var bmp = await Llamashot.Core.FillSignRender.RenderPageToBitmapAsync(path, page, FsDpi);
+            return Llamashot.Core.FillSignDetector.DetectRegions(bmp);
+        });
+        _fsRegionCache[page] = regions;
+    }
+
+    private async void FsNextPage(object sender, RoutedEventArgs e)
+    {
+        if (_fsCurrentPage < _fsPageCount - 1) { _fsCurrentPage++; await FsRenderCurrentPage(); }
+    }
+
+    private async void FsPrevPage(object sender, RoutedEventArgs e)
+    {
+        if (_fsCurrentPage > 0) { _fsCurrentPage--; await FsRenderCurrentPage(); }
+    }
+
+    private async void FsBuildThumbnails()
+    {
+        FillSignThumbs.Children.Clear();
+        if (_fsPdfPath == null) return;
+        for (int i = 0; i < _fsPageCount; i++)
+        {
+            int pageIdx = i;
+            using var bmp = await Llamashot.Core.FillSignRender.RenderPageToBitmapAsync(_fsPdfPath, i, 30);
+            var bi = new BitmapImage();
+            using (var ms = new MemoryStream())
+            {
+                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                ms.Position = 0;
+                bi.BeginInit(); bi.StreamSource = ms; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); bi.Freeze();
+            }
+            var img = new System.Windows.Controls.Image { Source = bi, Margin = new Thickness(4), Cursor = Cursors.Hand };
+            img.MouseLeftButtonDown += async (_, _) => { _fsCurrentPage = pageIdx; await FsRenderCurrentPage(); };
+            FillSignThumbs.Children.Add(img);
+        }
+    }
+
+    // =====================================================================
+    //  Fill & Sign — hover highlight (Task 12)
+    // =====================================================================
+
+    private void FsOverlay_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_fsRegionCache.TryGetValue(_fsCurrentPage, out var regions))
+        { FillSignHover.Visibility = Visibility.Collapsed; return; }
+        var p = e.GetPosition(FillSignOverlay);
+        Llamashot.Core.DetectedRegion? hit = null;
+        foreach (var r in regions)
+            if (p.X >= r.X && p.X <= r.X + r.W && p.Y >= r.Y && p.Y <= r.Y + r.H) { hit = r; break; }
+        if (hit is { } h)
+        {
+            Canvas.SetLeft(FillSignHover, h.X); Canvas.SetTop(FillSignHover, h.Y);
+            FillSignHover.Width = h.W; FillSignHover.Height = h.H;
+            FillSignHover.Visibility = Visibility.Visible;
+        }
+        else FillSignHover.Visibility = Visibility.Collapsed;
+    }
+
+    private void FsOverlay_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) { }
+
+    // =====================================================================
     //  11. Compress Image
     // =====================================================================
 
@@ -3546,6 +3615,841 @@ public partial class FileToolsWindow : Window
             System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    // =====================================================================
+    //  Image Editor (unified single-image workspace)
+    // =====================================================================
+
+    private string? _ieImagePath;
+    private BitmapImage? _ieOriginalImage;
+    private BitmapSource? _ieWorkingImage;
+    private BitmapSource? _ieAdjustBase; // snapshot before live adjust preview
+    private BitmapSource? _ieFilterBase; // snapshot before filter was applied (so filters don't stack)
+    private string _ieActiveTool = "crop";
+    private double _ieRotation = 0;
+    private bool _ieFlipH, _ieFlipV;
+    private int _ieOrigW, _ieOrigH;
+    private double _ieZoom = 0; // 0 = fit
+    private bool _ieSuppressResize;
+    private bool _ieSuppressAdjust;
+    // Undo
+    private readonly List<BitmapSource> _ieUndoStack = new();
+    private readonly List<BitmapSource> _ieRedoStack = new();
+    // Crop drag
+    private bool _ieCropDragging;
+    private Point _ieCropStart;
+    private Rect _ieCropRect = Rect.Empty;
+    private Rectangle? _ieCropSelection;
+    private enum IeCropHandle { None, TL, TR, BL, BR, T, B, L, R, Move }
+    private IeCropHandle _ieCropHandle = IeCropHandle.None;
+    private Rect _ieCropRectOnDown;
+
+    private void IePushUndo()
+    {
+        if (_ieWorkingImage != null) _ieUndoStack.Add(_ieWorkingImage);
+        _ieRedoStack.Clear();
+        if (_ieUndoStack.Count > 50) _ieUndoStack.RemoveAt(0);
+    }
+
+    private void IeUndo()
+    {
+        if (_ieUndoStack.Count == 0) return;
+        _ieRedoStack.Add(_ieWorkingImage!);
+        _ieWorkingImage = _ieUndoStack[^1];
+        _ieUndoStack.RemoveAt(_ieUndoStack.Count - 1);
+        IePreviewImage.Source = _ieWorkingImage;
+        _ieZoom = 0; IeApplyZoom();
+        IeUpdateInfo();
+    }
+
+    private void IeRedo()
+    {
+        if (_ieRedoStack.Count == 0) return;
+        _ieUndoStack.Add(_ieWorkingImage!);
+        _ieWorkingImage = _ieRedoStack[^1];
+        _ieRedoStack.RemoveAt(_ieRedoStack.Count - 1);
+        IePreviewImage.Source = _ieWorkingImage;
+        _ieZoom = 0; IeApplyZoom();
+        IeUpdateInfo();
+    }
+
+    private void IeUndo_Click(object sender, RoutedEventArgs e) => IeUndo();
+    private void IeRedo_Click(object sender, RoutedEventArgs e) => IeRedo();
+
+    private void ImgEditor_SelectFile(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tiff;*.tif;*.webp|All|*.*"
+        };
+        if (dlg.ShowDialog() != true) return;
+        IeLoadImage(dlg.FileName);
+        ShowConfigState("image_editor");
+    }
+
+    private void ImgEditor_SelectDrop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+        var imgFile = files.FirstOrDefault(f => ImageExtensions.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()));
+        if (imgFile == null) return;
+        IeLoadImage(imgFile);
+        ShowConfigState("image_editor");
+    }
+
+    private void IeLoadImage(string path)
+    {
+        _ieImagePath = path;
+        _ieRotation = 0; _ieFlipH = false; _ieFlipV = false;
+        IeRotateTransform.Angle = 0;
+        IeFlipTransform.ScaleX = 1; IeFlipTransform.ScaleY = 1;
+        _ieUndoStack.Clear(); _ieRedoStack.Clear();
+
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.UriSource = new Uri(path);
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.EndInit();
+        bmp.Freeze();
+        _ieOriginalImage = bmp;
+        // Convert to Bgra32 for pixel operations
+        _ieWorkingImage = IeEnsureBgra32(bmp);
+        _ieAdjustBase = _ieWorkingImage;
+        _ieFilterBase = _ieWorkingImage;
+        _ieOrigW = bmp.PixelWidth;
+        _ieOrigH = bmp.PixelHeight;
+
+        IePreviewImage.Source = _ieWorkingImage;
+        _ieZoom = 0;
+        IeApplyZoom();
+        IeUpdateInfo();
+
+        _ieSuppressResize = true;
+        _ieSuppressAdjust = true;
+        TxtIeCropW.Text = _ieOrigW.ToString();
+        TxtIeCropH.Text = _ieOrigH.ToString();
+        TxtIeCropX.Text = "0"; TxtIeCropY.Text = "0";
+        TxtIeResizeW.Text = _ieOrigW.ToString();
+        TxtIeResizeH.Text = _ieOrigH.ToString();
+        SldIeResizePct.Value = 100;
+        SldIeBrightness.Value = 0; SldIeContrast.Value = 0; SldIeSaturation.Value = 0;
+        SldIeExposure.Value = 0; SldIeHighlights.Value = 0; SldIeShadows.Value = 0; SldIeTemperature.Value = 0;
+        _ieSuppressResize = false;
+        _ieSuppressAdjust = false;
+
+        _ieCropRect = Rect.Empty;
+        IeClearCropVisuals();
+        IeUpdateCompressEstimate();
+        IeUpdateConvertEstimate();
+        SelectIeTool("crop");
+        // Delay crop init until layout is done
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+        {
+            IeApplyZoom();
+            if (_ieActiveTool == "crop") IeInitCropRect();
+        });
+    }
+
+    private static BitmapSource IeEnsureBgra32(BitmapSource src)
+    {
+        if (src.Format == PixelFormats.Bgra32) return src;
+        var converted = new FormatConvertedBitmap(src, PixelFormats.Bgra32, null, 0);
+        converted.Freeze();
+        return converted;
+    }
+
+    private void IeUpdateInfo()
+    {
+        if (_ieImagePath == null || _ieWorkingImage == null) return;
+        var info = new FileInfo(_ieImagePath);
+        TxtIeFileName.Text = System.IO.Path.GetFileName(_ieImagePath);
+        TxtIeFileInfo.Text = $"{_ieWorkingImage.PixelWidth} x {_ieWorkingImage.PixelHeight} \u2022 {FileToolsService.FormatFileSize(info.Length)}";
+        TxtIeCurrentSize.Text = $"{_ieWorkingImage.PixelWidth} x {_ieWorkingImage.PixelHeight}";
+    }
+
+    // ---- Tool selection ----
+    private void IeToolSelect_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string tool)
+            SelectIeTool(tool);
+    }
+
+    private void SelectIeTool(string tool)
+    {
+        _ieActiveTool = tool;
+        System.Windows.Controls.Button[] sidebarBtns =
+        {
+            BtnIeTool_crop, BtnIeTool_resize, BtnIeTool_rotateflip, BtnIeTool_adjust,
+            BtnIeTool_filters, BtnIeTool_watermark, BtnIeTool_compress, BtnIeTool_convert
+        };
+        foreach (var btn in sidebarBtns)
+        {
+            btn.Background = Brushes.Transparent;
+            btn.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#AAA"));
+        }
+        var activeBtn = tool switch
+        {
+            "crop" => BtnIeTool_crop, "resize" => BtnIeTool_resize,
+            "rotateflip" => BtnIeTool_rotateflip, "adjust" => BtnIeTool_adjust,
+            "filters" => BtnIeTool_filters, "watermark" => BtnIeTool_watermark,
+            "compress" => BtnIeTool_compress, "convert" => BtnIeTool_convert,
+            _ => BtnIeTool_crop
+        };
+        activeBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C4DFF"));
+        activeBtn.Foreground = Brushes.White;
+
+        IeSecCrop.Visibility = tool == "crop" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecResize.Visibility = tool == "resize" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecRotateFlip.Visibility = tool == "rotateflip" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecAdjust.Visibility = tool == "adjust" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecFilters.Visibility = tool == "filters" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecWatermark.Visibility = tool == "watermark" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecCompress.Visibility = tool == "compress" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecConvert.Visibility = tool == "convert" ? Visibility.Visible : Visibility.Collapsed;
+
+        if (tool != "crop") IeClearCropVisuals();
+        else if (_ieWorkingImage != null) IeInitCropRect();
+
+        if (tool == "adjust" && _ieWorkingImage != null)
+        {
+            _ieAdjustBase = _ieWorkingImage;
+            _ieSuppressAdjust = true;
+            SldIeBrightness.Value = 0; SldIeContrast.Value = 0; SldIeSaturation.Value = 0;
+            SldIeExposure.Value = 0; SldIeHighlights.Value = 0; SldIeShadows.Value = 0; SldIeTemperature.Value = 0;
+            _ieSuppressAdjust = false;
+        }
+        if (tool == "filters" && _ieWorkingImage != null) _ieFilterBase = _ieWorkingImage;
+        if (tool == "compress") IeUpdateCompressEstimate();
+        if (tool == "convert") IeUpdateConvertEstimate();
+        if (tool == "resize" && _ieWorkingImage != null)
+        {
+            _ieSuppressResize = true;
+            TxtIeResizeW.Text = _ieWorkingImage.PixelWidth.ToString();
+            TxtIeResizeH.Text = _ieWorkingImage.PixelHeight.ToString();
+            SldIeResizePct.Value = 100;
+            _ieSuppressResize = false;
+        }
+    }
+
+    // ---- Keyboard shortcuts ----
+    public void IeHandleKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        if (_ieImagePath == null) return;
+        bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (ctrl && !shift && e.Key == Key.Z) { IeUndo(); e.Handled = true; }
+        else if (ctrl && shift && e.Key == Key.Z) { IeRedo(); e.Handled = true; }
+        else if (ctrl && e.Key == Key.Y) { IeRedo(); e.Handled = true; }
+        else if (ctrl && e.Key == Key.S) { IeSave_Click(this, new RoutedEventArgs()); e.Handled = true; }
+    }
+
+    // ---- Zoom ----
+    private void IeApplyZoom()
+    {
+        if (_ieWorkingImage == null) return;
+        double iw = _ieWorkingImage.PixelWidth, ih = _ieWorkingImage.PixelHeight;
+
+        if (_ieZoom <= 0)
+        {
+            // Fit: scale to fit viewport
+            double vw = IeScrollViewer.ActualWidth - 40;
+            double vh = IeScrollViewer.ActualHeight - 40;
+            if (vw <= 0 || vh <= 0) _ieZoom = 100;
+            else
+            {
+                double fitScale = Math.Min(vw / iw, vh / ih);
+                _ieZoom = Math.Max(5, (int)(fitScale * 100));
+            }
+        }
+
+        double scale = _ieZoom / 100.0;
+        // Set image to natural pixel size, use LayoutTransform for zoom
+        IePreviewImage.Width = iw;
+        IePreviewImage.Height = ih;
+        IeCanvas.Width = iw;
+        IeCanvas.Height = ih;
+        IeZoomTransform.ScaleX = scale;
+        IeZoomTransform.ScaleY = scale;
+
+        TxtIeZoom.Text = $"{(int)_ieZoom}%";
+    }
+
+    private void IeZoom_Out(object sender, RoutedEventArgs e)
+    {
+        if (_ieZoom <= 0) IeApplyZoom(); // resolve fit
+        _ieZoom = Math.Max(5, _ieZoom - 5);
+        IeApplyZoom();
+        if (_ieActiveTool == "crop") IeInitCropRect();
+    }
+    private void IeZoom_In(object sender, RoutedEventArgs e)
+    {
+        if (_ieZoom <= 0) IeApplyZoom(); // resolve fit
+        _ieZoom = Math.Min(400, _ieZoom + 5);
+        IeApplyZoom();
+        if (_ieActiveTool == "crop") IeInitCropRect();
+    }
+    private void IeZoom_Fit(object sender, RoutedEventArgs e)
+    {
+        _ieZoom = 0;
+        IeApplyZoom();
+        if (_ieActiveTool == "crop") IeInitCropRect();
+    }
+
+    // ---- Interactive Crop ----
+    private void IeInitCropRect()
+    {
+        if (_ieWorkingImage == null) return;
+        // Canvas is at natural pixel size (zoom via LayoutTransform) — crop coords are pixel coords
+        double dw = _ieWorkingImage.PixelWidth, dh = _ieWorkingImage.PixelHeight;
+        _ieCropRect = new Rect(0, 0, dw, dh);
+        IeUpdateCropVisuals();
+    }
+
+    private void IeClearCropVisuals()
+    {
+        var toRemove = IeCanvas.Children.OfType<System.Windows.Shapes.Shape>()
+            .Concat<UIElement>(IeCanvas.Children.OfType<Border>().Where(b => b.Tag is string s && s == "ieCH"))
+            .ToList();
+        foreach (var el in toRemove) IeCanvas.Children.Remove(el);
+        _ieCropSelection = null;
+    }
+
+    private void IeUpdateCropVisuals()
+    {
+        IeClearCropVisuals();
+        if (_ieCropRect.IsEmpty || _ieWorkingImage == null) return;
+
+        _ieCropSelection = new Rectangle
+        {
+            Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C4DFF")),
+            StrokeThickness = 2, StrokeDashArray = new DoubleCollection { 4, 3 },
+            Fill = Brushes.Transparent, IsHitTestVisible = false
+        };
+        Canvas.SetLeft(_ieCropSelection, _ieCropRect.X);
+        Canvas.SetTop(_ieCropSelection, _ieCropRect.Y);
+        _ieCropSelection.Width = Math.Max(1, _ieCropRect.Width);
+        _ieCropSelection.Height = Math.Max(1, _ieCropRect.Height);
+        IeCanvas.Children.Add(_ieCropSelection);
+
+        var pts = new (double x, double y)[]
+        {
+            (_ieCropRect.Left, _ieCropRect.Top), (_ieCropRect.Right, _ieCropRect.Top),
+            (_ieCropRect.Left, _ieCropRect.Bottom), (_ieCropRect.Right, _ieCropRect.Bottom),
+            ((_ieCropRect.Left+_ieCropRect.Right)/2, _ieCropRect.Top),
+            ((_ieCropRect.Left+_ieCropRect.Right)/2, _ieCropRect.Bottom),
+            (_ieCropRect.Left, (_ieCropRect.Top+_ieCropRect.Bottom)/2),
+            (_ieCropRect.Right, (_ieCropRect.Top+_ieCropRect.Bottom)/2),
+        };
+        foreach (var (hx, hy) in pts)
+        {
+            var h = new Border
+            {
+                Width = 10, Height = 10, CornerRadius = new CornerRadius(2),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C4DFF")),
+                BorderBrush = Brushes.White, BorderThickness = new Thickness(1),
+                Tag = "ieCH", IsHitTestVisible = false
+            };
+            Canvas.SetLeft(h, hx - 5); Canvas.SetTop(h, hy - 5);
+            IeCanvas.Children.Add(h);
+        }
+
+        // Coords are pixel values directly (LayoutTransform handles visual zoom)
+        TxtIeCropX.Text = ((int)_ieCropRect.X).ToString();
+        TxtIeCropY.Text = ((int)_ieCropRect.Y).ToString();
+        TxtIeCropW.Text = ((int)_ieCropRect.Width).ToString();
+        TxtIeCropH.Text = ((int)_ieCropRect.Height).ToString();
+    }
+
+    private IeCropHandle IeHitTestCropHandle(Point pt)
+    {
+        if (_ieCropRect.IsEmpty) return IeCropHandle.None;
+        double tol = 8; var r = _ieCropRect;
+        double mx = (r.Left+r.Right)/2, my = (r.Top+r.Bottom)/2;
+        if (Math.Abs(pt.X-r.Left)<tol && Math.Abs(pt.Y-r.Top)<tol) return IeCropHandle.TL;
+        if (Math.Abs(pt.X-r.Right)<tol && Math.Abs(pt.Y-r.Top)<tol) return IeCropHandle.TR;
+        if (Math.Abs(pt.X-r.Left)<tol && Math.Abs(pt.Y-r.Bottom)<tol) return IeCropHandle.BL;
+        if (Math.Abs(pt.X-r.Right)<tol && Math.Abs(pt.Y-r.Bottom)<tol) return IeCropHandle.BR;
+        if (Math.Abs(pt.X-mx)<tol && Math.Abs(pt.Y-r.Top)<tol) return IeCropHandle.T;
+        if (Math.Abs(pt.X-mx)<tol && Math.Abs(pt.Y-r.Bottom)<tol) return IeCropHandle.B;
+        if (Math.Abs(pt.X-r.Left)<tol && Math.Abs(pt.Y-my)<tol) return IeCropHandle.L;
+        if (Math.Abs(pt.X-r.Right)<tol && Math.Abs(pt.Y-my)<tol) return IeCropHandle.R;
+        if (r.Contains(pt)) return IeCropHandle.Move;
+        return IeCropHandle.None;
+    }
+
+    private void IeCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_ieActiveTool != "crop" || _ieWorkingImage == null) return;
+        var pt = e.GetPosition(IeCanvas);
+        _ieCropHandle = IeHitTestCropHandle(pt);
+        if (_ieCropHandle == IeCropHandle.None)
+        {
+            _ieCropRect = new Rect(pt, new Size(0, 0));
+            _ieCropHandle = IeCropHandle.BR;
+        }
+        _ieCropStart = pt; _ieCropRectOnDown = _ieCropRect;
+        _ieCropDragging = true;
+        IeCanvas.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void IeCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_ieCropDragging || _ieActiveTool != "crop") return;
+        var pt = e.GetPosition(IeCanvas);
+        double dx = pt.X - _ieCropStart.X, dy = pt.Y - _ieCropStart.Y;
+        var r = _ieCropRectOnDown;
+        switch (_ieCropHandle)
+        {
+            case IeCropHandle.Move: _ieCropRect = new Rect(r.X+dx, r.Y+dy, r.Width, r.Height); break;
+            case IeCropHandle.BR: _ieCropRect = new Rect(r.X, r.Y, Math.Max(10,r.Width+dx), Math.Max(10,r.Height+dy)); break;
+            case IeCropHandle.BL: _ieCropRect = new Rect(r.X+dx, r.Y, Math.Max(10,r.Width-dx), Math.Max(10,r.Height+dy)); break;
+            case IeCropHandle.TR: _ieCropRect = new Rect(r.X, r.Y+dy, Math.Max(10,r.Width+dx), Math.Max(10,r.Height-dy)); break;
+            case IeCropHandle.TL: _ieCropRect = new Rect(r.X+dx, r.Y+dy, Math.Max(10,r.Width-dx), Math.Max(10,r.Height-dy)); break;
+            case IeCropHandle.T: _ieCropRect = new Rect(r.X, r.Y+dy, r.Width, Math.Max(10,r.Height-dy)); break;
+            case IeCropHandle.B: _ieCropRect = new Rect(r.X, r.Y, r.Width, Math.Max(10,r.Height+dy)); break;
+            case IeCropHandle.L: _ieCropRect = new Rect(r.X+dx, r.Y, Math.Max(10,r.Width-dx), r.Height); break;
+            case IeCropHandle.R: _ieCropRect = new Rect(r.X, r.Y, Math.Max(10,r.Width+dx), r.Height); break;
+        }
+        // Clamp crop rect to image pixel bounds
+        double imgW = _ieWorkingImage?.PixelWidth ?? 100;
+        double imgH = _ieWorkingImage?.PixelHeight ?? 100;
+        double cx = Math.Max(0, _ieCropRect.X), cy = Math.Max(0, _ieCropRect.Y);
+        double cr = Math.Min(imgW, _ieCropRect.Right), cb = Math.Min(imgH, _ieCropRect.Bottom);
+        if (cr - cx > 5 && cb - cy > 5) _ieCropRect = new Rect(cx, cy, cr - cx, cb - cy);
+        IeUpdateCropVisuals();
+    }
+
+    private void IeCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        _ieCropDragging = false; _ieCropHandle = IeCropHandle.None;
+        IeCanvas.ReleaseMouseCapture();
+    }
+
+    private void IeCropRatio_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_ieWorkingImage == null || CmbIeCropRatio.SelectedIndex <= 0) return;
+        double ratio = CmbIeCropRatio.SelectedIndex switch { 1=>1.0, 2=>4.0/3, 3=>16.0/9, 4=>3.0/2, _=>0 };
+        if (ratio <= 0) return;
+        double iw = _ieWorkingImage.PixelWidth, ih = _ieWorkingImage.PixelHeight;
+        double cw = iw, ch = cw / ratio;
+        if (ch > ih) { ch = ih; cw = ch * ratio; }
+        _ieCropRect = new Rect((iw-cw)/2, (ih-ch)/2, cw, ch);
+        IeUpdateCropVisuals();
+    }
+
+    private void IeCrop_Apply(object sender, RoutedEventArgs e)
+    {
+        if (_ieWorkingImage == null) return;
+        // Crop rect is in pixel coords directly
+        int cx = Math.Max(0, (int)_ieCropRect.X);
+        int cy = Math.Max(0, (int)_ieCropRect.Y);
+        int cw = (int)_ieCropRect.Width; int ch = (int)_ieCropRect.Height;
+        if (cx+cw > _ieWorkingImage.PixelWidth) cw = _ieWorkingImage.PixelWidth-cx;
+        if (cy+ch > _ieWorkingImage.PixelHeight) ch = _ieWorkingImage.PixelHeight-cy;
+        if (cw <= 0 || ch <= 0) return;
+
+        IePushUndo();
+        var cropped = new CroppedBitmap(_ieWorkingImage, new Int32Rect(cx, cy, cw, ch));
+        cropped.Freeze();
+        _ieWorkingImage = IeEnsureBgra32(cropped);
+        _ieAdjustBase = _ieWorkingImage;
+        IePreviewImage.Source = _ieWorkingImage;
+        _ieZoom = 0; IeApplyZoom();
+        _ieCropRect = Rect.Empty; IeClearCropVisuals(); IeInitCropRect();
+        IeUpdateInfo();
+    }
+
+    // ---- Resize ----
+    private void IeResizeW_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (_ieSuppressResize || _ieWorkingImage == null || ChkIeResizeLock?.IsChecked != true) return;
+        if (!int.TryParse(TxtIeResizeW.Text, out int w) || w <= 0) return;
+        double ratio = (double)_ieWorkingImage.PixelHeight / _ieWorkingImage.PixelWidth;
+        _ieSuppressResize = true;
+        TxtIeResizeH.Text = ((int)(w * ratio)).ToString();
+        _ieSuppressResize = false;
+    }
+    private void IeResizeH_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (_ieSuppressResize || _ieWorkingImage == null || ChkIeResizeLock?.IsChecked != true) return;
+        if (!int.TryParse(TxtIeResizeH.Text, out int h) || h <= 0) return;
+        double ratio = (double)_ieWorkingImage.PixelWidth / _ieWorkingImage.PixelHeight;
+        _ieSuppressResize = true;
+        TxtIeResizeW.Text = ((int)(h * ratio)).ToString();
+        _ieSuppressResize = false;
+    }
+    private void IeResizePct_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_ieSuppressResize || _ieWorkingImage == null || SldIeResizePct == null) return;
+        double pct = SldIeResizePct.Value / 100.0;
+        _ieSuppressResize = true;
+        TxtIeResizeW.Text = ((int)(_ieWorkingImage.PixelWidth * pct)).ToString();
+        TxtIeResizeH.Text = ((int)(_ieWorkingImage.PixelHeight * pct)).ToString();
+        if (TxtIeResizePct != null) TxtIeResizePct.Text = $"{(int)SldIeResizePct.Value}%";
+        _ieSuppressResize = false;
+    }
+    private void IeResize_Apply(object sender, RoutedEventArgs e)
+    {
+        if (_ieWorkingImage == null) return;
+        if (!int.TryParse(TxtIeResizeW.Text, out int tw) || !int.TryParse(TxtIeResizeH.Text, out int th) || tw<=0 || th<=0) return;
+        IePushUndo();
+        var scaled = new TransformedBitmap(_ieWorkingImage, new ScaleTransform((double)tw/_ieWorkingImage.PixelWidth, (double)th/_ieWorkingImage.PixelHeight));
+        scaled.Freeze();
+        _ieWorkingImage = IeEnsureBgra32(scaled);
+        _ieAdjustBase = _ieWorkingImage;
+        IePreviewImage.Source = _ieWorkingImage;
+        _ieZoom = 0; IeApplyZoom(); IeUpdateInfo();
+    }
+
+    // ---- Rotate & Flip ----
+    private void IeRotate_Left(object sender, RoutedEventArgs e) { _ieRotation = (_ieRotation+270)%360; IeRotateTransform.Angle = _ieRotation; }
+    private void IeRotate_Right(object sender, RoutedEventArgs e) { _ieRotation = (_ieRotation+90)%360; IeRotateTransform.Angle = _ieRotation; }
+    private void IeFlip_H(object sender, RoutedEventArgs e) { _ieFlipH = !_ieFlipH; IeFlipTransform.ScaleX = _ieFlipH ? -1 : 1; }
+    private void IeFlip_V(object sender, RoutedEventArgs e) { _ieFlipV = !_ieFlipV; IeFlipTransform.ScaleY = _ieFlipV ? -1 : 1; }
+
+    // ---- Adjust (live preview) ----
+    private DispatcherTimer? _ieAdjustDebounce;
+
+    private void IeAdjust_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_ieSuppressAdjust) return;
+        if (TxtIeBrightVal != null) TxtIeBrightVal.Text = ((int)SldIeBrightness.Value).ToString();
+        if (TxtIeContrastVal != null) TxtIeContrastVal.Text = ((int)SldIeContrast.Value).ToString();
+        if (TxtIeSatVal != null) TxtIeSatVal.Text = ((int)SldIeSaturation.Value).ToString();
+        if (TxtIeExposureVal != null) TxtIeExposureVal.Text = ((int)SldIeExposure.Value).ToString();
+        if (TxtIeHighlightsVal != null) TxtIeHighlightsVal.Text = ((int)SldIeHighlights.Value).ToString();
+        if (TxtIeShadowsVal != null) TxtIeShadowsVal.Text = ((int)SldIeShadows.Value).ToString();
+        if (TxtIeTempVal != null) TxtIeTempVal.Text = ((int)SldIeTemperature.Value).ToString();
+
+        // Debounce live preview
+        _ieAdjustDebounce?.Stop();
+        _ieAdjustDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _ieAdjustDebounce.Tick += (s, _) => { _ieAdjustDebounce.Stop(); IeApplyAdjustPreview(); };
+        _ieAdjustDebounce.Start();
+    }
+
+    private async void IeApplyAdjustPreview()
+    {
+        if (_ieAdjustBase == null) return;
+        var src = IeEnsureBgra32(_ieAdjustBase);
+        int w = src.PixelWidth, h = src.PixelHeight, stride = w * 4;
+        byte[] px = new byte[h * stride];
+        src.CopyPixels(px, stride, 0);
+
+        double bright = SldIeBrightness.Value / 100.0;
+        double contrast = SldIeContrast.Value / 100.0;
+        double sat = SldIeSaturation.Value / 100.0;
+        double exposure = SldIeExposure.Value / 100.0;
+        double highlights = SldIeHighlights.Value / 100.0;
+        double shadows = SldIeShadows.Value / 100.0;
+        double temp = SldIeTemperature.Value / 100.0;
+
+        await Task.Run(() =>
+        {
+            double cF = (1 + contrast); cF *= cF;
+            double expMul = Math.Pow(2, exposure);
+
+            for (int i = 0; i < px.Length; i += 4)
+            {
+                double b = px[i]/255.0, g = px[i+1]/255.0, r = px[i+2]/255.0;
+                r *= expMul; g *= expMul; b *= expMul;
+                r += bright; g += bright; b += bright;
+                r = ((r-0.5)*cF)+0.5; g = ((g-0.5)*cF)+0.5; b = ((b-0.5)*cF)+0.5;
+                double lum = 0.2126*r + 0.7152*g + 0.0722*b;
+                if (lum > 0.5) { double f = highlights * (lum-0.5)*2; r+=f; g+=f; b+=f; }
+                else { double f = shadows * (0.5-lum)*2; r+=f; g+=f; b+=f; }
+                double gray = 0.2126*r + 0.7152*g + 0.0722*b;
+                r = gray + (r-gray)*(1+sat); g = gray + (g-gray)*(1+sat); b = gray + (b-gray)*(1+sat);
+                r += temp * 0.15; b -= temp * 0.15;
+                px[i] = (byte)Math.Clamp((int)(b*255), 0, 255);
+                px[i+1] = (byte)Math.Clamp((int)(g*255), 0, 255);
+                px[i+2] = (byte)Math.Clamp((int)(r*255), 0, 255);
+            }
+        });
+
+        var wb = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+        wb.WritePixels(new Int32Rect(0, 0, w, h), px, stride, 0);
+        wb.Freeze();
+        IePreviewImage.Source = wb;
+    }
+
+    private void IeAdjust_Apply(object sender, RoutedEventArgs e)
+    {
+        if (_ieAdjustBase == null) return;
+        IeApplyAdjustPreview(); // ensure latest
+        IePushUndo();
+        _ieWorkingImage = IePreviewImage.Source as BitmapSource ?? _ieWorkingImage;
+        _ieAdjustBase = _ieWorkingImage;
+        _ieSuppressAdjust = true;
+        SldIeBrightness.Value = 0; SldIeContrast.Value = 0; SldIeSaturation.Value = 0;
+        SldIeExposure.Value = 0; SldIeHighlights.Value = 0; SldIeShadows.Value = 0; SldIeTemperature.Value = 0;
+        _ieSuppressAdjust = false;
+        IeUpdateInfo();
+    }
+
+    // ---- Filters ----
+    private async void IeFilter_Click(object sender, RoutedEventArgs e)
+    {
+        if (_ieWorkingImage == null || sender is not System.Windows.Controls.Button btn || btn.Tag is not string filter) return;
+        // Apply filter on the pre-filter base so filters don't stack
+        var src = IeEnsureBgra32(_ieFilterBase ?? _ieWorkingImage);
+        int w = src.PixelWidth, h = src.PixelHeight, stride = w * 4;
+        byte[] px = new byte[h * stride];
+        src.CopyPixels(px, stride, 0);
+
+        await Task.Run(() => { for (int i = 0; i < px.Length; i += 4)
+        {
+            double b = px[i], g = px[i+1], r = px[i+2];
+            switch (filter)
+            {
+                case "grayscale":
+                    double gray = 0.2126*r + 0.7152*g + 0.0722*b;
+                    r = g = b = gray; break;
+                case "sepia":
+                    double sr = r*0.393+g*0.769+b*0.189;
+                    double sg = r*0.349+g*0.686+b*0.168;
+                    double sb = r*0.272+g*0.534+b*0.131;
+                    r=sr; g=sg; b=sb; break;
+                case "invert": r=255-r; g=255-g; b=255-b; break;
+                case "warm": r=Math.Min(255,r+20); g=Math.Min(255,g+10); b=Math.Max(0,b-15); break;
+                case "cool": r=Math.Max(0,r-15); g=Math.Min(255,g+5); b=Math.Min(255,b+20); break;
+                case "vintage":
+                    r=r*0.5+g*0.35+b*0.15+30; g=r*0.2+g*0.55+b*0.15+15; b=r*0.1+g*0.2+b*0.4+10; break;
+                case "hdr":
+                    double l2 = (r+g+b)/3/255.0;
+                    double boost = l2 < 0.5 ? 1.3 : 0.85;
+                    r*=boost; g*=boost; b*=boost; break;
+                case "bw_high_contrast":
+                    double g2 = 0.2126*r+0.7152*g+0.0722*b;
+                    g2 = ((g2/255.0-0.5)*2.5+0.5)*255;
+                    r=g=b=g2; break;
+            }
+            px[i]=(byte)Math.Clamp((int)b,0,255);
+            px[i+1]=(byte)Math.Clamp((int)g,0,255);
+            px[i+2]=(byte)Math.Clamp((int)r,0,255);
+        } });
+
+        IePushUndo();
+        var wb = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+        wb.WritePixels(new Int32Rect(0, 0, w, h), px, stride, 0);
+        wb.Freeze();
+        _ieWorkingImage = wb;
+        _ieAdjustBase = wb;
+        IePreviewImage.Source = wb;
+        IeUpdateInfo();
+    }
+
+    // ---- Watermark ----
+    private void IeWatermark_Apply(object sender, RoutedEventArgs e)
+    {
+        if (_ieWorkingImage == null) return;
+        string text = TxtIeWatermarkText.Text;
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        IePushUndo();
+        double fontSize = SldIeWmFontSize.Value;
+        double opacity = SldIeWmOpacity.Value / 100.0;
+        int pos = CmbIeWmPosition.SelectedIndex;
+        var wmColor = (CmbIeWmColor.SelectedIndex) switch
+        {
+            1 => System.Windows.Media.Color.FromArgb((byte)(opacity*255), 0, 0, 0),
+            2 => System.Windows.Media.Color.FromArgb((byte)(opacity*255), 255, 0, 0),
+            3 => System.Windows.Media.Color.FromArgb((byte)(opacity*255), 255, 255, 0),
+            _ => System.Windows.Media.Color.FromArgb((byte)(opacity*255), 255, 255, 255),
+        };
+
+        int w = _ieWorkingImage.PixelWidth, h = _ieWorkingImage.PixelHeight;
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawImage(_ieWorkingImage, new Rect(0, 0, w, h));
+            var tf = new Typeface(new System.Windows.Media.FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+            var ft = new FormattedText(text, System.Globalization.CultureInfo.InvariantCulture,
+                System.Windows.FlowDirection.LeftToRight, tf, fontSize, new SolidColorBrush(wmColor),
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            double tx = pos switch { 0 or 3 or 6 => 20, 1 or 4 or 7 => (w-ft.Width)/2, _ => w-ft.Width-20 };
+            double ty = pos switch { 0 or 1 or 2 => 20, 3 or 4 or 5 => (h-ft.Height)/2, _ => h-ft.Height-20 };
+            dc.DrawText(ft, new Point(tx, ty));
+        }
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(dv); rtb.Freeze();
+        _ieWorkingImage = IeEnsureBgra32(rtb);
+        _ieAdjustBase = _ieWorkingImage;
+        IePreviewImage.Source = _ieWorkingImage;
+        IeUpdateInfo();
+    }
+
+    // ---- Compress ----
+    private void IeCompress_QualityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (TxtIeCompressQuality != null) TxtIeCompressQuality.Text = $"{(int)SldIeCompressQuality.Value}%";
+        IeUpdateCompressEstimate();
+    }
+
+    private void IeUpdateCompressEstimate()
+    {
+        if (_ieWorkingImage == null || TxtIeCompressOrigSize == null) return;
+        long origSize = _ieImagePath != null && File.Exists(_ieImagePath) ? new FileInfo(_ieImagePath).Length : 0;
+        TxtIeCompressOrigSize.Text = FileToolsService.FormatFileSize(origSize);
+        try
+        {
+            int quality = (int)SldIeCompressQuality.Value;
+            using var ms = new MemoryStream();
+            var enc = new JpegBitmapEncoder { QualityLevel = quality };
+            enc.Frames.Add(BitmapFrame.Create(_ieWorkingImage));
+            enc.Save(ms);
+            TxtIeCompressEstSize.Text = FileToolsService.FormatFileSize(ms.Length);
+        }
+        catch { TxtIeCompressEstSize.Text = "N/A"; }
+    }
+
+    private void IeCompress_Apply(object sender, RoutedEventArgs e)
+    {
+        if (_ieWorkingImage == null) return;
+        IePushUndo();
+        int quality = (int)SldIeCompressQuality.Value;
+        using var ms = new MemoryStream();
+        var enc = new JpegBitmapEncoder { QualityLevel = quality };
+        enc.Frames.Add(BitmapFrame.Create(_ieWorkingImage));
+        enc.Save(ms); ms.Position = 0;
+        var bmp = new BitmapImage();
+        bmp.BeginInit(); bmp.StreamSource = ms; bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
+        _ieWorkingImage = IeEnsureBgra32(bmp);
+        _ieAdjustBase = _ieWorkingImage;
+        IePreviewImage.Source = _ieWorkingImage;
+        IeUpdateInfo(); IeUpdateCompressEstimate();
+    }
+
+    // ---- Convert ----
+    private void IeConvertFormat_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => IeUpdateConvertEstimate();
+
+    private void IeUpdateConvertEstimate()
+    {
+        if (_ieWorkingImage == null || TxtIeConvertEstSize == null) return;
+        try
+        {
+            int fmt = CmbIeConvertFormat?.SelectedIndex ?? 0;
+            int quality = (int)(SldIeConvertQuality?.Value ?? 90);
+            using var ms = new MemoryStream();
+            BitmapEncoder enc = fmt switch
+            {
+                1 => new JpegBitmapEncoder { QualityLevel = quality },
+                2 => new BmpBitmapEncoder(),
+                3 => new TiffBitmapEncoder(),
+                4 => new GifBitmapEncoder(),
+                _ => new PngBitmapEncoder()
+            };
+            enc.Frames.Add(BitmapFrame.Create(_ieWorkingImage));
+            enc.Save(ms);
+            TxtIeConvertEstSize.Text = $"Estimated: {FileToolsService.FormatFileSize(ms.Length)}";
+        }
+        catch { TxtIeConvertEstSize.Text = ""; }
+    }
+
+    private void IeConvert_Save(object sender, RoutedEventArgs e) => IeSave_Click(sender, e);
+
+    // ---- Compare ----
+    private BitmapSource? _iePreCompareSource;
+    private void IeCompare_Down(object sender, MouseButtonEventArgs e)
+    {
+        if (_ieOriginalImage == null) return;
+        _iePreCompareSource = IePreviewImage.Source as BitmapSource;
+        IePreviewImage.Source = _ieOriginalImage;
+        IeRotateTransform.Angle = 0; IeFlipTransform.ScaleX = 1; IeFlipTransform.ScaleY = 1;
+    }
+    private void IeCompare_Up(object sender, MouseButtonEventArgs e)
+    {
+        if (_iePreCompareSource != null)
+        {
+            IePreviewImage.Source = _iePreCompareSource;
+            IeRotateTransform.Angle = _ieRotation;
+            IeFlipTransform.ScaleX = _ieFlipH ? -1 : 1; IeFlipTransform.ScaleY = _ieFlipV ? -1 : 1;
+            _iePreCompareSource = null;
+        }
+    }
+
+    // ---- Reset ----
+    private void IeReset_Click(object sender, RoutedEventArgs e)
+    {
+        if (_ieImagePath == null) return;
+        IeLoadImage(_ieImagePath);
+    }
+
+    private void IeShowOriginal_Click(object sender, RoutedEventArgs e)
+    {
+        if (_ieOriginalImage == null) return;
+        IePushUndo();
+        _ieWorkingImage = IeEnsureBgra32(_ieOriginalImage);
+        _ieAdjustBase = _ieWorkingImage;
+        IePreviewImage.Source = _ieWorkingImage;
+        _ieRotation = 0; _ieFlipH = false; _ieFlipV = false;
+        IeRotateTransform.Angle = 0; IeFlipTransform.ScaleX = 1; IeFlipTransform.ScaleY = 1;
+        _ieZoom = 0; IeApplyZoom(); IeUpdateInfo();
+    }
+
+    // ---- Save ----
+    private void IeSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_ieWorkingImage == null) return;
+        string ext = CmbIeConvertFormat?.SelectedIndex switch { 1=>".jpg", 2=>".bmp", 3=>".tiff", 4=>".gif", _=>".png" };
+        string defaultName = _ieImagePath != null ? System.IO.Path.GetFileNameWithoutExtension(_ieImagePath)+ext : "image"+ext;
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "PNG|*.png|JPEG|*.jpg;*.jpeg|BMP|*.bmp|TIFF|*.tiff|GIF|*.gif|All|*.*",
+            FileName = defaultName
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        ShowProcessing("Saving image...");
+        try
+        {
+            // Apply any pending adjust preview to working image
+            var working = (IePreviewImage.Source as BitmapSource) ?? _ieWorkingImage;
+            int quality = (int)SldIeCompressQuality.Value;
+            double rot = _ieRotation; bool fh = _ieFlipH, fv = _ieFlipV;
+
+            var thread = new System.Threading.Thread(() =>
+            {
+                BitmapSource final2 = working;
+                if (rot != 0) { final2 = new TransformedBitmap(final2, new RotateTransform(rot)); final2.Freeze(); }
+                if (fh || fv) { final2 = new TransformedBitmap(final2, new ScaleTransform(fh?-1:1, fv?-1:1)); final2.Freeze(); }
+                string outExt = System.IO.Path.GetExtension(dlg.FileName).ToLowerInvariant();
+                BitmapEncoder encoder = outExt switch
+                {
+                    ".jpg" or ".jpeg" => new JpegBitmapEncoder { QualityLevel = quality },
+                    ".bmp" => new BmpBitmapEncoder(),
+                    ".tiff" or ".tif" => new TiffBitmapEncoder(),
+                    ".gif" => new GifBitmapEncoder(),
+                    _ => new PngBitmapEncoder()
+                };
+                encoder.Frames.Add(BitmapFrame.Create(final2));
+                using var fs = new FileStream(dlg.FileName, FileMode.Create);
+                encoder.Save(fs);
+            });
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.Start(); thread.Join();
+            var info = new FileInfo(dlg.FileName);
+            ShowComplete("Image saved!", $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}", dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            FadeOut(ProcessingOverlay);
+            MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static BitmapImage BitmapSourceToBitmapImage(BitmapSource src)
+    {
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(src));
+        using var ms = new MemoryStream();
+        enc.Save(ms); ms.Position = 0;
+        var bmp = new BitmapImage();
+        bmp.BeginInit(); bmp.StreamSource = ms; bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
+        return bmp;
+    }
+
 
     // =====================================================================
     //  16. Compress Office
@@ -5164,6 +6068,11 @@ public partial class FileToolsWindow : Window
         foreach (var v in _ytVideos) v.IsSelected = true;
     }
 
+    private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (_currentToolId == "image_editor") IeHandleKeyDown(e);
+    }
+
     private void Yt_DeselectAll(object sender, RoutedEventArgs e)
     {
         foreach (var v in _ytVideos) v.IsSelected = false;
@@ -5233,16 +6142,6 @@ public class AudioTrimItem
 // =========================================================================
 //  PDF Editor data classes
 // =========================================================================
-
-public class PdfEditorFileEntry
-{
-    public string FilePath { get; set; } = "";
-    public string FileName { get; set; } = "";
-    public int PageCount { get; set; }
-    public long FileSize { get; set; }
-    public List<PdfEditorPageEntry> Pages { get; set; } = new();
-    public Border? GroupBorder { get; set; }
-}
 
 public class PdfEditorPageEntry
 {
