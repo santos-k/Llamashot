@@ -51,6 +51,9 @@ internal static class Program
         try { Test_ExportImage(); }
         catch (Exception e) { Check("Export embeds signature image", false, e.ToString()); }
 
+        try { Test_Fallback(); }
+        catch (Exception e) { Check("Rasterized fallback produces valid PDF", false, e.ToString()); }
+
         Sb.AppendLine($"\n=== {Pass} passed, {Fail} failed ===");
         File.WriteAllText(Path.Combine(Dir, "results.txt"), Sb.ToString());
         return Fail == 0 ? 0 : 1;
@@ -156,6 +159,20 @@ internal static class Program
         Llamashot.Core.FillSignExporter.Export(src, els, outPath);
         using var d = PdfSharp.Pdf.IO.PdfReader.Open(outPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
         Check("Export embeds signature image", System.IO.File.Exists(outPath) && d.Pages.Count >= 1, $"pages={d.Pages.Count} size={new System.IO.FileInfo(outPath).Length}b");
+    }
+
+    // Task 9: Rasterized fallback
+    static void Test_Fallback()
+    {
+        string src = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fixtures", "137.pdf"));
+        string outPath = System.IO.Path.Combine(Dir, "export_raster.pdf");
+        var els = new System.Collections.Generic.List<Llamashot.Models.FillElement>
+        {
+            new() { Page=1, Type=Llamashot.Models.FillElementType.Text, X=120, Y=110, Width=200, Height=16, Text="RASTER-FILL", FontSize=12, ColorHex="#000000", FontFamily="Arial" }
+        };
+        Llamashot.Core.FillSignExporter.ExportRasterized(src, els, 150, outPath).GetAwaiter().GetResult();
+        int pc = Llamashot.Core.FileToolsService.GetPdfPageCountAsync(outPath).GetAwaiter().GetResult();
+        Check("Rasterized fallback produces valid PDF", System.IO.File.Exists(outPath) && pc >= 2, $"pages={pc}");
     }
 
     // Task 6: Region classification

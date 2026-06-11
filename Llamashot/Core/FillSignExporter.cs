@@ -83,10 +83,62 @@ public static class FillSignExporter
         gfx.DrawString(text, font, brush, rect, XStringFormats.CenterLeft);
     }
 
-    /// <summary>Public entry — vector path with automatic rasterized fallback (fallback added in Task 9).</summary>
+    public static async System.Threading.Tasks.Task ExportRasterized(string srcPdf, List<FillElement> elements, int dpi, string outPath)
+    {
+        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(srcPdf);
+        var pdf = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+        int pages = (int)pdf.PageCount;
+
+        string tempDir = Path.Combine(Path.GetTempPath(), "fillsign_raster_" + System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        var imgs = new List<string>();
+        try
+        {
+            for (int i = 0; i < pages; i++)
+            {
+                using var bmp = await FillSignRender.RenderPageToBitmapAsync(srcPdf, i, dpi);
+                using (var g = System.Drawing.Graphics.FromImage(bmp))
+                {
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    foreach (var e in elements)
+                    {
+                        if (e.Page != i) continue;
+                        var (px, py, pw, ph) = FillSignGeometry.PointRectToPixelRect(e.X, e.Y, e.Width, e.Height, dpi);
+                        if (e.Type is FillElementType.Signature or FillElementType.Stamp)
+                        {
+                            if (e.ImagePath != null && File.Exists(e.ImagePath))
+                                using (var im = System.Drawing.Image.FromFile(e.ImagePath))
+                                    g.DrawImage(im, (float)px, (float)py, (float)pw, (float)ph);
+                        }
+                        else
+                        {
+                            var col = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(e.ColorHex);
+                            using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(col.A, col.R, col.G, col.B));
+                            var style = (e.Bold ? System.Drawing.FontStyle.Bold : 0) | (e.Italic ? System.Drawing.FontStyle.Italic : 0);
+                            float emPx = (float)FillSignGeometry.PointsToPixels(e.FontSize, dpi);
+                            using var font = new System.Drawing.Font(e.FontFamily, emPx, style, System.Drawing.GraphicsUnit.Pixel);
+                            string text = e.Type == FillElementType.Check && string.IsNullOrEmpty(e.Text) ? "X" : e.Text;
+                            g.DrawString(text, font, brush, (float)px, (float)py);
+                        }
+                    }
+                }
+                string f = Path.Combine(tempDir, $"page_{i:D3}.png");
+                bmp.Save(f, System.Drawing.Imaging.ImageFormat.Png);
+                imgs.Add(f);
+            }
+            await FileToolsService.ImagesToPdfAsync(imgs.ToArray(), outPath);
+        }
+        finally { try { Directory.Delete(tempDir, true); } catch { } }
+    }
+
+    /// <summary>Public entry — vector path with automatic rasterized fallback.</summary>
     public static void Export(string srcPdf, List<FillElement> elements, string outPath)
     {
         EnsureResolver();
-        ExportVector(srcPdf, elements, outPath);
+        try { ExportVector(srcPdf, elements, outPath); }
+        catch (System.Exception)
+        {
+            ExportRasterized(srcPdf, elements, 150, outPath).GetAwaiter().GetResult();
+        }
     }
 }
