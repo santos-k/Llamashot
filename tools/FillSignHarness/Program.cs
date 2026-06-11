@@ -42,6 +42,9 @@ internal static class Program
         try { Test_Segments(); }
         catch (Exception e) { Check("Detector finds H+V segments", false, e.ToString()); }
 
+        try { Test_Regions(); }
+        catch (Exception e) { Check("Detector classifies regions", false, e.ToString()); }
+
         Sb.AppendLine($"\n=== {Pass} passed, {Fail} failed ===");
         File.WriteAllText(Path.Combine(Dir, "results.txt"), Sb.ToString());
         return Fail == 0 ? 0 : 1;
@@ -110,6 +113,33 @@ internal static class Program
     }
 
     static bool ContainsTokenInStreams(PdfDocument doc) => false;
+
+    // Task 6: Region classification
+    static void Test_Regions()
+    {
+        using var bmp = new System.Drawing.Bitmap(600, 400);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.Clear(System.Drawing.Color.White);
+            using var pen = new System.Drawing.Pen(System.Drawing.Color.Black, 2);
+            g.DrawRectangle(pen, 40, 40, 20, 20);
+            g.DrawLine(pen, 40, 150, 300, 150);
+            g.DrawRectangle(pen, 40, 200, 250, 40);
+            for (int i = 1; i < 5; i++) g.DrawLine(pen, 40 + i * 50, 200, 40 + i * 50, 240);
+        }
+        var regions = Llamashot.Core.FillSignDetector.DetectRegions(bmp);
+        int boxes = regions.FindAll(r => r.Kind == Llamashot.Core.RegionKind.Checkbox).Count;
+        int combs = regions.FindAll(r => r.Kind == Llamashot.Core.RegionKind.Comb).Count;
+        int unders = regions.FindAll(r => r.Kind == Llamashot.Core.RegionKind.Underline).Count;
+        Check("Detector classifies regions", boxes >= 1 && combs >= 1 && unders >= 1, $"box={boxes} comb={combs} under={unders} total={regions.Count}");
+
+        string src = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fixtures", "137.pdf"));
+        using var page = Llamashot.Core.FillSignRender.RenderPageToBitmapAsync(src, 1, 150).GetAwaiter().GetResult();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var real = Llamashot.Core.FillSignDetector.DetectRegions(page);
+        sw.Stop();
+        Check("Detector finds regions on 137.pdf p2", real.Count >= 10, $"regions={real.Count} ms={sw.ElapsedMilliseconds}");
+    }
 
     // Task 5: Line-segment extraction
     static void Test_Segments()

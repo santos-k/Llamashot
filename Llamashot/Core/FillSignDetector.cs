@@ -78,3 +78,64 @@ public static partial class FillSignDetector
         return set;
     }
 }
+
+public enum RegionKind { Underline, Box, Checkbox, Comb }
+
+public record DetectedRegion(RegionKind Kind, int X, int Y, int W, int H);
+
+public static partial class FillSignDetector
+{
+    public static List<DetectedRegion> DetectRegions(Bitmap bmp)
+    {
+        var seg = ExtractSegments(bmp, 0.012);
+        var regions = new List<DetectedRegion>();
+        int tol = Math.Max(3, bmp.Width / 300);
+
+        foreach (var top in seg.Horizontal)
+        {
+            foreach (var bot in seg.Horizontal)
+            {
+                if (bot.Y1 - top.Y1 < 8 || bot.Y1 - top.Y1 > bmp.Height / 4) continue;
+                int xL = Math.Max(top.X1, bot.X1), xR = Math.Min(top.X2, bot.X2);
+                if (xR - xL < 8) continue;
+                bool left = HasVerticalNear(seg, xL, top.Y1, bot.Y1, tol);
+                bool right = HasVerticalNear(seg, xR, top.Y1, bot.Y1, tol);
+                if (!(left && right)) continue;
+                int w = xR - xL, h = bot.Y1 - top.Y1;
+                int seps = CountInteriorVerticals(seg, xL, xR, top.Y1, bot.Y1, tol);
+                RegionKind kind;
+                if (seps >= 3) kind = RegionKind.Comb;
+                else if (Math.Abs(w - h) <= Math.Max(w, h) * 0.4 && w <= bmp.Width / 25) kind = RegionKind.Checkbox;
+                else kind = RegionKind.Box;
+                AddUnique(regions, new DetectedRegion(kind, xL, top.Y1, w, h), tol);
+            }
+        }
+        foreach (var hs in seg.Horizontal)
+        {
+            if (hs.Length < bmp.Width * 0.06) continue;
+            bool insideBox = regions.Exists(r => r.Y <= hs.Y1 + tol && r.Y + r.H >= hs.Y1 - tol &&
+                                                 r.X <= hs.X1 + tol && r.X + r.W >= hs.X2 - tol);
+            if (!insideBox)
+                AddUnique(regions, new DetectedRegion(RegionKind.Underline, hs.X1, hs.Y1 - 20, hs.Length, 20), tol);
+        }
+        return regions;
+    }
+
+    static bool HasVerticalNear(SegmentSet seg, int x, int yTop, int yBot, int tol) =>
+        seg.Vertical.Exists(v => Math.Abs(v.X1 - x) <= tol && v.Y1 <= yTop + tol && v.Y2 >= yBot - tol);
+
+    static int CountInteriorVerticals(SegmentSet seg, int xL, int xR, int yTop, int yBot, int tol)
+    {
+        int c = 0;
+        foreach (var v in seg.Vertical)
+            if (v.X1 > xL + tol && v.X1 < xR - tol && v.Y1 <= yTop + tol && v.Y2 >= yBot - tol) c++;
+        return c;
+    }
+
+    static void AddUnique(List<DetectedRegion> list, DetectedRegion r, int tol)
+    {
+        if (!list.Exists(e => e.Kind == r.Kind && Math.Abs(e.X - r.X) <= tol &&
+                              Math.Abs(e.Y - r.Y) <= tol && Math.Abs(e.W - r.W) <= tol))
+            list.Add(r);
+    }
+}
