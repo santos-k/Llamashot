@@ -1253,6 +1253,12 @@
                 <Button Content="Date" Tag="datetime" Click="FsMode_Click"
                         Background="#333" Foreground="White" BorderThickness="0"
                         Padding="8,4" Margin="2,0" FontSize="12" Cursor="Hand"/>
+                <Button Content="Signature" Click="FsMode_Click" Tag="signature" Margin="2,0" Padding="8,4"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        FontSize="12" Cursor="Hand"/>
+                <Button Content="Stamp" Click="FsMode_Click" Tag="stamp" Margin="2,0" Padding="8,4"
+                        Background="#333" Foreground="White" BorderThickness="0"
+                        FontSize="12" Cursor="Hand"/>
                 <!-- Separator -->
                 <Border Width="1" Background="#444" Margin="8,2"/>
                 <!-- Font family -->

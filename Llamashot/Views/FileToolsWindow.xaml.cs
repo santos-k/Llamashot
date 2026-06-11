@@ -2719,6 +2719,44 @@ public partial class FileToolsWindow : Window
 
     private void FsOverlay_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (_fsMode is "signature" or "stamp")
+        {
+            var pos = e.GetPosition(FillSignOverlay);
+            string? imgPath = null;
+            if (_fsMode == "signature")
+            {
+                var dlg = new SignatureDialog { Owner = this };
+                if (dlg.ShowDialog() == true) imgPath = dlg.ResultPngPath;
+            }
+            else
+            {
+                var ofd = new Microsoft.Win32.OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg" };
+                if (ofd.ShowDialog() == true) imgPath = ofd.FileName;
+            }
+            if (string.IsNullOrEmpty(imgPath) || !System.IO.File.Exists(imgPath)) return;
+
+            // Default size: 160px wide, height from image aspect; positioned at click.
+            double defW = 160, defH = 60;
+            try
+            {
+                var probe = new System.Windows.Media.Imaging.BitmapImage();
+                probe.BeginInit(); probe.UriSource = new Uri(imgPath); probe.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; probe.EndInit();
+                if (probe.PixelWidth > 0) defH = defW * probe.PixelHeight / probe.PixelWidth;
+            }
+            catch { }
+
+            var (sx, sy, sw, sh) = Llamashot.Core.FillSignGeometry.PixelRectToPointRect(pos.X, pos.Y, defW, defH, FsDpi);
+            var sigEl = new Llamashot.Models.FillElement
+            {
+                Page = _fsCurrentPage,
+                Type = _fsMode == "signature" ? Llamashot.Models.FillElementType.Signature : Llamashot.Models.FillElementType.Stamp,
+                X = sx, Y = sy, Width = sw, Height = sh, ImagePath = imgPath
+            };
+            _fsElements.Add(sigEl);
+            FsAddElementVisual(sigEl);
+            return;
+        }
+
         if (_fsMode is not ("text" or "datetime" or "check")) return;
         var p = e.GetPosition(FillSignOverlay);
 
@@ -2794,8 +2832,58 @@ public partial class FileToolsWindow : Window
                 if (focus) { tb.Focus(); tb.CaretIndex = tb.Text.Length; }
                 break;
             }
+            case Llamashot.Models.FillElementType.Signature:
+            case Llamashot.Models.FillElementType.Stamp:
+            {
+                if (string.IsNullOrEmpty(el.ImagePath) || !System.IO.File.Exists(el.ImagePath)) break;
+                var img = new System.Windows.Controls.Image
+                {
+                    Width = pxW > 0 ? pxW : 160,
+                    Height = pxH > 0 ? pxH : 60,
+                    Stretch = Stretch.Fill, Tag = el
+                };
+                var src = new System.Windows.Media.Imaging.BitmapImage();
+                src.BeginInit(); src.UriSource = new Uri(el.ImagePath); src.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; src.EndInit(); src.Freeze();
+                img.Source = src;
+
+                var holder = new System.Windows.Controls.Grid { Width = img.Width, Height = img.Height, Tag = el };
+                holder.Children.Add(img);
+                var handle = new System.Windows.Shapes.Rectangle
+                {
+                    Width = 12, Height = 12, Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3B82F6")),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+                    VerticalAlignment = System.Windows.VerticalAlignment.Bottom,
+                    Cursor = System.Windows.Input.Cursors.SizeNWSE
+                };
+                holder.Children.Add(handle);
+
+                System.Windows.Controls.Canvas.SetLeft(holder, pxX);
+                System.Windows.Controls.Canvas.SetTop(holder, pxY);
+                FsEnableDrag(holder, el);
+
+                bool resizing = false; System.Windows.Point rStart = default; double rW = 0, rH = 0;
+                handle.PreviewMouseLeftButtonDown += (s, ev) =>
+                {
+                    resizing = true; rStart = ev.GetPosition(FillSignOverlay); rW = holder.Width; rH = holder.Height;
+                    handle.CaptureMouse(); ev.Handled = true;
+                };
+                handle.PreviewMouseMove += (s, ev) =>
+                {
+                    if (!resizing) return;
+                    var p = ev.GetPosition(FillSignOverlay);
+                    double nw = Math.Max(16, rW + (p.X - rStart.X)), nh = Math.Max(8, rH + (p.Y - rStart.Y));
+                    holder.Width = nw; holder.Height = nh; img.Width = nw; img.Height = nh;
+                    el.Width = Llamashot.Core.FillSignGeometry.PixelsToPoints(nw, FsDpi);
+                    el.Height = Llamashot.Core.FillSignGeometry.PixelsToPoints(nh, FsDpi);
+                    ev.Handled = true;
+                };
+                handle.PreviewMouseLeftButtonUp += (s, ev) => { if (resizing) { resizing = false; handle.ReleaseMouseCapture(); ev.Handled = true; } };
+
+                FillSignOverlay.Children.Add(holder);
+                break;
+            }
             default:
-                break; // Signature/Stamp visuals added by a later task group
+                break;
         }
     }
 
