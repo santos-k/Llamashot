@@ -165,6 +165,16 @@ public partial class FileToolsWindow : Window
     private readonly ObservableCollection<YtVideoItem> _ytVideos = new();
     private CancellationTokenSource? _ytCancelSource;
     private string? _ytUrl;
+    private bool _ytGridView = true; // grid is the default view
+
+    // Search results live on the search page; "Go to download"/"Open playlist" move to the download page.
+    private enum YtScreen { Hero, SearchVideos, SearchPlaylists, Download }
+    private YtScreen _ytScreen = YtScreen.Hero;
+    private YtScreen _ytBackTarget = YtScreen.Hero;
+    // Cached search results + header text, so "Back" restores the search page without re-fetching.
+    private readonly List<YtVideoItem> _ytSearchCache = new();
+    private string _ytResultsTitle = "";
+    private string _ytResultsDetail = "";
 
     // =====================================================================
     //  Video crop state
@@ -221,6 +231,7 @@ public partial class FileToolsWindow : Window
         ExtractAudioList.ItemsSource = _extractAudioFiles;
         TrimAudioFileList.ItemsSource = _trimAudioFiles;
         YtVideoList.ItemsSource = _ytVideos;
+        YtVideoGrid.ItemsSource = _ytVideos;
     }
 
     // =====================================================================
@@ -627,8 +638,19 @@ public partial class FileToolsWindow : Window
         TrimWaveformPanel.Children.Clear();
         _trimOutputFolder = null;
         _audioPlayTimer?.Stop();
+        foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
         _ytUrl = null;
         _ytVideos.Clear();
+        _ytSearchCache.Clear();
+        _ytScreen = YtScreen.Hero;
+        _ytBackTarget = YtScreen.Hero;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
+        _ytGridView = true;
+        if (TxtYtSearch != null) TxtYtSearch.Text = "";
+        if (TxtYtSearchPlaceholder != null) TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+        if (TxtYtUrlTop != null) TxtYtUrlTop.Text = "";
+        ApplyYtViewMode();
+        ApplyYtScreen();
         _ytCancelSource?.Cancel();
         _ytCancelSource = null;
         BtnYtStop.Visibility = Visibility.Collapsed;
@@ -762,6 +784,10 @@ public partial class FileToolsWindow : Window
 
     private void GoBack_Click(object sender, RoutedEventArgs e)
     {
+        // YouTube has internal navigation levels: Download -> Search -> Hero -> tool grid.
+        if (_currentToolId == "youtube_dl" && YtTryGoBack())
+            return;
+
         if (!ConfirmDiscardWork()) return;
 
         // Hide overlays immediately
@@ -6178,10 +6204,23 @@ public partial class FileToolsWindow : Window
     //  YouTube Download
     // =====================================================================
 
-    private async void Yt_Fetch(object sender, RoutedEventArgs e)
+    // Treat input as a URL if it looks like one; otherwise it's a search query.
+    private static bool YtLooksLikeUrl(string s) =>
+        s.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+        s.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+        s.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ||
+        s.Contains("youtube.com", StringComparison.OrdinalIgnoreCase) ||
+        s.Contains("youtu.be", StringComparison.OrdinalIgnoreCase);
+
+    private void Yt_Fetch(object sender, RoutedEventArgs e)
+        => _ = RunYtFetchAsync(TxtYtUrl.Text.Trim(), RbYtModePlaylists?.IsChecked == true, fromHero: true);
+
+    private void Yt_FetchTop(object sender, RoutedEventArgs e)
+        => _ = RunYtFetchAsync(TxtYtUrlTop.Text.Trim(), RbYtModePlaylistsTop?.IsChecked == true, fromHero: false);
+
+    private async Task RunYtFetchAsync(string url, bool playlistMode, bool fromHero)
     {
-        string url = TxtYtUrl.Text.Trim();
-        if (string.IsNullOrEmpty(url)) { MessageBox.Show("Enter a YouTube URL."); return; }
+        if (string.IsNullOrEmpty(url)) { MessageBox.Show("Enter a YouTube URL or a search term."); return; }
         if (!FileToolsService.IsYtDlpAvailable())
         {
             MessageBox.Show("yt-dlp is required.\n\nInstall: https://github.com/yt-dlp/yt-dlp",
@@ -6189,73 +6228,332 @@ public partial class FileToolsWindow : Window
             return;
         }
 
-        _ytUrl = url;
-        _ytVideos.Clear();
+        // If the input isn't a URL, treat it as a YouTube search query.
+        // The Videos/Playlists radio chooses between a video search and a playlist search.
+        bool isSearch = !YtLooksLikeUrl(url);
+        bool playlistSearch = isSearch && playlistMode;
+        string target = !isSearch ? url
+            : playlistSearch
+                ? $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp=EgIQAw%3D%3D"
+                : $"ytsearch20:{url}";
 
-        // Show spinner on select view
-        YtSpinner.Visibility = Visibility.Visible;
-        TxtYtSpinner.Text = "Fetching video info...";
-        var spinAnim = new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(1))
-        { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
-        YtSpinnerRotate.BeginAnimation(System.Windows.Media.Animation.Storyboard.TargetPropertyProperty, null);
-        YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, spinAnim);
+        _ytUrl = url;
+        _ytSearchCache.Clear();
+        foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
+        _ytVideos.Clear();
+        TxtYtSearch.Text = "";
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
+        _ytGridView = true;
+        TxtYtUrlTop.Text = url;
+        // Keep the hero and top-bar mode radios in sync.
+        RbYtModeVideos.IsChecked = !playlistMode; RbYtModePlaylists.IsChecked = playlistMode;
+        RbYtModeVideosTop.IsChecked = !playlistMode; RbYtModePlaylistsTop.IsChecked = playlistMode;
+
+        // Spinner: hero uses the big centered spinner; re-searching from the top bar uses the header line.
+        if (fromHero)
+        {
+            YtSpinner.Visibility = Visibility.Visible;
+            TxtYtSpinner.Text = playlistSearch ? "Searching playlists..." : isSearch ? "Searching YouTube..." : "Fetching video info...";
+            var spinAnim = new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(1))
+            { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+            YtSpinnerRotate.BeginAnimation(System.Windows.Media.Animation.Storyboard.TargetPropertyProperty, null);
+            YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, spinAnim);
+        }
+        else
+        {
+            TxtYtDetail.Text = playlistSearch ? "Searching playlists\u2026" : "Searching\u2026";
+            ShowProcessing(playlistSearch ? "Searching playlists\u2026" : "Searching\u2026");
+        }
 
         try
         {
-            var videos = await FileToolsService.FetchYouTubeVideosAsync(url);
+            var videos = await FileToolsService.FetchYouTubeVideosAsync(target);
 
-            // Stop spinner, show config
-            YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
-            YtSpinner.Visibility = Visibility.Collapsed;
-            ShowConfigState("youtube_dl");
-
-            TxtYtTitle.Text = videos.Count == 1 ? videos[0].title : $"Playlist \u2014 {videos.Count} videos";
-            TxtYtDetail.Text = $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} found";
-
-            foreach (var (title, duration, videoUrl, thumbnail) in videos)
+            if (fromHero)
             {
-                var item = new YtVideoItem
-                {
-                    Title = title,
-                    Duration = duration,
-                    VideoUrl = videoUrl,
-                    ThumbnailUrl = thumbnail
-                };
-
-                // Build thumbnail URL — use YouTube thumbnail from video ID if not provided
-                string thumbUrl = thumbnail;
-                if (string.IsNullOrEmpty(thumbUrl))
-                {
-                    var idMatch = System.Text.RegularExpressions.Regex.Match(
-                        videoUrl, @"(?:v=|youtu\.be/|/embed/)([a-zA-Z0-9_-]{11})");
-                    if (idMatch.Success)
-                        thumbUrl = $"https://i.ytimg.com/vi/{idMatch.Groups[1].Value}/mqdefault.jpg";
-                }
-                if (!string.IsNullOrEmpty(thumbUrl))
-                {
-                    try
-                    {
-                        // Don't use CacheOption.OnLoad for remote URLs — let WPF download async
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.UriSource = new Uri(thumbUrl);
-                        bmp.DecodePixelWidth = 160;
-                        bmp.EndInit();
-                        item.Thumbnail = bmp;
-                    }
-                    catch { }
-                }
-
-                _ytVideos.Add(item);
+                YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+                YtSpinner.Visibility = Visibility.Collapsed;
+                ShowConfigState("youtube_dl");
             }
+            else
+            {
+                ProcessingOverlay.Visibility = Visibility.Collapsed;
+                ProcessingOverlay.Opacity = 1;
+            }
+
+            string headerTitle = playlistSearch
+                ? $"Playlist results \u2014 \u201c{url}\u201d"
+                : isSearch
+                    ? $"Search results \u2014 \u201c{url}\u201d"
+                    : (videos.Count == 1 ? videos[0].title : $"Playlist \u2014 {videos.Count} videos");
+            string headerDetail = playlistSearch
+                ? $"{videos.Count} playlist{(videos.Count != 1 ? "s" : "")} found"
+                : $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} found";
+
+            PopulateYtItems(videos);
+
+            if (isSearch)
+            {
+                // Stay on the search page; cache the results so "Back" can restore them.
+                _ytScreen = playlistSearch ? YtScreen.SearchPlaylists : YtScreen.SearchVideos;
+                _ytResultsTitle = headerTitle;
+                _ytResultsDetail = headerDetail;
+                _ytSearchCache.Clear();
+                _ytSearchCache.AddRange(_ytVideos);
+            }
+            else
+            {
+                // A pasted URL goes straight to the download page.
+                _ytScreen = YtScreen.Download;
+                _ytBackTarget = YtScreen.Hero;
+            }
+
+            TxtYtTitle.Text = headerTitle;
+            TxtYtDetail.Text = headerDetail;
+
+            ApplyYtViewMode();
+            ApplyYtScreen();
+            UpdateYtSelectedCount();
+            YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
         {
-            YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
-            YtSpinner.Visibility = Visibility.Collapsed;
-            ShowConfigState("youtube_dl");
+            if (fromHero)
+            {
+                YtSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+                YtSpinner.Visibility = Visibility.Collapsed;
+                ShowConfigState("youtube_dl");
+            }
+            else
+            {
+                ProcessingOverlay.Visibility = Visibility.Collapsed;
+                ProcessingOverlay.Opacity = 1;
+            }
             TxtYtTitle.Text = "Failed to fetch";
             TxtYtDetail.Text = ex.Message;
+        }
+    }
+
+    // Builds YtVideoItems (with thumbnails) from fetch results and adds them to the bound collection.
+    private void PopulateYtItems(List<(string title, string duration, string url, string thumbnail, bool isPlaylist)> videos)
+    {
+        foreach (var (title, duration, videoUrl, thumbnail, isPlaylist) in videos)
+        {
+            var item = new YtVideoItem
+            {
+                Title = title,
+                Duration = duration,
+                VideoUrl = videoUrl,
+                ThumbnailUrl = thumbnail,
+                IsPlaylist = isPlaylist
+            };
+
+            // Derive thumbnail from video ID when not provided (videos only; playlists rely on the given URL).
+            string thumbUrl = thumbnail;
+            if (string.IsNullOrEmpty(thumbUrl) && !isPlaylist)
+            {
+                var idMatch = System.Text.RegularExpressions.Regex.Match(
+                    videoUrl, @"(?:v=|youtu\.be/|/embed/)([a-zA-Z0-9_-]{11})");
+                if (idMatch.Success)
+                    thumbUrl = $"https://i.ytimg.com/vi/{idMatch.Groups[1].Value}/mqdefault.jpg";
+            }
+            if (!string.IsNullOrEmpty(thumbUrl))
+            {
+                try
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(thumbUrl);
+                    bmp.DecodePixelWidth = 160;
+                    bmp.EndInit();
+                    item.Thumbnail = bmp;
+                }
+                catch { }
+            }
+
+            item.PropertyChanged += YtItem_PropertyChanged;
+            _ytVideos.Add(item);
+        }
+    }
+
+    // Shows/hides controls based on the current screen.
+    private void ApplyYtScreen()
+    {
+        if (YtDownloadControls == null) return;
+        bool searchVideos = _ytScreen == YtScreen.SearchVideos;
+        bool searchPlaylists = _ytScreen == YtScreen.SearchPlaylists;
+        bool search = searchVideos || searchPlaylists;
+        bool download = _ytScreen == YtScreen.Download;
+        bool checks = searchVideos || download; // screens where checkboxes apply
+
+        YtTopSearchBar.Visibility = search ? Visibility.Visible : Visibility.Collapsed;
+        YtDownloadControls.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
+
+        // Header action button (column 1 is mutually exclusive across screens).
+        BtnYtGoDownload.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
+        BtnYtOpenPlaylist.Visibility = searchPlaylists ? Visibility.Visible : Visibility.Collapsed;
+        BtnYtBack.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
+
+        BtnYtSelectAll.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
+        BtnYtDeselectAll.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
+        BtnYtCheckedFirst.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
+        TxtYtSelectedCount.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
+
+        UpdateYtGoDownloadEnabled();
+    }
+
+    private void UpdateYtGoDownloadEnabled()
+    {
+        if (BtnYtGoDownload != null)
+            BtnYtGoDownload.IsEnabled = _ytVideos.Any(v => v.IsSelected);
+    }
+
+    // From video search results: carry the selected videos to the download page.
+    private void Yt_GoToDownload(object sender, RoutedEventArgs e)
+    {
+        var selected = _ytVideos.Where(v => v.IsSelected).ToList();
+        if (selected.Count == 0) { MessageBox.Show("Select at least one video."); return; }
+
+        _ytSearchCache.Clear();
+        _ytSearchCache.AddRange(_ytVideos);
+        _ytBackTarget = YtScreen.SearchVideos;
+
+        foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
+        _ytVideos.Clear();
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
+        TxtYtSearch.Text = "";
+        foreach (var v in selected) { v.PropertyChanged += YtItem_PropertyChanged; _ytVideos.Add(v); }
+
+        _ytScreen = YtScreen.Download;
+        TxtYtTitle.Text = $"Download — {selected.Count} selected";
+        TxtYtDetail.Text = $"{selected.Count} video{(selected.Count != 1 ? "s" : "")} ready to download";
+
+        ApplyYtViewMode();
+        ApplyYtScreen();
+        UpdateYtSelectedCount();
+        YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+    }
+
+    // Clears the search results and returns to the hero entry screen.
+    private void Yt_ClearResults(object sender, RoutedEventArgs e)
+    {
+        foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
+        _ytVideos.Clear();
+        _ytSearchCache.Clear();
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
+        TxtYtSearch.Text = "";
+        _ytScreen = YtScreen.Hero;
+        _ytBackTarget = YtScreen.Hero;
+        TxtYtUrl.Text = "";
+        TxtYtUrlTop.Text = "";
+        ShowSelectState("youtube_dl");
+    }
+
+    // Loads the videos of the highlighted playlist into the download page (drill-in).
+    private async void Yt_OpenPlaylist(object sender, RoutedEventArgs e)
+    {
+        var lb = _ytGridView ? (System.Windows.Controls.ListBox)YtVideoGrid : YtVideoList;
+        if (lb.SelectedItem is not YtVideoItem pl || !pl.IsPlaylist)
+        {
+            MessageBox.Show("Select a playlist to open."); return;
+        }
+        await YtOpenPlaylistAsync(pl);
+    }
+
+    private async Task YtOpenPlaylistAsync(YtVideoItem pl)
+    {
+        // Cache the playlist search results so "Back" can restore them.
+        _ytSearchCache.Clear();
+        _ytSearchCache.AddRange(_ytVideos);
+        _ytBackTarget = YtScreen.SearchPlaylists;
+
+        BtnYtOpenPlaylist.IsEnabled = false;
+        TxtYtDetail.Text = "Loading playlist…";
+        ShowProcessing("Loading playlist…");
+        try
+        {
+            var videos = await FileToolsService.FetchYouTubeVideosAsync(pl.VideoUrl);
+
+            foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
+            _ytVideos.Clear();
+            System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
+            TxtYtSearch.Text = "";
+            PopulateYtItems(videos);
+
+            _ytScreen = YtScreen.Download;
+            TxtYtTitle.Text = pl.Title;
+            TxtYtDetail.Text = $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} in playlist";
+
+            ApplyYtViewMode();
+            ApplyYtScreen();
+            UpdateYtSelectedCount();
+            YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Failed to load playlist: " + ex.Message);
+            TxtYtDetail.Text = _ytResultsDetail;
+        }
+        finally
+        {
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
+            ProcessingOverlay.Opacity = 1;
+            BtnYtOpenPlaylist.IsEnabled = true;
+        }
+    }
+
+    // Returns from the download page to the cached search results (or hero for a pasted URL).
+    private void Yt_BackToResults(object sender, RoutedEventArgs e)
+    {
+        if (_ytBackTarget == YtScreen.Hero)
+        {
+            Yt_ClearResults(sender, e);
+            return;
+        }
+
+        foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
+        _ytVideos.Clear();
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
+        TxtYtSearch.Text = "";
+        foreach (var v in _ytSearchCache)
+        {
+            v.PropertyChanged += YtItem_PropertyChanged;
+            _ytVideos.Add(v);
+        }
+        _ytScreen = _ytBackTarget;
+        TxtYtTitle.Text = _ytResultsTitle;
+        TxtYtDetail.Text = _ytResultsDetail;
+
+        ApplyYtViewMode();
+        ApplyYtScreen();
+        UpdateYtSelectedCount();
+        YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+    }
+
+    private void Yt_UrlTopKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { e.Handled = true; Yt_FetchTop(sender, e); }
+    }
+
+    // Handles the global Back button for the YouTube tool's internal levels.
+    // Returns true when it consumed the back (so the caller doesn't return to the tool grid).
+    private bool YtTryGoBack()
+    {
+        switch (_ytScreen)
+        {
+            case YtScreen.Download:
+                Yt_BackToResults(this, new RoutedEventArgs());
+                return true;
+            case YtScreen.SearchVideos:
+            case YtScreen.SearchPlaylists:
+                Yt_ClearResults(this, new RoutedEventArgs());
+                return true;
+            default:
+                return false; // Hero -> let the global Back return to the tool grid
         }
     }
 
@@ -6271,6 +6569,14 @@ public partial class FileToolsWindow : Window
     {
         var selected = _ytVideos.Where(v => v.IsSelected).ToList();
         if (selected.Count == 0) { MessageBox.Show("Select at least one video."); return; }
+
+        bool confirmAudio = RbYtAudio.IsChecked == true;
+        string confirmQuality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Best";
+        string confirmMsg = confirmAudio
+            ? $"Download {selected.Count} video(s) as MP3 audio?"
+            : $"Download {selected.Count} video(s) as Video — {confirmQuality}?";
+        if (!ConfirmDialog.Show(this, "Confirm Download", confirmMsg, "Download", "Cancel"))
+            return;
 
         var folderDlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Select download folder" };
         if (folderDlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
@@ -6342,7 +6648,9 @@ public partial class FileToolsWindow : Window
 
     private void Yt_SelectAll(object sender, RoutedEventArgs e)
     {
-        foreach (var v in _ytVideos) v.IsSelected = true;
+        foreach (var v in System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Cast<YtVideoItem>())
+            v.IsSelected = true;
+        UpdateYtSelectedCount();
     }
 
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -6363,7 +6671,148 @@ public partial class FileToolsWindow : Window
 
     private void Yt_DeselectAll(object sender, RoutedEventArgs e)
     {
-        foreach (var v in _ytVideos) v.IsSelected = false;
+        foreach (var v in System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Cast<YtVideoItem>())
+            v.IsSelected = false;
+        UpdateYtSelectedCount();
+    }
+
+    // Fetch when Enter is pressed in the URL box.
+    private void Yt_UrlKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            Yt_Fetch(sender, e);
+        }
+    }
+
+    // Space toggles the check state of the highlighted item(s).
+    // Arrow keys / clicks only move the highlight — they never check/uncheck.
+    private void Yt_ListPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.ListBox lb) return;
+
+        // In playlist results, Enter opens the highlighted playlist; checks don't apply here.
+        if (_ytScreen == YtScreen.SearchPlaylists)
+        {
+            if (e.Key == Key.Enter && lb.SelectedItem is YtVideoItem pl && pl.IsPlaylist)
+            {
+                e.Handled = true;
+                _ = YtOpenPlaylistAsync(pl);
+            }
+        }
+        else if (e.Key == Key.Space)
+        {
+            var items = lb.SelectedItems.Cast<YtVideoItem>().ToList();
+            if (items.Count == 0) return;
+            // If any highlighted item is unchecked, check them all; otherwise uncheck all.
+            bool check = items.Any(v => !v.IsSelected);
+            foreach (var v in items) v.IsSelected = check;
+            UpdateYtSelectedCount();
+            e.Handled = true;
+            return;
+        }
+
+        // Left/Right move the highlight linearly across the whole list (reading order),
+        // wrapping to the next/previous row automatically — not just within a grid row.
+        if (e.Key == Key.Left || e.Key == Key.Right)
+        {
+            int count = lb.Items.Count;
+            if (count == 0) return;
+            int idx = lb.SelectedIndex;
+            idx = e.Key == Key.Right
+                ? (idx < 0 ? 0 : Math.Min(idx + 1, count - 1))
+                : (idx < 0 ? count - 1 : Math.Max(idx - 1, 0));
+            lb.SelectedIndex = idx;
+            lb.ScrollIntoView(lb.SelectedItem);
+            if (lb.ItemContainerGenerator.ContainerFromIndex(idx) is ListBoxItem lbi)
+                lbi.Focus();
+            e.Handled = true;
+        }
+    }
+
+    // Double-click toggles the check state of a video, or opens a playlist.
+    private async void Yt_ItemDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.ListBox lb || e.OriginalSource is not DependencyObject src) return;
+        if (ItemsControl.ContainerFromElement(lb, src) is ListBoxItem { DataContext: YtVideoItem v })
+        {
+            e.Handled = true;
+            if (v.IsPlaylist) { await YtOpenPlaylistAsync(v); return; }
+            v.IsSelected = !v.IsSelected;
+            UpdateYtSelectedCount();
+        }
+    }
+
+    private void Yt_ListView(object sender, RoutedEventArgs e)
+    {
+        _ytGridView = false;
+        ApplyYtViewMode();
+    }
+
+    private void Yt_GridView(object sender, RoutedEventArgs e)
+    {
+        _ytGridView = true;
+        ApplyYtViewMode();
+    }
+
+    private void ApplyYtViewMode()
+    {
+        if (YtVideoList == null || YtVideoGrid == null) return;
+
+        YtVideoList.Visibility = _ytGridView ? Visibility.Collapsed : Visibility.Visible;
+        YtVideoGrid.Visibility = _ytGridView ? Visibility.Visible : Visibility.Collapsed;
+
+        var active = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF0000"));
+        var inactive = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
+        var activeFg = Brushes.White;
+        var inactiveFg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC"));
+
+        BtnYtGridView.Background = _ytGridView ? active : inactive;
+        BtnYtListView.Background = _ytGridView ? inactive : active;
+        BtnYtGridView.Foreground = _ytGridView ? activeFg : inactiveFg;
+        BtnYtListView.Foreground = _ytGridView ? inactiveFg : activeFg;
+    }
+
+    private void Yt_SearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TxtYtSearchPlaceholder != null)
+            TxtYtSearchPlaceholder.Visibility =
+                string.IsNullOrEmpty(TxtYtSearch.Text) ? Visibility.Visible : Visibility.Collapsed;
+
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos);
+        if (view == null) return;
+
+        string q = TxtYtSearch.Text.Trim();
+        view.Filter = string.IsNullOrEmpty(q)
+            ? null
+            : o => o is YtVideoItem v && v.Title.Contains(q, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void YtItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(YtVideoItem.IsSelected))
+            UpdateYtSelectedCount();
+    }
+
+    private void UpdateYtSelectedCount()
+    {
+        if (TxtYtSelectedCount == null) return;
+        int sel = _ytVideos.Count(v => v.IsSelected);
+        TxtYtSelectedCount.Text = $"{sel} of {_ytVideos.Count} selected";
+        UpdateYtGoDownloadEnabled();
+    }
+
+    private void Yt_CheckedFirst(object sender, RoutedEventArgs e)
+    {
+        var ordered = _ytVideos.Where(v => v.IsSelected)
+            .Concat(_ytVideos.Where(v => !v.IsSelected))
+            .ToList();
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            int cur = _ytVideos.IndexOf(ordered[i]);
+            if (cur != i) _ytVideos.Move(cur, i);
+        }
     }
 }
 
@@ -6453,6 +6902,7 @@ public class YtVideoItem : INotifyPropertyChanged
     private int _progress;
 
     public bool IsSelected { get => _isSelected; set { _isSelected = value; OnPropertyChanged(); } }
+    public bool IsPlaylist { get; set; }
     public string Title { get; set; } = "";
     public string Duration { get; set; } = "";
     public string VideoUrl { get; set; } = "";

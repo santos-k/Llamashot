@@ -2903,7 +2903,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="TxtYtUrl" Height="44" Padding="14,10" FontSize="14"
                                  Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="2"
-                                 VerticalContentAlignment="Center">
+                                 VerticalContentAlignment="Center" KeyDown="Yt_UrlKeyDown">
                             <TextBox.Style>
                                 <Style TargetType="TextBox">
                                     <Style.Triggers>
@@ -2919,8 +2919,17 @@
                                 Cursor="Hand" Click="Yt_Fetch" Margin="8,0,0,0"
                                 Template="{StaticResource RoundedButton}"/>
                     </Grid>
-                    <TextBlock Text="Paste a YouTube URL (video or playlist)" FontSize="12" Foreground="#666"
-                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Paste a YouTube URL (video or playlist), or type keywords to search"
+                               FontSize="12" Foreground="#666" HorizontalAlignment="Center"/>
+                    <!-- Search mode (applies to keyword searches only; URLs are auto-detected) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                        <TextBlock Text="Search for:" Foreground="#888" FontSize="12" VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <RadioButton x:Name="RbYtModeVideos" Content="Videos" Foreground="#CCC" FontSize="12"
+                                     IsChecked="True" GroupName="YtSearchMode" Cursor="Hand" Margin="0,0,14,0"/>
+                        <RadioButton x:Name="RbYtModePlaylists" Content="Playlists" Foreground="#CCC" FontSize="12"
+                                     GroupName="YtSearchMode" Cursor="Hand"/>
+                    </StackPanel>
                     <!-- Loading spinner (shown while fetching) -->
                     <StackPanel x:Name="YtSpinner" Visibility="Collapsed" Margin="0,30,0,0" HorizontalAlignment="Center">
                         <Border Width="36" Height="36" CornerRadius="18" BorderThickness="3"
@@ -2944,33 +2953,113 @@
             <!-- Config state -->
             <Grid x:Name="YtConfigView" Visibility="Collapsed" Margin="16,8">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>   <!-- Header with info + controls -->
-                    <RowDefinition Height="*"/>      <!-- Video list -->
+                    <RowDefinition Height="Auto"/>   <!-- Header: title/detail + select all/deselect -->
+                    <RowDefinition Height="Auto"/>   <!-- Toolbar: search + count + checked-first + view toggle -->
+                    <RowDefinition Height="*"/>       <!-- Video views (list + grid) -->
                     <RowDefinition Height="Auto"/>   <!-- Download controls -->
                 </Grid.RowDefinitions>
 
-                <!-- Header -->
-                <Grid Margin="0,0,0,8">
+                <!-- Row 0: compact search bar (search page) + header -->
+                <StackPanel>
+                    <!-- Compact search bar — shown on the search page (input shifted to top) -->
+                    <Grid x:Name="YtTopSearchBar" Margin="0,0,0,10" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtYtUrlTop" Grid.Column="0" Height="36" Padding="12,6" FontSize="13"
+                                 Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="1"
+                                 VerticalContentAlignment="Center" KeyDown="Yt_UrlTopKeyDown"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                            <RadioButton x:Name="RbYtModeVideosTop" Content="Videos" Foreground="#CCC" FontSize="12"
+                                         IsChecked="True" GroupName="YtSearchModeTop" Cursor="Hand" Margin="0,0,10,0"/>
+                            <RadioButton x:Name="RbYtModePlaylistsTop" Content="Playlists" Foreground="#CCC" FontSize="12"
+                                         GroupName="YtSearchModeTop" Cursor="Hand"/>
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="Fetch →" Height="36" Width="80" FontSize="13" FontWeight="SemiBold"
+                                Foreground="White" Background="#FF0000" Cursor="Hand" Click="Yt_FetchTop"
+                                Template="{StaticResource RoundedButton}" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnYtClear" Grid.Column="3" Content="Clear" Height="36" Width="70" FontSize="12"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="Yt_ClearResults"/>
+                    </Grid>
+
+                    <!-- Header -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>   <!-- Back / Open playlist / Go to download -->
+                            <ColumnDefinition Width="Auto"/>   <!-- Select All -->
+                            <ColumnDefinition Width="Auto"/>   <!-- Deselect All -->
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="TxtYtTitle" Text="" Foreground="#EEE" FontSize="16" FontWeight="SemiBold"
+                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="44"/>
+                            <TextBlock x:Name="TxtYtDetail" Text="" Foreground="#888" FontSize="12" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <!-- Back (from the download page) -->
+                        <Button x:Name="BtnYtBack" Grid.Column="1" Content="← Back" Height="28" FontSize="11"
+                                Padding="10,0" Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_BackToResults" Visibility="Collapsed" Margin="8,0,4,0"/>
+                        <!-- Open playlist (from playlist results) -->
+                        <Button x:Name="BtnYtOpenPlaylist" Grid.Column="1" Content="Open playlist →" Height="28" FontSize="11"
+                                Padding="10,0" Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_OpenPlaylist" Visibility="Collapsed" Margin="8,0,4,0"/>
+                        <!-- Go to download (from video search results) -->
+                        <Button x:Name="BtnYtGoDownload" Grid.Column="1" Content="Go to download →" Height="28" FontSize="11"
+                                Padding="12,0" Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_GoToDownload" Visibility="Collapsed" Margin="8,0,4,0"/>
+                        <Button x:Name="BtnYtSelectAll" Grid.Column="2" Content="Select All" Width="80" Height="28" FontSize="11"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_SelectAll" Margin="8,0,4,0"/>
+                        <Button x:Name="BtnYtDeselectAll" Grid.Column="3" Content="Deselect All" Width="85" Height="28" FontSize="11"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_DeselectAll"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Toolbar -->
+                <Grid x:Name="YtToolbar" Grid.Row="1" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>      <!-- search -->
+                        <ColumnDefinition Width="Auto"/>   <!-- count -->
+                        <ColumnDefinition Width="Auto"/>   <!-- checked first -->
+                        <ColumnDefinition Width="Auto"/>   <!-- view toggle -->
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock x:Name="TxtYtTitle" Text="" Foreground="#EEE" FontSize="16" FontWeight="SemiBold"
-                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="44"/>
-                        <TextBlock x:Name="TxtYtDetail" Text="" Foreground="#888" FontSize="12" Margin="0,2,0,0"/>
+
+                    <!-- Search box with watermark -->
+                    <Grid x:Name="YtSearchBox" Grid.Column="0" HorizontalAlignment="Left" Width="280">
+                        <TextBox x:Name="TxtYtSearch" Height="30" Padding="10,4" FontSize="12"
+                                 Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="1"
+                                 VerticalContentAlignment="Center" TextChanged="Yt_SearchChanged"/>
+                        <TextBlock x:Name="TxtYtSearchPlaceholder" Text="Search videos…" Foreground="#666"
+                                   FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   IsHitTestVisible="False"/>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtYtSelectedCount" Grid.Column="1" Text="0 of 0 selected"
+                               Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="12,0"/>
+
+                    <Button x:Name="BtnYtCheckedFirst" Grid.Column="2" Content="Checked first" Height="28"
+                            FontSize="11" Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                            Padding="10,0" Margin="0,0,8,0" Click="Yt_CheckedFirst"/>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal">
+                        <Button x:Name="BtnYtListView" Content="List" Width="50" Height="28" FontSize="11"
+                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_ListView"/>
+                        <Button x:Name="BtnYtGridView" Content="Grid" Width="50" Height="28" FontSize="11"
+                                Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
+                                Click="Yt_GridView"/>
                     </StackPanel>
-                    <Button Grid.Column="1" Content="Select All" Width="80" Height="28" FontSize="11"
-                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                            Click="Yt_SelectAll" Margin="8,0,4,0"/>
-                    <Button Grid.Column="2" Content="Deselect All" Width="85" Height="28" FontSize="11"
-                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                            Click="Yt_DeselectAll"/>
                 </Grid>
 
-                <!-- Video list with thumbnails -->
-                <ListBox x:Name="YtVideoList" Grid.Row="1" Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
+                <!-- Video list (row) view -->
+                <ListBox x:Name="YtVideoList" Grid.Row="2" Visibility="Collapsed"
+                         IsSynchronizedWithCurrentItem="False" SelectionMode="Extended"
+                         PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
+                         Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListBox.ItemContainerStyle>
@@ -2980,19 +3069,49 @@
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="BorderBrush" Value="#252528"/>
                             <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#232328"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#2B2E36"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="8,6">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>  <!-- Checkbox -->
-                                    <ColumnDefinition Width="Auto"/>  <!-- Thumbnail -->
-                                    <ColumnDefinition Width="*"/>     <!-- Title + duration -->
-                                    <ColumnDefinition Width="Auto"/>  <!-- Status -->
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"
-                                          Cursor="Hand" Margin="0,0,8,0"/>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" VerticalAlignment="Center"
+                                          IsHitTestVisible="False" Focusable="False" Margin="0,0,8,0">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
                                 <Image Grid.Column="1" Source="{Binding Thumbnail}" Width="120" Height="68"
                                        Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"
                                        Margin="0,0,10,0">
@@ -3004,29 +3123,168 @@
                                     <TextBlock Text="{Binding Title}" Foreground="#CCC" FontSize="13"
                                                TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                     <TextBlock Text="{Binding Duration}" Foreground="#666" FontSize="11" Margin="0,2,0,0"/>
-                                    <!-- Per-video progress bar -->
                                     <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="3"
                                                  Foreground="#42A5F5" Background="#333" BorderThickness="0"
                                                  Margin="0,4,0,0"/>
                                 </StackPanel>
-                                <TextBlock Grid.Column="3" Text="{Binding Status}" Foreground="{Binding StatusColor}"
-                                           FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                <Grid Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}"
+                                               FontSize="11" FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Border Background="#CCFF0000" CornerRadius="3" Padding="6,2">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="&#x25B6; Playlist" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
 
+                <!-- Video grid (card) view -->
+                <ListBox x:Name="YtVideoGrid" Grid.Row="2"
+                         IsSynchronizedWithCurrentItem="False" SelectionMode="Extended"
+                         PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
+                         Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="6"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="180" Background="#222226" CornerRadius="6" BorderThickness="2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                <Setter Property="BorderBrush" Value="#6E7787"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <Grid>
+                                        <Image Source="{Binding Thumbnail}" Width="180" Height="101"
+                                               Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality">
+                                            <Image.Clip>
+                                                <RectangleGeometry Rect="0,0,180,101" RadiusX="6" RadiusY="6"/>
+                                            </Image.Clip>
+                                        </Image>
+                                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
+                                                Background="#99000000" CornerRadius="3" Padding="3,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                      IsHitTestVisible="False" Focusable="False"/>
+                                        </Border>
+                                        <!-- Playlist badge (top-left), shown only for playlist results -->
+                                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
+                                                Background="#CCFF0000" CornerRadius="3" Padding="5,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="&#x25B6; Playlist" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
+                                                Background="#CC000000" CornerRadius="3" Padding="5,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Duration}" Foreground="#EEE" FontSize="10"/>
+                                        </Border>
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6"
+                                                Background="#CC000000" CornerRadius="3" Padding="5,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}"
+                                                       FontSize="10" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Title}" Foreground="#CCC" FontSize="12"
+                                               Margin="8,6,8,4" TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis" MaxHeight="32"/>
+                                    <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="3"
+                                                 Foreground="#42A5F5" Background="#333" BorderThickness="0"
+                                                 Margin="8,0,8,8"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
                 <!-- Download controls -->
-                <Grid Grid.Row="2" Margin="0,12,0,8">
+                <Grid x:Name="YtDownloadControls" Grid.Row="3" Margin="0,12,0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>   <!-- Mode selector -->
-                        <ColumnDefinition Width="Auto"/>   <!-- Quality -->
-                        <ColumnDefinition Width="*"/>      <!-- Progress info -->
-                        <ColumnDefinition Width="Auto"/>   <!-- Stop button -->
-                        <ColumnDefinition Width="Auto"/>   <!-- Download button -->
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Mode -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <RadioButton x:Name="RbYtVideo" Content="Video" Foreground="#CCC" FontSize="12"
                                      IsChecked="True" GroupName="YtMode" Margin="0,0,12,0" Cursor="Hand"
@@ -3035,7 +3293,6 @@
                                      GroupName="YtMode" Cursor="Hand" Checked="YtMode_Changed"/>
                     </StackPanel>
 
-                    <!-- Quality (video only) -->
                     <StackPanel x:Name="YtVideoOptions" Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0">
                         <ComboBox x:Name="CmbYtQuality" Width="80" Height="28" FontSize="11" SelectedIndex="0">
                             <ComboBoxItem Content="Best"/>
@@ -3045,22 +3302,18 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <!-- Audio options (hidden by default) -->
                     <CheckBox x:Name="ChkYtEmbedThumb" Grid.Column="1" Content="Embed thumbnail"
                               Foreground="#CCC" FontSize="11" IsChecked="True" Cursor="Hand"
                               Visibility="Collapsed" VerticalAlignment="Center" Margin="16,0,0,0"/>
 
-                    <!-- Progress info -->
                     <TextBlock x:Name="TxtYtOverallProgress" Grid.Column="2" Text="" Foreground="#888" FontSize="12"
                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
-                    <!-- Stop button -->
                     <Button x:Name="BtnYtStop" Grid.Column="3" Content="Stop" Width="70" Height="38"
                             FontSize="13" Background="#EF5350" Foreground="White" BorderThickness="0"
                             Cursor="Hand" Click="Yt_Stop" Visibility="Collapsed" Margin="0,0,8,0"
                             Template="{StaticResource RoundedButton21}"/>
 
-                    <!-- Download button -->
                     <Button x:Name="BtnYtDownload" Grid.Column="4" Content="Download &#x2192;" Width="140" Height="42"
                             FontSize="14" FontWeight="SemiBold" Foreground="White" Background="#FF0000"
                             Cursor="Hand" Click="Yt_Download"

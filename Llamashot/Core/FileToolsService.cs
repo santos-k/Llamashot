@@ -935,17 +935,18 @@ public static class FileToolsService
         return "yt-dlp"; // fallback to PATH
     }
 
-    public static async Task<List<(string title, string duration, string url, string thumbnail)>> FetchYouTubeVideosAsync(string inputUrl)
+    public static async Task<List<(string title, string duration, string url, string thumbnail, bool isPlaylist)>> FetchYouTubeVideosAsync(string inputUrl)
     {
-        var results = new List<(string title, string duration, string url, string thumbnail)>();
+        var results = new List<(string title, string duration, string url, string thumbnail, bool isPlaylist)>();
         string ytdlp = FindYtDlpPath();
         string sep = "|||";
 
         await Task.Run(() =>
         {
-            // Use --flat-playlist with a unique separator (tabs are unreliable across process boundaries)
+            // Use --flat-playlist with a unique separator (tabs are unreliable across process boundaries).
+            // %(ie_key)s reports the extractor: "YoutubeTab" = a playlist entry, "Youtube" = a single video.
             var psi = new ProcessStartInfo(ytdlp,
-                $"--flat-playlist --print \"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s\" --no-warnings \"{inputUrl}\"")
+                $"--flat-playlist --print \"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s{sep}%(ie_key)s\" --no-warnings \"{inputUrl}\"")
             {
                 RedirectStandardOutput = true, RedirectStandardError = true,
                 UseShellExecute = false, CreateNoWindow = true
@@ -963,15 +964,17 @@ public static class FileToolsService
                     string duration = parts.Length >= 2 ? parts[1].Trim() : "";
                     string url = parts.Length >= 3 ? parts[2].Trim() : "";
                     string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
+                    string ieKey = parts.Length >= 5 ? parts[4].Trim() : "";
                     if (title == "NA") title = "Untitled";
                     if (duration == "NA") duration = "";
                     if (url == "NA") url = "";
                     if (thumb == "NA") thumb = "";
+                    bool isPlaylist = ieKey.Equals("YoutubeTab", StringComparison.OrdinalIgnoreCase);
                     // For playlist entries without webpage_url, construct from video id
                     if (string.IsNullOrEmpty(url) && line.Contains("youtube.com"))
                         url = inputUrl;
                     if (!string.IsNullOrEmpty(title) && title != "Untitled")
-                        results.Add((title, duration, !string.IsNullOrEmpty(url) ? url : inputUrl, thumb));
+                        results.Add((title, duration, !string.IsNullOrEmpty(url) ? url : inputUrl, thumb, isPlaylist));
                 }
             }
 
@@ -995,7 +998,7 @@ public static class FileToolsService
                     string duration = parts.Length >= 2 ? parts[1].Trim() : "";
                     string url = parts.Length >= 3 ? parts[2].Trim() : inputUrl;
                     string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
-                    results.Add((title, duration, url, thumb));
+                    results.Add((title, duration, url, thumb, false));
                 }
             }
         });
