@@ -3483,6 +3483,20 @@
         <Border x:Name="ProcessingOverlay" Grid.Row="1" Visibility="Collapsed" Background="#E61A1A1E"
                 IsHitTestVisible="True">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <!-- Indeterminate circular spinner (shown for searches / unknown-duration work) -->
+                <Border x:Name="MainSpinner" Width="46" Height="46" CornerRadius="23" BorderThickness="4"
+                        RenderTransformOrigin="0.5,0.5" Visibility="Collapsed" Margin="0,0,0,18"
+                        HorizontalAlignment="Center">
+                    <Border.BorderBrush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FF3B3B" Offset="0"/>
+                            <GradientStop Color="Transparent" Offset="0.7"/>
+                        </LinearGradientBrush>
+                    </Border.BorderBrush>
+                    <Border.RenderTransform>
+                        <RotateTransform x:Name="MainSpinnerRotate" Angle="0"/>
+                    </Border.RenderTransform>
+                </Border>
                 <TextBlock x:Name="TxtProcessing" Text="Processing..." FontSize="18" Foreground="#CCC"
                            HorizontalAlignment="Center" Margin="0,0,0,16"/>
                 <ProgressBar x:Name="MainProgress" Width="350" Height="6" Margin="0,0,0,8"

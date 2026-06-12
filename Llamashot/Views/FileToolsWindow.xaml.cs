@@ -177,10 +177,11 @@ public partial class FileToolsWindow : Window
     private bool _ytFiltersReady;                   // suppress filter handlers during programmatic init
     private bool _ytSyncingSort;                    // guard while mirroring the two sort combos
     // Incremental keyword search: load results in batches of 10 (infinite scroll).
-    private string _ytSearchQuery = "";             // current keyword (video search) for paging
+    private string _ytSearchQuery = "";             // current keyword for paging (video or playlist search)
+    private bool _ytSearchIsPlaylist;               // current keyword search is a playlist search
     private int _ytLoadedCount;                     // results fetched so far for the current query
     private bool _ytLoadingMore;
-    private bool _ytNoMore = true;                  // true until a video keyword search starts
+    private bool _ytNoMore = true;                  // true until a keyword search starts
     private const int YtBatchSize = 12;   // 4 columns × 3 rows per batch
     private const int YtMaxResults = 120;
     // Cached search results + header text, so "Back" restores the search page without re-fetching.
@@ -561,13 +562,29 @@ public partial class FileToolsWindow : Window
         }
     }
 
-    private void ShowProcessing(string message)
+    private void ShowProcessing(string message, bool indeterminate = false)
     {
         TxtProcessing.Text = message;
         MainProgress.Value = 0;
         TxtProgressPct.Text = "0%";
+
+        // Indeterminate work (searches) shows a spinner; measurable work keeps the % bar.
+        MainSpinner.Visibility = indeterminate ? Visibility.Visible : Visibility.Collapsed;
+        MainProgress.Visibility = indeterminate ? Visibility.Collapsed : Visibility.Visible;
+        TxtProgressPct.Visibility = indeterminate ? Visibility.Collapsed : Visibility.Visible;
+        if (indeterminate) StartMainSpinner(); else StopMainSpinner();
+
         FadeIn(ProcessingOverlay);
     }
+
+    private void StartMainSpinner()
+    {
+        var anim = new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(0.9))
+        { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+        MainSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+    }
+
+    private void StopMainSpinner() => MainSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
 
     private IProgress<int> CreateProgress()
     {
@@ -6244,26 +6261,30 @@ public partial class FileToolsWindow : Window
         // The Videos/Playlists radio chooses between a video search and a playlist search.
         bool isSearch = !YtLooksLikeUrl(url);
         bool playlistSearch = isSearch && playlistMode;
-        bool videoSearch = isSearch && !playlistSearch;
         string target;
         string? batchItems = null;
         if (!isSearch)
             target = url;
         else if (playlistSearch)
-            target = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp=EgIQAw%3D%3D";
+        {
+            // Playlist keyword search: first batch of 12 (more on scroll).
+            target = BuildPlaylistSearchTarget(url);
+            batchItems = $"1-{YtBatchSize}";
+        }
         else
         {
-            // Video keyword search: load the first batch of 10 (more on scroll).
+            // Video keyword search: first batch of 12 (more on scroll).
             target = BuildVideoSearchTarget(url, YtBatchSize);
             batchItems = $"1-{YtBatchSize}";
         }
         _ytFiltersReady = false; // suppress filter handlers while this fetch mutates UI
 
-        // Reset paging state for this query.
-        _ytSearchQuery = videoSearch ? url : "";
+        // Reset paging state for this query (both video and playlist searches page).
+        _ytSearchQuery = isSearch ? url : "";
+        _ytSearchIsPlaylist = playlistSearch;
         _ytLoadedCount = 0;
         _ytLoadingMore = false;
-        _ytNoMore = !videoSearch;
+        _ytNoMore = !isSearch;
 
         _ytUrl = url;
         _ytSearchCache.Clear();
@@ -6290,7 +6311,7 @@ public partial class FileToolsWindow : Window
         else
         {
             TxtYtDetail.Text = playlistSearch ? "Searching playlists\u2026" : "Searching\u2026";
-            ShowProcessing(playlistSearch ? "Searching playlists\u2026" : "Searching\u2026");
+            ShowProcessing(playlistSearch ? "Searching playlists\u2026" : "Searching\u2026", indeterminate: true);
         }
 
         try
@@ -6320,7 +6341,7 @@ public partial class FileToolsWindow : Window
 
             PopulateYtItems(videos);
 
-            if (videoSearch)
+            if (isSearch)
             {
                 _ytLoadedCount = videos.Count;
                 _ytNoMore = videos.Count < YtBatchSize;
@@ -6419,6 +6440,7 @@ public partial class FileToolsWindow : Window
     private void ApplyYtScreen()
     {
         if (YtDownloadControls == null) return;
+        StopMainSpinner(); // results are rendering — kill any search spinner
         bool searchVideos = _ytScreen == YtScreen.SearchVideos;
         bool searchPlaylists = _ytScreen == YtScreen.SearchPlaylists;
         bool search = searchVideos || searchPlaylists;
@@ -6434,6 +6456,12 @@ public partial class FileToolsWindow : Window
         BtnYtBack.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
         ChkYtSelectAll.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
         CmbYtSortHeader.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
+
+        // Playlists allow picking exactly one; videos allow multi-select checkboxes.
+        var mode = searchPlaylists ? System.Windows.Controls.SelectionMode.Single
+                                   : System.Windows.Controls.SelectionMode.Extended;
+        YtVideoGrid.SelectionMode = mode;
+        YtVideoList.SelectionMode = mode;
 
         UpdateYtGoDownloadEnabled();
     }
@@ -6518,7 +6546,7 @@ public partial class FileToolsWindow : Window
 
         BtnYtOpenPlaylist.IsEnabled = false;
         TxtYtDetail.Text = "Loading playlist…";
-        ShowProcessing("Loading playlist…");
+        ShowProcessing("Loading playlist…", indeterminate: true);
         try
         {
             var videos = await FileToolsService.FetchYouTubeVideosAsync(pl.VideoUrl);
@@ -6973,11 +7001,20 @@ public partial class FileToolsWindow : Window
             : $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(query)}&sp={Uri.EscapeDataString(sp)}";
     }
 
-    // Infinite scroll: fetch the next batch of 10 and append (selection preserved).
+    // Playlist search uses the results page with the "Playlist" type filter (sp=EgIQAw==).
+    private static string BuildPlaylistSearchTarget(string query)
+        => $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(query)}&sp=EgIQAw%3D%3D";
+
+    private string BuildSearchTarget(string query, int end)
+        => _ytSearchIsPlaylist ? BuildPlaylistSearchTarget(query) : BuildVideoSearchTarget(query, end);
+
+    private bool YtOnSearchScreen() => _ytScreen == YtScreen.SearchVideos || _ytScreen == YtScreen.SearchPlaylists;
+
+    // Infinite scroll: fetch the next batch of 12 and append (selection preserved).
     private async Task YtLoadMoreAsync()
     {
         if (_ytLoadingMore || _ytNoMore) return;
-        if (_ytScreen != YtScreen.SearchVideos || string.IsNullOrWhiteSpace(_ytSearchQuery)) return;
+        if (!YtOnSearchScreen() || string.IsNullOrWhiteSpace(_ytSearchQuery)) return;
         if (_ytLoadedCount >= YtMaxResults) { _ytNoMore = true; return; }
 
         _ytLoadingMore = true;
@@ -6986,7 +7023,7 @@ public partial class FileToolsWindow : Window
         {
             int start = _ytLoadedCount + 1;
             int end = _ytLoadedCount + YtBatchSize;
-            string target = BuildVideoSearchTarget(_ytSearchQuery, end);
+            string target = BuildSearchTarget(_ytSearchQuery, end);
             var more = await FileToolsService.FetchYouTubeVideosAsync(target, $"{start}-{end}");
 
             // De-dupe against what's already loaded, then append.
@@ -6997,7 +7034,8 @@ public partial class FileToolsWindow : Window
             _ytLoadedCount += more.Count;
             if (more.Count < YtBatchSize || _ytLoadedCount >= YtMaxResults) _ytNoMore = true;
 
-            _ytResultsDetail = $"{_ytVideos.Count} videos loaded";
+            string noun = _ytSearchIsPlaylist ? "playlists" : "videos";
+            _ytResultsDetail = $"{_ytVideos.Count} {noun} loaded";
             TxtYtDetail.Text = _ytResultsDetail;
             UpdateYtSelectedCount();
             _ytSearchCache.Clear();
@@ -7014,7 +7052,7 @@ public partial class FileToolsWindow : Window
     // Load the next batch when the results are scrolled near the bottom.
     private async void Yt_GridScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (_ytScreen != YtScreen.SearchVideos || _ytNoMore || _ytLoadingMore) return;
+        if (!YtOnSearchScreen() || _ytNoMore || _ytLoadingMore) return;
         if (e.ExtentHeight <= 0 || e.VerticalChange <= 0) return;
         if (e.VerticalOffset + e.ViewportHeight >= e.ExtentHeight - 250)
             await YtLoadMoreAsync();
