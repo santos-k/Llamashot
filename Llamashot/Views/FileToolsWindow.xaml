@@ -2889,47 +2889,83 @@
 
         <!-- ====================== PanelYouTubeDl ====================== -->
         <Grid x:Name="PanelYouTubeDl" Grid.Row="1" Visibility="Collapsed">
+            <Grid.Resources>
+                <!-- Segmented toggle (Videos | Playlists) built on RadioButton — shared by hero + results -->
+                <Style x:Key="YtSegment" TargetType="RadioButton">
+                    <Setter Property="Foreground" Value="#AAA"/>
+                    <Setter Property="FontSize" Value="13"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="RadioButton">
+                                <Border x:Name="Seg" Background="Transparent" CornerRadius="6" Padding="14,7">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="Seg" Property="Background" Value="#FF0000"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="#EEE"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Grid.Resources>
             <Border x:Name="YtSelectView" Background="Transparent">
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="YouTube Download" FontSize="28" FontWeight="Bold" Foreground="#EEE"
-                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Download video or audio from YouTube" FontSize="14" Foreground="#888"
-                               HorizontalAlignment="Center" Margin="0,0,0,40"/>
-                    <!-- URL input -->
-                    <Grid Width="500" Margin="0,0,0,16">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="640">
+                    <!-- YouTube logo + title -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+                        <Border Background="#FF0000" CornerRadius="7" Width="46" Height="32" Margin="0,0,14,0"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="&#x25B6;" Foreground="White" FontSize="15"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="YouTube Downloader" FontSize="30" FontWeight="Bold" Foreground="#EEE"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="Search YouTube or paste a video / playlist link to download" FontSize="14"
+                               Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,34"/>
+                    <!-- Search bar (magnifier + input) + red Search -->
+                    <Grid Margin="0,0,0,18">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="TxtYtUrl" Height="44" Padding="14,10" FontSize="14"
-                                 Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="2"
-                                 VerticalContentAlignment="Center" KeyDown="Yt_UrlKeyDown">
-                            <TextBox.Style>
-                                <Style TargetType="TextBox">
-                                    <Style.Triggers>
-                                        <Trigger Property="Text" Value="">
-                                            <Setter Property="Background" Value="#252528"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBox.Style>
-                        </TextBox>
-                        <Button Grid.Column="1" Content="Fetch &#x2192;" Width="90" Height="44"
-                                FontSize="14" FontWeight="SemiBold" Foreground="White" Background="#FF0000"
-                                Cursor="Hand" Click="Yt_Fetch" Margin="8,0,0,0"
+                        <Border Grid.Column="0" Background="#252528" CornerRadius="10" BorderBrush="#3A3A3F"
+                                BorderThickness="1" Height="50">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                           Foreground="#888" VerticalAlignment="Center" Margin="16,0,10,0"/>
+                                <TextBox x:Name="TxtYtUrl" Grid.Column="1" BorderThickness="0" Background="Transparent"
+                                         Foreground="#EEE" FontSize="15" VerticalContentAlignment="Center"
+                                         KeyDown="Yt_UrlKeyDown" Margin="0,0,12,0"/>
+                            </Grid>
+                        </Border>
+                        <Button Grid.Column="1" Content="Search" Width="120" Height="50" FontSize="15" FontWeight="SemiBold"
+                                Foreground="White" Background="#FF0000" Cursor="Hand" Click="Yt_Fetch" Margin="12,0,0,0"
                                 Template="{StaticResource RoundedButton}"/>
                     </Grid>
-                    <TextBlock Text="Paste a YouTube URL (video or playlist), or type keywords to search"
-                               FontSize="12" Foreground="#666" HorizontalAlignment="Center"/>
-                    <!-- Search mode (applies to keyword searches only; URLs are auto-detected) -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
-                        <TextBlock Text="Search for:" Foreground="#888" FontSize="12" VerticalAlignment="Center"
-                                   Margin="0,0,10,0"/>
-                        <RadioButton x:Name="RbYtModeVideos" Content="Videos" Foreground="#CCC" FontSize="12"
-                                     IsChecked="True" GroupName="YtSearchMode" Cursor="Hand" Margin="0,0,14,0"/>
-                        <RadioButton x:Name="RbYtModePlaylists" Content="Playlists" Foreground="#CCC" FontSize="12"
-                                     GroupName="YtSearchMode" Cursor="Hand"/>
-                    </StackPanel>
+                    <!-- Videos / Playlists segmented toggle -->
+                    <Border HorizontalAlignment="Center" Background="#252528" CornerRadius="8" BorderBrush="#3A3A3F"
+                            BorderThickness="1" Padding="3">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="RbYtModeVideos" Style="{StaticResource YtSegment}" Content="Videos"
+                                         GroupName="YtSearchMode" IsChecked="True"/>
+                            <RadioButton x:Name="RbYtModePlaylists" Style="{StaticResource YtSegment}" Content="Playlists"
+                                         GroupName="YtSearchMode"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Tip: paste a URL to download directly, or type keywords to search"
+                               FontSize="12" Foreground="#666" HorizontalAlignment="Center" Margin="0,16,0,0"/>
                     <!-- Loading spinner (shown while fetching) -->
                     <StackPanel x:Name="YtSpinner" Visibility="Collapsed" Margin="0,30,0,0" HorizontalAlignment="Center">
                         <Border Width="36" Height="36" CornerRadius="18" BorderThickness="3"
@@ -2952,33 +2988,6 @@
 
             <!-- Config state -->
             <Grid x:Name="YtConfigView" Visibility="Collapsed" Margin="16,8">
-                <Grid.Resources>
-                    <!-- Segmented toggle (Videos | Playlists) built on RadioButton -->
-                    <Style x:Key="YtSegment" TargetType="RadioButton">
-                        <Setter Property="Foreground" Value="#AAA"/>
-                        <Setter Property="FontSize" Value="13"/>
-                        <Setter Property="Cursor" Value="Hand"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="RadioButton">
-                                    <Border x:Name="Seg" Background="Transparent" CornerRadius="6" Padding="14,7">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="Seg" Property="Background" Value="#FF0000"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                            <Setter Property="FontWeight" Value="SemiBold"/>
-                                        </Trigger>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Foreground" Value="#EEE"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>  <!-- FILTERS sidebar (collapses to 0 on review) -->
                     <ColumnDefinition Width="*"/>      <!-- main content -->
