@@ -280,6 +280,24 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
+    // --- Focused control detection (which child control has keyboard focus) ---
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GUITHREADINFO
+    {
+        public int cbSize;
+        public int flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT rcCaret;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
     // --- Shell Preview Handler COM interfaces ---
     public const string PreviewHandlerGuid = "{8895b1c6-b41f-4c1c-a562-0d564250836f}";
 

@@ -977,10 +977,19 @@ body {{ margin:0; padding:20px; background:#2d2d2d; font-family:Segoe UI,sans-se
     public void BringToFront()
     {
         _activatedAt = DateTime.UtcNow;
-        Topmost = true;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
+        Topmost = true;
         Focus();
-        Topmost = false;
+        // Keep topmost just long enough to win the z-order race, then drop it so
+        // the window doesn't permanently float. Deferring to ApplicationIdle makes
+        // this reliable even when BringToFront is called synchronously from inside
+        // another window's input handler (e.g. clicking an item in the History
+        // window), which otherwise leaves the preview behind that window.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try { Topmost = false; } catch { }
+        }), DispatcherPriority.ApplicationIdle);
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)

@@ -143,7 +143,10 @@ public partial class App : Application
                 var fgHwnd = NativeMethods.GetForegroundWindow();
                 var classNameBuf = new System.Text.StringBuilder(256);
                 NativeMethods.GetClassName(fgHwnd, classNameBuf, 256);
-                if (classNameBuf.ToString() == "CabinetWClass")
+                // Don't hijack the key while the user is typing into an Explorer
+                // edit box (inline rename, search box, address bar) — they need
+                // the space character.
+                if (classNameBuf.ToString() == "CabinetWClass" && !IsExplorerEditFocused(fgHwnd))
                 {
                     var now2 = DateTime.Now;
                     if ((now2 - _lastSpaceTime).TotalMilliseconds > 300)
@@ -215,6 +218,24 @@ public partial class App : Application
         if (fg == IntPtr.Zero) return false;
         NativeMethods.GetWindowThreadProcessId(fg, out uint pid);
         return pid == (uint)Environment.ProcessId;
+    }
+
+    // True when keyboard focus inside the Explorer window is on a text-entry
+    // control (inline rename box, search box, address-bar editor) — all of
+    // which are "Edit" controls. In that state Quick Preview must not steal keys.
+    private static bool IsExplorerEditFocused(IntPtr fgHwnd)
+    {
+        uint threadId = NativeMethods.GetWindowThreadProcessId(fgHwnd, out _);
+        if (threadId == 0) return false;
+
+        var gti = new NativeMethods.GUITHREADINFO();
+        gti.cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>();
+        if (!NativeMethods.GetGUIThreadInfo(threadId, ref gti) || gti.hwndFocus == IntPtr.Zero)
+            return false;
+
+        var cls = new System.Text.StringBuilder(256);
+        NativeMethods.GetClassName(gti.hwndFocus, cls, 256);
+        return cls.ToString().Contains("Edit", StringComparison.OrdinalIgnoreCase);
     }
 
     private void DismissAllOverlays()
