@@ -935,18 +935,20 @@ public static class FileToolsService
         return "yt-dlp"; // fallback to PATH
     }
 
-    public static async Task<List<(string title, string duration, string url, string thumbnail, bool isPlaylist)>> FetchYouTubeVideosAsync(string inputUrl)
+    public static async Task<List<(string title, string duration, string url, string thumbnail, bool isPlaylist, string channel, string views, string age)>> FetchYouTubeVideosAsync(string inputUrl)
     {
-        var results = new List<(string title, string duration, string url, string thumbnail, bool isPlaylist)>();
+        var results = new List<(string title, string duration, string url, string thumbnail, bool isPlaylist, string channel, string views, string age)>();
         string ytdlp = FindYtDlpPath();
         string sep = "|||";
+        // title|||duration|||url|||thumbnail|||ie_key|||channel|||view_count|||upload_date
+        string printFmt = $"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s{sep}%(ie_key)s{sep}%(channel)s{sep}%(view_count)s{sep}%(upload_date)s";
 
         await Task.Run(() =>
         {
             // Use --flat-playlist with a unique separator (tabs are unreliable across process boundaries).
             // %(ie_key)s reports the extractor: "YoutubeTab" = a playlist entry, "Youtube" = a single video.
             var psi = new ProcessStartInfo(ytdlp,
-                $"--flat-playlist --print \"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s{sep}%(ie_key)s\" --no-warnings \"{inputUrl}\"")
+                $"--flat-playlist --print \"{printFmt}\" --no-warnings \"{inputUrl}\"")
             {
                 RedirectStandardOutput = true, RedirectStandardError = true,
                 UseShellExecute = false, CreateNoWindow = true
@@ -965,16 +967,21 @@ public static class FileToolsService
                     string url = parts.Length >= 3 ? parts[2].Trim() : "";
                     string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
                     string ieKey = parts.Length >= 5 ? parts[4].Trim() : "";
+                    string channel = parts.Length >= 6 ? parts[5].Trim() : "";
+                    string viewCount = parts.Length >= 7 ? parts[6].Trim() : "";
+                    string uploadDate = parts.Length >= 8 ? parts[7].Trim() : "";
                     if (title == "NA") title = "Untitled";
                     if (duration == "NA") duration = "";
                     if (url == "NA") url = "";
                     if (thumb == "NA") thumb = "";
+                    if (channel == "NA") channel = "";
                     bool isPlaylist = ieKey.Equals("YoutubeTab", StringComparison.OrdinalIgnoreCase);
                     // For playlist entries without webpage_url, construct from video id
                     if (string.IsNullOrEmpty(url) && line.Contains("youtube.com"))
                         url = inputUrl;
                     if (!string.IsNullOrEmpty(title) && title != "Untitled")
-                        results.Add((title, duration, !string.IsNullOrEmpty(url) ? url : inputUrl, thumb, isPlaylist));
+                        results.Add((title, duration, !string.IsNullOrEmpty(url) ? url : inputUrl, thumb, isPlaylist,
+                            channel, FormatViewCount(viewCount), FormatUploadAge(uploadDate)));
                 }
             }
 
@@ -982,7 +989,7 @@ public static class FileToolsService
             if (results.Count == 0)
             {
                 var psi2 = new ProcessStartInfo(ytdlp,
-                    $"--print \"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s\" --no-download --no-warnings \"{inputUrl}\"")
+                    $"--print \"{printFmt}\" --no-download --no-warnings \"{inputUrl}\"")
                 {
                     RedirectStandardOutput = true, RedirectStandardError = true,
                     UseShellExecute = false, CreateNoWindow = true
@@ -998,12 +1005,49 @@ public static class FileToolsService
                     string duration = parts.Length >= 2 ? parts[1].Trim() : "";
                     string url = parts.Length >= 3 ? parts[2].Trim() : inputUrl;
                     string thumb = parts.Length >= 4 ? parts[3].Trim() : "";
-                    results.Add((title, duration, url, thumb, false));
+                    string channel = parts.Length >= 6 ? parts[5].Trim() : "";
+                    string viewCount = parts.Length >= 7 ? parts[6].Trim() : "";
+                    string uploadDate = parts.Length >= 8 ? parts[7].Trim() : "";
+                    if (channel == "NA") channel = "";
+                    results.Add((title, duration, url, thumb, false,
+                        channel, FormatViewCount(viewCount), FormatUploadAge(uploadDate)));
                 }
             }
         });
 
         return results;
+    }
+
+    // "1234567" -> "1.2M views"; "" / "NA" -> "".
+    private static string FormatViewCount(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw) || raw == "NA") return "";
+        if (!long.TryParse(raw, out long n) || n < 0) return "";
+        string num = n switch
+        {
+            >= 1_000_000_000 => $"{n / 1_000_000_000.0:0.#}B",
+            >= 1_000_000 => $"{n / 1_000_000.0:0.#}M",
+            >= 1_000 => $"{n / 1_000.0:0.#}K",
+            _ => n.ToString()
+        };
+        return $"{num} views";
+    }
+
+    // yt-dlp upload_date "YYYYMMDD" -> coarse relative age ("2 years ago"); "" when absent.
+    private static string FormatUploadAge(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw) || raw == "NA" || raw.Length != 8) return "";
+        if (!DateTime.TryParseExact(raw, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var date))
+            return "";
+        var days = (DateTime.Now.Date - date.Date).TotalDays;
+        if (days < 0) return "";
+        if (days < 1) return "today";
+        if (days < 2) return "yesterday";
+        if (days < 7) return $"{(int)days} days ago";
+        if (days < 30) { int w = (int)(days / 7); return $"{w} week{(w != 1 ? "s" : "")} ago"; }
+        if (days < 365) { int m = (int)(days / 30); return $"{m} month{(m != 1 ? "s" : "")} ago"; }
+        int y = (int)(days / 365); return $"{y} year{(y != 1 ? "s" : "")} ago";
     }
 
     public static async Task<string?> DownloadSingleVideoAsync(string videoUrl, string outputDir, string quality, bool audioOnly, bool embedThumbnail, IProgress<(int percent, string status)>? progress = null)

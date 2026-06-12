@@ -2952,111 +2952,171 @@
 
             <!-- Config state -->
             <Grid x:Name="YtConfigView" Visibility="Collapsed" Margin="16,8">
+                <Grid.Resources>
+                    <!-- Segmented toggle (Videos | Playlists) built on RadioButton -->
+                    <Style x:Key="YtSegment" TargetType="RadioButton">
+                        <Setter Property="Foreground" Value="#AAA"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Seg" Background="Transparent" CornerRadius="6" Padding="14,7">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Seg" Property="Background" Value="#FF0000"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="#EEE"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Grid.Resources>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>  <!-- FILTERS sidebar (collapses to 0 on review) -->
+                    <ColumnDefinition Width="*"/>      <!-- main content -->
+                </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>   <!-- Header: title/detail + select all/deselect -->
-                    <RowDefinition Height="Auto"/>   <!-- Toolbar: search + count + checked-first + view toggle -->
-                    <RowDefinition Height="*"/>       <!-- Video views (list + grid) -->
-                    <RowDefinition Height="Auto"/>   <!-- Download controls -->
+                    <RowDefinition Height="Auto"/>   <!-- Top search bar -->
+                    <RowDefinition Height="Auto"/>   <!-- Results header: title/count + select all + sort + view toggle -->
+                    <RowDefinition Height="*"/>       <!-- Body: sidebar (col0) + video views (col1) -->
+                    <RowDefinition Height="Auto"/>   <!-- Bottom bar / download controls -->
                 </Grid.RowDefinitions>
 
-                <!-- Row 0: compact search bar (search page) + header -->
-                <StackPanel>
-                    <!-- Compact search bar — shown on the search page (input shifted to top) -->
-                    <Grid x:Name="YtTopSearchBar" Margin="0,0,0,10" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="TxtYtUrlTop" Grid.Column="0" Height="36" Padding="12,6" FontSize="13"
-                                 Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="1"
-                                 VerticalContentAlignment="Center" KeyDown="Yt_UrlTopKeyDown"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
-                            <RadioButton x:Name="RbYtModeVideosTop" Content="Videos" Foreground="#CCC" FontSize="12"
-                                         IsChecked="True" GroupName="YtSearchModeTop" Cursor="Hand" Margin="0,0,10,0"/>
-                            <RadioButton x:Name="RbYtModePlaylistsTop" Content="Playlists" Foreground="#CCC" FontSize="12"
-                                         GroupName="YtSearchModeTop" Cursor="Hand"/>
-                        </StackPanel>
-                        <Button Grid.Column="2" Content="Fetch →" Height="36" Width="80" FontSize="13" FontWeight="SemiBold"
-                                Foreground="White" Background="#FF0000" Cursor="Hand" Click="Yt_FetchTop"
-                                Template="{StaticResource RoundedButton}" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnYtClear" Grid.Column="3" Content="Clear" Height="36" Width="70" FontSize="12"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand" Click="Yt_ClearResults"/>
-                    </Grid>
-
-                    <!-- Header -->
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>   <!-- Back / Open playlist / Go to download -->
-                            <ColumnDefinition Width="Auto"/>   <!-- Select All -->
-                            <ColumnDefinition Width="Auto"/>   <!-- Deselect All -->
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock x:Name="TxtYtTitle" Text="" Foreground="#EEE" FontSize="16" FontWeight="SemiBold"
-                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="44"/>
-                            <TextBlock x:Name="TxtYtDetail" Text="" Foreground="#888" FontSize="12" Margin="0,2,0,0"/>
-                        </StackPanel>
-                        <!-- Back (from the download page) -->
-                        <Button x:Name="BtnYtBack" Grid.Column="1" Content="← Back" Height="28" FontSize="11"
-                                Padding="10,0" Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_BackToResults" Visibility="Collapsed" Margin="8,0,4,0"/>
-                        <!-- Open playlist (from playlist results) -->
-                        <Button x:Name="BtnYtOpenPlaylist" Grid.Column="1" Content="Open playlist →" Height="28" FontSize="11"
-                                Padding="10,0" Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_OpenPlaylist" Visibility="Collapsed" Margin="8,0,4,0"/>
-                        <!-- Go to download (from video search results) -->
-                        <Button x:Name="BtnYtGoDownload" Grid.Column="1" Content="Go to download →" Height="28" FontSize="11"
-                                Padding="12,0" Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_GoToDownload" Visibility="Collapsed" Margin="8,0,4,0"/>
-                        <Button x:Name="BtnYtSelectAll" Grid.Column="2" Content="Select All" Width="80" Height="28" FontSize="11"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_SelectAll" Margin="8,0,4,0"/>
-                        <Button x:Name="BtnYtDeselectAll" Grid.Column="3" Content="Deselect All" Width="85" Height="28" FontSize="11"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_DeselectAll"/>
-                    </Grid>
-                </StackPanel>
-
-                <!-- Toolbar -->
-                <Grid x:Name="YtToolbar" Grid.Row="1" Margin="0,0,0,8">
+                <!-- Row 0: top search bar (magnifier + clear + Search + Videos/Playlists segment) -->
+                <Grid x:Name="YtTopSearchBar" Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,14" Visibility="Collapsed">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>      <!-- search -->
-                        <ColumnDefinition Width="Auto"/>   <!-- count -->
-                        <ColumnDefinition Width="Auto"/>   <!-- checked first -->
-                        <ColumnDefinition Width="Auto"/>   <!-- view toggle -->
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#252528" CornerRadius="8" BorderBrush="#3A3A3F" BorderThickness="1" Height="44">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="15"
+                                       Foreground="#888" VerticalAlignment="Center" Margin="14,0,10,0"/>
+                            <TextBox x:Name="TxtYtUrlTop" Grid.Column="1" BorderThickness="0" Background="Transparent"
+                                     Foreground="#EEE" FontSize="14" VerticalContentAlignment="Center"
+                                     KeyDown="Yt_UrlTopKeyDown"/>
+                            <Button x:Name="BtnYtClear" Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                    Width="30" Height="30" FontSize="11" Background="Transparent" Foreground="#888"
+                                    BorderThickness="0" Cursor="Hand" Click="Yt_ClearResults" Margin="0,0,8,0"/>
+                        </Grid>
+                    </Border>
+                    <Button Grid.Column="1" Content="Search" Height="44" Width="120" FontSize="14" FontWeight="SemiBold"
+                            Foreground="White" Background="#FF0000" Cursor="Hand" Click="Yt_FetchTop"
+                            Template="{StaticResource RoundedButton}" Margin="12,0,0,0"/>
+                    <Border Grid.Column="2" Margin="12,0,0,0" Background="#252528" CornerRadius="8"
+                            BorderBrush="#3A3A3F" BorderThickness="1" Padding="3" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="RbYtModeVideosTop" Style="{StaticResource YtSegment}" Content="Videos"
+                                         GroupName="YtSearchModeTop" IsChecked="True"/>
+                            <RadioButton x:Name="RbYtModePlaylistsTop" Style="{StaticResource YtSegment}" Content="Playlists"
+                                         GroupName="YtSearchModeTop"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
 
-                    <!-- Search box with watermark -->
-                    <Grid x:Name="YtSearchBox" Grid.Column="0" HorizontalAlignment="Left" Width="280">
-                        <TextBox x:Name="TxtYtSearch" Height="30" Padding="10,4" FontSize="12"
-                                 Background="#252528" Foreground="#EEE" BorderBrush="#444" BorderThickness="1"
-                                 VerticalContentAlignment="Center" TextChanged="Yt_SearchChanged"/>
-                        <TextBlock x:Name="TxtYtSearchPlaceholder" Text="Search videos…" Foreground="#666"
-                                   FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center"
-                                   IsHitTestVisible="False"/>
-                    </Grid>
-
-                    <TextBlock x:Name="TxtYtSelectedCount" Grid.Column="1" Text="0 of 0 selected"
-                               Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="12,0"/>
-
-                    <Button x:Name="BtnYtCheckedFirst" Grid.Column="2" Content="Checked first" Height="28"
-                            FontSize="11" Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                            Padding="10,0" Margin="0,0,8,0" Click="Yt_CheckedFirst"/>
-
-                    <StackPanel Grid.Column="3" Orientation="Horizontal">
-                        <Button x:Name="BtnYtListView" Content="List" Width="50" Height="28" FontSize="11"
+                <!-- Row 1: results header — title/count (left); Select All + sort + view toggle (right) -->
+                <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtYtTitle" Text="" Foreground="#EEE" FontSize="18" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="48"/>
+                        <TextBlock x:Name="TxtYtDetail" Text="" Foreground="#888" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnYtBack" Content="← Back" Height="30" FontSize="12" Padding="12,0"
                                 Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_ListView"/>
-                        <Button x:Name="BtnYtGridView" Content="Grid" Width="50" Height="28" FontSize="11"
+                                Click="Yt_BackToResults" Visibility="Collapsed" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnYtOpenPlaylist" Content="Open playlist →" Height="30" FontSize="12" Padding="12,0"
                                 Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_GridView"/>
+                                Click="Yt_OpenPlaylist" Visibility="Collapsed" Margin="0,0,8,0"
+                                Template="{StaticResource RoundedButton21}"/>
+                        <CheckBox x:Name="ChkYtSelectAll" Content="Select All" Foreground="#CCC" FontSize="12"
+                                  VerticalAlignment="Center" Cursor="Hand" Margin="0,0,14,0" Click="Yt_SelectAllToggle"/>
+                        <ComboBox x:Name="CmbYtSortHeader" Width="150" Height="32" FontSize="12" Margin="0,0,10,0"
+                                  SelectedIndex="0" SelectionChanged="Yt_SortChanged">
+                            <ComboBoxItem Content="Relevance"/>
+                            <ComboBoxItem Content="Upload date"/>
+                            <ComboBoxItem Content="View count"/>
+                            <ComboBoxItem Content="Rating"/>
+                        </ComboBox>
+                        <Border Background="#252528" CornerRadius="6" BorderBrush="#3A3A3F" BorderThickness="1" Padding="2">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="BtnYtGridView" Content="&#xF0E2;" FontFamily="Segoe MDL2 Assets" Width="34" Height="28"
+                                        FontSize="13" Background="#FF0000" Foreground="White" BorderThickness="0" Cursor="Hand"
+                                        Click="Yt_GridView"/>
+                                <Button x:Name="BtnYtListView" Content="&#xE8FD;" FontFamily="Segoe MDL2 Assets" Width="34" Height="28"
+                                        FontSize="13" Background="Transparent" Foreground="#CCC" BorderThickness="0" Cursor="Hand"
+                                        Click="Yt_ListView"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Grid>
 
+                <!-- Legacy controls kept (hidden) so existing handlers stay valid; superseded by the new UI -->
+                <StackPanel Grid.Row="1" Grid.Column="1" Visibility="Collapsed" IsHitTestVisible="False">
+                    <Button x:Name="BtnYtGoDownload" Click="Yt_GoToDownload"/>
+                    <Button x:Name="BtnYtSelectAll" Click="Yt_SelectAll"/>
+                    <Button x:Name="BtnYtDeselectAll" Click="Yt_DeselectAll"/>
+                    <Button x:Name="BtnYtCheckedFirst" Click="Yt_CheckedFirst"/>
+                    <Grid x:Name="YtSearchBox">
+                        <TextBox x:Name="TxtYtSearch" TextChanged="Yt_SearchChanged"/>
+                        <TextBlock x:Name="TxtYtSearchPlaceholder"/>
+                    </Grid>
+                    <TextBlock x:Name="TxtYtSelectedCount"/>
+                </StackPanel>
+
+                <!-- Body col0: FILTERS sidebar (hidden on the review screen) -->
+                <Border x:Name="YtFiltersPanel" Grid.Row="2" Grid.Column="0" Width="190" Margin="0,0,16,0"
+                        Background="#161619" BorderBrush="#2A2A2F" BorderThickness="1" CornerRadius="8" Padding="16,14">
+                    <DockPanel>
+                        <Button x:Name="BtnYtClearFilters" DockPanel.Dock="Bottom" Content="↺  Clear filters" Height="36"
+                                FontSize="12" Background="#222226" Foreground="#CCC" BorderBrush="#3A3A3F" Cursor="Hand"
+                                Click="Yt_ClearFilters" Margin="0,12,0,0"/>
+                        <StackPanel>
+                            <TextBlock Text="FILTERS" Foreground="#777" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                            <TextBlock Text="Upload date" Foreground="#DDD" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <StackPanel x:Name="YtUploadDateGroup">
+                                <RadioButton Content="Any time" Tag="any" GroupName="YtUploadDate" IsChecked="True"
+                                             Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,3" Checked="Yt_FilterChanged"/>
+                                <RadioButton Content="Today" Tag="today" GroupName="YtUploadDate"
+                                             Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,3" Checked="Yt_FilterChanged"/>
+                                <RadioButton Content="This week" Tag="week" GroupName="YtUploadDate"
+                                             Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,3" Checked="Yt_FilterChanged"/>
+                                <RadioButton Content="This month" Tag="month" GroupName="YtUploadDate"
+                                             Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,3" Checked="Yt_FilterChanged"/>
+                                <RadioButton Content="This year" Tag="year" GroupName="YtUploadDate"
+                                             Foreground="#CCC" FontSize="12" Cursor="Hand" Margin="0,3" Checked="Yt_FilterChanged"/>
+                            </StackPanel>
+                            <TextBlock Text="Sort by" Foreground="#DDD" FontSize="13" FontWeight="SemiBold" Margin="0,18,0,8"/>
+                            <ComboBox x:Name="CmbYtSort" Height="32" FontSize="12" SelectedIndex="0" SelectionChanged="Yt_SortChanged">
+                                <ComboBoxItem Content="Relevance"/>
+                                <ComboBoxItem Content="Upload date"/>
+                                <ComboBoxItem Content="View count"/>
+                                <ComboBoxItem Content="Rating"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
                 <!-- Video list (row) view -->
-                <ListBox x:Name="YtVideoList" Grid.Row="2" Visibility="Collapsed"
+                <ListBox x:Name="YtVideoList" Grid.Row="2" Grid.Column="1" Visibility="Collapsed"
                          IsSynchronizedWithCurrentItem="False" SelectionMode="Extended"
                          PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
                          Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
@@ -3120,8 +3180,11 @@
                                     </Image.Clip>
                                 </Image>
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}" Foreground="#CCC" FontSize="13"
+                                    <TextBlock Text="{Binding Title}" Foreground="#DDD" FontSize="13" FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                                    <TextBlock Foreground="#888" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Channel, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding ViewsAge, Mode=OneWay}"/>
+                                    </TextBlock>
                                     <TextBlock Text="{Binding Duration}" Foreground="#666" FontSize="11" Margin="0,2,0,0"/>
                                     <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="3"
                                                  Foreground="#42A5F5" Background="#333" BorderThickness="0"
@@ -3160,7 +3223,7 @@
                 </ListBox>
 
                 <!-- Video grid (card) view -->
-                <ListBox x:Name="YtVideoGrid" Grid.Row="2"
+                <ListBox x:Name="YtVideoGrid" Grid.Row="2" Grid.Column="1"
                          IsSynchronizedWithCurrentItem="False" SelectionMode="Extended"
                          PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
                          Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
@@ -3187,23 +3250,23 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Border Width="180" Background="#222226" CornerRadius="6" BorderThickness="2">
+                            <Border Width="210" Background="#222226" CornerRadius="8" BorderThickness="2">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="BorderBrush" Value="Transparent"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                                <Setter Property="BorderBrush" Value="#6E7787"/>
+                                                <Setter Property="BorderBrush" Value="#FF3B3B"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
                                 <StackPanel>
                                     <Grid>
-                                        <Image Source="{Binding Thumbnail}" Width="180" Height="101"
+                                        <Image Source="{Binding Thumbnail}" Width="210" Height="118"
                                                Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality">
                                             <Image.Clip>
-                                                <RectangleGeometry Rect="0,0,180,101" RadiusX="6" RadiusY="6"/>
+                                                <RectangleGeometry Rect="0,0,210,118" RadiusX="8" RadiusY="8"/>
                                             </Image.Clip>
                                         </Image>
                                         <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
@@ -3256,6 +3319,10 @@
                                                         <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
                                                         </DataTrigger>
+                                                        <!-- Hide the status badge until a download is underway -->
+                                                        <DataTrigger Binding="{Binding Status}" Value="Pending">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
@@ -3263,9 +3330,44 @@
                                                        FontSize="10" FontWeight="SemiBold"/>
                                         </Border>
                                     </Grid>
-                                    <TextBlock Text="{Binding Title}" Foreground="#CCC" FontSize="12"
-                                               Margin="8,6,8,4" TextWrapping="Wrap"
-                                               TextTrimming="CharacterEllipsis" MaxHeight="32"/>
+                                    <Grid Margin="8,6,6,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Title}" Foreground="#DDD" FontSize="12" FontWeight="SemiBold"
+                                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="32" LineHeight="15"/>
+                                            <TextBlock Text="{Binding Channel}" Foreground="#999" FontSize="11" Margin="0,4,0,0"
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Channel}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding ViewsAge}" Foreground="#777" FontSize="11" Margin="0,1,0,0"
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ViewsAge}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="&#x22EF;" FontSize="15" Width="26" Height="26"
+                                                VerticalAlignment="Top" Background="Transparent" Foreground="#888"
+                                                BorderThickness="0" Cursor="Hand" Click="Yt_CardMenu" Tag="{Binding}"
+                                                ToolTip="More"/>
+                                    </Grid>
                                     <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="3"
                                                  Foreground="#42A5F5" Background="#333" BorderThickness="0"
                                                  Margin="8,0,8,8"/>
@@ -3275,8 +3377,41 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
+                <!-- Bottom action bar (search screens): selected count + est. size + Continue -->
+                <Border x:Name="YtBottomBar" Grid.Row="3" Grid.ColumnSpan="2" Visibility="Collapsed"
+                        Background="#161619" BorderBrush="#2A2A2F" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,40,0">
+                            <TextBlock Text="Selected" Foreground="#888" FontSize="12"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="TxtYtSelectedVideos" Text="0" Foreground="#FF3B3B" FontSize="22" FontWeight="Bold"/>
+                                <TextBlock Text="Videos" Foreground="#FF3B3B" FontSize="14" FontWeight="SemiBold"
+                                           VerticalAlignment="Bottom" Margin="6,0,0,3"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Estimated size" Foreground="#888" FontSize="12"/>
+                            <TextBlock x:Name="TxtYtEstSize" Text="~0 MB" Foreground="#EEE" FontSize="18" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <Button x:Name="BtnYtContinue" Grid.Column="3" Height="56" Width="220" Cursor="Hand"
+                                Background="#FF0000" Foreground="White" BorderThickness="0" Click="Yt_GoToDownload"
+                                Template="{StaticResource RoundedButton}">
+                            <StackPanel>
+                                <TextBlock Text="Continue  →" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Review and download" FontSize="11" Opacity="0.85" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+
                 <!-- Download controls -->
-                <Grid x:Name="YtDownloadControls" Grid.Row="3" Margin="0,12,0,8">
+                <Grid x:Name="YtDownloadControls" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
@@ -3294,7 +3429,8 @@
                     </StackPanel>
 
                     <StackPanel x:Name="YtVideoOptions" Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0">
-                        <ComboBox x:Name="CmbYtQuality" Width="80" Height="28" FontSize="11" SelectedIndex="0">
+                        <ComboBox x:Name="CmbYtQuality" Width="80" Height="28" FontSize="11" SelectedIndex="0"
+                                  SelectionChanged="Yt_QualityChanged">
                             <ComboBoxItem Content="Best"/>
                             <ComboBoxItem Content="720p"/>
                             <ComboBoxItem Content="480p"/>

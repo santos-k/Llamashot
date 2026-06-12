@@ -171,6 +171,11 @@ public partial class FileToolsWindow : Window
     private enum YtScreen { Hero, SearchVideos, SearchPlaylists, Download }
     private YtScreen _ytScreen = YtScreen.Hero;
     private YtScreen _ytBackTarget = YtScreen.Hero;
+    // Search filters (video search only): upload-date + sort drive YouTube's sp= token.
+    private string _ytUploadDate = "any";          // any|today|week|month|year
+    private int _ytSort;                            // 0 Relevance, 1 Upload date, 2 View count, 3 Rating
+    private bool _ytFiltersReady;                   // suppress filter handlers during programmatic init
+    private bool _ytSyncingSort;                    // guard while mirroring the two sort combos
     // Cached search results + header text, so "Back" restores the search page without re-fetching.
     private readonly List<YtVideoItem> _ytSearchCache = new();
     private string _ytResultsTitle = "";
@@ -6232,10 +6237,20 @@ public partial class FileToolsWindow : Window
         // The Videos/Playlists radio chooses between a video search and a playlist search.
         bool isSearch = !YtLooksLikeUrl(url);
         bool playlistSearch = isSearch && playlistMode;
-        string target = !isSearch ? url
-            : playlistSearch
-                ? $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp=EgIQAw%3D%3D"
-                : $"ytsearch20:{url}";
+        string target;
+        if (!isSearch)
+            target = url;
+        else if (playlistSearch)
+            target = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp=EgIQAw%3D%3D";
+        else
+        {
+            // Video search: apply upload-date + sort via YouTube's sp= token when non-default.
+            string sp = BuildYtSp(_ytUploadDate, _ytSort);
+            target = string.IsNullOrEmpty(sp)
+                ? $"ytsearch20:{url}"
+                : $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp={Uri.EscapeDataString(sp)}";
+        }
+        _ytFiltersReady = false; // suppress filter handlers while this fetch mutates UI
 
         _ytUrl = url;
         _ytSearchCache.Clear();
@@ -6316,6 +6331,7 @@ public partial class FileToolsWindow : Window
             UpdateYtSelectedCount();
             YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+            _ytFiltersReady = true; // re-enable filter/sort re-search now that the UI is settled
         }
         catch (Exception ex)
         {
@@ -6336,9 +6352,9 @@ public partial class FileToolsWindow : Window
     }
 
     // Builds YtVideoItems (with thumbnails) from fetch results and adds them to the bound collection.
-    private void PopulateYtItems(List<(string title, string duration, string url, string thumbnail, bool isPlaylist)> videos)
+    private void PopulateYtItems(List<(string title, string duration, string url, string thumbnail, bool isPlaylist, string channel, string views, string age)> videos)
     {
-        foreach (var (title, duration, videoUrl, thumbnail, isPlaylist) in videos)
+        foreach (var (title, duration, videoUrl, thumbnail, isPlaylist, channel, views, age) in videos)
         {
             var item = new YtVideoItem
             {
@@ -6346,7 +6362,10 @@ public partial class FileToolsWindow : Window
                 Duration = duration,
                 VideoUrl = videoUrl,
                 ThumbnailUrl = thumbnail,
-                IsPlaylist = isPlaylist
+                IsPlaylist = isPlaylist,
+                Channel = channel,
+                Views = views,
+                Age = age
             };
 
             // Derive thumbnail from video ID when not provided (videos only; playlists rely on the given URL).
@@ -6385,28 +6404,26 @@ public partial class FileToolsWindow : Window
         bool searchPlaylists = _ytScreen == YtScreen.SearchPlaylists;
         bool search = searchVideos || searchPlaylists;
         bool download = _ytScreen == YtScreen.Download;
-        bool checks = searchVideos || download; // screens where checkboxes apply
 
         YtTopSearchBar.Visibility = search ? Visibility.Visible : Visibility.Collapsed;
+        YtFiltersPanel.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed; // filters: video search only
+        YtBottomBar.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
         YtDownloadControls.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
 
-        // Header action button (column 1 is mutually exclusive across screens).
-        BtnYtGoDownload.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
+        // Header right-side controls.
         BtnYtOpenPlaylist.Visibility = searchPlaylists ? Visibility.Visible : Visibility.Collapsed;
         BtnYtBack.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
-
-        BtnYtSelectAll.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
-        BtnYtDeselectAll.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
-        BtnYtCheckedFirst.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
-        TxtYtSelectedCount.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
+        ChkYtSelectAll.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
+        CmbYtSortHeader.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateYtGoDownloadEnabled();
     }
 
     private void UpdateYtGoDownloadEnabled()
     {
-        if (BtnYtGoDownload != null)
-            BtnYtGoDownload.IsEnabled = _ytVideos.Any(v => v.IsSelected);
+        bool any = _ytVideos.Any(v => v.IsSelected && !v.IsPlaylist);
+        if (BtnYtGoDownload != null) BtnYtGoDownload.IsEnabled = any;
+        if (BtnYtContinue != null) BtnYtContinue.IsEnabled = any;
     }
 
     // From video search results: carry the selected videos to the download page.
@@ -6448,6 +6465,17 @@ public partial class FileToolsWindow : Window
         _ytBackTarget = YtScreen.Hero;
         TxtYtUrl.Text = "";
         TxtYtUrlTop.Text = "";
+
+        // Reset filters to defaults for the next search.
+        _ytFiltersReady = false;
+        _ytUploadDate = "any";
+        _ytSort = 0;
+        if (CmbYtSort != null) CmbYtSort.SelectedIndex = 0;
+        if (CmbYtSortHeader != null) CmbYtSortHeader.SelectedIndex = 0;
+        if (YtUploadDateGroup != null)
+            foreach (var c in YtUploadDateGroup.Children)
+                if (c is System.Windows.Controls.RadioButton rb) rb.IsChecked = (rb.Tag as string) == "any";
+
         ShowSelectState("youtube_dl");
     }
 
@@ -6563,6 +6591,7 @@ public partial class FileToolsWindow : Window
         bool isVideo = RbYtVideo?.IsChecked == true;
         YtVideoOptions.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
         ChkYtEmbedThumb.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
+        UpdateYtSelectedCount();
     }
 
     private async void Yt_Download(object sender, RoutedEventArgs e)
@@ -6798,9 +6827,58 @@ public partial class FileToolsWindow : Window
     private void UpdateYtSelectedCount()
     {
         if (TxtYtSelectedCount == null) return;
-        int sel = _ytVideos.Count(v => v.IsSelected);
-        TxtYtSelectedCount.Text = $"{sel} of {_ytVideos.Count} selected";
+        int sel = _ytVideos.Count(v => v.IsSelected && !v.IsPlaylist);
+        int total = _ytVideos.Count(v => !v.IsPlaylist);
+        TxtYtSelectedCount.Text = $"{sel} of {total} selected";
+
+        if (TxtYtSelectedVideos != null) TxtYtSelectedVideos.Text = sel.ToString();
+        if (TxtYtEstSize != null) TxtYtEstSize.Text = "~" + FormatYtSize(EstimateYtSizeMb());
+
+        if (ChkYtSelectAll != null)
+            ChkYtSelectAll.IsChecked = total == 0 ? false : (sel == total ? true : (sel == 0 ? false : (bool?)null));
+
         UpdateYtGoDownloadEnabled();
+    }
+
+    // Rough size estimate: duration × MB-per-minute for the active format/quality.
+    private double EstimateYtSizeMb()
+    {
+        double rate = YtMbPerMin();
+        double mb = 0;
+        foreach (var v in _ytVideos)
+            if (v.IsSelected && !v.IsPlaylist) mb += v.DurationMinutes * rate;
+        return mb;
+    }
+
+    private double YtMbPerMin()
+    {
+        // On the review screen the chosen format/quality is known; otherwise assume 720p.
+        if (_ytScreen == YtScreen.Download && RbYtAudio?.IsChecked == true) return 1.0;
+        string q = (_ytScreen == YtScreen.Download && CmbYtQuality?.SelectedItem is ComboBoxItem ci)
+            ? (ci.Content?.ToString() ?? "Best") : "Best";
+        return q switch { "360p" => 5.0, "480p" => 8.0, "720p" => 15.0, _ => 15.0 };
+    }
+
+    private static string FormatYtSize(double mb)
+    {
+        if (mb <= 0) return "0 MB";
+        return mb >= 1024 ? $"{mb / 1024.0:0.##} GB" : $"{mb:0} MB";
+    }
+
+    // Builds YouTube's sp= filter token from upload-date + sort. Returns "" for the
+    // default (Any time + Relevance) so the caller can use the plain ytsearch path.
+    // Protobuf: field 1 (0x08) = sort; field 2 (0x12) = filter group containing
+    // sub-field 1 (0x08) = upload-date. YouTube sort values: relevance=0, rating=1,
+    // upload-date=2, view-count=3.
+    private static string BuildYtSp(string uploadDate, int sortIdx)
+    {
+        int dateVal = uploadDate switch { "today" => 2, "week" => 3, "month" => 4, "year" => 5, _ => 0 };
+        int sortVal = sortIdx switch { 1 => 2, 2 => 3, 3 => 1, _ => 0 };
+        if (dateVal == 0 && sortVal == 0) return "";
+        var b = new List<byte>();
+        if (sortVal != 0) { b.Add(0x08); b.Add((byte)sortVal); }
+        if (dateVal != 0) { b.Add(0x12); b.Add(0x02); b.Add(0x08); b.Add((byte)dateVal); }
+        return Convert.ToBase64String(b.ToArray());
     }
 
     private void Yt_CheckedFirst(object sender, RoutedEventArgs e)
@@ -6814,6 +6892,79 @@ public partial class FileToolsWindow : Window
             if (cur != i) _ytVideos.Move(cur, i);
         }
     }
+
+    // Header "Select All" tri-state checkbox: check/uncheck every (non-playlist) item.
+    private void Yt_SelectAllToggle(object sender, RoutedEventArgs e)
+    {
+        bool check = ChkYtSelectAll.IsChecked == true;
+        foreach (var v in _ytVideos)
+            if (!v.IsPlaylist) v.IsSelected = check;
+        UpdateYtSelectedCount();
+    }
+
+    // Upload-date radio changed → re-query video search.
+    private async void Yt_FilterChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_ytFiltersReady) return;
+        if (sender is System.Windows.Controls.RadioButton rb && rb.Tag is string tag) _ytUploadDate = tag;
+        await YtReSearchAsync();
+    }
+
+    // Sort combo changed (either sidebar or header) → mirror the other, then re-query.
+    private async void Yt_SortChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ytFiltersReady || _ytSyncingSort) return;
+        int idx = (sender as ComboBox)?.SelectedIndex ?? 0;
+        _ytSort = idx;
+        _ytSyncingSort = true;
+        if (CmbYtSort != null && CmbYtSort.SelectedIndex != idx) CmbYtSort.SelectedIndex = idx;
+        if (CmbYtSortHeader != null && CmbYtSortHeader.SelectedIndex != idx) CmbYtSortHeader.SelectedIndex = idx;
+        _ytSyncingSort = false;
+        await YtReSearchAsync();
+    }
+
+    private async void Yt_ClearFilters(object sender, RoutedEventArgs e)
+    {
+        _ytFiltersReady = false;
+        _ytUploadDate = "any";
+        _ytSort = 0;
+        if (CmbYtSort != null) CmbYtSort.SelectedIndex = 0;
+        if (CmbYtSortHeader != null) CmbYtSortHeader.SelectedIndex = 0;
+        if (YtUploadDateGroup != null)
+            foreach (var c in YtUploadDateGroup.Children)
+                if (c is System.Windows.Controls.RadioButton rb) rb.IsChecked = (rb.Tag as string) == "any";
+        _ytFiltersReady = true;
+        await YtReSearchAsync();
+    }
+
+    // Re-run the current video search with the active filters/sort.
+    private async Task YtReSearchAsync()
+    {
+        if (_ytScreen != YtScreen.SearchVideos || string.IsNullOrWhiteSpace(_ytUrl)) return;
+        await RunYtFetchAsync(_ytUrl, playlistMode: false, fromHero: false);
+    }
+
+    // Card "⋯" menu: Open on YouTube / Copy link.
+    private void Yt_CardMenu(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn || btn.Tag is not YtVideoItem item) return;
+        var menu = new System.Windows.Controls.ContextMenu();
+        var open = new System.Windows.Controls.MenuItem { Header = "Open on YouTube" };
+        open.Click += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(item.VideoUrl) { UseShellExecute = true }); }
+            catch { }
+        };
+        var copy = new System.Windows.Controls.MenuItem { Header = "Copy link" };
+        copy.Click += (_, _) => { try { Clipboard.SetText(item.VideoUrl); } catch { } };
+        menu.Items.Add(open);
+        menu.Items.Add(copy);
+        menu.PlacementTarget = btn;
+        menu.IsOpen = true;
+    }
+
+    // Review-screen quality changed → refresh the estimated size.
+    private void Yt_QualityChanged(object sender, SelectionChangedEventArgs e) => UpdateYtSelectedCount();
 }
 
 // =========================================================================
@@ -6907,6 +7058,38 @@ public class YtVideoItem : INotifyPropertyChanged
     public string Duration { get; set; } = "";
     public string VideoUrl { get; set; } = "";
     public string ThumbnailUrl { get; set; } = "";
+    public string Channel { get; set; } = "";
+    public string Views { get; set; } = "";
+    public string Age { get; set; } = "";
+
+    // "12M views · 2 years ago" — drops the missing half (age is often absent in flat search).
+    public string ViewsAge =>
+        (string.IsNullOrEmpty(Views), string.IsNullOrEmpty(Age)) switch
+        {
+            (false, false) => $"{Views} · {Age}",
+            (false, true) => Views,
+            (true, false) => Age,
+            _ => ""
+        };
+
+    // Approximate duration in minutes parsed from the "H:MM:SS" / "M:SS" duration string.
+    public double DurationMinutes
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Duration)) return 0;
+            var segs = Duration.Split(':');
+            double mins = 0;
+            try
+            {
+                if (segs.Length == 3) mins = int.Parse(segs[0]) * 60 + int.Parse(segs[1]) + int.Parse(segs[2]) / 60.0;
+                else if (segs.Length == 2) mins = int.Parse(segs[0]) + int.Parse(segs[1]) / 60.0;
+                else if (segs.Length == 1 && int.TryParse(segs[0], out int s)) mins = s / 60.0;
+            }
+            catch { return 0; }
+            return mins;
+        }
+    }
     public BitmapImage? Thumbnail { get; set; }
     public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
     public int Progress { get => _progress; set { _progress = value; OnPropertyChanged(); } }
