@@ -6358,9 +6358,12 @@ public partial class FileToolsWindow : Window
             }
             else
             {
-                // A pasted URL goes straight to the download page.
+                // A pasted URL goes straight to the download page. A single pasted
+                // video is pre-checked (obvious intent); a pasted playlist's items
+                // stay unchecked so the user picks which to download.
                 _ytScreen = YtScreen.Download;
                 _ytBackTarget = YtScreen.Hero;
+                if (_ytVideos.Count == 1) _ytVideos[0].IsSelected = true;
             }
 
             TxtYtTitle.Text = headerTitle;
@@ -7162,7 +7165,7 @@ public class PdfEditorPageEntry
 
 public class YtVideoItem : INotifyPropertyChanged
 {
-    private bool _isSelected = true;
+    private bool _isSelected = false;   // results start unchecked; the user opts in
     private string _status = "Pending";
     private int _progress;
 
