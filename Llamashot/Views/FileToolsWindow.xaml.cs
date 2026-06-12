@@ -176,6 +176,13 @@ public partial class FileToolsWindow : Window
     private int _ytSort;                            // 0 Relevance, 1 Upload date, 2 View count, 3 Rating
     private bool _ytFiltersReady;                   // suppress filter handlers during programmatic init
     private bool _ytSyncingSort;                    // guard while mirroring the two sort combos
+    // Incremental keyword search: load results in batches of 10 (infinite scroll).
+    private string _ytSearchQuery = "";             // current keyword (video search) for paging
+    private int _ytLoadedCount;                     // results fetched so far for the current query
+    private bool _ytLoadingMore;
+    private bool _ytNoMore = true;                  // true until a video keyword search starts
+    private const int YtBatchSize = 12;   // 4 columns × 3 rows per batch
+    private const int YtMaxResults = 120;
     // Cached search results + header text, so "Back" restores the search page without re-fetching.
     private readonly List<YtVideoItem> _ytSearchCache = new();
     private string _ytResultsTitle = "";
@@ -6237,20 +6244,26 @@ public partial class FileToolsWindow : Window
         // The Videos/Playlists radio chooses between a video search and a playlist search.
         bool isSearch = !YtLooksLikeUrl(url);
         bool playlistSearch = isSearch && playlistMode;
+        bool videoSearch = isSearch && !playlistSearch;
         string target;
+        string? batchItems = null;
         if (!isSearch)
             target = url;
         else if (playlistSearch)
             target = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp=EgIQAw%3D%3D";
         else
         {
-            // Video search: apply upload-date + sort via YouTube's sp= token when non-default.
-            string sp = BuildYtSp(_ytUploadDate, _ytSort);
-            target = string.IsNullOrEmpty(sp)
-                ? $"ytsearch20:{url}"
-                : $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(url)}&sp={Uri.EscapeDataString(sp)}";
+            // Video keyword search: load the first batch of 10 (more on scroll).
+            target = BuildVideoSearchTarget(url, YtBatchSize);
+            batchItems = $"1-{YtBatchSize}";
         }
         _ytFiltersReady = false; // suppress filter handlers while this fetch mutates UI
+
+        // Reset paging state for this query.
+        _ytSearchQuery = videoSearch ? url : "";
+        _ytLoadedCount = 0;
+        _ytLoadingMore = false;
+        _ytNoMore = !videoSearch;
 
         _ytUrl = url;
         _ytSearchCache.Clear();
@@ -6282,7 +6295,7 @@ public partial class FileToolsWindow : Window
 
         try
         {
-            var videos = await FileToolsService.FetchYouTubeVideosAsync(target);
+            var videos = await FileToolsService.FetchYouTubeVideosAsync(target, batchItems);
 
             if (fromHero)
             {
@@ -6306,6 +6319,12 @@ public partial class FileToolsWindow : Window
                 : $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} found";
 
             PopulateYtItems(videos);
+
+            if (videoSearch)
+            {
+                _ytLoadedCount = videos.Count;
+                _ytNoMore = videos.Count < YtBatchSize;
+            }
 
             if (isSearch)
             {
@@ -6942,6 +6961,63 @@ public partial class FileToolsWindow : Window
     {
         if (_ytScreen != YtScreen.SearchVideos || string.IsNullOrWhiteSpace(_ytUrl)) return;
         await RunYtFetchAsync(_ytUrl, playlistMode: false, fromHero: false);
+    }
+
+    // Builds a video-search target for the first `end` results (ytsearch, or the
+    // results page + sp= token when a filter/sort is active).
+    private string BuildVideoSearchTarget(string query, int end)
+    {
+        string sp = BuildYtSp(_ytUploadDate, _ytSort);
+        return string.IsNullOrEmpty(sp)
+            ? $"ytsearch{end}:{query}"
+            : $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(query)}&sp={Uri.EscapeDataString(sp)}";
+    }
+
+    // Infinite scroll: fetch the next batch of 10 and append (selection preserved).
+    private async Task YtLoadMoreAsync()
+    {
+        if (_ytLoadingMore || _ytNoMore) return;
+        if (_ytScreen != YtScreen.SearchVideos || string.IsNullOrWhiteSpace(_ytSearchQuery)) return;
+        if (_ytLoadedCount >= YtMaxResults) { _ytNoMore = true; return; }
+
+        _ytLoadingMore = true;
+        if (YtLoadMoreBar != null) YtLoadMoreBar.Visibility = Visibility.Visible;
+        try
+        {
+            int start = _ytLoadedCount + 1;
+            int end = _ytLoadedCount + YtBatchSize;
+            string target = BuildVideoSearchTarget(_ytSearchQuery, end);
+            var more = await FileToolsService.FetchYouTubeVideosAsync(target, $"{start}-{end}");
+
+            // De-dupe against what's already loaded, then append.
+            var existing = new HashSet<string>(_ytVideos.Select(v => v.VideoUrl), StringComparer.OrdinalIgnoreCase);
+            var fresh = more.Where(m => !existing.Contains(m.url)).ToList();
+            PopulateYtItems(fresh);
+
+            _ytLoadedCount += more.Count;
+            if (more.Count < YtBatchSize || _ytLoadedCount >= YtMaxResults) _ytNoMore = true;
+
+            _ytResultsDetail = $"{_ytVideos.Count} videos loaded";
+            TxtYtDetail.Text = _ytResultsDetail;
+            UpdateYtSelectedCount();
+            _ytSearchCache.Clear();
+            _ytSearchCache.AddRange(_ytVideos); // keep Back in sync
+        }
+        catch { /* keep what we already have */ }
+        finally
+        {
+            if (YtLoadMoreBar != null) YtLoadMoreBar.Visibility = Visibility.Collapsed;
+            _ytLoadingMore = false;
+        }
+    }
+
+    // Load the next batch when the results are scrolled near the bottom.
+    private async void Yt_GridScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (_ytScreen != YtScreen.SearchVideos || _ytNoMore || _ytLoadingMore) return;
+        if (e.ExtentHeight <= 0 || e.VerticalChange <= 0) return;
+        if (e.VerticalOffset + e.ViewportHeight >= e.ExtentHeight - 250)
+            await YtLoadMoreAsync();
     }
 
     // Card "⋯" menu: Open on YouTube / Copy link.

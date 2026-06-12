@@ -935,20 +935,22 @@ public static class FileToolsService
         return "yt-dlp"; // fallback to PATH
     }
 
-    public static async Task<List<(string title, string duration, string url, string thumbnail, bool isPlaylist, string channel, string views, string age)>> FetchYouTubeVideosAsync(string inputUrl)
+    public static async Task<List<(string title, string duration, string url, string thumbnail, bool isPlaylist, string channel, string views, string age)>> FetchYouTubeVideosAsync(string inputUrl, string? playlistItems = null)
     {
         var results = new List<(string title, string duration, string url, string thumbnail, bool isPlaylist, string channel, string views, string age)>();
         string ytdlp = FindYtDlpPath();
         string sep = "|||";
         // title|||duration|||url|||thumbnail|||ie_key|||channel|||view_count|||upload_date
         string printFmt = $"%(title)s{sep}%(duration_string)s{sep}%(webpage_url)s{sep}%(thumbnail)s{sep}%(ie_key)s{sep}%(channel)s{sep}%(view_count)s{sep}%(upload_date)s";
+        // Slice a search/playlist into a batch, e.g. "1-10" / "11-20".
+        string itemsArg = string.IsNullOrEmpty(playlistItems) ? "" : $"--playlist-items {playlistItems} ";
 
         await Task.Run(() =>
         {
             // Use --flat-playlist with a unique separator (tabs are unreliable across process boundaries).
             // %(ie_key)s reports the extractor: "YoutubeTab" = a playlist entry, "Youtube" = a single video.
             var psi = new ProcessStartInfo(ytdlp,
-                $"--flat-playlist --print \"{printFmt}\" --no-warnings \"{inputUrl}\"")
+                $"--flat-playlist {itemsArg}--print \"{printFmt}\" --no-warnings \"{inputUrl}\"")
             {
                 RedirectStandardOutput = true, RedirectStandardError = true,
                 UseShellExecute = false, CreateNoWindow = true

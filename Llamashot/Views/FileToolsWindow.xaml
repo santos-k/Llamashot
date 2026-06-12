@@ -3130,7 +3130,8 @@
                          PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
                          Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.ScrollChanged="Yt_GridScrollChanged">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -3237,16 +3238,18 @@
                          PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
                          Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.ScrollChanged="Yt_GridScrollChanged">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal"/>
+                            <UniformGrid Columns="4"/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Padding" Value="0"/>
                             <Setter Property="Margin" Value="6"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="Template">
                                 <Setter.Value>
@@ -3259,7 +3262,7 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Border Width="210" Background="#222226" CornerRadius="8" BorderThickness="2">
+                            <Border Background="#222226" CornerRadius="8" BorderThickness="2" HorizontalAlignment="Stretch">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -3271,13 +3274,9 @@
                                     </Style>
                                 </Border.Style>
                                 <StackPanel>
-                                    <Grid>
-                                        <Image Source="{Binding Thumbnail}" Width="210" Height="118"
-                                               Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality">
-                                            <Image.Clip>
-                                                <RectangleGeometry Rect="0,0,210,118" RadiusX="8" RadiusY="8"/>
-                                            </Image.Clip>
-                                        </Image>
+                                    <Grid Background="#2A2A2F" Height="124" ClipToBounds="True">
+                                        <Image Source="{Binding Thumbnail}" HorizontalAlignment="Stretch" Height="124"
+                                               Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
                                         <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
                                                 Background="#99000000" CornerRadius="3" Padding="3,2">
                                             <Border.Style>
@@ -3385,6 +3384,17 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <!-- "Loading more…" loader, overlaid at the bottom of the results while paging -->
+                <Border x:Name="YtLoadMoreBar" Grid.Row="2" Grid.Column="1" Visibility="Collapsed"
+                        VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Height="44"
+                        Background="#CC161619" BorderBrush="#2A2A2F" BorderThickness="0,1,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="120" Height="4" Foreground="#FF3B3B"
+                                     Background="#333" BorderThickness="0" Margin="0,0,12,0"/>
+                        <TextBlock Text="Loading more…" Foreground="#AAA" FontSize="12" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
                 <!-- Bottom action bar (search screens): selected count + est. size + Continue -->
                 <Border x:Name="YtBottomBar" Grid.Row="3" Grid.ColumnSpan="2" Visibility="Collapsed"
