@@ -2499,214 +2499,326 @@
                 </StackPanel>
             </Border>
 
-            <ScrollViewer x:Name="ExtractAudioConfigView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24,8,24,20">
+            <!-- Review & Download-style card grid for Extract Audio -->
+            <Grid x:Name="ExtractAudioConfigView" Visibility="Collapsed" Margin="16,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>   <!-- results header: title/count + add/filter/sort/view -->
+                    <RowDefinition Height="*"/>       <!-- body: card grid / list -->
+                    <RowDefinition Height="Auto"/>   <!-- bottom bar: settings + extract -->
+                </Grid.RowDefinitions>
 
-                    <!-- ========== Select Files Card ========== -->
-                    <Border Background="#1A1D2E" CornerRadius="10" Margin="0,0,0,16">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>  <!-- header -->
-                                <RowDefinition Height="Auto"/>  <!-- column headers -->
-                                <RowDefinition Height="Auto"/>  <!-- file list -->
-                                <RowDefinition Height="Auto"/>  <!-- footer -->
-                            </Grid.RowDefinitions>
-
-                            <!-- Header: Select Files + Add buttons -->
-                            <Grid Margin="20,16,20,10">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#x1F4CB;" FontSize="16" Foreground="#4DB6AC" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Select Files" Foreground="#EEE" FontSize="15" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Add one or more video files to extract audio." Foreground="#666" FontSize="11"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <Button Content="+ Add Files" FontSize="12" Padding="14,7"
-                                            Background="#252840" Foreground="#CCC" BorderBrush="#3A3D50" Cursor="Hand"
-                                            Click="ExtractAudio_AddMoreBtn" Template="{StaticResource RoundedButton21}" Margin="0,0,8,0"/>
-                                    <Button Content="&#x1F4C1; Add Folder" FontSize="12" Padding="14,7"
-                                            Background="#252840" Foreground="#CCC" BorderBrush="#3A3D50" Cursor="Hand"
-                                            Click="ExtractAudio_AddFolder" Template="{StaticResource RoundedButton21}"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Column headers -->
-                            <Grid Grid.Row="1" Margin="20,0,20,6">
+                <!-- Row 0: header -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Select files to extract audio" Foreground="#EEE" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtExtAudioFileCount" Text="0 files selected" Foreground="#888" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="+ Add Files" FontSize="12" Height="32" Padding="12,0"
+                                Background="#252840" Foreground="#CCC" BorderBrush="#3A3D50" Cursor="Hand"
+                                Click="ExtractAudio_AddMoreBtn" Template="{StaticResource RoundedButton21}" Margin="0,0,8,0"/>
+                        <Button Content="&#x1F4C1; Add Folder" FontSize="12" Height="32" Padding="12,0"
+                                Background="#252840" Foreground="#CCC" BorderBrush="#3A3D50" Cursor="Hand"
+                                Click="ExtractAudio_AddFolder" Template="{StaticResource RoundedButton21}" Margin="0,0,14,0"/>
+                        <!-- Filter loaded videos by name -->
+                        <Border Background="#252528" CornerRadius="6" BorderBrush="#3A3A3F" BorderThickness="1"
+                                Height="32" Width="190" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="50"/>   <!-- # -->
-                                    <ColumnDefinition Width="*"/>    <!-- File Name -->
-                                    <ColumnDefinition Width="80"/>   <!-- Resolution -->
-                                    <ColumnDefinition Width="90"/>   <!-- Duration -->
-                                    <ColumnDefinition Width="80"/>   <!-- Size -->
-                                    <ColumnDefinition Width="60"/>   <!-- Remove -->
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="#" Foreground="#555" FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0"/>
-                                <TextBlock Grid.Column="1" Text="File Name" Foreground="#555" FontSize="11" FontWeight="SemiBold"/>
-                                <TextBlock Grid.Column="2" Text="Resolution" Foreground="#555" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
-                                <TextBlock Grid.Column="3" Text="Duration" Foreground="#555" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
-                                <TextBlock Grid.Column="4" Text="Size" Foreground="#555" FontSize="11" FontWeight="SemiBold" TextAlignment="Right"/>
-                                <TextBlock Grid.Column="5" Text="Remove" Foreground="#555" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                                <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                           Foreground="#888" VerticalAlignment="Center" Margin="10,0,8,0"/>
+                                <Grid Grid.Column="1">
+                                    <TextBox x:Name="TxtExtAudioFilter" BorderThickness="0" Background="Transparent"
+                                             Foreground="#EEE" FontSize="12" VerticalContentAlignment="Center"
+                                             TextChanged="ExtractAudio_FilterChanged"/>
+                                    <TextBlock x:Name="TxtExtAudioFilterPh" Text="Filter files…" Foreground="#777"
+                                               FontSize="12" VerticalAlignment="Center" Margin="2,0,8,0" IsHitTestVisible="False"/>
+                                </Grid>
                             </Grid>
+                        </Border>
+                        <CheckBox x:Name="ChkExtAudioSelectAll" Content="Select All" Foreground="#CCC" FontSize="12"
+                                  IsChecked="True" VerticalAlignment="Center" Cursor="Hand" Margin="0,0,14,0"
+                                  Click="ExtractAudio_SelectAllToggle"/>
+                        <ComboBox x:Name="CmbExtAudioSort" Width="150" Height="32" FontSize="12" Margin="0,0,10,0"
+                                  SelectedIndex="0" SelectionChanged="ExtractAudio_SortChanged">
+                            <ComboBoxItem Content="Added order"/>
+                            <ComboBoxItem Content="Selected first"/>
+                            <ComboBoxItem Content="Name (A–Z)"/>
+                            <ComboBoxItem Content="Longest first"/>
+                        </ComboBox>
+                        <Border Background="#252528" CornerRadius="6" BorderBrush="#3A3A3F" BorderThickness="1" Padding="2">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="BtnExtAudioGridView" Content="&#xF0E2;" FontFamily="Segoe MDL2 Assets" Width="34" Height="28"
+                                        FontSize="13" Background="#00BCD4" Foreground="White" BorderThickness="0" Cursor="Hand"
+                                        Click="ExtractAudio_GridView"/>
+                                <Button x:Name="BtnExtAudioListView" Content="&#xE8FD;" FontFamily="Segoe MDL2 Assets" Width="34" Height="28"
+                                        FontSize="13" Background="Transparent" Foreground="#CCC" BorderThickness="0" Cursor="Hand"
+                                        Click="ExtractAudio_ListView"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
 
-                            <!-- File list -->
-                            <ListBox x:Name="ExtractAudioList" Grid.Row="2" Background="Transparent" BorderThickness="0"
-                                     MaxHeight="340" MinHeight="50"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                        <Setter Property="Padding" Value="0"/>
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="BorderBrush" Value="#252840"/>
-                                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                <!-- Row 1: card (grid) view -->
+                <ListBox x:Name="ExtractAudioGrid" Grid.Row="1"
+                         IsSynchronizedWithCurrentItem="False" SelectionMode="Extended"
+                         MouseDoubleClick="ExtractAudio_ItemDoubleClick"
+                         Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="4"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="6"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#222226" CornerRadius="8" BorderThickness="2" HorizontalAlignment="Stretch">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BorderBrush" Value="#00BCD4"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
                                     </Style>
-                                </ListBox.ItemContainerStyle>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="20,8,20,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="50"/>   <!-- checkbox + # -->
-                                                <ColumnDefinition Width="*"/>    <!-- play + name + path -->
-                                                <ColumnDefinition Width="80"/>   <!-- Resolution -->
-                                                <ColumnDefinition Width="90"/>   <!-- Duration -->
-                                                <ColumnDefinition Width="80"/>   <!-- Size -->
-                                                <ColumnDefinition Width="60"/>   <!-- Remove -->
-                                            </Grid.ColumnDefinitions>
-                                            <!-- # -->
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <CheckBox IsChecked="True" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Index}" Foreground="#555" FontSize="12" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <!-- Play + Filename + Path -->
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Button Content="&#x25B6;" Width="36" Height="36" FontSize="14"
-                                                        Background="#252840" Foreground="#4DB6AC" BorderThickness="0" Cursor="Hand"
-                                                        Click="PreviewFile_Click" Tag="{Binding FilePath}"
-                                                        Template="{StaticResource RoundedButton21}" Margin="0,0,10,0"/>
-                                                <StackPanel VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding FileName}" Foreground="#CCC" FontSize="12"
-                                                               TextTrimming="CharacterEllipsis" MaxWidth="400"/>
-                                                    <TextBlock Text="{Binding FilePath}" Foreground="#555" FontSize="9"
-                                                               TextTrimming="CharacterEllipsis" MaxWidth="400" Margin="0,2,0,0"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                            <!-- Resolution -->
-                                            <TextBlock Grid.Column="2" Text="{Binding Extra}" Foreground="#4DB6AC" FontSize="12"
-                                                       VerticalAlignment="Center" TextAlignment="Center"/>
-                                            <!-- Duration -->
-                                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
-                                                        HorizontalAlignment="Center">
-                                                <TextBlock Text="&#x23F1;" Foreground="#888" FontSize="11" Margin="0,0,4,0"/>
-                                                <TextBlock Text="{Binding DurationText}" Foreground="#CCC" FontSize="12"/>
-                                            </StackPanel>
-                                            <!-- Size -->
-                                            <TextBlock Grid.Column="4" Text="{Binding FileSize}" Foreground="#CCC" FontSize="12"
-                                                       VerticalAlignment="Center" TextAlignment="Right"/>
-                                            <!-- Remove -->
-                                            <Button Grid.Column="5" Content="&#x1F5D1;" Width="28" Height="28" FontSize="14"
+                                </Border.Style>
+                                <StackPanel>
+                                    <Grid Background="#2A2A2F" Height="124" ClipToBounds="True">
+                                        <Image Source="{Binding Thumbnail}" HorizontalAlignment="Stretch" Height="124"
+                                               Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                        <!-- film placeholder shown until the thumbnail loads -->
+                                        <TextBlock Text="&#x1F3AC;" FontSize="34" Foreground="#55585F"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Thumbnail}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <!-- checkbox (top-left) -->
+                                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
+                                                Background="#99000000" CornerRadius="3" Padding="3,2">
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                      IsHitTestVisible="False" Focusable="False"/>
+                                        </Border>
+                                        <!-- duration badge (top-right) -->
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
+                                                Background="#CC000000" CornerRadius="3" Padding="5,2">
+                                            <TextBlock Text="{Binding DurationText}" Foreground="#EEE" FontSize="10"/>
+                                        </Border>
+                                        <!-- status badge (bottom-right), hidden until extraction starts -->
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6"
+                                                Background="#CC000000" CornerRadius="3" Padding="5,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Pending">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}"
+                                                       FontSize="10" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </Grid>
+                                    <Grid Margin="8,6,6,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding FileName}" Foreground="#DDD" FontSize="12" FontWeight="SemiBold"
+                                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="32" LineHeight="15"/>
+                                            <TextBlock Text="{Binding MetaLine}" Foreground="#999" FontSize="11" Margin="0,4,0,0"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                            <Button Content="&#x25B6;" FontSize="11" Width="26" Height="26"
+                                                    Background="Transparent" Foreground="#26C6DA" BorderThickness="0" Cursor="Hand"
+                                                    Click="PreviewFile_Click" Tag="{Binding FilePath}" ToolTip="Preview"/>
+                                            <Button Content="&#x1F5D1;" FontSize="13" Width="26" Height="26"
                                                     Background="Transparent" Foreground="#EF5350" BorderThickness="0" Cursor="Hand"
-                                                    Click="ExtractAudio_Remove" Tag="{Binding FilePath}" VerticalAlignment="Center"
-                                                    HorizontalAlignment="Center"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                                    Click="ExtractAudio_Remove" Tag="{Binding FilePath}" ToolTip="Remove"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="3"
+                                                 Foreground="#26C6DA" Background="#333" BorderThickness="0"
+                                                 Margin="8,0,8,8"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
-                            <!-- Footer: file count + total size -->
-                            <Grid Grid.Row="3" Margin="20,8,20,14">
-                                <TextBlock x:Name="TxtExtAudioFileCount" Text="0 files selected" Foreground="#888" FontSize="12"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <TextBlock Text="Total size: " Foreground="#888" FontSize="12"/>
-                                    <TextBlock x:Name="TxtExtAudioTotalSize" Text="0 B" Foreground="#4DB6AC" FontSize="12" FontWeight="SemiBold"/>
+                <!-- Row 1: list (row) view -->
+                <ListBox x:Name="ExtractAudioListView" Grid.Row="1" Visibility="Collapsed"
+                         IsSynchronizedWithCurrentItem="False" SelectionMode="Extended"
+                         MouseDoubleClick="ExtractAudio_ItemDoubleClick"
+                         Background="#1A1A1E" BorderBrush="#333" BorderThickness="1"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="#252528"/>
+                            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="10,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}" VerticalAlignment="Center"
+                                          IsHitTestVisible="False" Focusable="False" Margin="0,0,8,0"/>
+                                <Image Grid.Column="1" Source="{Binding Thumbnail}" Width="120" Height="68"
+                                       Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,10,0">
+                                    <Image.Clip>
+                                        <RectangleGeometry Rect="0,0,120,68" RadiusX="4" RadiusY="4"/>
+                                    </Image.Clip>
+                                </Image>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding FileName}" Foreground="#DDD" FontSize="13" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                                    <TextBlock Text="{Binding MetaLine}" Foreground="#888" FontSize="11" Margin="0,2,0,0"/>
+                                    <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="3"
+                                                 Foreground="#26C6DA" Background="#333" BorderThickness="0" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                                    <TextBlock Text="&#x23F1; " Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding DurationText}" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" FontSize="11"
+                                               FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Pending">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="&#x25B6;" FontSize="12" Width="30" Height="30"
+                                            Background="Transparent" Foreground="#26C6DA" BorderThickness="0" Cursor="Hand"
+                                            Click="PreviewFile_Click" Tag="{Binding FilePath}" ToolTip="Preview"/>
+                                    <Button Content="&#x1F5D1;" FontSize="14" Width="30" Height="30"
+                                            Background="Transparent" Foreground="#EF5350" BorderThickness="0" Cursor="Hand"
+                                            Click="ExtractAudio_Remove" Tag="{Binding FilePath}" ToolTip="Remove"/>
                                 </StackPanel>
                             </Grid>
-                        </Grid>
-                    </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
-                    <!-- ========== Output Settings + Save To (side by side) ========== -->
-                    <Grid Margin="0,0,0,20">
+                <!-- Row 2: bottom bar — output settings + save-to + extract -->
+                <Border Grid.Row="2" Background="#161619" BorderBrush="#2A2A2F" BorderThickness="0,1,0,0"
+                        Margin="0,12,0,0" Padding="0,12">
+                    <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="16"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>   <!-- output settings -->
+                            <ColumnDefinition Width="Auto"/>   <!-- save to -->
+                            <ColumnDefinition Width="*"/>       <!-- progress -->
+                            <ColumnDefinition Width="Auto"/>   <!-- extract -->
                         </Grid.ColumnDefinitions>
 
-                        <!-- Output Settings card -->
-                        <Border Background="#1A1D2E" CornerRadius="10" Padding="20,16">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="&#x2699;" FontSize="16" Foreground="#4DB6AC" Margin="0,0,8,0"/>
-                                    <TextBlock Text="Output Settings" Foreground="#EEE" FontSize="14" FontWeight="SemiBold"/>
-                                </StackPanel>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Format" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <ComboBox x:Name="CmbExtAudioFormat" Grid.Column="1" Width="130" Height="30" FontSize="12" SelectedIndex="0">
-                                        <ComboBoxItem Content="MP3"/>
-                                        <ComboBoxItem Content="WAV"/>
-                                        <ComboBoxItem Content="AAC"/>
-                                        <ComboBoxItem Content="FLAC"/>
-                                    </ComboBox>
-                                    <CheckBox x:Name="ChkExtAudioThumb" Grid.Column="2" Content="Embed thumbnail as album art"
-                                              Foreground="#CCC" FontSize="11" IsChecked="True" Cursor="Hand"
-                                              VerticalAlignment="Center" Margin="16,0,0,0"/>
-                                </Grid>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Quality" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <ComboBox x:Name="CmbExtAudioQuality" Grid.Column="1" Width="190" Height="30" FontSize="12" SelectedIndex="0">
-                                        <ComboBoxItem Content="320 kbps (High Quality)"/>
-                                        <ComboBoxItem Content="256 kbps"/>
-                                        <ComboBoxItem Content="192 kbps (Standard)"/>
-                                        <ComboBoxItem Content="128 kbps (Small)"/>
-                                    </ComboBox>
-                                </Grid>
+                        <!-- Output settings -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,28,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Format" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ComboBox x:Name="CmbExtAudioFormat" Width="90" Height="30" FontSize="12" SelectedIndex="0" Margin="0,0,14,0">
+                                    <ComboBoxItem Content="MP3"/>
+                                    <ComboBoxItem Content="WAV"/>
+                                    <ComboBoxItem Content="AAC"/>
+                                    <ComboBoxItem Content="FLAC"/>
+                                </ComboBox>
+                                <TextBlock Text="Quality" Foreground="#888" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ComboBox x:Name="CmbExtAudioQuality" Width="180" Height="30" FontSize="12" SelectedIndex="0">
+                                    <ComboBoxItem Content="320 kbps (High Quality)"/>
+                                    <ComboBoxItem Content="256 kbps"/>
+                                    <ComboBoxItem Content="192 kbps (Standard)"/>
+                                    <ComboBoxItem Content="128 kbps (Small)"/>
+                                </ComboBox>
                             </StackPanel>
-                        </Border>
+                            <CheckBox x:Name="ChkExtAudioThumb" Content="Embed thumbnail as album art"
+                                      Foreground="#CCC" FontSize="11" IsChecked="True" Cursor="Hand"/>
+                        </StackPanel>
 
-                        <!-- Save To card -->
-                        <Border Grid.Column="2" Background="#1A1D2E" CornerRadius="10" Padding="20,16">
+                        <!-- Save to -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0">
+                            <RadioButton x:Name="RbExtAudioNew" Content="New folder" Foreground="#CCC" FontSize="12"
+                                         IsChecked="True" Cursor="Hand" GroupName="ExtAudioSave" Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtExtAudioOutputFolder" Height="26" Padding="8,2" FontSize="11"
+                                         Background="#252840" Foreground="#AAA" BorderBrush="#3A3D50" IsReadOnly="True"
+                                         VerticalContentAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Browse" FontSize="11" Padding="10,4"
+                                        Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
+                                        Click="ExtractAudio_BrowseFolder" Template="{StaticResource RoundedButton21}" Margin="6,0,0,0"/>
+                            </Grid>
+                            <RadioButton x:Name="RbExtAudioOverwrite" Content="Same folder as source" Foreground="#CCC"
+                                         FontSize="12" Cursor="Hand" GroupName="ExtAudioSave" Margin="0,6,0,0"/>
+                        </StackPanel>
+
+                        <!-- Overall progress -->
+                        <TextBlock x:Name="TxtExtAudioOverall" Grid.Column="2" Text="" Foreground="#EEE" FontSize="13"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                        <!-- Extract button -->
+                        <Button x:Name="BtnExtAudioExtract" Grid.Column="3" Width="200" Height="56" Cursor="Hand"
+                                Background="#00897B" Foreground="White" BorderThickness="0" Click="ExtractAudio_Execute"
+                                Template="{StaticResource RoundedButton}">
                             <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="&#x1F4C1;" FontSize="16" Foreground="#7C4DFF" Margin="0,0,8,0"/>
-                                    <TextBlock Text="Save To" Foreground="#EEE" FontSize="14" FontWeight="SemiBold"/>
-                                </StackPanel>
-                                <RadioButton x:Name="RbExtAudioNew" Content="New files (choose output folder)"
-                                             Foreground="#CCC" FontSize="12" IsChecked="True" Cursor="Hand"
-                                             GroupName="ExtAudioSave" Margin="0,0,0,8"/>
-                                <Grid Margin="20,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="TxtExtAudioOutputFolder" Height="28" Padding="8,2" FontSize="11"
-                                             Background="#252840" Foreground="#AAA" BorderBrush="#3A3D50" IsReadOnly="True"/>
-                                    <Button Grid.Column="1" Content="Browse" FontSize="11" Padding="12,5"
-                                            Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                            Click="ExtractAudio_BrowseFolder" Template="{StaticResource RoundedButton21}" Margin="6,0,0,0"/>
-                                </Grid>
-                                <RadioButton x:Name="RbExtAudioOverwrite" Content="Same folder as source (replace extension)"
-                                             Foreground="#CCC" FontSize="12" Cursor="Hand" GroupName="ExtAudioSave"/>
+                                <TextBlock Text="Extract Audio  →" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TxtExtAudioTotalSize" Text="0 selected" FontSize="11" Opacity="0.85" HorizontalAlignment="Center"/>
                             </StackPanel>
-                        </Border>
+                        </Button>
                     </Grid>
-
-                    <!-- Extract button -->
-                    <Button Content="Extract Audio &#x2192;" Width="300" Height="50"
-                            FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#00897B"
-                            HorizontalAlignment="Center" Cursor="Hand" Click="ExtractAudio_Execute"
-                            Template="{StaticResource RoundedButton}"/>
-                </StackPanel>
-            </ScrollViewer>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- ====================== PanelTrimAudio ====================== -->
@@ -2755,6 +2867,7 @@
 
                         <!-- File list -->
                         <ListBox x:Name="TrimAudioFileList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                                 SelectionChanged="TrimAudio_FileSelected"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <ListBox.ItemContainerStyle>
@@ -2764,6 +2877,28 @@
                                     <Setter Property="Background" Value="Transparent"/>
                                     <Setter Property="BorderBrush" Value="#2A2A2E"/>
                                     <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    <Setter Property="Cursor" Value="Hand"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#232328"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#15332F"/>
+                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="#4DB6AC"/>
+                                                        <Setter TargetName="Bd" Property="BorderThickness" Value="3,0,0,1"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
                                 </Style>
                             </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
@@ -2818,31 +2953,29 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Trim Settings" Foreground="#EEE" FontSize="13" FontWeight="SemiBold"
                                        VerticalAlignment="Center" Margin="0,0,16,0"/>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,12,0">
-                                <TextBlock Text="Cut Start" Foreground="#888" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <TextBox x:Name="TxtGlobalTrimStart" Width="85" Height="26" Padding="6,2" FontSize="11"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="00:00.000"/>
+                            <TextBlock Grid.Column="1" Foreground="#777" FontSize="11" VerticalAlignment="Center"
+                                       Text="Drag the handles on each wave, or use Suggest trims. Zoom in for finer cuts."/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrimSuggest" Content="&#x2728; Suggest trims" FontSize="11" Padding="10,5"
+                                        Background="#2A2540" Foreground="#B39DDB" BorderBrush="#473C66" Cursor="Hand"
+                                        Click="TrimAudio_SuggestTrims" Template="{StaticResource RoundedButton21}"
+                                        ToolTip="Auto-detect quiet dips, mark them, and snap the trim handles"
+                                        Margin="0,0,8,0"/>
+                                <Button Content="Apply to All" FontSize="11" Padding="10,5"
+                                        Background="#333" Foreground="#4DB6AC" BorderBrush="#444" Cursor="Hand"
+                                        Click="TrimAudio_ApplyToAll" Template="{StaticResource RoundedButton21}"
+                                        ToolTip="Apply the active file's cut points to every file"
+                                        Margin="0,0,8,0"/>
+                                <Button Content="Reset" FontSize="11" Padding="10,5"
+                                        Background="#333" Foreground="#888" BorderBrush="#444" Cursor="Hand"
+                                        Click="TrimAudio_Reset" Template="{StaticResource RoundedButton21}"/>
                             </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,12,0">
-                                <TextBlock Text="Cut End" Foreground="#888" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <TextBox x:Name="TxtGlobalTrimEnd" Width="85" Height="26" Padding="6,2" FontSize="11"
-                                         Background="#1A1A1E" Foreground="#EEE" BorderBrush="#444" Text="00:01.000"/>
-                            </StackPanel>
-                            <Button Grid.Column="4" Content="Apply to All" FontSize="11" Padding="10,5"
-                                    Background="#333" Foreground="#4DB6AC" BorderBrush="#444" Cursor="Hand"
-                                    Click="TrimAudio_ApplyToAll" Template="{StaticResource RoundedButton21}"
-                                    Margin="0,0,8,0"/>
-                            <Button Grid.Column="5" Content="Reset" FontSize="11" Padding="10,5"
-                                    Background="#333" Foreground="#888" BorderBrush="#444" Cursor="Hand"
-                                    Click="TrimAudio_Reset" Template="{StaticResource RoundedButton21}"/>
                         </Grid>
                     </Border>
 

@@ -244,7 +244,8 @@ public partial class FileToolsWindow : Window
         CompressImgList.ItemsSource = _compressImgFiles;
         CompressOfficeList.ItemsSource = _compressOfficeFiles;
         InsertImageList.ItemsSource = _insertImages;
-        ExtractAudioList.ItemsSource = _extractAudioFiles;
+        ExtractAudioGrid.ItemsSource = _extractAudioFiles;
+        ExtractAudioListView.ItemsSource = _extractAudioFiles;
         TrimAudioFileList.ItemsSource = _trimAudioFiles;
         YtVideoList.ItemsSource = _ytVideos;
         YtVideoGrid.ItemsSource = _ytVideos;
@@ -555,6 +556,7 @@ public partial class FileToolsWindow : Window
 
     private void ShowConfigState(string toolId)
     {
+        if (toolId == "extract_audio") ApplyExtAudioViewMode();
         if (_selectViews.TryGetValue(toolId, out var selectView))
         {
             FadeOut(selectView, 150, () =>
@@ -656,8 +658,18 @@ public partial class FileToolsWindow : Window
         _videoCropRect = Rect.Empty;
         VideoCropCanvas.Visibility = Visibility.Collapsed;
         VideoCropCanvas.Children.Clear();
+        foreach (var f in _extractAudioFiles) f.PropertyChanged -= ExtAudioItem_PropertyChanged;
         _extractAudioFiles.Clear();
+        _extAudioOriginal.Clear();
         _extAudioOutputFolder = null;
+        _extAudioGridView = true;
+        _extAudioBusy = false;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_extractAudioFiles).Filter = null;
+        if (TxtExtAudioFilter != null) TxtExtAudioFilter.Text = "";
+        if (TxtExtAudioFilterPh != null) TxtExtAudioFilterPh.Visibility = Visibility.Visible;
+        if (CmbExtAudioSort != null) { _extAudioSyncingSort = true; CmbExtAudioSort.SelectedIndex = 0; _extAudioSyncingSort = false; }
+        if (TxtExtAudioOverall != null) TxtExtAudioOverall.Text = "";
+        if (TxtExtAudioOutputFolder != null) TxtExtAudioOutputFolder.Text = "";
         // Trim audio cleanup
         StopTrimPlayback();
         foreach (var item in _trimAudioItems)
@@ -668,6 +680,7 @@ public partial class FileToolsWindow : Window
         _trimAudioItems.Clear();
         _trimAudioFiles.Clear();
         TrimWaveformPanel.Children.Clear();
+        _activeTrimItem = null;
         _trimOutputFolder = null;
         _audioPlayTimer?.Stop();
         foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
@@ -5438,6 +5451,12 @@ public partial class FileToolsWindow : Window
     // =====================================================================
 
     private string? _extAudioOutputFolder;
+    private bool _extAudioGridView = true;                 // card grid vs. row list
+    private bool _extAudioSyncingSort;                     // guard while resetting the sort combo
+    private bool _extAudioBusy;                            // an extraction run is in progress
+    private readonly List<FileItem> _extAudioOriginal = new(); // added order, for the "Added order" sort
+    private static readonly string[] ExtAudioVideoExts =
+        { ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm", ".m4v", ".flv", ".3gp", ".mpeg", ".mpg" };
 
     private void ExtractAudio_SelectFiles(object sender, RoutedEventArgs e)
     {
@@ -5455,10 +5474,35 @@ public partial class FileToolsWindow : Window
     private void ExtractAudio_SelectDrop(object sender, DragEventArgs e)
     {
         if (!CheckFFmpeg()) return;
-        var files = GetDroppedFiles(e, IsVideoFile);
+        var files = CollectDroppedVideos(e);
         if (files.Length == 0) return;
         AddVideosToExtractList(files);
         ShowConfigState("extract_audio");
+    }
+
+    // Dropped items may be files or folders \u2014 gather all videos (folders scanned recursively).
+    private static string[] CollectDroppedVideos(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return Array.Empty<string>();
+        var dropped = (string[])e.Data.GetData(DataFormats.FileDrop)!;
+        var result = new List<string>();
+        foreach (var p in dropped)
+        {
+            if (Directory.Exists(p)) result.AddRange(ScanFolderForVideos(p));
+            else if (File.Exists(p) && IsVideoFile(p)) result.Add(p);
+        }
+        return result.ToArray();
+    }
+
+    private static string[] ScanFolderForVideos(string folder)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories)
+                .Where(f => ExtAudioVideoExts.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()))
+                .ToArray();
+        }
+        catch { return Array.Empty<string>(); }
     }
 
     private void ExtractAudio_AddMoreBtn(object sender, RoutedEventArgs e)
@@ -5476,18 +5520,30 @@ public partial class FileToolsWindow : Window
     private void ExtractAudio_AddFolder(object sender, RoutedEventArgs e)
     {
         if (!CheckFFmpeg()) return;
-        var fbd = new System.Windows.Forms.FolderBrowserDialog { Description = "Select folder with video files" };
+        var fbd = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Select a folder \u2014 videos in it and its subfolders are added"
+        };
         if (fbd.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-        var videoExts = new[] { ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm", ".m4v" };
-        var files = Directory.GetFiles(fbd.SelectedPath)
-            .Where(f => videoExts.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()))
-            .ToArray();
+        var files = ScanFolderForVideos(fbd.SelectedPath);
         if (files.Length > 0) AddVideosToExtractList(files);
+        else MessageBox.Show("No video files found in that folder.", "Nothing to add",
+                             MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void ExtractAudio_Remove(object sender, RoutedEventArgs e)
     {
-        RemoveFromList(_extractAudioFiles, sender);
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string path)
+        {
+            var item = _extractAudioFiles.FirstOrDefault(f => f.FilePath == path);
+            if (item != null)
+            {
+                item.PropertyChanged -= ExtAudioItem_PropertyChanged;
+                _extractAudioFiles.Remove(item);
+                _extAudioOriginal.Remove(item);
+            }
+            RenumberList(_extractAudioFiles);
+        }
         UpdateExtAudioFooter();
     }
 
@@ -5498,6 +5554,7 @@ public partial class FileToolsWindow : Window
         {
             _extAudioOutputFolder = fbd.SelectedPath;
             TxtExtAudioOutputFolder.Text = _extAudioOutputFolder;
+            RbExtAudioNew.IsChecked = true;
         }
     }
 
@@ -5513,44 +5570,174 @@ public partial class FileToolsWindow : Window
         foreach (var path in paths)
         {
             if (_extractAudioFiles.Any(f => f.FilePath == path)) continue;
-            var info = new FileInfo(path);
-            string resolution = "";
-            string durText = "";
-            try
-            {
-                var (duration, w, h, codec) = await FileToolsService.GetVideoInfoAsync(path);
-                resolution = $"{Math.Min(w, h)}p";
-                if (h > w) resolution = $"{w}p"; // portrait
-                durText = FileToolsService.FormatTimeSpan(duration);
-            }
-            catch { }
-            _extractAudioFiles.Add(new FileItem
+            long size = 0;
+            try { size = new FileInfo(path).Length; } catch { }
+            var item = new FileItem
             {
                 Index = _extractAudioFiles.Count + 1,
                 FilePath = path,
                 FileName = System.IO.Path.GetFileName(path),
-                FileSize = FileToolsService.FormatFileSize(info.Length),
-                Extra = resolution,
-                DurationText = durText
-            });
+                FileSize = FileToolsService.FormatFileSize(size),
+                IsSelected = true,
+            };
+            item.PropertyChanged += ExtAudioItem_PropertyChanged;
+            _extractAudioFiles.Add(item);
+            _extAudioOriginal.Add(item);
+
+            // Probe duration/resolution and grab a thumbnail in the background so the
+            // grid fills in progressively instead of blocking on each file.
+            _ = LoadExtAudioMetaAsync(item);
         }
         UpdateExtAudioFooter();
     }
 
+    // Fills in duration, resolution and a frame-grab thumbnail for one item, asynchronously.
+    private async Task LoadExtAudioMetaAsync(FileItem item)
+    {
+        try
+        {
+            var (duration, w, h, _) = await FileToolsService.GetVideoInfoAsync(item.FilePath);
+            string resolution = h > w ? $"{w}p" : $"{Math.Min(w, h)}p";
+            item.Extra = resolution;
+            item.DurationText = FileToolsService.FormatTimeSpan(duration);
+        }
+        catch { }
+
+        try
+        {
+            string? thumb = await FileToolsService.GenerateVideoThumbnailAsync(item.FilePath);
+            if (thumb != null)
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.UriSource = new Uri(thumb);
+                bmp.EndInit();
+                bmp.Freeze();
+                item.Thumbnail = bmp; // notifying \u2192 card/list updates
+            }
+        }
+        catch { }
+    }
+
+    private void ExtAudioItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FileItem.IsSelected))
+            UpdateExtAudioFooter();
+    }
+
     private void UpdateExtAudioFooter()
     {
-        TxtExtAudioFileCount.Text = $"{_extractAudioFiles.Count} files selected";
-        long total = 0;
-        foreach (var f in _extractAudioFiles)
+        int total = _extractAudioFiles.Count;
+        int sel = _extractAudioFiles.Count(f => f.IsSelected);
+        TxtExtAudioFileCount.Text = total == 0
+            ? "No files added yet"
+            : $"{sel} of {total} selected";
+
+        if (ChkExtAudioSelectAll != null)
+            ChkExtAudioSelectAll.IsChecked = total == 0 ? false : (sel == total ? true : (sel == 0 ? false : (bool?)null));
+
+        long bytes = 0;
+        foreach (var f in _extractAudioFiles.Where(f => f.IsSelected))
+            try { bytes += new FileInfo(f.FilePath).Length; } catch { }
+        if (TxtExtAudioTotalSize != null)
+            TxtExtAudioTotalSize.Text = sel == 0 ? "0 selected" : $"{sel} selected \u00b7 {FileToolsService.FormatFileSize(bytes)}";
+
+        if (BtnExtAudioExtract != null) BtnExtAudioExtract.IsEnabled = sel > 0 && !_extAudioBusy;
+    }
+
+    // Select-all tri-state checkbox toggles every item.
+    private void ExtractAudio_SelectAllToggle(object sender, RoutedEventArgs e)
+    {
+        bool check = ChkExtAudioSelectAll.IsChecked == true;
+        foreach (var f in _extractAudioFiles) f.IsSelected = check;
+        UpdateExtAudioFooter();
+    }
+
+    private void ExtractAudio_FilterChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TxtExtAudioFilterPh != null)
+            TxtExtAudioFilterPh.Visibility =
+                string.IsNullOrEmpty(TxtExtAudioFilter.Text) ? Visibility.Visible : Visibility.Collapsed;
+
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_extractAudioFiles);
+        if (view == null) return;
+        string q = TxtExtAudioFilter.Text.Trim();
+        view.Filter = string.IsNullOrEmpty(q)
+            ? null
+            : o => o is FileItem v && v.FileName.Contains(q, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ExtractAudio_SortChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_extAudioSyncingSort || CmbExtAudioSort == null) return;
+        int ExtOrig(FileItem v) { int i = _extAudioOriginal.IndexOf(v); return i < 0 ? int.MaxValue : i; }
+        List<FileItem> ordered = CmbExtAudioSort.SelectedIndex switch
         {
-            try { total += new FileInfo(f.FilePath).Length; } catch { }
+            1 => _extractAudioFiles.OrderBy(v => v.IsSelected ? 0 : 1).ThenBy(ExtOrig).ToList(),  // selected first
+            2 => _extractAudioFiles.OrderBy(v => v.FileName, StringComparer.OrdinalIgnoreCase).ToList(), // name
+            3 => _extractAudioFiles.OrderByDescending(v => ExtAudioDurationSeconds(v)).ThenBy(ExtOrig).ToList(), // longest
+            _ => _extractAudioFiles.OrderBy(ExtOrig).ToList(),                                     // added order
+        };
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            int cur = _extractAudioFiles.IndexOf(ordered[i]);
+            if (cur != i) _extractAudioFiles.Move(cur, i);
         }
-        TxtExtAudioTotalSize.Text = FileToolsService.FormatFileSize(total);
+        RenumberList(_extractAudioFiles);
+    }
+
+    // Parses the "H:MM:SS" / "M:SS" DurationText into seconds for sorting.
+    private static int ExtAudioDurationSeconds(FileItem v)
+    {
+        if (string.IsNullOrWhiteSpace(v.DurationText)) return 0;
+        var segs = v.DurationText.Split(':');
+        try
+        {
+            if (segs.Length == 3) return int.Parse(segs[0]) * 3600 + int.Parse(segs[1]) * 60 + int.Parse(segs[2]);
+            if (segs.Length == 2) return int.Parse(segs[0]) * 60 + int.Parse(segs[1]);
+            if (segs.Length == 1 && int.TryParse(segs[0], out int s)) return s;
+        }
+        catch { return 0; }
+        return 0;
+    }
+
+    private void ExtractAudio_GridView(object sender, RoutedEventArgs e) { _extAudioGridView = true; ApplyExtAudioViewMode(); }
+    private void ExtractAudio_ListView(object sender, RoutedEventArgs e) { _extAudioGridView = false; ApplyExtAudioViewMode(); }
+
+    private void ApplyExtAudioViewMode()
+    {
+        if (ExtractAudioGrid == null || ExtractAudioListView == null) return;
+        ExtractAudioGrid.Visibility = _extAudioGridView ? Visibility.Visible : Visibility.Collapsed;
+        ExtractAudioListView.Visibility = _extAudioGridView ? Visibility.Collapsed : Visibility.Visible;
+
+        var active = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00BCD4"));
+        var inactive = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333"));
+        var activeFg = Brushes.White;
+        var inactiveFg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC"));
+        BtnExtAudioGridView.Background = _extAudioGridView ? active : inactive;
+        BtnExtAudioListView.Background = _extAudioGridView ? inactive : active;
+        BtnExtAudioGridView.Foreground = _extAudioGridView ? activeFg : inactiveFg;
+        BtnExtAudioListView.Foreground = _extAudioGridView ? inactiveFg : activeFg;
+    }
+
+    // Double-click toggles the check state of a card/row.
+    private void ExtractAudio_ItemDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.ListBox lb || e.OriginalSource is not DependencyObject src) return;
+        if (ItemsControl.ContainerFromElement(lb, src) is ListBoxItem { DataContext: FileItem v })
+        {
+            e.Handled = true;
+            v.IsSelected = !v.IsSelected;
+            UpdateExtAudioFooter();
+        }
     }
 
     private async void ExtractAudio_Execute(object sender, RoutedEventArgs e)
     {
-        if (_extractAudioFiles.Count == 0) return;
+        var selected = _extractAudioFiles.Where(f => f.IsSelected).ToList();
+        if (selected.Count == 0) { MessageBox.Show("Select at least one file."); return; }
+
         var format = (CmbExtAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
         string ext = format switch { "wav" => ".wav", "aac" => ".aac", "flac" => ".flac", _ => ".mp3" };
         bool embedThumb = ChkExtAudioThumb.IsChecked == true;
@@ -5563,8 +5750,15 @@ public partial class FileToolsWindow : Window
             return;
         }
 
-        ShowProcessing("Extracting audio...");
-        int count = _extractAudioFiles.Count;
+        // Lock the page controls while extracting; reset per-card progress.
+        _extAudioBusy = true;
+        BtnExtAudioExtract.IsEnabled = false;
+        ChkExtAudioSelectAll.IsEnabled = false;
+        CmbExtAudioSort.IsEnabled = false;
+        foreach (var f in selected) { f.Status = "Pending"; f.Progress = 0; }
+
+        int count = selected.Count;
+        int completed = 0;
         long totalSize = 0;
         string? lastFile = null;
 
@@ -5572,39 +5766,50 @@ public partial class FileToolsWindow : Window
         {
             for (int i = 0; i < count; i++)
             {
-                var file = _extractAudioFiles[i];
-                string outPath;
-                if (overwrite)
-                {
-                    string dir = System.IO.Path.GetDirectoryName(file.FilePath)!;
-                    string name = System.IO.Path.GetFileNameWithoutExtension(file.FilePath);
-                    outPath = System.IO.Path.Combine(dir, name + ext);
-                }
-                else
-                {
-                    string name = System.IO.Path.GetFileNameWithoutExtension(file.FilePath);
-                    outPath = System.IO.Path.Combine(outputDir!, name + ext);
-                }
+                var file = selected[i];
+                string name = System.IO.Path.GetFileNameWithoutExtension(file.FilePath);
+                string dir = overwrite ? System.IO.Path.GetDirectoryName(file.FilePath)! : outputDir!;
+                string outPath = System.IO.Path.Combine(dir, name + ext);
 
-                if (embedThumb)
-                    await FileToolsService.ExtractAudioWithThumbnailAsync(file.FilePath, outPath, CreateProgress());
-                else
-                    await FileToolsService.ExtractAudioAsync(file.FilePath, outPath, CreateProgress());
+                file.Status = "Extracting";
+                file.Progress = 0;
+                TxtExtAudioOverall.Text = $"Extracting {i + 1} / {count}\u2026";
 
-                totalSize += new FileInfo(outPath).Length;
-                lastFile = outPath;
-                MainProgress.Value = (int)((i + 1) * 100.0 / count);
-                TxtProgressPct.Text = $"{(int)((i + 1) * 100.0 / count)}%";
+                try
+                {
+                    var progress = new Progress<int>(p => file.Progress = p);
+                    if (embedThumb)
+                        await FileToolsService.ExtractAudioWithThumbnailAsync(file.FilePath, outPath, progress);
+                    else
+                        await FileToolsService.ExtractAudioAsync(file.FilePath, outPath, progress);
+
+                    file.Status = "Done";
+                    file.Progress = 100;
+                    totalSize += new FileInfo(outPath).Length;
+                    lastFile = outPath;
+                    completed++;
+                }
+                catch
+                {
+                    file.Status = "Error";
+                }
             }
 
-            string detail = $"{count} file(s) \u2014 {FileToolsService.FormatFileSize(totalSize)}";
-            string folder = overwrite
-                ? System.IO.Path.GetDirectoryName(_extractAudioFiles[0].FilePath)!
-                : outputDir!;
-            ShowComplete($"{count} audio track(s) extracted!", detail,
-                filePath: count == 1 ? lastFile : null, folderPath: folder);
+            TxtExtAudioOverall.Text = $"Done \u2014 {completed} of {count} extracted";
+            string detail = $"{completed} file(s) \u2014 {FileToolsService.FormatFileSize(totalSize)}";
+            string folder = overwrite ? System.IO.Path.GetDirectoryName(selected[0].FilePath)! : outputDir!;
+            if (completed > 0)
+                ShowComplete($"{completed} audio track(s) extracted!", detail,
+                    filePath: completed == 1 ? lastFile : null, folderPath: folder);
         }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; System.Windows.MessageBox.Show(ex.Message); }
+        catch (Exception ex) { System.Windows.MessageBox.Show(ex.Message); }
+        finally
+        {
+            _extAudioBusy = false;
+            ChkExtAudioSelectAll.IsEnabled = true;
+            CmbExtAudioSort.IsEnabled = true;
+            UpdateExtAudioFooter();
+        }
     }
 
     // =====================================================================
@@ -5618,6 +5823,8 @@ public partial class FileToolsWindow : Window
     private AudioTrimItem? _activeDragItem;
     private DispatcherTimer? _audioPlayTimer;
     private AudioTrimItem? _playingAudioItem;
+    private AudioTrimItem? _activeTrimItem;          // the file currently being worked on (highlighted)
+    private bool _suppressTrimFileSelect;            // guard while syncing sidebar selection
     private string? _trimOutputFolder;
 
     private void TrimAudio_SelectFiles(object sender, RoutedEventArgs e)
@@ -5719,6 +5926,9 @@ public partial class FileToolsWindow : Window
             _ = GenerateWaveformForItem(item);
         }
         UpdateTrimSidebarInfo();
+        // Ensure a working file is always highlighted.
+        if (_activeTrimItem == null && _trimAudioItems.Count > 0)
+            SetActiveTrimItem(_trimAudioItems[0]);
     }
 
     private void UpdateTrimSidebarInfo()
@@ -5768,16 +5978,54 @@ public partial class FileToolsWindow : Window
         var outerStack = new StackPanel();
         rowBorder.Child = outerStack;
 
-        // Header: filename
+        // Header: filename (left) + zoom controls (right)
+        var headerDock = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+
+        var zoomPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        DockPanel.SetDock(zoomPanel, Dock.Right);
+        System.Windows.Controls.Button MakeZoomBtn(string glyph, Action act)
+        {
+            var b = new System.Windows.Controls.Button
+            {
+                Content = glyph, Width = 24, Height = 22, FontSize = 13,
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2A2A2E")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCC")),
+                BorderThickness = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand,
+                Margin = new Thickness(2, 0, 2, 0)
+            };
+            b.Click += (s, e) => act();
+            return b;
+        }
+        var zoomLabel = new TextBlock
+        {
+            Text = "1x", FontSize = 11, MinWidth = 26, TextAlignment = TextAlignment.Center,
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888")),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        item.TxtZoom = zoomLabel;
+        var zoomTxt = new TextBlock
+        {
+            Text = "Zoom", FontSize = 11, Margin = new Thickness(0, 0, 6, 0),
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666")),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        zoomPanel.Children.Add(zoomTxt);
+        zoomPanel.Children.Add(MakeZoomBtn("−", () => TrimZoom(item, 0.5)));   // −
+        zoomPanel.Children.Add(zoomLabel);
+        zoomPanel.Children.Add(MakeZoomBtn("+", () => TrimZoom(item, 2.0)));        // +
+        headerDock.Children.Add(zoomPanel);
+
         var header = new TextBlock
         {
             Text = item.FileName,
             Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCCCCC")),
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 6)
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-        outerStack.Children.Add(header);
+        headerDock.Children.Add(header);
+        outerStack.Children.Add(headerDock);
 
         // Content: play + waveform + remaining
         var contentGrid = new Grid();
@@ -5816,7 +6064,7 @@ public partial class FileToolsWindow : Window
         Grid.SetColumn(playStack, 0);
         contentGrid.Children.Add(playStack);
 
-        // Waveform area
+        // Waveform area — a horizontal ScrollViewer holds the (zoomable) waveform grid.
         var wfBorder = new Border
         {
             Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#111111")),
@@ -5825,8 +6073,19 @@ public partial class FileToolsWindow : Window
             Height = WF_HEIGHT,
             Margin = new Thickness(8, 0, 8, 0)
         };
-        var wfGrid = new Grid();
-        wfBorder.Child = wfGrid;
+        var wfScroll = new System.Windows.Controls.ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Background = Brushes.Transparent,
+            Padding = new Thickness(0)
+        };
+        item.WfScroll = wfScroll;
+        var wfGrid = new Grid { HorizontalAlignment = System.Windows.HorizontalAlignment.Left };
+        item.WfZoomGrid = wfGrid;
+        wfScroll.Content = wfGrid;
+        wfBorder.Child = wfScroll;
+        wfScroll.SizeChanged += (s, ev) => ApplyTrimZoom(item);
 
         // Waveform image
         var wfImage = new Image
@@ -5911,6 +6170,7 @@ public partial class FileToolsWindow : Window
         // Mouse handlers on canvas
         canvas.MouseLeftButtonDown += (s, ev) =>
         {
+            SetActiveTrimItem(item);
             double canvasW = canvas.ActualWidth;
             if (canvasW <= 0) return;
             var pos = ev.GetPosition(canvas);
@@ -6000,10 +6260,68 @@ public partial class FileToolsWindow : Window
         timeLabelGrid.Children.Add(endLabel);
         outerStack.Children.Add(timeLabelGrid);
 
-        // Initial handle positions (after loaded)
-        canvas.Loaded += (s, ev) => UpdateItemWaveformHandles(item);
+        // Initial sizing/handle positions (after loaded), and keep them aligned on resize.
+        canvas.Loaded += (s, ev) => ApplyTrimZoom(item);
+        canvas.SizeChanged += (s, ev) => UpdateItemWaveformHandles(item);
 
         return rowBorder;
+    }
+
+    // Sets the per-wave zoom (clamped 1x..16x) and re-fits the waveform grid width.
+    private void TrimZoom(AudioTrimItem item, double factor)
+    {
+        item.Zoom = Math.Clamp(item.Zoom * factor, 1, 16);
+        SetActiveTrimItem(item);
+        ApplyTrimZoom(item);
+    }
+
+    // Widens the waveform grid to viewport×zoom so the horizontal scrollbar appears,
+    // giving finer control when placing cut points; 1x exactly fits the viewport.
+    private void ApplyTrimZoom(AudioTrimItem item)
+    {
+        if (item.WfScroll == null || item.WfZoomGrid == null) return;
+        double vw = item.WfScroll.ViewportWidth;
+        if (vw <= 0) vw = item.WfScroll.ActualWidth;
+        if (vw <= 0) return;
+        item.WfZoomGrid.Width = Math.Max(vw, vw * item.Zoom);
+        if (item.TxtZoom != null) item.TxtZoom.Text = item.Zoom <= 1.0 ? "1x" : $"{item.Zoom:0}x";
+        UpdateItemWaveformHandles(item);
+    }
+
+    // Highlights the row + sidebar entry of the file currently being worked on.
+    private void SetActiveTrimItem(AudioTrimItem item)
+    {
+        _activeTrimItem = item;
+        foreach (var it in _trimAudioItems)
+        {
+            if (it.WfRow == null) continue;
+            bool active = it == item;
+            it.WfRow.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(active ? "#22343A" : "#1E1E22"));
+            it.WfRow.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(active ? "#4DB6AC" : "#333333"));
+            it.WfRow.BorderThickness = active ? new Thickness(3, 0, 0, 1) : new Thickness(0, 0, 0, 1);
+        }
+        var fi = _trimAudioFiles.FirstOrDefault(f => f.FilePath == item.FilePath);
+        if (fi != null && !ReferenceEquals(TrimAudioFileList.SelectedItem, fi))
+        {
+            _suppressTrimFileSelect = true;
+            TrimAudioFileList.SelectedItem = fi;
+            _suppressTrimFileSelect = false;
+        }
+    }
+
+    // Clicking a file in the sidebar makes it the active/working file and scrolls to it.
+    private void TrimAudio_FileSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressTrimFileSelect) return;
+        if (TrimAudioFileList.SelectedItem is FileItem fi)
+        {
+            var item = _trimAudioItems.FirstOrDefault(a => a.FilePath == fi.FilePath);
+            if (item != null)
+            {
+                SetActiveTrimItem(item);
+                item.WfRow?.BringIntoView();
+            }
+        }
     }
 
     private void UpdateItemWaveformHandles(AudioTrimItem item)
@@ -6021,6 +6339,8 @@ public partial class FileToolsWindow : Window
         if (item.WfDarkenLeft != null) { Canvas.SetLeft(item.WfDarkenLeft, 0); item.WfDarkenLeft.Width = Math.Max(0, leftX); }
         if (item.WfDarkenRight != null) { Canvas.SetLeft(item.WfDarkenRight, rightX); item.WfDarkenRight.Width = Math.Max(0, canvasW - rightX); }
 
+        RenderLowPeakMarkers(item, canvasW);
+
         // Update time labels
         if (item.Duration.TotalSeconds > 0)
         {
@@ -6032,12 +6352,40 @@ public partial class FileToolsWindow : Window
         }
     }
 
+    // Draws an amber marker (guide line + down-triangle) at each detected low peak.
+    private void RenderLowPeakMarkers(AudioTrimItem item, double canvasW)
+    {
+        if (item.WfCanvas == null) return;
+        foreach (var el in item.MarkerEls) item.WfCanvas.Children.Remove(el);
+        item.MarkerEls.Clear();
+        if (canvasW <= 0 || item.LowPeaks.Count == 0) return;
+
+        double h = item.WfCanvas.ActualHeight > 0 ? item.WfCanvas.ActualHeight : 100;
+        var fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFC107"));
+        var lineFill = new SolidColorBrush(Color.FromArgb(0x66, 0xFF, 0xC1, 0x07));
+        foreach (var frac in item.LowPeaks)
+        {
+            double x = Math.Clamp(frac, 0, 1) * canvasW;
+            var line = new Rectangle { Width = 1, Height = h, Fill = lineFill, IsHitTestVisible = false };
+            Canvas.SetLeft(line, x); Canvas.SetTop(line, 0);
+            item.WfCanvas.Children.Add(line); item.MarkerEls.Add(line);
+
+            var tri = new System.Windows.Shapes.Polygon
+            {
+                Points = new PointCollection { new Point(x - 5, 0), new Point(x + 5, 0), new Point(x, 9) },
+                Fill = fill, IsHitTestVisible = false
+            };
+            item.WfCanvas.Children.Add(tri); item.MarkerEls.Add(tri);
+        }
+    }
+
     private static string FormatMs(TimeSpan ts) => ts.TotalHours >= 1
         ? ts.ToString(@"h\:mm\:ss\.fff")
         : ts.ToString(@"mm\:ss\.fff");
 
     private void ToggleTrimPlayback(AudioTrimItem item)
     {
+        SetActiveTrimItem(item);
         // Stop any other playing item
         if (_playingAudioItem != null && _playingAudioItem != item)
             StopTrimPlayback();
@@ -6148,18 +6496,29 @@ public partial class FileToolsWindow : Window
             item.TxtPlayTime.Text = FileToolsService.FormatTimeSpan(item.Player.Position);
     }
 
+    // Copies the active (highlighted) file's cut points to every file: the same number
+    // of seconds is cut from the start and from the end of each track.
     private void TrimAudio_ApplyToAll(object sender, RoutedEventArgs e)
     {
-        if (!TimeSpan.TryParse(TxtGlobalTrimStart.Text.Trim(), out var cutStart)) cutStart = TimeSpan.Zero;
-        if (!TimeSpan.TryParse(TxtGlobalTrimEnd.Text.Trim(), out var cutEnd)) cutEnd = TimeSpan.FromSeconds(1);
+        var src = _activeTrimItem ?? (_trimAudioItems.Count > 0 ? _trimAudioItems[0] : null);
+        if (src == null || src.Duration.TotalSeconds <= 0)
+        {
+            MessageBox.Show("Set the cut points on a file first (drag its handles or use Suggest trims).",
+                            "No active file", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        double cutStartSec = src.TrimStartPct * src.Duration.TotalSeconds;
+        double cutEndSec = (1.0 - src.TrimEndPct) * src.Duration.TotalSeconds;
 
         foreach (var item in _trimAudioItems)
         {
-            if (item.Duration.TotalSeconds <= 0) continue;
-            item.TrimStartPct = Math.Min(cutStart.TotalSeconds / item.Duration.TotalSeconds, 0.99);
-            // Cut from end: trim end = duration - cutEnd
-            double endPct = Math.Max(0, (item.Duration.TotalSeconds - cutEnd.TotalSeconds) / item.Duration.TotalSeconds);
-            item.TrimEndPct = Math.Max(endPct, item.TrimStartPct + 0.01);
+            double dur = item.Duration.TotalSeconds;
+            if (dur <= 0) continue;
+            double startPct = Math.Clamp(cutStartSec / dur, 0, 0.98);
+            double endPct = Math.Clamp((dur - cutEndSec) / dur, startPct + 0.01, 1);
+            item.TrimStartPct = startPct;
+            item.TrimEndPct = endPct;
             UpdateItemWaveformHandles(item);
         }
     }
@@ -6170,8 +6529,51 @@ public partial class FileToolsWindow : Window
         {
             item.TrimStartPct = 0;
             item.TrimEndPct = 1;
+            item.LowPeaks = new List<double>();   // clear detected markers
             UpdateItemWaveformHandles(item);
         }
+    }
+
+    // Auto-detect each track's quiet dips ("low peaks"), mark them on the waveform, and
+    // snap the trim handles past the quiet intro/outro (relative to the track's loudness).
+    private async void TrimAudio_SuggestTrims(object sender, RoutedEventArgs e)
+    {
+        if (_trimAudioItems.Count == 0) return;
+        StopTrimPlayback();
+        BtnTrimSuggest.IsEnabled = false;
+        ShowProcessing("Analyzing levels…", indeterminate: true);
+        int adjusted = 0;
+        try
+        {
+            foreach (var item in _trimAudioItems)
+            {
+                if (item.Duration.TotalSeconds <= 0) continue;
+                try
+                {
+                    var (lowPeaks, startFrac, endFrac) = await FileToolsService.AnalyzeAudioLowPeaksAsync(item.FilePath);
+                    item.LowPeaks = lowPeaks;
+                    double startPct = Math.Clamp(startFrac, 0, 0.98);
+                    double endPct = Math.Clamp(endFrac, startPct + 0.01, 1);
+                    // Count it as a real suggestion if some intro/outro was trimmed.
+                    if (startPct > 0.001 || endPct < 0.999) adjusted++;
+                    item.TrimStartPct = startPct;
+                    item.TrimEndPct = endPct;
+                    UpdateItemWaveformHandles(item);
+                }
+                catch { /* leave this item's handles untouched */ }
+            }
+        }
+        finally
+        {
+            ProcessingOverlay.Visibility = Visibility.Collapsed;
+            ProcessingOverlay.Opacity = 1;
+            StopMainSpinner();
+            BtnTrimSuggest.IsEnabled = true;
+        }
+
+        if (adjusted == 0)
+            MessageBox.Show("No quiet intro/outro was detected — handles left unchanged. Low-peak markers (if any) are shown on the waveform.",
+                            "Nothing to snap", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void TrimAudio_BrowseFolder(object sender, RoutedEventArgs e)
@@ -7197,9 +7599,42 @@ public class FileItem : INotifyPropertyChanged
     public string FilePath { get; set; } = "";
     public string FileName { get; set; } = "";
     public string FileSize { get; set; } = "";
-    public string Extra { get; set; } = "";
-    public string DurationText { get; set; } = "";
-    public BitmapImage? Thumbnail { get; set; }
+
+    private string _extra = "";
+    public string Extra { get => _extra; set { _extra = value; OnPropertyChanged(); OnPropertyChanged(nameof(MetaLine)); } }
+
+    private string _durationText = "";
+    public string DurationText { get => _durationText; set { _durationText = value; OnPropertyChanged(); } }
+
+    private BitmapImage? _thumbnail;
+    public BitmapImage? Thumbnail { get => _thumbnail; set { _thumbnail = value; OnPropertyChanged(); } }
+
+    // Selection + per-file progress (used by the Extract Audio card grid; ignored elsewhere).
+    private bool _isSelected = true;
+    private string _status = "Pending";
+    private int _progress;
+    public bool IsSelected { get => _isSelected; set { _isSelected = value; OnPropertyChanged(); } }
+    public string Status { get => _status; set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusColor)); } }
+    public int Progress { get => _progress; set { _progress = value; OnPropertyChanged(); } }
+
+    // "1080p · 12.3 MB" style meta line for the card footer.
+    public string MetaLine =>
+        (string.IsNullOrEmpty(Extra), string.IsNullOrEmpty(FileSize)) switch
+        {
+            (false, false) => $"{Extra} · {FileSize}",
+            (false, true) => Extra,
+            (true, false) => FileSize,
+            _ => ""
+        };
+
+    public System.Windows.Media.Brush StatusColor => Status switch
+    {
+        "Done" => new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#4CAF50")),
+        "Extracting" => new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#26C6DA")),
+        "Error" => new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EF5350")),
+        "Cancelled" => new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888")),
+        _ => new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888")),
+    };
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -7220,6 +7655,16 @@ public class AudioTrimItem
     public double TrimEndPct { get; set; } = 1;
     public bool IsPlaying { get; set; }
     public string? WaveformTempPath { get; set; }
+
+    // Auto-detected quiet dips ("low peaks") as fractions 0..1, plus their drawn markers.
+    public List<double> LowPeaks { get; set; } = new();
+    public List<UIElement> MarkerEls { get; } = new();
+
+    // Per-wave horizontal zoom (1x = fit; higher widens the wave for finer cut placement).
+    public double Zoom { get; set; } = 1;
+    public System.Windows.Controls.ScrollViewer? WfScroll { get; set; }
+    public Grid? WfZoomGrid { get; set; }
+    public TextBlock? TxtZoom { get; set; }
 
     // Programmatic UI refs
     public Border? WfRow { get; set; }

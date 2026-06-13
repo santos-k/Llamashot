@@ -723,7 +723,7 @@ public static class FileToolsService
         return await Task.Run(() =>
         {
             var psi = new ProcessStartInfo("ffprobe",
-                $"-v error -select_streams v:0 -show_entries stream=width,height,codec_name -show_entries format=duration -of csv=p=0:s=, \"{path}\"")
+                $"-v error -select_streams v:0 -show_entries stream=width,height,codec_name -show_entries format=duration -of default=noprint_wrappers=1 \"{path}\"")
             {
                 RedirectStandardOutput = true, RedirectStandardError = true,
                 UseShellExecute = false, CreateNoWindow = true
@@ -732,21 +732,28 @@ public static class FileToolsService
             string output = proc.StandardOutput.ReadToEnd().Trim();
             proc.WaitForExit(10000);
 
-            // Output format: "width,height,codec\nduration"
-            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            // Output is order-independent "key=value" lines (ffprobe doesn't honor the
+            // requested column order in csv mode), e.g. width=320 / height=240 / duration=4.0
             int width = 0, height = 0;
             string codec = "unknown";
             double durationSec = 0;
 
-            if (lines.Length >= 1)
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var parts = lines[0].Split(',');
-                if (parts.Length >= 1) int.TryParse(parts[0].Trim(), out width);
-                if (parts.Length >= 2) int.TryParse(parts[1].Trim(), out height);
-                if (parts.Length >= 3) codec = parts[2].Trim();
+                int eq = line.IndexOf('=');
+                if (eq <= 0) continue;
+                string key = line[..eq].Trim();
+                string val = line[(eq + 1)..].Trim();
+                switch (key)
+                {
+                    case "width": int.TryParse(val, out width); break;
+                    case "height": int.TryParse(val, out height); break;
+                    case "codec_name": codec = val; break;
+                    case "duration":
+                        double.TryParse(val, NumberStyles.Any, CultureInfo.InvariantCulture, out durationSec);
+                        break;
+                }
             }
-            if (lines.Length >= 2)
-                double.TryParse(lines[1].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out durationSec);
 
             return (TimeSpan.FromSeconds(durationSec), width, height, codec);
         });
@@ -806,10 +813,200 @@ public static class FileToolsService
 
     public static async Task TrimAudioAsync(string inputPath, string outputPath, TimeSpan start, TimeSpan end, IProgress<int>? progress = null)
     {
-        string startStr = start.ToString(@"hh\:mm\:ss\.ff");
-        string endStr = end.ToString(@"hh\:mm\:ss\.ff");
+        string startStr = start.ToString(@"hh\:mm\:ss\.fff");
+        string endStr = end.ToString(@"hh\:mm\:ss\.fff");
+        string durStr = (end - start).ToString(@"hh\:mm\:ss\.fff");
         var duration = end - start;
+
+        // Preserve the source's embedded cover art (MP3 ID3) when present. Output-side
+        // seeking would discard the cover frame (it sits at t=0), so we seek the audio
+        // input only (input-side -ss/-t) and re-attach the untouched cover image.
+        string? cover = Path.GetExtension(outputPath).ToLowerInvariant() == ".mp3"
+            ? await TryExtractCoverAsync(inputPath)
+            : null;
+
+        if (cover != null)
+        {
+            try
+            {
+                await RunFFmpegAsync(
+                    $"-ss {startStr} -t {durStr} -i \"{inputPath}\" -i \"{cover}\" -map 0:a -map 1:0 " +
+                    $"-c copy -id3v2_version 3 -metadata:s:v title=\"Album cover\" -metadata:s:v comment=\"Cover (front)\" " +
+                    $"-disposition:v attached_pic \"{outputPath}\"",
+                    duration, progress);
+                return;
+            }
+            catch { /* fall back to a plain trim below */ }
+            finally { try { File.Delete(cover); } catch { } }
+        }
+
         await RunFFmpegAsync($"-i \"{inputPath}\" -ss {startStr} -to {endStr} -c copy \"{outputPath}\"", duration, progress);
+    }
+
+    // Pulls the embedded cover art (attached picture) out to a temp JPEG, or null if none.
+    private static async Task<string?> TryExtractCoverAsync(string inputPath)
+    {
+        string cover = Path.Combine(Path.GetTempPath(), $"llamashot_cover_{Guid.NewGuid():N}.jpg");
+        try
+        {
+            await RunFFmpegAsync($"-i \"{inputPath}\" -an -map 0:v:0 -frames:v 1 -q:v 2 \"{cover}\"", null, null);
+        }
+        catch { try { if (File.Exists(cover)) File.Delete(cover); } catch { } return null; }
+        return (File.Exists(cover) && new FileInfo(cover).Length > 0) ? cover : null;
+    }
+
+    // Analyses the loudness envelope and returns, as fractions of the duration (0..1):
+    //  - lowPeaks: the quiet dips (where the smoothed level falls well below the track's
+    //    own peak) — one marker per dip,
+    //  - startFraction/endFraction: where the strong audio begins/ends (for snapping the
+    //    trim handles past the quiet intro/outro). Thresholds are relative to each track.
+    public static async Task<(List<double> lowPeaks, double startFraction, double endFraction)>
+        AnalyzeAudioLowPeaksAsync(string path)
+    {
+        var info = await GetVideoInfoAsync(path);
+        double durSec = info.duration.TotalSeconds;
+        var empty = (new List<double>(), 0.0, 1.0);
+        if (durSec <= 0) return empty;
+
+        // Decode mono PCM at 8 kHz — high enough that the anti-alias filter keeps the
+        // musical energy (so loud passages stay loud), then measure loudness as windowed RMS.
+        const int sr = 8000;
+        byte[] pcm = await Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo("ffmpeg", $"-v error -i \"{path}\" -ac 1 -ar {sr} -f s16le -")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+            proc.ErrorDataReceived += (_, __) => { };
+            proc.BeginErrorReadLine();                  // drain stderr so it can't deadlock
+            using var ms = new MemoryStream();
+            proc.StandardOutput.BaseStream.CopyTo(ms);
+            proc.WaitForExit(120000);
+            return ms.ToArray();
+        });
+
+        int samples = pcm.Length / 2;
+        int wlen = (int)(sr * 0.05);                    // 50 ms RMS window
+        int nw = samples / wlen;
+        if (nw <= 2) return empty;
+
+        var rms = new double[nw];
+        for (int w = 0; w < nw; w++)
+        {
+            double sum = 0;
+            int baseIdx = w * wlen * 2;
+            for (int k = 0; k < wlen; k++)
+            {
+                short s = (short)(pcm[baseIdx + 2 * k] | (pcm[baseIdx + 2 * k + 1] << 8));
+                double v = s / 32768.0;
+                sum += v * v;
+            }
+            rms[w] = Math.Sqrt(sum / wlen);
+        }
+
+        // Light 3-window (150 ms) smoothing so a single quiet window isn't a false dip.
+        var sm = new double[nw];
+        for (int i = 0; i < nw; i++)
+        {
+            double a = i > 0 ? rms[i - 1] : rms[i];
+            double c = i < nw - 1 ? rms[i + 1] : rms[i];
+            sm[i] = (a + rms[i] + c) / 3.0;
+        }
+
+        double peak = sm.Max();
+        if (peak <= 0) return empty;
+
+        double strongThresh = peak * 0.30;  // "real audio" level
+        double lowThresh = peak * 0.08;     // a genuine quiet pause (not an inter-beat dip)
+
+        int firstStrong = Array.FindIndex(sm, v => v >= strongThresh);
+        int lastStrong = Array.FindLastIndex(sm, v => v >= strongThresh);
+        if (firstStrong < 0) { firstStrong = 0; lastStrong = nw - 1; }
+
+        double ToFrac(int w) => Math.Clamp((w + 0.5) / nw, 0, 1);
+
+        // Collect sustained quiet pauses only: a region must stay below the threshold for
+        // at least ~0.7s to count (so phrase gaps and momentary dips are ignored). Each
+        // region yields one marker at its lowest point.
+        int minRegion = Math.Max(1, (int)(0.7 / 0.05));   // 0.7s
+        var regions = new List<(int minIdx, int len)>();
+        for (int i = 0; i < nw;)
+        {
+            if (sm[i] < lowThresh)
+            {
+                int j = i, minIdx = i;
+                while (j < nw && sm[j] < lowThresh) { if (sm[j] < sm[minIdx]) minIdx = j; j++; }
+                if (j - i >= minRegion) regions.Add((minIdx, j - i));
+                i = j;
+            }
+            else i++;
+        }
+
+        // Keep only the most prominent pauses (longest), capped so the waveform stays
+        // readable even on long compilations; then restore chronological order.
+        const int maxMarkers = 12;
+        var lowPeaks = regions
+            .OrderByDescending(r => r.len)
+            .Take(maxMarkers)
+            .Select(r => ToFrac(r.minIdx))
+            .OrderBy(f => f)
+            .ToList();
+
+        // Snap the handles just past the intro / before the outro (~50 ms margin so the
+        // first/last beat isn't clipped), landing the cut in the adjacent quiet dip.
+        double startFraction = ToFrac(Math.Max(0, firstStrong - 1));
+        double endFraction = ToFrac(Math.Min(nw - 1, lastStrong + 1));
+        if (endFraction <= startFraction) { startFraction = 0; endFraction = 1; }
+
+        return (lowPeaks, startFraction, endFraction);
+    }
+
+    // Detects leading/trailing silence and returns the suggested keep-region [start, end].
+    // Falls back to [0, duration] when no edge silence is found.
+    public static async Task<(TimeSpan start, TimeSpan end)> DetectSilenceBoundsAsync(
+        string path, double noiseDb = -30, double minSilenceSec = 0.4)
+    {
+        var info = await GetVideoInfoAsync(path);
+        TimeSpan total = info.duration;
+
+        string stderr = await Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo("ffmpeg",
+                $"-i \"{path}\" -af silencedetect=noise={noiseDb}dB:d={minSilenceSec.ToString(CultureInfo.InvariantCulture)} -f null -")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+            string err = proc.StandardError.ReadToEnd();
+            proc.WaitForExit(60000);
+            return err;
+        });
+
+        // Collect (start,end) silence intervals from silencedetect's stderr log.
+        var intervals = new List<(double s, double e)>();
+        double? pending = null;
+        foreach (Match m in Regex.Matches(stderr, @"silence_(start|end):\s*(-?\d+(?:\.\d+)?)"))
+        {
+            double v = double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+            if (m.Groups[1].Value == "start") pending = v;
+            else { intervals.Add((pending ?? 0, v)); pending = null; }
+        }
+        if (pending.HasValue) intervals.Add((pending.Value, total.TotalSeconds)); // silence ran to EOF
+
+        double startSec = 0, endSec = total.TotalSeconds;
+        // Leading silence: an interval that begins at (or very near) the start.
+        var lead = intervals.Where(iv => iv.s <= 0.3).ToList();
+        if (lead.Count > 0) startSec = lead[0].e;
+        // Trailing silence: an interval that ends at (or very near) the end.
+        var trail = intervals.Where(iv => iv.e >= total.TotalSeconds - 0.3).ToList();
+        if (trail.Count > 0) endSec = trail[^1].s;
+
+        // Guard against nonsensical bounds.
+        if (endSec <= startSec) { startSec = 0; endSec = total.TotalSeconds; }
+        return (TimeSpan.FromSeconds(Math.Max(0, startSec)), TimeSpan.FromSeconds(Math.Min(total.TotalSeconds, endSec)));
     }
 
     public static async Task<string> GenerateWaveformAsync(string audioPath, int width = 1400, int height = 150)
@@ -825,6 +1022,32 @@ public static class FileToolsService
     {
         var info = await GetVideoInfoAsync(path); // ffprobe works for audio too
         return info.duration;
+    }
+
+    // Grabs a single representative frame from a video as a small JPEG thumbnail.
+    // Returns the temp file path, or null if extraction failed (caller shows a placeholder).
+    public static async Task<string?> GenerateVideoThumbnailAsync(string videoPath, int width = 360)
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"llamashot_vthumb_{Guid.NewGuid():N}.jpg");
+        try
+        {
+            // Seek ~1s in (fast pre-input seek) and grab one frame scaled to `width`.
+            await RunFFmpegAsync(
+                $"-ss 1 -i \"{videoPath}\" -frames:v 1 -vf \"scale={width}:-1\" -q:v 4 \"{outputPath}\"",
+                null, null);
+        }
+        catch
+        {
+            // Very short clips can fail the 1s seek — retry from the first frame.
+            try
+            {
+                await RunFFmpegAsync(
+                    $"-i \"{videoPath}\" -frames:v 1 -vf \"scale={width}:-1\" -q:v 4 \"{outputPath}\"",
+                    null, null);
+            }
+            catch { return null; }
+        }
+        return File.Exists(outputPath) ? outputPath : null;
     }
 
     public static bool IsAudioExtension(string ext) =>
