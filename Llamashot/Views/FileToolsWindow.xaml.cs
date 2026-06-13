@@ -188,6 +188,9 @@ public partial class FileToolsWindow : Window
     private readonly List<YtVideoItem> _ytSearchCache = new();
     private string _ytResultsTitle = "";
     private string _ytResultsDetail = "";
+    // Snapshot of the download list's natural (playlist) order, for the "Playlist order" sort option.
+    private readonly List<YtVideoItem> _ytDownloadOriginal = new();
+    private bool _ytDownloadSortSyncing;
 
     // =====================================================================
     //  Video crop state
@@ -678,6 +681,9 @@ public partial class FileToolsWindow : Window
         if (TxtYtSearch != null) TxtYtSearch.Text = "";
         if (TxtYtSearchPlaceholder != null) TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
         if (TxtYtUrlTop != null) TxtYtUrlTop.Text = "";
+        if (TxtYtDownloadFilter != null) TxtYtDownloadFilter.Text = "";
+        if (TxtYtDownloadFilterPh != null) TxtYtDownloadFilterPh.Visibility = Visibility.Visible;
+        _ytDownloadOriginal.Clear();
         ApplyYtViewMode();
         ApplyYtScreen();
         _ytCancelSource?.Cancel();
@@ -6364,6 +6370,7 @@ public partial class FileToolsWindow : Window
                 _ytScreen = YtScreen.Download;
                 _ytBackTarget = YtScreen.Hero;
                 if (_ytVideos.Count == 1) _ytVideos[0].IsSelected = true;
+                CaptureYtDownloadOrder();
             }
 
             TxtYtTitle.Text = headerTitle;
@@ -6372,8 +6379,7 @@ public partial class FileToolsWindow : Window
             ApplyYtViewMode();
             ApplyYtScreen();
             UpdateYtSelectedCount();
-            YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-            TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+            ResetYtDownloadFilter();
             _ytFiltersReady = true; // re-enable filter/sort re-search now that the UI is settled
         }
         catch (Exception ex)
@@ -6454,11 +6460,20 @@ public partial class FileToolsWindow : Window
         YtBottomBar.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
         YtDownloadControls.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
 
+        // The page title reflects the stage: searching vs. reviewing for download.
+        if (_currentToolId == "youtube_dl")
+            TxtToolTitle.Text = download ? "Review & Download" : "YouTube Download";
+
+        // Multiple real (non-playlist) videos are loaded → the filter/sort helpers are useful.
+        bool manyVideos = _ytVideos.Count(v => !v.IsPlaylist) > 1;
+
         // Header right-side controls.
         BtnYtOpenPlaylist.Visibility = searchPlaylists ? Visibility.Visible : Visibility.Collapsed;
-        BtnYtBack.Visibility = download ? Visibility.Visible : Visibility.Collapsed;
-        ChkYtSelectAll.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
+        // A single global Back (top-left) drives every level — the second Back button was removed.
+        ChkYtSelectAll.Visibility = (searchVideos || download) ? Visibility.Visible : Visibility.Collapsed;
         CmbYtSortHeader.Visibility = searchVideos ? Visibility.Visible : Visibility.Collapsed;
+        YtDownloadFilterBox.Visibility = (download && manyVideos) ? Visibility.Visible : Visibility.Collapsed;
+        CmbYtDownloadSort.Visibility = (download && manyVideos) ? Visibility.Visible : Visibility.Collapsed;
 
         // Playlists allow picking exactly one; videos allow multi-select checkboxes.
         var mode = searchPlaylists ? System.Windows.Controls.SelectionMode.Single
@@ -6493,14 +6508,14 @@ public partial class FileToolsWindow : Window
         foreach (var v in selected) { v.PropertyChanged += YtItem_PropertyChanged; _ytVideos.Add(v); }
 
         _ytScreen = YtScreen.Download;
-        TxtYtTitle.Text = $"Download — {selected.Count} selected";
+        TxtYtTitle.Text = $"Review & download — {selected.Count} selected";
         TxtYtDetail.Text = $"{selected.Count} video{(selected.Count != 1 ? "s" : "")} ready to download";
+        CaptureYtDownloadOrder();
 
         ApplyYtViewMode();
         ApplyYtScreen();
         UpdateYtSelectedCount();
-        YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-        TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+        ResetYtDownloadFilter();
     }
 
     // Clears the search results and returns to the hero entry screen.
@@ -6563,12 +6578,12 @@ public partial class FileToolsWindow : Window
             _ytScreen = YtScreen.Download;
             TxtYtTitle.Text = pl.Title;
             TxtYtDetail.Text = $"{videos.Count} video{(videos.Count != 1 ? "s" : "")} in playlist";
+            CaptureYtDownloadOrder();
 
             ApplyYtViewMode();
             ApplyYtScreen();
             UpdateYtSelectedCount();
-            YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-            TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
+            ResetYtDownloadFilter();
         }
         catch (Exception ex)
         {
@@ -6592,6 +6607,7 @@ public partial class FileToolsWindow : Window
             return;
         }
 
+        ResetYtDownloadFilter();
         foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
         _ytVideos.Clear();
         System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
@@ -6608,8 +6624,6 @@ public partial class FileToolsWindow : Window
         ApplyYtViewMode();
         ApplyYtScreen();
         UpdateYtSelectedCount();
-        YtSearchBox.Visibility = _ytVideos.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-        TxtYtSearchPlaceholder.Visibility = Visibility.Visible;
     }
 
     private void Yt_UrlTopKeyDown(object sender, KeyEventArgs e)
@@ -6661,7 +6675,12 @@ public partial class FileToolsWindow : Window
         if (folderDlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
         BtnYtDownload.IsEnabled = false;
+        BtnYtDownload.Content = "Downloading…";
         BtnYtStop.Visibility = Visibility.Visible;
+        // Lock list-editing controls so the in-flight selection can't change mid-download.
+        if (ChkYtSelectAll != null) ChkYtSelectAll.IsEnabled = false;
+        if (CmbYtDownloadSort != null) CmbYtDownloadSort.IsEnabled = false;
+        if (YtDownloadFilterBox != null) YtDownloadFilterBox.IsEnabled = false;
         _ytCancelSource = new CancellationTokenSource();
 
         bool isAudio = RbYtAudio.IsChecked == true;
@@ -6683,7 +6702,7 @@ public partial class FileToolsWindow : Window
 
                 video.Status = "Downloading";
                 video.Progress = 0;
-                TxtYtOverallProgress.Text = $"Downloading {completed + 1} of {total}...";
+                TxtYtOverallProgress.Text = $"Downloading {completed + 1} / {total}…";
 
                 try
                 {
@@ -6714,8 +6733,13 @@ public partial class FileToolsWindow : Window
         finally
         {
             BtnYtDownload.IsEnabled = true;
+            BtnYtDownload.Content = "Download \u2192";
             BtnYtStop.Visibility = Visibility.Collapsed;
+            if (ChkYtSelectAll != null) ChkYtSelectAll.IsEnabled = true;
+            if (CmbYtDownloadSort != null) CmbYtDownloadSort.IsEnabled = true;
+            if (YtDownloadFilterBox != null) YtDownloadFilterBox.IsEnabled = true;
             _ytCancelSource = null;
+            UpdateYtSelectedCount();
         }
     }
 
@@ -6868,6 +6892,74 @@ public partial class FileToolsWindow : Window
             : o => o is YtVideoItem v && v.Title.Contains(q, StringComparison.OrdinalIgnoreCase);
     }
 
+    // Clears the download-page title filter and removes any active list filter.
+    private void ResetYtDownloadFilter()
+    {
+        if (TxtYtDownloadFilter != null) TxtYtDownloadFilter.Text = "";
+        if (TxtYtDownloadFilterPh != null) TxtYtDownloadFilterPh.Visibility = Visibility.Visible;
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos);
+        if (view != null) view.Filter = null;
+    }
+
+    // Download page: filter the loaded videos by title (does not re-query YouTube).
+    private void Yt_DownloadFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TxtYtDownloadFilterPh != null)
+            TxtYtDownloadFilterPh.Visibility =
+                string.IsNullOrEmpty(TxtYtDownloadFilter.Text) ? Visibility.Visible : Visibility.Collapsed;
+
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos);
+        if (view == null) return;
+
+        string q = TxtYtDownloadFilter.Text.Trim();
+        view.Filter = string.IsNullOrEmpty(q)
+            ? null
+            : o => o is YtVideoItem v && v.Title.Contains(q, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Captures the current order as the "natural" order and resets the sort combo.
+    private void CaptureYtDownloadOrder()
+    {
+        _ytDownloadOriginal.Clear();
+        _ytDownloadOriginal.AddRange(_ytVideos);
+        if (CmbYtDownloadSort != null)
+        {
+            _ytDownloadSortSyncing = true;
+            CmbYtDownloadSort.SelectedIndex = 0;
+            _ytDownloadSortSyncing = false;
+        }
+    }
+
+    private int YtOriginalIndex(YtVideoItem v)
+    {
+        int i = _ytDownloadOriginal.IndexOf(v);
+        return i < 0 ? int.MaxValue : i;
+    }
+
+    // Download page: re-order the loaded list locally (selected first / title / longest).
+    private void Yt_DownloadSortChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_ytDownloadSortSyncing || _ytScreen != YtScreen.Download) return;
+        ApplyYtDownloadSort();
+    }
+
+    private void ApplyYtDownloadSort()
+    {
+        if (CmbYtDownloadSort == null) return;
+        List<YtVideoItem> ordered = CmbYtDownloadSort.SelectedIndex switch
+        {
+            1 => _ytVideos.OrderBy(v => v.IsSelected ? 0 : 1).ThenBy(YtOriginalIndex).ToList(), // selected first
+            2 => _ytVideos.OrderBy(v => v.Title, StringComparer.OrdinalIgnoreCase).ToList(),     // title A–Z
+            3 => _ytVideos.OrderByDescending(v => v.DurationMinutes).ThenBy(YtOriginalIndex).ToList(), // longest
+            _ => _ytVideos.OrderBy(YtOriginalIndex).ToList(),                                    // playlist order
+        };
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            int cur = _ytVideos.IndexOf(ordered[i]);
+            if (cur != i) _ytVideos.Move(cur, i);
+        }
+    }
+
     private void YtItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(YtVideoItem.IsSelected))
@@ -6883,6 +6975,11 @@ public partial class FileToolsWindow : Window
 
         if (TxtYtSelectedVideos != null) TxtYtSelectedVideos.Text = sel.ToString();
         if (TxtYtEstSize != null) TxtYtEstSize.Text = "~" + FormatYtSize(EstimateYtSizeMb());
+
+        // On the review/download page the bottom bar is hidden, so surface the
+        // live selected count + estimated size in the header subtitle instead.
+        if (_ytScreen == YtScreen.Download && TxtYtDetail != null && _ytCancelSource == null)
+            TxtYtDetail.Text = $"{sel} of {total} selected · ~{FormatYtSize(EstimateYtSizeMb())}";
 
         if (ChkYtSelectAll != null)
             ChkYtSelectAll.IsChecked = total == 0 ? false : (sel == total ? true : (sel == 0 ? false : (bool?)null));

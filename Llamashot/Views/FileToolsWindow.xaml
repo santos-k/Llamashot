@@ -3049,13 +3049,31 @@
                         <TextBlock x:Name="TxtYtDetail" Text="" Foreground="#888" FontSize="12" Margin="0,2,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="BtnYtBack" Content="← Back" Height="30" FontSize="12" Padding="12,0"
-                                Background="#333" Foreground="#CCC" BorderBrush="#444" Cursor="Hand"
-                                Click="Yt_BackToResults" Visibility="Collapsed" Margin="0,0,8,0"/>
                         <Button x:Name="BtnYtOpenPlaylist" Content="Open playlist →" Height="30" FontSize="12" Padding="12,0"
                                 Background="#FF0000" Foreground="White" BorderBrush="#444" Cursor="Hand"
                                 Click="Yt_OpenPlaylist" Visibility="Collapsed" Margin="0,0,8,0"
                                 Template="{StaticResource RoundedButton21}"/>
+                        <!-- Download screen: filter the loaded videos by title -->
+                        <Border x:Name="YtDownloadFilterBox" Visibility="Collapsed" Background="#252528" CornerRadius="6"
+                                BorderBrush="#3A3A3F" BorderThickness="1" Height="32" Width="200" Margin="0,0,12,0"
+                                VerticalAlignment="Center">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                           Foreground="#888" VerticalAlignment="Center" Margin="10,0,8,0"/>
+                                <Grid Grid.Column="1">
+                                    <TextBox x:Name="TxtYtDownloadFilter" BorderThickness="0" Background="Transparent"
+                                             Foreground="#EEE" FontSize="12" VerticalContentAlignment="Center"
+                                             TextChanged="Yt_DownloadFilterChanged"/>
+                                    <TextBlock x:Name="TxtYtDownloadFilterPh" Text="Filter videos…" Foreground="#777"
+                                               FontSize="12" VerticalAlignment="Center" Margin="2,0,8,0"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
                         <CheckBox x:Name="ChkYtSelectAll" Content="Select All" Foreground="#CCC" FontSize="12"
                                   VerticalAlignment="Center" Cursor="Hand" Margin="0,0,14,0" Click="Yt_SelectAllToggle"/>
                         <ComboBox x:Name="CmbYtSortHeader" Width="150" Height="32" FontSize="12" Margin="0,0,10,0"
@@ -3064,6 +3082,14 @@
                             <ComboBoxItem Content="Upload date"/>
                             <ComboBoxItem Content="View count"/>
                             <ComboBoxItem Content="Rating"/>
+                        </ComboBox>
+                        <!-- Download screen: local re-ordering of the loaded list -->
+                        <ComboBox x:Name="CmbYtDownloadSort" Width="150" Height="32" FontSize="12" Margin="0,0,10,0"
+                                  Visibility="Collapsed" SelectedIndex="0" SelectionChanged="Yt_DownloadSortChanged">
+                            <ComboBoxItem Content="Playlist order"/>
+                            <ComboBoxItem Content="Selected first"/>
+                            <ComboBoxItem Content="Title (A–Z)"/>
+                            <ComboBoxItem Content="Longest first"/>
                         </ComboBox>
                         <Border Background="#252528" CornerRadius="6" BorderBrush="#3A3A3F" BorderThickness="1" Padding="2">
                             <StackPanel Orientation="Horizontal">
@@ -3461,8 +3487,8 @@
                               Foreground="#CCC" FontSize="11" IsChecked="True" Cursor="Hand"
                               Visibility="Collapsed" VerticalAlignment="Center" Margin="16,0,0,0"/>
 
-                    <TextBlock x:Name="TxtYtOverallProgress" Grid.Column="2" Text="" Foreground="#888" FontSize="12"
-                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TxtYtOverallProgress" Grid.Column="2" Text="" Foreground="#EEE" FontSize="13"
+                               FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
                     <Button x:Name="BtnYtStop" Grid.Column="3" Content="Stop" Width="70" Height="38"
                             FontSize="13" Background="#EF5350" Foreground="White" BorderThickness="0"
