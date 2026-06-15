@@ -6,10 +6,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
     <SelfContained>true</SelfContained>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Llamashot\Llamashot.csproj" />
+  </ItemGroup>
+  <!-- Mirror Llamashot's embedded resources so the window's relative
+       pack URIs (/Resources/icon32.png, etc.) resolve against this
+       entry assembly when hosting FileToolsWindow standalone. -->
+  <ItemGroup>
+    <Resource Include="..\..\Llamashot\Resources\**">
+      <Link>Resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Resource>
   </ItemGroup>
 </Project>
