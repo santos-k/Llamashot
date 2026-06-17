@@ -29,7 +29,11 @@ public partial class ToolWorkspaceWindow : Window
 
     // which tool this workspace is currently showing
     private string _toolId = "split_pdf";
-    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images", "images_to_pdf", "rotate_pdf" };
+    private static readonly HashSet<string> Implemented = new()
+    {
+        "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images", "images_to_pdf", "rotate_pdf",
+        "extract_pages", "insert_pages", "page_numbers", "watermark", "protect_pdf"
+    };
 
     // split settings controls
     private string _method = "custom";
@@ -60,6 +64,30 @@ public partial class ToolWorkspaceWindow : Window
     private int _rotateDeg = 90;
     private readonly Dictionary<string, Border> _rotateCards = new();
 
+    // extract-pages settings
+    private TextBox _extractBox = null!;
+    private TextBox _extractNameBox = null!;
+
+    // page-numbers settings
+    private string _pnPos = "bottom-center";
+    private readonly Dictionary<string, Border> _pnCards = new();
+
+    // watermark settings
+    private TextBox _wmTextBox = null!;
+    private double _wmOpacity = 0.3;
+    private int _wmFontSize = 48;
+    private readonly Dictionary<string, Border> _wmOpacityCards = new();
+    private readonly Dictionary<string, Border> _wmSizeCards = new();
+
+    // insert-pages settings
+    private readonly List<string> _insertImages = new();
+    private TextBox _insertAfterBox = null!;
+    private TextBlock _insertCountText = null!;
+
+    // protect settings
+    private System.Windows.Controls.PasswordBox _protectPwBox = null!;
+    private System.Windows.Controls.PasswordBox _protectConfirmBox = null!;
+
     private static readonly string[] ImageExts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff" };
 
     /// <summary>True for tools that take a reorderable list of input files (Merge, Images→PDF).</summary>
@@ -86,6 +114,21 @@ public partial class ToolWorkspaceWindow : Window
         "rotate_pdf" => ("Rotate PDF", "Turn every page by a fixed angle",
             "The preview shows how pages will look after rotating. The rotation is applied to all pages in the document.",
             "Rotate PDF  →"),
+        "extract_pages" => ("Extract Pages", "Pull specific pages into a new PDF",
+            "List the pages you want with commas and ranges, e.g. 1, 3, 5-8. Pages keep the order you enter.",
+            "Extract  →"),
+        "insert_pages" => ("Insert Pages", "Insert images as pages into a PDF",
+            "Pick images to insert, then choose which page they go after. Each image becomes one new page.",
+            "Insert  →"),
+        "page_numbers" => ("Page Numbers", "Stamp page numbers onto every page",
+            "Choose where the number sits on each page. Numbering starts at 1 on the first page.",
+            "Add Numbers  →"),
+        "watermark" => ("Watermark PDF", "Overlay text across every page",
+            "Enter your watermark text and tune the size and opacity. It's drawn diagonally across each page.",
+            "Add Watermark  →"),
+        "protect_pdf" => ("Protect PDF", "Lock a PDF with a password",
+            "Set a password that will be required to open the PDF. Keep it somewhere safe — it can't be recovered.",
+            "Protect  →"),
         "compress_pdf" => ("Compress PDF", "Reduce file size while keeping quality",
             "Higher compression means a smaller file but lower image quality. Recommended works well for most documents.",
             "Compress PDF  →"),
@@ -146,11 +189,19 @@ public partial class ToolWorkspaceWindow : Window
         _fmtCards.Clear();
         _dpiCards.Clear();
         _rotateCards.Clear();
+        _pnCards.Clear();
+        _wmOpacityCards.Clear();
+        _wmSizeCards.Clear();
         if (_toolId == "merge_pdf") BuildMergeSettings();
         else if (_toolId == "images_to_pdf") BuildImagesToPdfSettings();
         else if (_toolId == "compress_pdf") BuildCompressSettings();
         else if (_toolId == "pdf_to_images") BuildPdfToImagesSettings();
         else if (_toolId == "rotate_pdf") BuildRotateSettings();
+        else if (_toolId == "extract_pages") BuildExtractSettings();
+        else if (_toolId == "insert_pages") BuildInsertSettings();
+        else if (_toolId == "page_numbers") BuildPageNumbersSettings();
+        else if (_toolId == "watermark") BuildWatermarkSettings();
+        else if (_toolId == "protect_pdf") BuildProtectSettings();
         else BuildSplitSettings();
     }
 
@@ -520,6 +571,201 @@ public partial class ToolWorkspaceWindow : Window
             ? new RotateTransform(_rotateDeg)
             : Transform.Identity;
 
+    private TextBox ThemedBox(string text) => new()
+    {
+        Text = text, FontSize = 14, Padding = new Thickness(11), Margin = new Thickness(0, 8, 0, 0),
+        Background = B("SurfaceAltBrush"), Foreground = B("TextPrimaryBrush"),
+        BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1)
+    };
+
+    private TextBlock Hint(string text) => new()
+    {
+        Text = text, FontSize = 11.5, Foreground = B("TextMutedBrush"),
+        Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap
+    };
+
+    // =====================================================================
+    //  Extract Pages settings
+    // =====================================================================
+    private void BuildExtractSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Pages to Extract"));
+        SettingsHost.Children.Add(MutedLabel("PAGE SELECTION"));
+        _extractBox = ThemedBox(_pageCount > 0 ? $"1-{_pageCount}" : "");
+        SettingsHost.Children.Add(_extractBox);
+        SettingsHost.Children.Add(Hint("Use commas and ranges, e.g. 1, 3, 5-8. Pages keep the order you enter."));
+
+        SettingsHost.Children.Add(MutedLabel("QUICK SELECT", 14));
+        var pills = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        pills.Children.Add(QuickPill("All Pages", () => { if (_pageCount > 0) _extractBox.Text = $"1-{_pageCount}"; }));
+        pills.Children.Add(QuickPill("First Half", () => { if (_pageCount > 0) _extractBox.Text = $"1-{Math.Max(1, _pageCount / 2)}"; }));
+        pills.Children.Add(QuickPill("Second Half", () => { if (_pageCount > 0) _extractBox.Text = $"{_pageCount / 2 + 1}-{_pageCount}"; }));
+        SettingsHost.Children.Add(pills);
+
+        SettingsHost.Children.Add(SectionTitle("Output File", 22));
+        SettingsHost.Children.Add(MutedLabel("FILE NAME"));
+        _extractNameBox = ThemedBox("extracted.pdf");
+        SettingsHost.Children.Add(_extractNameBox);
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Extracted")));
+    }
+
+    /// <summary>Parses "1, 3, 5-8" into an ordered, de-duplicated page list. Null if malformed.</summary>
+    private static List<int>? ParsePageSpec(string spec)
+    {
+        var result = new List<int>();
+        foreach (var raw in spec.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var token = raw.Trim();
+            if (token.Contains('-'))
+            {
+                var parts = token.Split('-');
+                if (parts.Length != 2 || !int.TryParse(parts[0].Trim(), out int a) || !int.TryParse(parts[1].Trim(), out int b)) return null;
+                if (a > b) (a, b) = (b, a);
+                for (int p = a; p <= b; p++) result.Add(p);
+            }
+            else
+            {
+                if (!int.TryParse(token, out int p)) return null;
+                result.Add(p);
+            }
+        }
+        var seen = new HashSet<int>();
+        var ordered = new List<int>();
+        foreach (var p in result) if (seen.Add(p)) ordered.Add(p);
+        return ordered;
+    }
+
+    // =====================================================================
+    //  Insert Pages settings
+    // =====================================================================
+    private void BuildInsertSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Images to Insert"));
+        var addBtn = SoftButton("＋  Choose Images", InsertChooseImages_Click);
+        addBtn.Background = B("AccentBrush");
+        addBtn.Foreground = B("AccentTextBrush");
+        addBtn.Padding = new Thickness(16, 11, 16, 11);
+        addBtn.HorizontalAlignment = HorizontalAlignment.Left;
+        SettingsHost.Children.Add(addBtn);
+        _insertCountText = new TextBlock { FontSize = 12.5, Foreground = B("TextMutedBrush"), Margin = new Thickness(2, 10, 0, 0) };
+        SettingsHost.Children.Add(_insertCountText);
+        UpdateInsertCount();
+
+        SettingsHost.Children.Add(MutedLabel("INSERT AFTER PAGE", 22));
+        _insertAfterBox = ThemedBox(_pageCount > 0 ? _pageCount.ToString() : "0");
+        SettingsHost.Children.Add(_insertAfterBox);
+        SettingsHost.Children.Add(Hint("0 places the images before page 1. Each image becomes one new page."));
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Inserted")));
+    }
+
+    private void InsertChooseImages_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Multiselect = true,
+            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff"
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            foreach (var f in dlg.FileNames) if (!_insertImages.Contains(f)) _insertImages.Add(f);
+            UpdateInsertCount();
+        }
+    }
+
+    private void UpdateInsertCount()
+        => _insertCountText.Text = _insertImages.Count == 0
+            ? "No images chosen yet."
+            : $"{_insertImages.Count} image{(_insertImages.Count == 1 ? "" : "s")} ready to insert";
+
+    // =====================================================================
+    //  Page Numbers settings
+    // =====================================================================
+    private void BuildPageNumbersSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Number Position"));
+        SettingsHost.Children.Add(RadioCard(_pnCards, "top-left", "Top Left", "Header, left edge", () => SelectPnPos("top-left")));
+        SettingsHost.Children.Add(RadioCard(_pnCards, "top-center", "Top Center", "Header, centered", () => SelectPnPos("top-center")));
+        SettingsHost.Children.Add(RadioCard(_pnCards, "top-right", "Top Right", "Header, right edge", () => SelectPnPos("top-right")));
+        SettingsHost.Children.Add(RadioCard(_pnCards, "bottom-left", "Bottom Left", "Footer, left edge", () => SelectPnPos("bottom-left")));
+        SettingsHost.Children.Add(RadioCard(_pnCards, "bottom-center", "Bottom Center", "Footer, centered", () => SelectPnPos("bottom-center")));
+        SettingsHost.Children.Add(RadioCard(_pnCards, "bottom-right", "Bottom Right", "Footer, right edge", () => SelectPnPos("bottom-right")));
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Numbered")));
+
+        SelectPnPos(_pnPos);
+    }
+
+    private void SelectPnPos(string key) { _pnPos = key; HighlightRadio(_pnCards, key); }
+
+    // =====================================================================
+    //  Watermark settings
+    // =====================================================================
+    private static double WmOpacityFor(string k) => k switch { "light" => 0.15, "strong" => 0.5, _ => 0.3 };
+    private static int WmSizeFor(string k) => k switch { "small" => 32, "large" => 72, _ => 48 };
+
+    private void BuildWatermarkSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Watermark Text"));
+        _wmTextBox = ThemedBox("CONFIDENTIAL");
+        _wmTextBox.Margin = new Thickness(0, 0, 0, 0);
+        SettingsHost.Children.Add(_wmTextBox);
+
+        SettingsHost.Children.Add(SectionTitle("Opacity", 22));
+        SettingsHost.Children.Add(RadioCard(_wmOpacityCards, "light", "Light", "Subtle · 15%", () => SelectWmOpacity("light")));
+        SettingsHost.Children.Add(RadioCard(_wmOpacityCards, "medium", "Medium", "Balanced · 30%", () => SelectWmOpacity("medium")));
+        SettingsHost.Children.Add(RadioCard(_wmOpacityCards, "strong", "Strong", "Bold · 50%", () => SelectWmOpacity("strong")));
+
+        SettingsHost.Children.Add(SectionTitle("Font Size", 22));
+        SettingsHost.Children.Add(RadioCard(_wmSizeCards, "small", "Small", "32 pt", () => SelectWmSize("small")));
+        SettingsHost.Children.Add(RadioCard(_wmSizeCards, "medium", "Medium", "48 pt", () => SelectWmSize("medium")));
+        SettingsHost.Children.Add(RadioCard(_wmSizeCards, "large", "Large", "72 pt", () => SelectWmSize("large")));
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Watermarked")));
+
+        SelectWmOpacity(_wmOpacity <= 0.15 ? "light" : _wmOpacity >= 0.5 ? "strong" : "medium");
+        SelectWmSize(_wmFontSize <= 32 ? "small" : _wmFontSize >= 72 ? "large" : "medium");
+    }
+
+    private void SelectWmOpacity(string key) { _wmOpacity = WmOpacityFor(key); HighlightRadio(_wmOpacityCards, key); }
+    private void SelectWmSize(string key) { _wmFontSize = WmSizeFor(key); HighlightRadio(_wmSizeCards, key); }
+
+    // =====================================================================
+    //  Protect settings
+    // =====================================================================
+    private void BuildProtectSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Set Password"));
+        SettingsHost.Children.Add(MutedLabel("PASSWORD"));
+        _protectPwBox = ThemedPasswordBox();
+        SettingsHost.Children.Add(_protectPwBox);
+
+        SettingsHost.Children.Add(MutedLabel("CONFIRM PASSWORD", 16));
+        _protectConfirmBox = ThemedPasswordBox();
+        SettingsHost.Children.Add(_protectConfirmBox);
+        SettingsHost.Children.Add(Hint("This password will be required to open the PDF. It can't be recovered if lost."));
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Protected")));
+    }
+
+    private System.Windows.Controls.PasswordBox ThemedPasswordBox() => new()
+    {
+        FontSize = 14, Padding = new Thickness(11), Margin = new Thickness(0, 8, 0, 0),
+        Background = B("SurfaceAltBrush"), Foreground = B("TextPrimaryBrush"),
+        BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1)
+    };
+
     /// <summary>Generic radio-style settings card (dot + title + description).</summary>
     private Border RadioCard(Dictionary<string, Border> dict, string key, string title, string desc, Action onClick)
     {
@@ -863,6 +1109,8 @@ public partial class ToolWorkspaceWindow : Window
         BuildInfo();
         UpdateSelection();
         if (_toolId == "split_pdf") { SetRange(1, pages); SelectMethod(_method); }
+        else if (_toolId == "extract_pages" && string.IsNullOrWhiteSpace(_extractBox.Text)) _extractBox.Text = $"1-{pages}";
+        else if (_toolId == "insert_pages") _insertAfterBox.Text = pages.ToString();
         await RenderCurrentPage();
         await BuildThumbnails();
     }
@@ -949,6 +1197,8 @@ public partial class ToolWorkspaceWindow : Window
         ThumbList.Items.Clear();
         _mergeFiles.Clear(); _mergePages.Clear(); _mergePw.Clear();
         if (MergeList != null) MergeList.Items.Clear();
+        _insertImages.Clear();
+        if (_toolId == "insert_pages") UpdateInsertCount();
         ShowPreviewState();
         BuildInfo();
         UpdateSelection();
@@ -1002,7 +1252,151 @@ public partial class ToolWorkspaceWindow : Window
         if (_toolId == "compress_pdf") await ProcessCompress();
         else if (_toolId == "pdf_to_images") await ProcessPdfToImages();
         else if (_toolId == "rotate_pdf") await ProcessRotate();
+        else if (_toolId == "extract_pages") await ProcessExtract();
+        else if (_toolId == "insert_pages") await ProcessInsert();
+        else if (_toolId == "page_numbers") await ProcessPageNumbers();
+        else if (_toolId == "watermark") await ProcessWatermark();
+        else if (_toolId == "protect_pdf") await ProcessProtect();
         else await ProcessSplit();
+    }
+
+    private async System.Threading.Tasks.Task ProcessExtract()
+    {
+        var pages = ParsePageSpec(_extractBox.Text);
+        if (pages == null || pages.Count == 0)
+        {
+            ConfirmDialog.Alert(this, "Invalid Pages", "Enter the pages to extract, e.g. 1, 3, 5-8.");
+            return;
+        }
+        if (pages.Any(p => p < 1 || p > _pageCount))
+        {
+            ConfirmDialog.Alert(this, "Page Out of Range", $"This PDF has {_pageCount} page(s). Use values within 1–{_pageCount}.");
+            return;
+        }
+
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string name = _extractNameBox.Text.Trim();
+        if (string.IsNullOrEmpty(name)) name = "extracted.pdf";
+        if (!name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) name += ".pdf";
+        string outPath = Path.Combine(outDir, name);
+
+        await RunJob("Extracting pages…", $"Pulling {pages.Count} page(s)", "Creating…",
+            () => FileToolsService.ExtractPdfPagesAsync(_pdfPath!, pages.ToArray(), outPath, null, _password),
+            "Extraction Complete", $"Extracted {pages.Count} page(s) to:\n{outPath}", outPath, select: true);
+    }
+
+    private async System.Threading.Tasks.Task ProcessInsert()
+    {
+        if (_insertImages.Count == 0)
+        {
+            ConfirmDialog.Alert(this, "No Images", "Choose at least one image to insert.");
+            return;
+        }
+        if (!int.TryParse(_insertAfterBox.Text.Trim(), out int afterPage) || afterPage < 0 || afterPage > _pageCount)
+        {
+            ConfirmDialog.Alert(this, "Invalid Page", $"\"Insert after page\" must be between 0 and {_pageCount}.");
+            return;
+        }
+
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_inserted.pdf");
+
+        await RunJob("Inserting pages…", $"Adding {_insertImages.Count} image(s)", "Inserting…",
+            () => FileToolsService.InsertPdfPagesAsync(_pdfPath!, _insertImages.ToArray(), afterPage, outPath, null, _password),
+            "Insert Complete", $"Inserted {_insertImages.Count} page(s) into:\n{outPath}", outPath, select: true);
+    }
+
+    private async System.Threading.Tasks.Task ProcessPageNumbers()
+    {
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_numbered.pdf");
+
+        await RunJob("Adding page numbers…", $"Stamping {_pageCount} page(s)", "Numbering…",
+            () => FileToolsService.AddPageNumbersAsync(_pdfPath!, outPath, _pnPos, null, _password),
+            "Page Numbers Added", $"Numbered {_pageCount} page(s) and saved to:\n{outPath}", outPath, select: true);
+    }
+
+    private async System.Threading.Tasks.Task ProcessWatermark()
+    {
+        string text = _wmTextBox.Text.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            ConfirmDialog.Alert(this, "No Text", "Enter the watermark text to overlay.");
+            return;
+        }
+
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_watermarked.pdf");
+
+        await RunJob("Adding watermark…", $"Overlaying “{text}”", "Stamping…",
+            () => FileToolsService.WatermarkPdfAsync(_pdfPath!, outPath, text, _wmOpacity, _wmFontSize, null, _password),
+            "Watermark Added", $"Watermarked {_pageCount} page(s) and saved to:\n{outPath}", outPath, select: true);
+    }
+
+    private async System.Threading.Tasks.Task ProcessProtect()
+    {
+        string pw = _protectPwBox.Password;
+        if (string.IsNullOrEmpty(pw))
+        {
+            ConfirmDialog.Alert(this, "No Password", "Enter a password to protect the PDF.");
+            return;
+        }
+        if (pw != _protectConfirmBox.Password)
+        {
+            ConfirmDialog.Alert(this, "Passwords Don't Match", "The password and confirmation don't match.");
+            return;
+        }
+
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_protected.pdf");
+
+        await RunJob("Protecting PDF…", "Encrypting with your password", "Protecting…",
+            () => FileToolsService.ProtectPdfAsync(_pdfPath!, outPath, pw, _password),
+            "PDF Protected", $"Saved a password-protected copy to:\n{outPath}", outPath, select: true);
+    }
+
+    /// <summary>Shared run wrapper: spinner + min-dwell, themed success, open result, advance.</summary>
+    private async System.Threading.Tasks.Task RunJob(
+        string busyTitle, string busySub, string buttonText,
+        Func<System.Threading.Tasks.Task> work,
+        string okTitle, string okMessage, string resultPath, bool select)
+    {
+        BtnProcess.IsEnabled = false;
+        TxtProcess.Text = buttonText;
+        ShowBusy(busyTitle, busySub);
+        try
+        {
+            await System.Threading.Tasks.Task.WhenAll(work(), System.Threading.Tasks.Task.Delay(650));
+            HideBusy();
+            ConfirmDialog.Alert(this, okTitle, okMessage, ConfirmDialog.AlertKind.Success, "Done");
+            try { System.Diagnostics.Process.Start("explorer.exe", select ? $"/select,\"{resultPath}\"" : resultPath); } catch { }
+            MoveToNextTool();
+        }
+        catch (Exception ex)
+        {
+            HideBusy();
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
+        }
+        finally
+        {
+            BtnProcess.IsEnabled = true;
+            ApplyToolMeta();
+        }
     }
 
     private async System.Threading.Tasks.Task ProcessRotate()

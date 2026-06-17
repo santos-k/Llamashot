@@ -658,6 +658,25 @@ public static class FileToolsService
         }
     }
 
+    /// <summary>Saves a password-protected (encrypted) copy of a PDF. currentPassword unlocks the source if it is already encrypted.</summary>
+    public static async Task ProtectPdfAsync(string inputPath, string outputPath, string newPassword, string? currentPassword = null)
+    {
+        await Task.Run(() =>
+        {
+            var doc = string.IsNullOrEmpty(currentPassword)
+                ? PdfSharp.Pdf.IO.PdfReader.Open(inputPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify)
+                : PdfSharp.Pdf.IO.PdfReader.Open(inputPath, currentPassword, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
+            using (doc)
+            {
+                // Setting a user password enables encryption (PdfSharp 6 default scheme).
+                var sec = doc.SecuritySettings;
+                sec.UserPassword = newPassword;
+                sec.OwnerPassword = newPassword;
+                doc.Save(outputPath);
+            }
+        });
+    }
+
     public static async Task ExtractPdfPagesAsync(string pdfPath, int[] pageNumbers, string outputPath, IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("extract");

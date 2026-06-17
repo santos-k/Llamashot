@@ -62,11 +62,13 @@ internal static class Program
             ThemeManager.Apply(ThemeManager.Dark, persist: false);
             await Task.Delay(200);
             await CaptureMergeList("i2p_dark.png", "images_to_pdf", imgRows);
-            await CaptureWorkspace("rotate_dark.png", "rotate_pdf", false);
+            foreach (var id in new[] { "rotate_pdf", "extract_pages", "insert_pages", "page_numbers", "watermark", "protect_pdf" })
+                await CaptureWorkspace($"{id}_dark.png", id, false);
             ThemeManager.Apply(ThemeManager.Light, persist: false);
             await Task.Delay(200);
             await CaptureMergeList("i2p_light.png", "images_to_pdf", imgRows);
-            await CaptureWorkspace("rotate_light.png", "rotate_pdf", false);
+            foreach (var id in new[] { "rotate_pdf", "extract_pages", "insert_pages", "page_numbers", "watermark", "protect_pdf" })
+                await CaptureWorkspace($"{id}_light.png", id, false);
             return;
         }
 

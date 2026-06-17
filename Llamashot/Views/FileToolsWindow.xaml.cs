@@ -828,8 +828,9 @@ public partial class FileToolsWindow : Window
     {
         string id = (string)((Border)sender).Tag;
 
-        // New unified workspace (rolling out tool-by-tool).
-        if (id == "merge_pdf" || id == "split_pdf" || id == "compress_pdf" || id == "pdf_to_images" || id == "images_to_pdf" || id == "rotate_pdf")
+        // New unified workspace — all PDF tools live here now.
+        if (id is "merge_pdf" or "split_pdf" or "compress_pdf" or "pdf_to_images" or "images_to_pdf"
+            or "rotate_pdf" or "extract_pages" or "insert_pages" or "page_numbers" or "watermark" or "protect_pdf")
         {
             var ws = new ToolWorkspaceWindow(id) { Owner = this };
             ws.ShowDialog();
