@@ -167,7 +167,7 @@
                                         <Button Content="−" Click="ZoomOut_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
                                         <TextBlock x:Name="TxtZoom" Text="100%" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12.5" VerticalAlignment="Center" Width="48" TextAlignment="Center"/>
                                         <Button Content="+" Click="ZoomIn_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
-                                        <Button Content="⛶" Click="FitZoom_Click" Width="32" Height="32" Margin="8,0,0,0" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                        <Button Content="⛶" Click="FitZoom_Click" ToolTip="View fullscreen" Width="32" Height="32" Margin="8,0,0,0" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

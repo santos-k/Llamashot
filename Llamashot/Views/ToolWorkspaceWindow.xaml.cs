@@ -1315,7 +1315,103 @@ public partial class ToolWorkspaceWindow : Window
 
     private async void ZoomIn_Click(object sender, RoutedEventArgs e) { _zoom = Math.Min(3, _zoom + 0.2); await RenderCurrentPage(); }
     private async void ZoomOut_Click(object sender, RoutedEventArgs e) { _zoom = Math.Max(0.4, _zoom - 0.2); await RenderCurrentPage(); }
-    private async void FitZoom_Click(object sender, RoutedEventArgs e) { _zoom = 1.0; await RenderCurrentPage(); }
+    private void FitZoom_Click(object sender, RoutedEventArgs e) => OpenFullscreenViewer();
+
+    private void OpenFullscreenViewer()
+    {
+        if (_previewPages.Count == 0) return;
+
+        int fsPage = _curPage;
+
+        var img = new Image
+        {
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(40, 70, 40, 70)
+        };
+        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+
+        var pager = new TextBlock
+        {
+            Foreground = Brushes.White, FontSize = 14, VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(16, 0, 16, 0), MinWidth = 70, TextAlignment = TextAlignment.Center
+        };
+
+        var root = new Grid { Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x10, 0x12, 0x16)) };
+
+        var fs = new Window
+        {
+            WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize,
+            WindowState = WindowState.Maximized,
+            AllowsTransparency = false,
+            ShowInTaskbar = false,
+            Owner = this,
+            Background = Brushes.Black,
+            Content = root
+        };
+
+        async System.Threading.Tasks.Task Show()
+        {
+            pager.Text = $"{fsPage} / {_previewPages.Count}";
+            var pp = _previewPages[fsPage - 1];
+            img.Source = pp.IsImage ? SafeImage(pp.Path) : await RenderThumbAsync(pp.Path, pp.Password, pp.Page, 1900);
+        }
+
+        Button NavBtn(string glyph, Action onClick)
+        {
+            var b = new Button
+            {
+                Content = glyph, Width = 46, Height = 46, FontSize = 22, Cursor = Cursors.Hand,
+                Foreground = Brushes.White, BorderThickness = new Thickness(0),
+                Background = new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            b.Template = (ControlTemplate)Resources["SoftBtn"] ?? b.Template;
+            b.Click += (_, _) => onClick();
+            return b;
+        }
+
+        var prev = NavBtn("‹", async () => { if (fsPage > 1) { fsPage--; await Show(); } });
+        prev.HorizontalAlignment = HorizontalAlignment.Left;
+        prev.Margin = new Thickness(18, 0, 0, 0);
+        var next = NavBtn("›", async () => { if (fsPage < _previewPages.Count) { fsPage++; await Show(); } });
+        next.HorizontalAlignment = HorizontalAlignment.Right;
+        next.Margin = new Thickness(0, 0, 18, 0);
+
+        var close = new Button
+        {
+            Content = "✕  Close  (Esc)", Height = 34, Padding = new Thickness(14, 0, 14, 0), FontSize = 13,
+            Cursor = Cursors.Hand, Foreground = Brushes.White, BorderThickness = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF))
+        };
+        close.Click += (_, _) => fs.Close();
+
+        var topBar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 16, 0, 0)
+        };
+        topBar.Children.Add(pager);
+        topBar.Children.Add(close);
+
+        root.Children.Add(img);
+        root.Children.Add(prev);
+        root.Children.Add(next);
+        root.Children.Add(topBar);
+
+        fs.KeyDown += async (_, ke) =>
+        {
+            if (ke.Key == System.Windows.Input.Key.Escape) fs.Close();
+            else if (ke.Key == System.Windows.Input.Key.Left && fsPage > 1) { fsPage--; await Show(); }
+            else if (ke.Key == System.Windows.Input.Key.Right && fsPage < _previewPages.Count) { fsPage++; await Show(); }
+        };
+
+        fs.Loaded += async (_, _) => { _curPage = fsPage; await Show(); };
+        fs.Closed += async (_, _) => { _curPage = fsPage; await RenderCurrentPage(); };
+        fs.Show();
+    }
 
     private void FilmPrev_Click(object sender, RoutedEventArgs e)
         => ThumbScroller?.ScrollToHorizontalOffset(Math.Max(0, ThumbScroller.HorizontalOffset - 264));

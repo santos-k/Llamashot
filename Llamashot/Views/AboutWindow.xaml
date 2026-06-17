@@ -22,7 +22,7 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 8.8.2" Foreground="#666"
+                <TextBlock Text="Version 8.8.3" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -71,6 +71,7 @@
                         <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: File Tools redesign — soft light/dark theme with live toggle" />
                         <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF workspace — all 11 tools (Merge, Split, Compress, PDF↔Images, Rotate, Extract, Insert, Page Numbers, Watermark, Protect) with live preview, password unlock &amp; progress" />
                         <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Fill &amp; Sign and Edit PDF — place text, checks, dates, images &amp; signatures with auto-detect fields" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Fullscreen preview in PDF workspace — view pages large with ‹/› &amp; Esc" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />

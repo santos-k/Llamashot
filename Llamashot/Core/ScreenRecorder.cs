@@ -436,8 +436,13 @@ public class ScreenRecorder : IDisposable
                 return;
             }
 
-            // Decode JPEG to raw BGRA pixels
+            // Decode JPEG to raw BGRA pixels.
+            // Media Foundation's uncompressed RGB streams use the legacy bottom-up
+            // (DIB) row convention, but GDI+ hands us top-down rows. Without this flip
+            // the encoded video comes out vertically inverted. Flip rows to bottom-up
+            // so MF's default interpretation matches the captured orientation.
             using var bmp = new DrawBitmap(path);
+            bmp.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
             var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
             var bmpData = bmp.LockBits(rect, DrawImaging.ImageLockMode.ReadOnly,
                 DrawImaging.PixelFormat.Format32bppArgb);
