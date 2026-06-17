@@ -258,10 +258,8 @@ internal static class Program
         var pages = (Dictionary<string, int>)t.GetField("_mergePages", BF)!.GetValue(ws)!;
         var pw = (Dictionary<string, string?>)t.GetField("_mergePw", BF)!.GetValue(ws)!;
         foreach (var (path, n) in new[] { (pdfA, 3), (pdfB, 2) }) { files.Add(path); pages[path] = n; pw[path] = null; }
-        t.GetMethod("BuildMergeList", BF)!.Invoke(ws, null);
-        t.GetMethod("BuildInfo", BF)!.Invoke(ws, null);
-        t.GetMethod("UpdateSelection", BF)!.Invoke(ws, null);
-        t.GetMethod("ShowPreviewState", BF)!.Invoke(ws, null);
+        t.GetMethod("RefreshAll", BF)!.Invoke(ws, null);
+        await Task.Delay(1400); // let the preview + filmstrip render
 
         await Task.Delay(1500); // let thumbnails render
         ws.UpdateLayout();
@@ -311,10 +309,8 @@ internal static class Program
         rows ??= new[] { (typeof(ToolWorkspaceWindow).Assembly.Location, 12), (typeof(Program).Assembly.Location, 5) };
         foreach (var (path, pg) in rows) { files.Add(path); pages[path] = pg; pw[path] = null; }
 
-        t.GetMethod("BuildMergeList", BF)!.Invoke(ws, null);
-        t.GetMethod("BuildInfo", BF)!.Invoke(ws, null);
-        t.GetMethod("UpdateSelection", BF)!.Invoke(ws, null);
-        t.GetMethod("ShowPreviewState", BF)!.Invoke(ws, null);
+        t.GetMethod("RefreshAll", BF)!.Invoke(ws, null);
+        await Task.Delay(1400); // let the preview + filmstrip render
 
         ws.UpdateLayout();
         await Task.Delay(300);

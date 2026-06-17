@@ -26,6 +26,11 @@ public partial class ToolWorkspaceWindow : Window
     private int _pageCount;
     private int _curPage = 1;
     private double _zoom = 1.0;
+    private const double PreviewBaseWidth = 540;
+
+    // unified preview model: every page to show, in order (single file or concatenated multi-file)
+    private readonly record struct PreviewPage(string Path, string? Password, int Page, bool IsImage);
+    private readonly List<PreviewPage> _previewPages = new();
 
     // which tool this workspace is currently showing
     private string _toolId = "split_pdf";
@@ -152,10 +157,9 @@ public partial class ToolWorkspaceWindow : Window
         _toolId = Implemented.Contains(toolId) ? toolId : "split_pdf";
         BuildRail();
         BuildSettings();
-        BuildInfo();
         ApplyToolMeta();
+        RefreshAll();
         UpdateThemeGlyph();
-        UpdateSelection();
         ThemeManager.ThemeChanged += OnThemeChanged;
         Closed += (_, _) => ThemeManager.ThemeChanged -= OnThemeChanged;
     }
@@ -167,18 +171,16 @@ public partial class ToolWorkspaceWindow : Window
         TxtSubtitle.Text = m.sub;
         TxtTip.Text = m.tip;
         TxtProcess.Text = m.action;
-        TxtDropTitle.Text = _toolId switch
-        {
-            "merge_pdf" => "Drag & drop PDFs here",
-            "images_to_pdf" => "Drag & drop images here",
-            _ => "Drag & drop a PDF here"
-        };
-        BtnEmptySelect.Content = _toolId switch
-        {
-            "merge_pdf" => "Select PDFs",
-            "images_to_pdf" => "Select Images",
-            _ => "Select PDF"
-        };
+
+        bool multi = IsMultiFile;
+        TxtLeftTitle.Text = multi ? (_toolId == "images_to_pdf" ? "Images" : "Uploaded Files") : "Source File";
+        TxtLeftSub.Text = multi ? "Use ↑ ↓ to reorder · drop more to add" : "The PDF you want to work on";
+        BtnAddMore.Content = multi ? "+ Add More" : (_pdfPath == null ? "Open" : "Replace");
+        TxtCenterEmptySub.Text = multi
+            ? (_toolId == "images_to_pdf" ? "Add images on the left to preview the PDF" : "Add PDFs on the left to preview the merge")
+            : "Add a file on the left to see it here";
+        TxtPreviewTitle.Text = _toolId == "merge_pdf" ? "Merged Preview"
+            : _toolId == "images_to_pdf" ? "PDF Preview" : "Preview";
     }
 
     /// <summary>Builds the per-tool settings slot for the active tool.</summary>
@@ -222,11 +224,7 @@ public partial class ToolWorkspaceWindow : Window
             else { SetRange(1, _pageCount); SelectMethod(_method); }
         }
 
-        if (IsMultiFile) BuildMergeList();
-        BuildInfo();
-        UpdateSelection();
-        ShowPreviewState();
-        UpdateRotatePreview();
+        RefreshAll();
     }
 
     /// <summary>Returns the next implemented tool after the current one (wraps around).</summary>
@@ -284,6 +282,8 @@ public partial class ToolWorkspaceWindow : Window
         BuildRail();
         BuildSettings();
         BuildInfo();
+        BuildLeftPanel();
+        _ = BuildFilmstrip();
     }
 
     private void UpdateThemeGlyph()
@@ -870,84 +870,171 @@ public partial class ToolWorkspaceWindow : Window
             _mergePw[path] = realPw;
         }
 
-        BuildMergeList();
+        RefreshAll();
+    }
+
+    // =====================================================================
+    //  Left panel (files management)
+    // =====================================================================
+    private void BuildLeftPanel()
+    {
+        if (LeftHost == null) return;
+        LeftHost.Children.Clear();
+        if (IsMultiFile)
+        {
+            for (int i = 0; i < _mergeFiles.Count; i++) LeftHost.Children.Add(MergeRow(i));
+            LeftHost.Children.Add(DropCard());
+            LeftHost.Children.Add(TipsCard());
+        }
+        else
+        {
+            LeftHost.Children.Add(_pdfPath != null ? SingleFileCard() : DropCard());
+            LeftHost.Children.Add(TipsCard());
+        }
+    }
+
+    private Border DropCard()
+    {
+        bool img = _toolId == "images_to_pdf";
+        var card = new Border
+        {
+            CornerRadius = new CornerRadius(12), Padding = new Thickness(16, 22, 16, 22), Margin = new Thickness(0, 2, 0, 12),
+            BorderThickness = new Thickness(1), BorderBrush = B("BorderSoftBrush"), Background = B("SurfaceAltBrush"), Cursor = Cursors.Hand
+        };
+        var sp = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+        sp.Children.Add(new TextBlock { Text = img ? "🖼" : "📄", FontSize = 26, HorizontalAlignment = HorizontalAlignment.Center, Opacity = 0.8 });
+        sp.Children.Add(new TextBlock
+        {
+            Text = IsMultiFile ? (img ? "Drag & drop more images here" : "Drag & drop more PDFs here") : "Drag & drop a PDF here",
+            Foreground = B("TextSecondaryBrush"), FontSize = 13, FontWeight = FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 2), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap
+        });
+        sp.Children.Add(new TextBlock { Text = "or click to browse", Foreground = B("TextMutedBrush"), FontSize = 11.5, HorizontalAlignment = HorizontalAlignment.Center });
+        card.Child = sp;
+        card.MouseLeftButtonUp += (_, _) => AddFiles_Click(card, new RoutedEventArgs());
+        return card;
+    }
+
+    private Border SingleFileCard()
+    {
+        var fi = new FileInfo(_pdfPath!);
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var badge = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(9), Background = Hex("#F06262"), Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        badge.Child = new TextBlock { Text = "PDF", Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(badge, 0);
+        var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        info.Children.Add(new TextBlock { Text = fi.Name, Foreground = B("TextPrimaryBrush"), FontWeight = FontWeights.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis });
+        info.Children.Add(new TextBlock { Text = $"{_pageCount} page{(_pageCount == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(fi.Length)}", Foreground = B("TextMutedBrush"), FontSize = 12 });
+        Grid.SetColumn(info, 1);
+        var remove = MiniBtn("✕", () => Clear_Click(this, new RoutedEventArgs()), true);
+        Grid.SetColumn(remove, 2);
+        grid.Children.Add(badge); grid.Children.Add(info); grid.Children.Add(remove);
+        return new Border
+        {
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 12),
+            Background = B("SurfaceAltBrush"), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1), Child = grid
+        };
+    }
+
+    private Border TipsCard()
+    {
+        var sp = new StackPanel();
+        sp.Children.Add(new TextBlock { Text = "💡 Tips", FontWeight = FontWeights.SemiBold, FontSize = 13, Foreground = B("AccentBrush"), Margin = new Thickness(0, 0, 0, 6) });
+        sp.Children.Add(new TextBlock
+        {
+            Text = IsMultiFile
+                ? "Use ↑ ↓ on each file to change the order. They are combined in this sequence."
+                : "Use the preview to check the pages before processing.",
+            TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = B("TextSecondaryBrush")
+        });
+        return new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Background = B("SurfaceAltBrush"), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1), Child = sp };
+    }
+
+    // =====================================================================
+    //  Unified preview (center): model + render + filmstrip
+    // =====================================================================
+    private void RebuildPreviewModel()
+    {
+        _previewPages.Clear();
+        if (IsMultiFile)
+        {
+            bool images = _toolId == "images_to_pdf";
+            foreach (var path in _mergeFiles)
+            {
+                if (images) { _previewPages.Add(new PreviewPage(path, null, 1, true)); continue; }
+                string? pw = _mergePw.TryGetValue(path, out var p) ? p : null;
+                int n = _mergePages.TryGetValue(path, out var pc) ? pc : 0;
+                for (int pg = 1; pg <= n; pg++) _previewPages.Add(new PreviewPage(path, pw, pg, false));
+            }
+        }
+        else if (_pdfPath != null)
+        {
+            for (int pg = 1; pg <= _pageCount; pg++) _previewPages.Add(new PreviewPage(_pdfPath, _password, pg, false));
+        }
+        if (_curPage < 1) _curPage = 1;
+        if (_curPage > _previewPages.Count) _curPage = Math.Max(1, _previewPages.Count);
+    }
+
+    /// <summary>Full UI refresh: model, left panel, info, action bar, preview, filmstrip.</summary>
+    private void RefreshAll()
+    {
+        RebuildPreviewModel();
+        BuildLeftPanel();
         BuildInfo();
         UpdateSelection();
         ShowPreviewState();
+        _ = RenderPreviewUi();
     }
 
-    private void BuildMergeList()
+    private async System.Threading.Tasks.Task RenderPreviewUi()
     {
-        MergeList.Items.Clear();
-        for (int i = 0; i < _mergeFiles.Count; i++)
-            MergeList.Items.Add(MergeRow(i));
-        string noun = _toolId == "images_to_pdf" ? "image" : "file";
-        TxtMergeCount.Text = $"{_mergeFiles.Count} {noun}{(_mergeFiles.Count == 1 ? "" : "s")}";
-        _ = BuildMergePreview();
+        if (_previewPages.Count > 0) { await RenderCurrentPage(); await BuildFilmstrip(); }
+        else { ThumbList.Items.Clear(); PreviewImage.Source = null; }
     }
 
-    /// <summary>Renders the combined page preview (every page of every file, in current order).</summary>
-    private async System.Threading.Tasks.Task BuildMergePreview()
+    private async System.Threading.Tasks.Task BuildFilmstrip()
     {
-        if (MergeThumbs == null) return;
+        if (ThumbList == null) return;
         int run = ++_previewRunId;
-        MergeThumbs.Children.Clear();
-
-        bool images = _toolId == "images_to_pdf";
-        TxtMergePreviewLabel.Text = images ? "PDF PREVIEW · PAGE ORDER" : "MERGED PREVIEW";
-        if (_mergeFiles.Count == 0)
+        ThumbList.Items.Clear();
+        for (int i = 0; i < _previewPages.Count; i++)
         {
-            MergeThumbs.Children.Add(new TextBlock
+            int idx = i;
+            var pp = _previewPages[i];
+            var card = new Border
             {
-                Text = images ? "Add images to preview the PDF." : "Add PDFs to preview the merged result.",
-                Foreground = B("TextMutedBrush"), FontSize = 13, Margin = new Thickness(2, 4, 0, 0)
-            });
-            return;
-        }
+                Width = 58, Margin = new Thickness(0, 0, 8, 0), CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(2), Cursor = Cursors.Hand, Tag = idx, ClipToBounds = true,
+                BorderBrush = (idx + 1) == _curPage ? B("AccentBrush") : B("BorderSoftBrush"), Background = B("SurfaceBrush")
+            };
+            var stack = new StackPanel();
+            var img = new Image { Height = 72, Stretch = Stretch.UniformToFill };
+            stack.Children.Add(img);
+            stack.Children.Add(new TextBlock { Text = (idx + 1).ToString(), FontSize = 9.5, Foreground = B("TextMutedBrush"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 2) });
+            card.Child = stack;
+            card.MouseLeftButtonUp += async (_, _) => { _curPage = idx + 1; await RenderCurrentPage(); };
+            ThumbList.Items.Add(card);
 
-        for (int fi = 0; fi < _mergeFiles.Count; fi++)
-        {
-            string path = _mergeFiles[fi];
-            string? pw = _mergePw.TryGetValue(path, out var p) ? p : null;
-
-            if (images)
-            {
-                AddThumbCard(out var img, $"{fi + 1}");
-                try { img.Source = new BitmapImage(new System.Uri(path)); } catch { }
-            }
-            else
-            {
-                int pages = _mergePages.TryGetValue(path, out var pc) ? pc : 0;
-                for (int pg = 1; pg <= pages; pg++)
-                {
-                    AddThumbCard(out var img, $"{fi + 1}.{pg}");
-                    var bmp = await RenderThumbAsync(path, pw, pg, 200);
-                    if (run != _previewRunId) return; // a newer rebuild superseded this one
-                    img.Source = bmp;
-                }
-            }
+            var bmp = pp.IsImage ? SafeImage(pp.Path) : await RenderThumbAsync(pp.Path, pp.Password, pp.Page, 150);
             if (run != _previewRunId) return;
+            img.Source = bmp;
         }
     }
 
-    private void AddThumbCard(out Image img, string label)
+    private void HighlightFilmstrip()
     {
-        var card = new Border
-        {
-            Width = 104, Margin = new Thickness(0, 0, 10, 10), CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(1), BorderBrush = B("BorderSoftBrush"),
-            Background = B("SurfaceAltBrush"), ClipToBounds = true
-        };
-        var stack = new StackPanel();
-        img = new Image { Height = 132, Stretch = Stretch.UniformToFill };
-        stack.Children.Add(img);
-        stack.Children.Add(new Border
-        {
-            Background = B("SurfaceBrush"),
-            Child = new TextBlock { Text = label, FontSize = 10, Foreground = B("TextMutedBrush"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 3, 0, 3) }
-        });
-        card.Child = stack;
-        MergeThumbs.Children.Add(card);
+        foreach (var item in ThumbList.Items)
+            if (item is Border b && b.Tag is int i)
+                b.BorderBrush = (i + 1) == _curPage ? B("AccentBrush") : B("BorderSoftBrush");
+    }
+
+    private static BitmapImage? SafeImage(string path)
+    {
+        try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new System.Uri(path); bi.CacheOption = BitmapCacheOption.OnLoad; bi.DecodePixelWidth = 200; bi.EndInit(); bi.Freeze(); return bi; }
+        catch { return null; }
     }
 
     private async System.Threading.Tasks.Task<BitmapImage?> RenderThumbAsync(string path, string? pw, int page1, uint width)
@@ -1034,7 +1121,7 @@ public partial class ToolWorkspaceWindow : Window
         int j = idx + dir;
         if (j < 0 || j >= _mergeFiles.Count) return;
         (_mergeFiles[idx], _mergeFiles[j]) = (_mergeFiles[j], _mergeFiles[idx]);
-        BuildMergeList();
+        RefreshAll();
     }
 
     private void RemoveMerge(int idx)
@@ -1043,10 +1130,7 @@ public partial class ToolWorkspaceWindow : Window
         string path = _mergeFiles[idx];
         _mergeFiles.RemoveAt(idx);
         _mergePages.Remove(path); _mergePw.Remove(path);
-        BuildMergeList();
-        BuildInfo();
-        UpdateSelection();
-        ShowPreviewState();
+        RefreshAll();
     }
 
     private UIElement BuildFolderRow(string defaultFolder)
@@ -1167,10 +1251,10 @@ public partial class ToolWorkspaceWindow : Window
         // unlock if protected
         string? pw = await PasswordDialog.UnlockAsync(this, path);
         if (pw == null) return; // cancelled
-        _password = string.IsNullOrEmpty(pw) ? null : pw;
+        string? realPw = string.IsNullOrEmpty(pw) ? null : pw;
 
         int pages;
-        try { pages = await FileToolsService.GetPdfPageCountAsync(path, _password); }
+        try { pages = await FileToolsService.GetPdfPageCountAsync(path, realPw); }
         catch (Exception ex)
         {
             ConfirmDialog.Alert(this, "Can't Open PDF", ex.Message, ConfirmDialog.AlertKind.Error);
@@ -1184,91 +1268,59 @@ public partial class ToolWorkspaceWindow : Window
         }
 
         _pdfPath = path;
+        _password = realPw;
         _pageCount = pages;
         _curPage = 1;
         _zoom = 1.0;
 
-        TxtFileName.Text = Path.GetFileName(path);
-        TxtTotalPages.Text = $"Total Pages: {pages}";
-        ShowPreviewState();
-
-        BuildInfo();
-        UpdateSelection();
         if (_toolId == "split_pdf") { SetRange(1, pages); SelectMethod(_method); }
         else if (_toolId == "extract_pages" && string.IsNullOrWhiteSpace(_extractBox.Text)) _extractBox.Text = $"1-{pages}";
         else if (_toolId == "insert_pages") _insertAfterBox.Text = pages.ToString();
-        await RenderCurrentPage();
-        await BuildThumbnails();
-    }
 
-    private async System.Threading.Tasks.Task<BitmapImage?> RenderPageAsync(int page1, uint width)
-    {
-        try
-        {
-            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(_pdfPath!);
-            var doc = string.IsNullOrEmpty(_password)
-                ? await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file)
-                : await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file, _password);
-            if (page1 < 1 || page1 > (int)doc.PageCount) return null;
-            using var pg = doc.GetPage((uint)(page1 - 1));
-            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-            await pg.RenderToStreamAsync(stream, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = width });
-            stream.Seek(0);
-            var bmp = new BitmapImage();
-            bmp.BeginInit(); bmp.StreamSource = stream.AsStreamForRead(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
-            return bmp;
-        }
-        catch { return null; }
+        BtnAddMore.Content = IsMultiFile ? "+ Add More" : "Replace";
+        RefreshAll();
     }
 
     private async System.Threading.Tasks.Task RenderCurrentPage()
     {
-        var bmp = await RenderPageAsync(_curPage, 900);
+        if (_previewPages.Count == 0) return;
+        if (_curPage < 1) _curPage = 1;
+        if (_curPage > _previewPages.Count) _curPage = _previewPages.Count;
+
+        var pp = _previewPages[_curPage - 1];
+        var bmp = pp.IsImage ? SafeImage(pp.Path) : await RenderThumbAsync(pp.Path, pp.Password, pp.Page, 1100);
         if (bmp != null) PreviewImage.Source = bmp;
-        PreviewImage.Width = 240 * _zoom;
-        TxtPager.Text = $"{_curPage} / {_pageCount}";
+        PreviewImage.Width = PreviewBaseWidth * _zoom;
+        TxtPager.Text = $"{_curPage} / {_previewPages.Count}";
+        TxtPreviewSub.Text = $"Total {_previewPages.Count} page{(_previewPages.Count == 1 ? "" : "s")}";
         TxtZoom.Text = $"{(int)(_zoom * 100)}%";
         UpdateRotatePreview();
+        HighlightFilmstrip();
+        ScrollThumbIntoView();
     }
 
-    private async System.Threading.Tasks.Task BuildThumbnails()
+    private void ScrollThumbIntoView()
     {
-        ThumbList.Items.Clear();
-        for (int p = 1; p <= _pageCount; p++)
-        {
-            var bmp = await RenderPageAsync(p, 150);
-            int pageNum = p;
-            var card = new Border
-            {
-                Width = 74, Margin = new Thickness(0, 0, 10, 0), CornerRadius = new CornerRadius(8),
-                BorderThickness = new Thickness(2), Cursor = Cursors.Hand, Tag = pageNum,
-                BorderBrush = pageNum == _curPage ? B("AccentBrush") : B("BorderSoftBrush"),
-                ClipToBounds = true
-            };
-            var stack = new StackPanel();
-            stack.Children.Add(new Image { Source = bmp, Height = 96, Stretch = Stretch.UniformToFill });
-            stack.Children.Add(new Border { Background = B("SurfaceAltBrush"), Child = new TextBlock { Text = $"Page {pageNum}", FontSize = 10, Foreground = B("TextSecondaryBrush"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 4) } });
-            card.Child = stack;
-            card.MouseLeftButtonUp += async (_, _) => { _curPage = pageNum; await RenderCurrentPage(); HighlightThumb(); };
-            ThumbList.Items.Add(card);
-        }
-    }
-
-    private void HighlightThumb()
-    {
-        foreach (var item in ThumbList.Items)
-            if (item is Border b && b.Tag is int p)
-                b.BorderBrush = p == _curPage ? B("AccentBrush") : B("BorderSoftBrush");
+        if (ThumbScroller == null) return;
+        double cardW = 66; // 58 width + 8 margin
+        double target = (_curPage - 1) * cardW - 100;
+        ThumbScroller.ScrollToHorizontalOffset(Math.Max(0, target));
     }
 
     private async void PrevPage_Click(object sender, RoutedEventArgs e)
-    { if (_curPage > 1) { _curPage--; await RenderCurrentPage(); HighlightThumb(); } }
+    { if (_curPage > 1) { _curPage--; await RenderCurrentPage(); } }
 
     private async void NextPage_Click(object sender, RoutedEventArgs e)
-    { if (_curPage < _pageCount) { _curPage++; await RenderCurrentPage(); HighlightThumb(); } }
+    { if (_curPage < _previewPages.Count) { _curPage++; await RenderCurrentPage(); } }
 
-    private async void ZoomIn_Click(object sender, RoutedEventArgs e) { _zoom = Math.Min(3, _zoom + 0.25); await RenderCurrentPage(); }
-    private async void ZoomOut_Click(object sender, RoutedEventArgs e) { _zoom = Math.Max(0.5, _zoom - 0.25); await RenderCurrentPage(); }
+    private async void ZoomIn_Click(object sender, RoutedEventArgs e) { _zoom = Math.Min(3, _zoom + 0.2); await RenderCurrentPage(); }
+    private async void ZoomOut_Click(object sender, RoutedEventArgs e) { _zoom = Math.Max(0.4, _zoom - 0.2); await RenderCurrentPage(); }
+    private async void FitZoom_Click(object sender, RoutedEventArgs e) { _zoom = 1.0; await RenderCurrentPage(); }
+
+    private void FilmPrev_Click(object sender, RoutedEventArgs e)
+        => ThumbScroller?.ScrollToHorizontalOffset(Math.Max(0, ThumbScroller.HorizontalOffset - 264));
+    private void FilmNext_Click(object sender, RoutedEventArgs e)
+        => ThumbScroller?.ScrollToHorizontalOffset(ThumbScroller.HorizontalOffset + 264);
 
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
@@ -1279,34 +1331,18 @@ public partial class ToolWorkspaceWindow : Window
     private void Clear_Click(object sender, RoutedEventArgs e)
     {
         _pdfPath = null; _password = null; _pageCount = 0; _curPage = 1; _zoom = 1.0;
-        PreviewImage.Source = null;
-        ThumbList.Items.Clear();
         _mergeFiles.Clear(); _mergePages.Clear(); _mergePw.Clear();
-        if (MergeList != null) MergeList.Items.Clear();
         _insertImages.Clear();
         if (_toolId == "insert_pages") UpdateInsertCount();
-        ShowPreviewState();
-        BuildInfo();
-        UpdateSelection();
+        BtnAddMore.Content = IsMultiFile ? "+ Add More" : "Open";
+        RefreshAll();
     }
 
-    /// <summary>Shows the correct preview region for the active tool and its current data.</summary>
     private void ShowPreviewState()
     {
-        if (IsMultiFile)
-        {
-            bool has = _mergeFiles.Count > 0;
-            EmptyState.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
-            MergeListState.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
-            LoadedState.Visibility = Visibility.Collapsed;
-        }
-        else
-        {
-            bool has = _pdfPath != null;
-            EmptyState.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
-            LoadedState.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
-            MergeListState.Visibility = Visibility.Collapsed;
-        }
+        bool has = _previewPages.Count > 0;
+        CenterEmpty.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
+        PreviewState.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateSelection()
@@ -1314,12 +1350,15 @@ public partial class ToolWorkspaceWindow : Window
         if (IsMultiFile)
         {
             string noun = _toolId == "images_to_pdf" ? "image" : "file";
-            TxtSelection.Text = _mergeFiles.Count == 0
-                ? $"No {noun}s selected"
-                : $"{_mergeFiles.Count} {noun}{(_mergeFiles.Count == 1 ? "" : "s")} selected";
+            if (_mergeFiles.Count == 0) { TxtSelection.Text = $"No {noun}s selected"; return; }
+            long size = _mergeFiles.Sum(p => new FileInfo(p).Length);
+            TxtSelection.Text = $"{_mergeFiles.Count} {noun}{(_mergeFiles.Count == 1 ? "" : "s")} selected · {_previewPages.Count} page{(_previewPages.Count == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(size)}";
         }
         else
-            TxtSelection.Text = _pdfPath == null ? "No file selected" : "1 file selected";
+        {
+            if (_pdfPath == null) { TxtSelection.Text = "No file selected"; return; }
+            TxtSelection.Text = $"{Path.GetFileName(_pdfPath)} · {_pageCount} page{(_pageCount == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(new FileInfo(_pdfPath).Length)}";
+        }
     }
 
     // =====================================================================

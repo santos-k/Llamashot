@@ -108,124 +108,113 @@
                 </Grid>
             </Border>
 
-            <!-- 3 columns -->
+            <!-- 3 columns: files | preview (large) | info + settings -->
             <Grid Grid.Row="1" Margin="26,22">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="1.15*"/>
-                    <ColumnDefinition Width="0.8*"/>
+                    <ColumnDefinition Width="1.6*"/>
+                    <ColumnDefinition Width="0.95*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- PREVIEW -->
+                <!-- ===== LEFT: files management ===== -->
                 <Border Grid.Column="0" Margin="0,0,9,0" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16"
+                        AllowDrop="True" Drop="Preview_Drop" DragOver="Preview_DragOver">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Padding="18,16" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtLeftTitle" Text="Source File" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="15"/>
+                                    <TextBlock x:Name="TxtLeftSub" Text="The PDF you want to work on" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <Button x:Name="BtnAddMore" HorizontalAlignment="Right" Content="+ Add More" Click="AddFiles_Click" Template="{StaticResource SoftBtn}"
+                                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Padding="13,8" Cursor="Hand"/>
+                            </Grid>
+                        </Border>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14">
+                            <StackPanel x:Name="LeftHost"/>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+
+                <!-- ===== CENTER: large unified preview ===== -->
+                <Border Grid.Column="1" Margin="9,0" Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16">
                     <Grid>
-                        <!-- empty state -->
-                        <Border x:Name="EmptyState" AllowDrop="True" Drop="Preview_Drop" DragOver="Preview_DragOver" Background="Transparent">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock Text="📄" FontSize="44" HorizontalAlignment="Center" Opacity="0.8"/>
-                                <TextBlock x:Name="TxtDropTitle" Text="Drag &amp; drop a PDF here" Foreground="{DynamicResource TextSecondaryBrush}"
-                                           FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,14,0,4"/>
-                                <TextBlock Text="or use Add Files" Foreground="{DynamicResource TextMutedBrush}" FontSize="12.5" HorizontalAlignment="Center"/>
-                                <Button x:Name="BtnEmptySelect" Content="Select PDF" Click="AddFiles_Click" Margin="0,16,0,0" Width="150" Height="40"
-                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentTextBrush}"
-                                        BorderThickness="0" Cursor="Hand" FontWeight="SemiBold" Template="{StaticResource SoftBtn}"/>
-                            </StackPanel>
-                        </Border>
+                        <!-- empty -->
+                        <StackPanel x:Name="CenterEmpty" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="📄" FontSize="46" HorizontalAlignment="Center" Opacity="0.75"/>
+                            <TextBlock Text="Nothing to preview yet" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,14,0,4"/>
+                            <TextBlock x:Name="TxtCenterEmptySub" Text="Add a file on the left to see it here" Foreground="{DynamicResource TextMutedBrush}" FontSize="12.5" HorizontalAlignment="Center"/>
+                        </StackPanel>
 
-                        <!-- merge file-list state (multi-file tools) -->
-                        <DockPanel x:Name="MergeListState" Visibility="Collapsed" AllowDrop="True" Drop="Preview_Drop" DragOver="Preview_DragOver">
-                            <Border DockPanel.Dock="Top" Padding="16" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
+                        <!-- loaded preview -->
+                        <DockPanel x:Name="PreviewState" Visibility="Collapsed">
+                            <!-- header: title + pager + zoom -->
+                            <Border DockPanel.Dock="Top" Padding="18,12" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
                                 <Grid>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtMergeCount" Text="0 files" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
-                                        <TextBlock Text="Use ↑ ↓ to reorder · drop more to add" Foreground="{DynamicResource TextMutedBrush}" FontSize="12"/>
+                                        <TextBlock x:Name="TxtPreviewTitle" Text="Preview" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                        <TextBlock x:Name="TxtPreviewSub" Text="Total 0 pages" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0"/>
                                     </StackPanel>
-                                    <Button HorizontalAlignment="Right" Content="+ Add" Click="AddFiles_Click" Template="{StaticResource SoftBtn}"
-                                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Padding="14,8" Cursor="Hand"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Button Content="‹" Click="PrevPage_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                        <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="14,6" Margin="8,0">
+                                            <TextBlock x:Name="TxtPager" Text="1 / 1" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12.5"/>
+                                        </Border>
+                                        <Button Content="›" Click="NextPage_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                        <Border Width="1" Background="{DynamicResource BorderSoftBrush}" Margin="14,4"/>
+                                        <Button Content="−" Click="ZoomOut_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                        <TextBlock x:Name="TxtZoom" Text="100%" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12.5" VerticalAlignment="Center" Width="48" TextAlignment="Center"/>
+                                        <Button Content="+" Click="ZoomIn_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                        <Button Content="⛶" Click="FitZoom_Click" Width="32" Height="32" Margin="8,0,0,0" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
-                            <!-- reorderable file list (capped height; preview gets the rest) -->
-                            <Border DockPanel.Dock="Top" MaxHeight="240" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,12">
-                                    <ItemsControl x:Name="MergeList">
-                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                            <!-- filmstrip -->
+                            <Border DockPanel.Dock="Bottom" Padding="10,10" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Left" Content="‹" Click="FilmPrev_Click" Width="28" Height="60" Margin="0,0,8,0" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                    <Button DockPanel.Dock="Right" Content="›" Click="FilmNext_Click" Width="28" Height="60" Margin="8,0,0,0" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                    <ScrollViewer x:Name="ThumbScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                        <ItemsControl x:Name="ThumbList">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
                             </Border>
-                            <!-- merged preview -->
-                            <TextBlock DockPanel.Dock="Top" x:Name="TxtMergePreviewLabel" Text="MERGED PREVIEW"
-                                       FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}" Margin="16,12,0,4"/>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="14,4,14,14">
-                                <WrapPanel x:Name="MergeThumbs"/>
-                            </ScrollViewer>
-                        </DockPanel>
-                        <!-- loaded state -->
-                        <DockPanel x:Name="LoadedState" Visibility="Collapsed">
-                            <Border DockPanel.Dock="Top" Padding="16" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
-                                <StackPanel Orientation="Horizontal">
-                                    <Border Width="34" Height="34" CornerRadius="9" Background="#F06262">
-                                        <TextBlock Text="PDF" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel VerticalAlignment="Center" Margin="11,0,0,0">
-                                        <TextBlock x:Name="TxtFileName" Text="document.pdf" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
-                                        <TextBlock x:Name="TxtTotalPages" Text="Total Pages: 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="12"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                            <!-- thumbnails -->
-                            <Border DockPanel.Dock="Bottom" Padding="14,10" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0">
-                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                                    <ItemsControl x:Name="ThumbList">
-                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </Border>
-                            <!-- pager + zoom -->
-                            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
-                                <Button Content="‹" Click="PrevPage_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
-                                <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="16,6" Margin="8,0">
-                                    <TextBlock x:Name="TxtPager" Text="1 / 1" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
-                                </Border>
-                                <Button Content="›" Click="NextPage_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
-                                <Border Width="1" Background="{DynamicResource BorderSoftBrush}" Margin="14,4"/>
-                                <Button Content="−" Click="ZoomOut_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
-                                <TextBlock x:Name="TxtZoom" Text="100%" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Width="46" TextAlignment="Center"/>
-                                <Button Content="+" Click="ZoomIn_Click" Width="32" Height="32" Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
-                            </StackPanel>
-                            <!-- preview image -->
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="18">
-                                <Image x:Name="PreviewImage" Stretch="Uniform" Width="240"
-                                       RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center"/>
+                            <!-- big page -->
+                            <ScrollViewer x:Name="PreviewScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="20" Background="{DynamicResource WindowBrush}">
+                                <Image x:Name="PreviewImage" Stretch="Uniform" Width="540"
+                                       RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                             </ScrollViewer>
                         </DockPanel>
                     </Grid>
                 </Border>
 
-                <!-- SETTINGS (per-tool slot) -->
-                <Border Grid.Column="1" Margin="9,0" Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22">
-                        <StackPanel x:Name="SettingsHost"/>
-                    </ScrollViewer>
-                </Border>
-
-                <!-- INFO -->
-                <StackPanel Grid.Column="2" Margin="9,0,0,0">
-                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,16">
-                        <StackPanel>
-                            <TextBlock Text="File Information" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14"/>
-                            <StackPanel x:Name="InfoRows"/>
-                        </StackPanel>
-                    </Border>
-                    <Border BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Background="{DynamicResource SurfaceAltBrush}">
-                        <StackPanel>
-                            <TextBlock Text="💡 Helpful Tips" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,8"/>
-                            <TextBlock x:Name="TxtTip" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Text="Choose a split method, set your page range, and pick an output folder."/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <!-- ===== RIGHT: info + tips + settings ===== -->
+                <ScrollViewer Grid.Column="2" Margin="9,0,0,0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="File Information" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                <StackPanel x:Name="InfoRows"/>
+                            </StackPanel>
+                        </Border>
+                        <Border BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Background="{DynamicResource SurfaceAltBrush}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="💡 Helpful Tips" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,8"/>
+                                <TextBlock x:Name="TxtTip" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="Choose a split method, set your page range, and pick an output folder."/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16" Padding="20">
+                            <ScrollViewer VerticalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="SettingsHost"/>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
 
             <!-- ACTION BAR -->
