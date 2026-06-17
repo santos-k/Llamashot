@@ -829,7 +829,7 @@ public partial class FileToolsWindow : Window
         string id = (string)((Border)sender).Tag;
 
         // New unified workspace (rolling out tool-by-tool).
-        if (id == "merge_pdf" || id == "split_pdf" || id == "compress_pdf")
+        if (id == "merge_pdf" || id == "split_pdf" || id == "compress_pdf" || id == "pdf_to_images")
         {
             var ws = new ToolWorkspaceWindow(id) { Owner = this };
             ws.ShowDialog();

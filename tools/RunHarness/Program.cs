@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Llamashot.Core;
 using Llamashot.Views;
 using SD = System.Drawing;
@@ -41,6 +42,21 @@ internal static class Program
     static async Task Run()
     {
         ThemeManager.Initialize(ThemeManager.Light);
+
+        // Workspace-only mode: skip the flaky FileToolsWindow/alert/password captures.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_WS_ONLY") == "1")
+        {
+            // warm-up: pump the message loop with a throwaway window so the first real capture paints
+            await CaptureWorkspace("_warmup.png", "pdf_to_images", false);
+            await Task.Delay(300);
+            ThemeManager.Apply(ThemeManager.Dark, persist: false);
+            await Task.Delay(200);
+            await CaptureWorkspace("p2i_dark.png", "pdf_to_images", false);
+            ThemeManager.Apply(ThemeManager.Light, persist: false);
+            await Task.Delay(200);
+            await CaptureWorkspace("p2i_light.png", "pdf_to_images", false);
+            return;
+        }
 
         var win = new FileToolsWindow { Width = 1300, Height = 860,
             WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true };
@@ -112,11 +128,13 @@ internal static class Program
         await Task.Delay(150);
         await CaptureWorkspace("workspace_dark.png", "split_pdf", false);
         await CaptureWorkspace("compress_dark.png", "compress_pdf", false);
+        await CaptureWorkspace("p2i_dark.png", "pdf_to_images", false);
         await CaptureWorkspace("busy_dark.png", "compress_pdf", true);
         ThemeManager.Apply(ThemeManager.Light, persist: false);
         await Task.Delay(150);
         await CaptureWorkspace("workspace_light.png", "split_pdf", false);
         await CaptureWorkspace("compress_light.png", "compress_pdf", false);
+        await CaptureWorkspace("p2i_light.png", "pdf_to_images", false);
         await CaptureWorkspace("busy_light.png", "compress_pdf", true);
 
         // Merge file-list layout (inject mock rows so the list renders without real PDFs)
@@ -180,8 +198,26 @@ internal static class Program
         }
         ws.UpdateLayout();
         await Task.Delay(300);
-        Shot(ws, name);
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_WS_ONLY") == "1") ShotRtb(ws, name);
+        else Shot(ws, name);
         ws.Close();
+    }
+
+    /// <summary>Renders the window visual directly (no screen capture / z-order dependency).</summary>
+    static void ShotRtb(Window win, string name)
+    {
+        try
+        {
+            win.UpdateLayout();
+            int w = (int)win.ActualWidth, h = (int)win.ActualHeight;
+            var rtb = new RenderTargetBitmap(Math.Max(1, w), Math.Max(1, h), 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(win);
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(rtb));
+            using var fs = File.Create(Path.Combine(Dir, name));
+            enc.Save(fs);
+        }
+        catch (Exception ex) { File.AppendAllText(Path.Combine(Dir, "err.txt"), $"shotrtb {name}: {ex}\n"); }
     }
 
     static void CapturePasswordDialog(Window owner, string name)

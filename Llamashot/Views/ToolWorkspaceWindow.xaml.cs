@@ -29,7 +29,7 @@ public partial class ToolWorkspaceWindow : Window
 
     // which tool this workspace is currently showing
     private string _toolId = "split_pdf";
-    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf" };
+    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images" };
 
     // split settings controls
     private string _method = "custom";
@@ -50,6 +50,12 @@ public partial class ToolWorkspaceWindow : Window
     private readonly Dictionary<string, string?> _mergePw = new();
     private TextBox _mergeNameBox = null!;
 
+    // pdf-to-images settings
+    private string _imgFormat = "png";
+    private int _imgDpi = 150;
+    private readonly Dictionary<string, Border> _fmtCards = new();
+    private readonly Dictionary<string, Border> _dpiCards = new();
+
     private static int QualityFor(string key) => key switch { "low" => 85, "high" => 40, _ => 65 };
 
     /// <summary>Per-tool title/subtitle/tip/action-button text.</summary>
@@ -58,6 +64,9 @@ public partial class ToolWorkspaceWindow : Window
         "merge_pdf" => ("Merge PDF", "Combine multiple PDFs into one",
             "Add two or more PDFs, then drag with ↑ ↓ to set the order they'll be combined in.",
             "Merge PDF  →"),
+        "pdf_to_images" => ("PDF to Images", "Convert each page to an image",
+            "PNG keeps quality and transparency; JPG makes smaller files. Higher resolution looks sharper but takes more space.",
+            "Convert  →"),
         "compress_pdf" => ("Compress PDF", "Reduce file size while keeping quality",
             "Higher compression means a smaller file but lower image quality. Recommended works well for most documents.",
             "Compress PDF  →"),
@@ -106,8 +115,11 @@ public partial class ToolWorkspaceWindow : Window
         SettingsHost.Children.Clear();
         _methodCards.Clear();
         _compressCards.Clear();
+        _fmtCards.Clear();
+        _dpiCards.Clear();
         if (_toolId == "merge_pdf") BuildMergeSettings();
         else if (_toolId == "compress_pdf") BuildCompressSettings();
+        else if (_toolId == "pdf_to_images") BuildPdfToImagesSettings();
         else BuildSplitSettings();
     }
 
@@ -411,6 +423,64 @@ public partial class ToolWorkspaceWindow : Window
         _compressLevel = key;
         _quality = QualityFor(key);
         foreach (var (k, card) in _compressCards)
+        {
+            bool on = k == key;
+            card.BorderBrush = on ? B("AccentBrush") : B("BorderSoftBrush");
+            card.Background = on ? Tint("AccentBrush") : B("SurfaceBrush");
+            var dot = (Border)((StackPanel)card.Child).Children[0];
+            dot.BorderBrush = on ? B("AccentBrush") : B("BorderSoftBrush");
+            dot.Child = on ? new Border { Width = 8, Height = 8, CornerRadius = new CornerRadius(4), Background = B("AccentBrush") } : null;
+        }
+    }
+
+    // =====================================================================
+    //  PDF to Images settings (the per-tool slot)
+    // =====================================================================
+    private void BuildPdfToImagesSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Image Format"));
+        SettingsHost.Children.Add(RadioCard(_fmtCards, "png", "PNG", "Lossless · supports transparency", () => SelectFormat("png")));
+        SettingsHost.Children.Add(RadioCard(_fmtCards, "jpg", "JPG", "Smaller files · best for photos", () => SelectFormat("jpg")));
+
+        SettingsHost.Children.Add(SectionTitle("Resolution", 22));
+        SettingsHost.Children.Add(RadioCard(_dpiCards, "96", "Screen", "96 DPI · web & previews", () => SelectDpi("96")));
+        SettingsHost.Children.Add(RadioCard(_dpiCards, "150", "Standard", "150 DPI · balanced (recommended)", () => SelectDpi("150")));
+        SettingsHost.Children.Add(RadioCard(_dpiCards, "300", "High", "300 DPI · print quality", () => SelectDpi("300")));
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Images")));
+
+        SelectFormat(_imgFormat);
+        SelectDpi(_imgDpi.ToString());
+    }
+
+    private void SelectFormat(string key) { _imgFormat = key; HighlightRadio(_fmtCards, key); }
+    private void SelectDpi(string key) { _imgDpi = int.Parse(key); HighlightRadio(_dpiCards, key); }
+
+    /// <summary>Generic radio-style settings card (dot + title + description).</summary>
+    private Border RadioCard(Dictionary<string, Border> dict, string key, string title, string desc, Action onClick)
+    {
+        var card = new Border
+        {
+            CornerRadius = new CornerRadius(12), Padding = new Thickness(16), Cursor = Cursors.Hand,
+            Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(1), Tag = key
+        };
+        var inner = new StackPanel { Orientation = Orientation.Horizontal };
+        var dot = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(9), BorderThickness = new Thickness(2), Margin = new Thickness(0, 1, 13, 0), VerticalAlignment = VerticalAlignment.Top };
+        var txt = new StackPanel();
+        txt.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 14, Foreground = B("TextPrimaryBrush") });
+        txt.Children.Add(new TextBlock { Text = desc, FontSize = 12, Foreground = B("TextMutedBrush"), Margin = new Thickness(0, 2, 0, 0) });
+        inner.Children.Add(dot); inner.Children.Add(txt);
+        card.Child = inner;
+        card.MouseLeftButtonUp += (_, _) => onClick();
+        dict[key] = card;
+        return card;
+    }
+
+    private void HighlightRadio(Dictionary<string, Border> dict, string key)
+    {
+        foreach (var (k, card) in dict)
         {
             bool on = k == key;
             card.BorderBrush = on ? B("AccentBrush") : B("BorderSoftBrush");
@@ -815,7 +885,41 @@ public partial class ToolWorkspaceWindow : Window
             return;
         }
         if (_toolId == "compress_pdf") await ProcessCompress();
+        else if (_toolId == "pdf_to_images") await ProcessPdfToImages();
         else await ProcessSplit();
+    }
+
+    private async System.Threading.Tasks.Task ProcessPdfToImages()
+    {
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        BtnProcess.IsEnabled = false;
+        TxtProcess.Text = "Converting…";
+        ShowBusy("Converting to images…", $"Rendering {_pageCount} page(s) as {_imgFormat.ToUpperInvariant()}");
+        try
+        {
+            var task = FileToolsService.PdfToImagesAsync(_pdfPath!, outDir, _imgFormat, _imgDpi, null, _password);
+            await System.Threading.Tasks.Task.WhenAll(task, System.Threading.Tasks.Task.Delay(650));
+            var results = await task;
+            HideBusy();
+            ConfirmDialog.Alert(this, "Conversion Complete",
+                $"Saved {results.Length} {_imgFormat.ToUpperInvariant()} image(s) to:\n{outDir}",
+                ConfirmDialog.AlertKind.Success, "Done");
+            try { System.Diagnostics.Process.Start("explorer.exe", outDir); } catch { }
+            MoveToNextTool();
+        }
+        catch (Exception ex)
+        {
+            HideBusy();
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
+        }
+        finally
+        {
+            BtnProcess.IsEnabled = true;
+            ApplyToolMeta();
+        }
     }
 
     private async System.Threading.Tasks.Task ProcessMerge()
