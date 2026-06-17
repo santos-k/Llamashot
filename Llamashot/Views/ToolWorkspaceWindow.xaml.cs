@@ -29,7 +29,7 @@ public partial class ToolWorkspaceWindow : Window
 
     // which tool this workspace is currently showing
     private string _toolId = "split_pdf";
-    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images", "images_to_pdf" };
+    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images", "images_to_pdf", "rotate_pdf" };
 
     // split settings controls
     private string _method = "custom";
@@ -56,6 +56,10 @@ public partial class ToolWorkspaceWindow : Window
     private readonly Dictionary<string, Border> _fmtCards = new();
     private readonly Dictionary<string, Border> _dpiCards = new();
 
+    // rotate settings
+    private int _rotateDeg = 90;
+    private readonly Dictionary<string, Border> _rotateCards = new();
+
     private static readonly string[] ImageExts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff" };
 
     /// <summary>True for tools that take a reorderable list of input files (Merge, Images→PDF).</summary>
@@ -79,6 +83,9 @@ public partial class ToolWorkspaceWindow : Window
         "images_to_pdf" => ("Images to PDF", "Combine images into one PDF",
             "Each image becomes one page, in the order shown. Use ↑ ↓ to rearrange before creating the PDF.",
             "Create PDF  →"),
+        "rotate_pdf" => ("Rotate PDF", "Turn every page by a fixed angle",
+            "The preview shows how pages will look after rotating. The rotation is applied to all pages in the document.",
+            "Rotate PDF  →"),
         "compress_pdf" => ("Compress PDF", "Reduce file size while keeping quality",
             "Higher compression means a smaller file but lower image quality. Recommended works well for most documents.",
             "Compress PDF  →"),
@@ -138,10 +145,12 @@ public partial class ToolWorkspaceWindow : Window
         _compressCards.Clear();
         _fmtCards.Clear();
         _dpiCards.Clear();
+        _rotateCards.Clear();
         if (_toolId == "merge_pdf") BuildMergeSettings();
         else if (_toolId == "images_to_pdf") BuildImagesToPdfSettings();
         else if (_toolId == "compress_pdf") BuildCompressSettings();
         else if (_toolId == "pdf_to_images") BuildPdfToImagesSettings();
+        else if (_toolId == "rotate_pdf") BuildRotateSettings();
         else BuildSplitSettings();
     }
 
@@ -165,6 +174,7 @@ public partial class ToolWorkspaceWindow : Window
         BuildInfo();
         UpdateSelection();
         ShowPreviewState();
+        UpdateRotatePreview();
     }
 
     /// <summary>Returns the next implemented tool after the current one (wraps around).</summary>
@@ -479,6 +489,36 @@ public partial class ToolWorkspaceWindow : Window
 
     private void SelectFormat(string key) { _imgFormat = key; HighlightRadio(_fmtCards, key); }
     private void SelectDpi(string key) { _imgDpi = int.Parse(key); HighlightRadio(_dpiCards, key); }
+
+    // =====================================================================
+    //  Rotate settings (the per-tool slot)
+    // =====================================================================
+    private void BuildRotateSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Rotation"));
+        SettingsHost.Children.Add(RadioCard(_rotateCards, "90", "Rotate 90° right", "Clockwise quarter turn", () => SelectRotation("90")));
+        SettingsHost.Children.Add(RadioCard(_rotateCards, "180", "Rotate 180°", "Flip upside down", () => SelectRotation("180")));
+        SettingsHost.Children.Add(RadioCard(_rotateCards, "270", "Rotate 90° left", "Counter-clockwise quarter turn", () => SelectRotation("270")));
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Rotated")));
+
+        SelectRotation(_rotateDeg.ToString());
+    }
+
+    private void SelectRotation(string key)
+    {
+        _rotateDeg = int.Parse(key);
+        HighlightRadio(_rotateCards, key);
+        UpdateRotatePreview();
+    }
+
+    /// <summary>Rotates the on-screen preview to show how pages will look after rotating.</summary>
+    private void UpdateRotatePreview()
+        => PreviewImage.LayoutTransform = _toolId == "rotate_pdf"
+            ? new RotateTransform(_rotateDeg)
+            : Transform.Identity;
 
     /// <summary>Generic radio-style settings card (dot + title + description).</summary>
     private Border RadioCard(Dictionary<string, Border> dict, string key, string title, string desc, Action onClick)
@@ -854,6 +894,7 @@ public partial class ToolWorkspaceWindow : Window
         PreviewImage.Width = 240 * _zoom;
         TxtPager.Text = $"{_curPage} / {_pageCount}";
         TxtZoom.Text = $"{(int)(_zoom * 100)}%";
+        UpdateRotatePreview();
     }
 
     private async System.Threading.Tasks.Task BuildThumbnails()
@@ -960,7 +1001,43 @@ public partial class ToolWorkspaceWindow : Window
         }
         if (_toolId == "compress_pdf") await ProcessCompress();
         else if (_toolId == "pdf_to_images") await ProcessPdfToImages();
+        else if (_toolId == "rotate_pdf") await ProcessRotate();
         else await ProcessSplit();
+    }
+
+    private async System.Threading.Tasks.Task ProcessRotate()
+    {
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_rotated.pdf");
+
+        BtnProcess.IsEnabled = false;
+        TxtProcess.Text = "Rotating…";
+        ShowBusy("Rotating PDF…", $"Turning {_pageCount} page(s) by {_rotateDeg}°");
+        try
+        {
+            var task = FileToolsService.RotatePdfAsync(_pdfPath!, outPath, _rotateDeg, null, _password);
+            await System.Threading.Tasks.Task.WhenAll(task, System.Threading.Tasks.Task.Delay(650));
+            await task;
+            HideBusy();
+            ConfirmDialog.Alert(this, "Rotation Complete",
+                $"Rotated {_pageCount} page(s) by {_rotateDeg}° and saved to:\n{outPath}",
+                ConfirmDialog.AlertKind.Success, "Done");
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
+            MoveToNextTool();
+        }
+        catch (Exception ex)
+        {
+            HideBusy();
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
+        }
+        finally
+        {
+            BtnProcess.IsEnabled = true;
+            ApplyToolMeta();
+        }
     }
 
     private async System.Threading.Tasks.Task ProcessPdfToImages()

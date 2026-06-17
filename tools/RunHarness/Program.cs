@@ -62,9 +62,11 @@ internal static class Program
             ThemeManager.Apply(ThemeManager.Dark, persist: false);
             await Task.Delay(200);
             await CaptureMergeList("i2p_dark.png", "images_to_pdf", imgRows);
+            await CaptureWorkspace("rotate_dark.png", "rotate_pdf", false);
             ThemeManager.Apply(ThemeManager.Light, persist: false);
             await Task.Delay(200);
             await CaptureMergeList("i2p_light.png", "images_to_pdf", imgRows);
+            await CaptureWorkspace("rotate_light.png", "rotate_pdf", false);
             return;
         }
 
