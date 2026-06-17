@@ -29,7 +29,7 @@ public partial class ToolWorkspaceWindow : Window
 
     // which tool this workspace is currently showing
     private string _toolId = "split_pdf";
-    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images" };
+    private static readonly HashSet<string> Implemented = new() { "merge_pdf", "split_pdf", "compress_pdf", "pdf_to_images", "images_to_pdf" };
 
     // split settings controls
     private string _method = "custom";
@@ -56,6 +56,15 @@ public partial class ToolWorkspaceWindow : Window
     private readonly Dictionary<string, Border> _fmtCards = new();
     private readonly Dictionary<string, Border> _dpiCards = new();
 
+    private static readonly string[] ImageExts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff" };
+
+    /// <summary>True for tools that take a reorderable list of input files (Merge, Images→PDF).</summary>
+    private bool IsMultiFile => _toolId == "merge_pdf" || _toolId == "images_to_pdf";
+
+    private bool AcceptsFile(string path) => _toolId == "images_to_pdf"
+        ? ImageExts.Any(e => path.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+        : path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+
     private static int QualityFor(string key) => key switch { "low" => 85, "high" => 40, _ => 65 };
 
     /// <summary>Per-tool title/subtitle/tip/action-button text.</summary>
@@ -67,6 +76,9 @@ public partial class ToolWorkspaceWindow : Window
         "pdf_to_images" => ("PDF to Images", "Convert each page to an image",
             "PNG keeps quality and transparency; JPG makes smaller files. Higher resolution looks sharper but takes more space.",
             "Convert  →"),
+        "images_to_pdf" => ("Images to PDF", "Combine images into one PDF",
+            "Each image becomes one page, in the order shown. Use ↑ ↓ to rearrange before creating the PDF.",
+            "Create PDF  →"),
         "compress_pdf" => ("Compress PDF", "Reduce file size while keeping quality",
             "Higher compression means a smaller file but lower image quality. Recommended works well for most documents.",
             "Compress PDF  →"),
@@ -104,9 +116,18 @@ public partial class ToolWorkspaceWindow : Window
         TxtSubtitle.Text = m.sub;
         TxtTip.Text = m.tip;
         TxtProcess.Text = m.action;
-        bool merge = _toolId == "merge_pdf";
-        TxtDropTitle.Text = merge ? "Drag & drop PDFs here" : "Drag & drop a PDF here";
-        BtnEmptySelect.Content = merge ? "Select PDFs" : "Select PDF";
+        TxtDropTitle.Text = _toolId switch
+        {
+            "merge_pdf" => "Drag & drop PDFs here",
+            "images_to_pdf" => "Drag & drop images here",
+            _ => "Drag & drop a PDF here"
+        };
+        BtnEmptySelect.Content = _toolId switch
+        {
+            "merge_pdf" => "Select PDFs",
+            "images_to_pdf" => "Select Images",
+            _ => "Select PDF"
+        };
     }
 
     /// <summary>Builds the per-tool settings slot for the active tool.</summary>
@@ -118,6 +139,7 @@ public partial class ToolWorkspaceWindow : Window
         _fmtCards.Clear();
         _dpiCards.Clear();
         if (_toolId == "merge_pdf") BuildMergeSettings();
+        else if (_toolId == "images_to_pdf") BuildImagesToPdfSettings();
         else if (_toolId == "compress_pdf") BuildCompressSettings();
         else if (_toolId == "pdf_to_images") BuildPdfToImagesSettings();
         else BuildSplitSettings();
@@ -139,7 +161,7 @@ public partial class ToolWorkspaceWindow : Window
             else { SetRange(1, _pageCount); SelectMethod(_method); }
         }
 
-        if (_toolId == "merge_pdf") BuildMergeList();
+        if (IsMultiFile) BuildMergeList();
         BuildInfo();
         UpdateSelection();
         ShowPreviewState();
@@ -511,13 +533,39 @@ public partial class ToolWorkspaceWindow : Window
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Merged")));
     }
 
+    private void BuildImagesToPdfSettings()
+    {
+        SettingsHost.Children.Add(SectionTitle("Output File"));
+        SettingsHost.Children.Add(MutedLabel("FILE NAME"));
+        _mergeNameBox = new TextBox
+        {
+            Text = "images.pdf", FontSize = 14, Padding = new Thickness(11), Margin = new Thickness(0, 8, 0, 0),
+            Background = B("SurfaceAltBrush"), Foreground = B("TextPrimaryBrush"),
+            BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1)
+        };
+        SettingsHost.Children.Add(_mergeNameBox);
+
+        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        SettingsHost.Children.Add(BuildFolderRow(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "PDF")));
+    }
+
     private async System.Threading.Tasks.Task AddMergeFiles(IEnumerable<string> paths)
     {
         foreach (var path in paths)
         {
-            if (!path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!AcceptsFile(path)) continue;
             if (_mergeFiles.Contains(path)) continue;
 
+            if (_toolId == "images_to_pdf")
+            {
+                _mergeFiles.Add(path);
+                _mergePages[path] = 1; // one image = one page
+                _mergePw[path] = null;
+                continue;
+            }
+
+            // PDF (merge): unlock if protected, then count pages
             string? pw = await PasswordDialog.UnlockAsync(this, path);
             if (pw == null) continue; // user cancelled this file's unlock
             string? realPw = string.IsNullOrEmpty(pw) ? null : pw;
@@ -546,7 +594,8 @@ public partial class ToolWorkspaceWindow : Window
         MergeList.Items.Clear();
         for (int i = 0; i < _mergeFiles.Count; i++)
             MergeList.Items.Add(MergeRow(i));
-        TxtMergeCount.Text = $"{_mergeFiles.Count} file{(_mergeFiles.Count == 1 ? "" : "s")}";
+        string noun = _toolId == "images_to_pdf" ? "image" : "file";
+        TxtMergeCount.Text = $"{_mergeFiles.Count} {noun}{(_mergeFiles.Count == 1 ? "" : "s")}";
     }
 
     private Border MergeRow(int idx)
@@ -560,9 +609,10 @@ public partial class ToolWorkspaceWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+        bool isImg = _toolId == "images_to_pdf";
         var badge = new Border
         {
-            Width = 32, Height = 32, CornerRadius = new CornerRadius(9), Background = Hex("#F06262"),
+            Width = 32, Height = 32, CornerRadius = new CornerRadius(9), Background = Hex(isImg ? "#5BB98B" : "#F06262"),
             Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center
         };
         badge.Child = new TextBlock
@@ -572,9 +622,12 @@ public partial class ToolWorkspaceWindow : Window
         };
         Grid.SetColumn(badge, 0);
 
+        string meta = isImg
+            ? $"{fi.Extension.TrimStart('.').ToUpperInvariant()} · {FileToolsService.FormatFileSize(fi.Length)}"
+            : $"{pages} page{(pages == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(fi.Length)}";
         var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         info.Children.Add(new TextBlock { Text = fi.Name, Foreground = B("TextPrimaryBrush"), FontWeight = FontWeights.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis });
-        info.Children.Add(new TextBlock { Text = $"{pages} page{(pages == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(fi.Length)}", Foreground = B("TextMutedBrush"), FontSize = 12 });
+        info.Children.Add(new TextBlock { Text = meta, Foreground = B("TextMutedBrush"), FontSize = 12 });
         Grid.SetColumn(info, 1);
 
         var ctrls = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -651,18 +704,28 @@ public partial class ToolWorkspaceWindow : Window
     {
         InfoRows.Children.Clear();
 
-        if (_toolId == "merge_pdf")
+        if (IsMultiFile)
         {
             if (_mergeFiles.Count == 0)
             {
-                InfoRows.Children.Add(new TextBlock { Text = "No files added yet.", Foreground = B("TextMutedBrush"), FontSize = 13 });
+                string what = _toolId == "images_to_pdf" ? "images" : "files";
+                InfoRows.Children.Add(new TextBlock { Text = $"No {what} added yet.", Foreground = B("TextMutedBrush"), FontSize = 13 });
                 return;
             }
-            int totalPages = _mergeFiles.Sum(p => _mergePages.TryGetValue(p, out var x) ? x : 0);
             long totalSize = _mergeFiles.Sum(p => new FileInfo(p).Length);
-            AddInfoRow("Files", _mergeFiles.Count.ToString());
-            AddInfoRow("Total Pages", totalPages.ToString());
-            AddInfoRow("Combined Size", FileToolsService.FormatFileSize(totalSize));
+            if (_toolId == "images_to_pdf")
+            {
+                AddInfoRow("Images", _mergeFiles.Count.ToString());
+                AddInfoRow("Output Pages", _mergeFiles.Count.ToString());
+                AddInfoRow("Combined Size", FileToolsService.FormatFileSize(totalSize));
+            }
+            else
+            {
+                int totalPages = _mergeFiles.Sum(p => _mergePages.TryGetValue(p, out var x) ? x : 0);
+                AddInfoRow("Files", _mergeFiles.Count.ToString());
+                AddInfoRow("Total Pages", totalPages.ToString());
+                AddInfoRow("Combined Size", FileToolsService.FormatFileSize(totalSize));
+            }
             return;
         }
 
@@ -696,11 +759,16 @@ public partial class ToolWorkspaceWindow : Window
     // =====================================================================
     private async void AddFiles_Click(object sender, RoutedEventArgs e)
     {
-        bool merge = _toolId == "merge_pdf";
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf", Multiselect = merge };
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Multiselect = IsMultiFile,
+            Filter = _toolId == "images_to_pdf"
+                ? "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff"
+                : "PDF Files|*.pdf"
+        };
         if (dlg.ShowDialog() == true)
         {
-            if (merge) await AddMergeFiles(dlg.FileNames);
+            if (IsMultiFile) await AddMergeFiles(dlg.FileNames);
             else await LoadPdf(dlg.FileName);
         }
     }
@@ -715,10 +783,10 @@ public partial class ToolWorkspaceWindow : Window
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
         {
-            var pdfs = files.Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (pdfs.Length == 0) return;
-            if (_toolId == "merge_pdf") await AddMergeFiles(pdfs);
-            else await LoadPdf(pdfs[0]);
+            var accepted = files.Where(AcceptsFile).ToArray();
+            if (accepted.Length == 0) return;
+            if (IsMultiFile) await AddMergeFiles(accepted);
+            else await LoadPdf(accepted[0]);
         }
     }
 
@@ -848,7 +916,7 @@ public partial class ToolWorkspaceWindow : Window
     /// <summary>Shows the correct preview region for the active tool and its current data.</summary>
     private void ShowPreviewState()
     {
-        if (_toolId == "merge_pdf")
+        if (IsMultiFile)
         {
             bool has = _mergeFiles.Count > 0;
             EmptyState.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
@@ -866,8 +934,13 @@ public partial class ToolWorkspaceWindow : Window
 
     private void UpdateSelection()
     {
-        if (_toolId == "merge_pdf")
-            TxtSelection.Text = _mergeFiles.Count == 0 ? "No files selected" : $"{_mergeFiles.Count} files selected";
+        if (IsMultiFile)
+        {
+            string noun = _toolId == "images_to_pdf" ? "image" : "file";
+            TxtSelection.Text = _mergeFiles.Count == 0
+                ? $"No {noun}s selected"
+                : $"{_mergeFiles.Count} {noun}{(_mergeFiles.Count == 1 ? "" : "s")} selected";
+        }
         else
             TxtSelection.Text = _pdfPath == null ? "No file selected" : "1 file selected";
     }
@@ -878,6 +951,7 @@ public partial class ToolWorkspaceWindow : Window
     private async void Process_Click(object sender, RoutedEventArgs e)
     {
         if (_toolId == "merge_pdf") { await ProcessMerge(); return; }
+        if (_toolId == "images_to_pdf") { await ProcessImagesToPdf(); return; }
 
         if (_pdfPath == null)
         {
@@ -953,6 +1027,51 @@ public partial class ToolWorkspaceWindow : Window
             long size = new FileInfo(outPath).Length;
             ConfirmDialog.Alert(this, "Merge Complete",
                 $"Combined {_mergeFiles.Count} files ({FileToolsService.FormatFileSize(size)}) into:\n{outPath}",
+                ConfirmDialog.AlertKind.Success, "Done");
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
+            MoveToNextTool();
+        }
+        catch (Exception ex)
+        {
+            HideBusy();
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
+        }
+        finally
+        {
+            BtnProcess.IsEnabled = true;
+            ApplyToolMeta();
+        }
+    }
+
+    private async System.Threading.Tasks.Task ProcessImagesToPdf()
+    {
+        if (_mergeFiles.Count < 1)
+        {
+            ConfirmDialog.Alert(this, "No Images", "Add at least one image to create a PDF.");
+            return;
+        }
+
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        string name = _mergeNameBox.Text.Trim();
+        if (string.IsNullOrEmpty(name)) name = "images.pdf";
+        if (!name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) name += ".pdf";
+        string outPath = Path.Combine(outDir, name);
+
+        BtnProcess.IsEnabled = false;
+        TxtProcess.Text = "Creating…";
+        ShowBusy("Creating PDF…", $"Adding {_mergeFiles.Count} image(s)");
+        try
+        {
+            var task = FileToolsService.ImagesToPdfAsync(_mergeFiles.ToArray(), outPath, null);
+            await System.Threading.Tasks.Task.WhenAll(task, System.Threading.Tasks.Task.Delay(650));
+            await task;
+            HideBusy();
+            long size = new FileInfo(outPath).Length;
+            ConfirmDialog.Alert(this, "PDF Created",
+                $"Combined {_mergeFiles.Count} image(s) ({FileToolsService.FormatFileSize(size)}) into:\n{outPath}",
                 ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
             MoveToNextTool();

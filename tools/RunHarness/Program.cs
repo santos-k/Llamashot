@@ -49,12 +49,22 @@ internal static class Program
             // warm-up: pump the message loop with a throwaway window so the first real capture paints
             await CaptureWorkspace("_warmup.png", "pdf_to_images", false);
             await Task.Delay(300);
+
+            // mock image rows from real PNGs in the output dir
+            var pngs = System.IO.Directory.GetFiles(Dir, "*.png");
+            var imgRows = new[]
+            {
+                (pngs.Length > 0 ? pngs[0] : typeof(Program).Assembly.Location, 1),
+                (pngs.Length > 1 ? pngs[1] : typeof(Program).Assembly.Location, 1),
+                (pngs.Length > 2 ? pngs[2] : typeof(Program).Assembly.Location, 1),
+            };
+
             ThemeManager.Apply(ThemeManager.Dark, persist: false);
             await Task.Delay(200);
-            await CaptureWorkspace("p2i_dark.png", "pdf_to_images", false);
+            await CaptureMergeList("i2p_dark.png", "images_to_pdf", imgRows);
             ThemeManager.Apply(ThemeManager.Light, persist: false);
             await Task.Delay(200);
-            await CaptureWorkspace("p2i_light.png", "pdf_to_images", false);
+            await CaptureMergeList("i2p_light.png", "images_to_pdf", imgRows);
             return;
         }
 
@@ -146,9 +156,9 @@ internal static class Program
         await CaptureMergeList("merge_light.png");
     }
 
-    static async Task CaptureMergeList(string name)
+    static async Task CaptureMergeList(string name, string toolId = "merge_pdf", (string path, int pages)[]? rows = null)
     {
-        var ws = new ToolWorkspaceWindow("merge_pdf")
+        var ws = new ToolWorkspaceWindow(toolId)
         {
             WindowState = WindowState.Normal, Width = 1380, Height = 880,
             WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true
@@ -163,10 +173,8 @@ internal static class Program
         var pw = (System.Collections.Generic.Dictionary<string, string?>)t.GetField("_mergePw", BF)!.GetValue(ws)!;
 
         // use real existing files so FileInfo works; names/sizes are just for layout
-        string a = typeof(ToolWorkspaceWindow).Assembly.Location;
-        string b = typeof(Program).Assembly.Location;
-        foreach (var (path, pg) in new[] { (a, 12), (b, 5) })
-        { files.Add(path); pages[path] = pg; pw[path] = null; }
+        rows ??= new[] { (typeof(ToolWorkspaceWindow).Assembly.Location, 12), (typeof(Program).Assembly.Location, 5) };
+        foreach (var (path, pg) in rows) { files.Add(path); pages[path] = pg; pw[path] = null; }
 
         t.GetMethod("BuildMergeList", BF)!.Invoke(ws, null);
         t.GetMethod("BuildInfo", BF)!.Invoke(ws, null);
@@ -175,7 +183,8 @@ internal static class Program
 
         ws.UpdateLayout();
         await Task.Delay(300);
-        Shot(ws, name);
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_WS_ONLY") == "1") ShotRtb(ws, name);
+        else Shot(ws, name);
         ws.Close();
     }
 

@@ -22,7 +22,7 @@
                            Foreground="#42A5F5" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 8.6.1" Foreground="#666"
+                <TextBlock Text="Version 8.6.2" Foreground="#666"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -69,7 +69,7 @@
                         <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Images to PDF &amp; PDF to images converter" />
                         <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Image resize, rotate, flip &amp; format conversion" />
                         <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: File Tools redesign — soft light/dark theme with live toggle" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF workspace — Merge, Split, Compress &amp; PDF→Images with live preview, password unlock &amp; progress" />
+                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF workspace — Merge, Split, Compress, PDF→Images &amp; Images→PDF with live preview, password unlock &amp; progress" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
                         <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
