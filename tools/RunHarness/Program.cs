@@ -50,6 +50,13 @@ internal static class Program
             await CaptureWorkspace("_warmup.png", "pdf_to_images", false);
             await Task.Delay(300);
 
+            ThemeManager.Apply(ThemeManager.Dark, persist: false);
+            await Task.Delay(150);
+            await CaptureMarkup("fillsign_dark.png", "fillsign");
+            ThemeManager.Apply(ThemeManager.Light, persist: false);
+            await Task.Delay(150);
+            await CaptureMarkup("editor_light.png", "edit");
+
             // mock image rows from real PNGs in the output dir
             var pngs = System.IO.Directory.GetFiles(Dir, "*.png");
             var imgRows = new[]
@@ -158,6 +165,22 @@ internal static class Program
         ThemeManager.Apply(ThemeManager.Light, persist: false);
         await Task.Delay(150);
         await CaptureMergeList("merge_light.png");
+    }
+
+    static async Task CaptureMarkup(string name, string mode)
+    {
+        var w = new PdfMarkupWindow(mode)
+        {
+            WindowState = WindowState.Normal, Width = 1380, Height = 880,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true
+        };
+        w.Show(); w.Activate();
+        await Task.Delay(500);
+        w.UpdateLayout();
+        await Task.Delay(300);
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_WS_ONLY") == "1") ShotRtb(w, name);
+        else Shot(w, name);
+        w.Close();
     }
 
     static async Task CaptureMergeList(string name, string toolId = "merge_pdf", (string path, int pages)[]? rows = null)

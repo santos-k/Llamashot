@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>Llamashot</AssemblyName>
     <RootNamespace>Llamashot</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
@@ -15,9 +16,9 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <Version>8.7.0</Version>
-    <AssemblyVersion>8.7.0</AssemblyVersion>
-    <FileVersion>8.7.0</FileVersion>
+    <Version>8.8.0</Version>
+    <AssemblyVersion>8.8.0</AssemblyVersion>
+    <FileVersion>8.8.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -34,6 +34,9 @@ public partial class FileToolsWindow : Window
         ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                  "#90A0F0", "#",      "PDF Tools"),
         ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",        "#FFB59B", "\u2398", "PDF Tools"),
         ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",              "#C9B0A6", "\u2295", "PDF Tools"),
+        ("protect_pdf",    "Protect PDF",     "Lock a PDF with a password",          "#8FB0F7", "\U0001F512", "PDF Tools"),
+        ("fill_sign",      "Fill & Sign",     "Fill fields and sign a PDF",          "#7FD1B0", "\u270D", "PDF Tools"),
+        ("pdf_editor",     "Edit PDF",        "Add text, images & marks to a PDF",   "#C7A6F0", "\u270E", "PDF Tools"),
         ("image_editor",   "Image Editor",    "All-in-one image editor",             "#A78BFA", "\u2B1C", "Image Tools"),
         ("compress_image", "Compress Image",  "Reduce image file size",              "#6FD9E6", "\u2B07", "Image Tools"),
         ("resize_image",   "Resize Image",    "Change dimensions",                   "#6FD0C3", "\u2922", "Image Tools"),
@@ -827,6 +830,14 @@ public partial class FileToolsWindow : Window
     private void Card_Click(object sender, MouseButtonEventArgs e)
     {
         string id = (string)((Border)sender).Tag;
+
+        // Interactive PDF editors (their own windows — not the convert-and-save shell).
+        if (id is "fill_sign" or "pdf_editor")
+        {
+            var ed = new PdfMarkupWindow(id == "pdf_editor" ? "edit" : "fillsign") { Owner = this };
+            ed.ShowDialog();
+            return;
+        }
 
         // New unified workspace — all PDF tools live here now.
         if (id is "merge_pdf" or "split_pdf" or "compress_pdf" or "pdf_to_images" or "images_to_pdf"
