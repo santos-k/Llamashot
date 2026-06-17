@@ -12,6 +12,47 @@ namespace Llamashot.Core;
 
 public static class FileToolsService
 {
+    // =====================================================================
+    //  Password-protected PDF support
+    // =====================================================================
+
+    /// <summary>Loads a PDF, supplying a password when one is provided.</summary>
+    private static async Task<Windows.Data.Pdf.PdfDocument> LoadPdfAsync(Windows.Storage.IStorageFile file, string? password)
+        => string.IsNullOrEmpty(password)
+            ? await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file)
+            : await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file, password);
+
+    /// <summary>True if the PDF requires a password to open.</summary>
+    public static async Task<bool> IsPdfEncryptedAsync(string path)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            return false;
+        }
+        catch
+        {
+            // LoadFromFileAsync throws for password-protected (and unreadable) PDFs.
+            return true;
+        }
+    }
+
+    /// <summary>True if the given password successfully opens the PDF.</summary>
+    public static async Task<bool> TryUnlockPdfAsync(string path, string password)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file, password);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static async Task ImagesToPdfAsync(string[] imagePaths, string outputPath, IProgress<int>? progress = null)
     {
         await Task.Run(() =>
@@ -147,12 +188,12 @@ public static class FileToolsService
         });
     }
 
-    public static async Task<string[]> PdfToImagesAsync(string pdfPath, string outputDir, string format = "png", int dpi = 150, IProgress<int>? progress = null)
+    public static async Task<string[]> PdfToImagesAsync(string pdfPath, string outputDir, string format = "png", int dpi = 150, IProgress<int>? progress = null, string? password = null)
     {
         Directory.CreateDirectory(outputDir);
 
         var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-        var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+        var pdfDoc = await LoadPdfAsync(file, password);
         uint pageCount = pdfDoc.PageCount;
         var outputPaths = new string[pageCount];
 
@@ -314,14 +355,14 @@ public static class FileToolsService
         };
     }
 
-    public static async Task<int> GetPdfPageCountAsync(string pdfPath)
+    public static async Task<int> GetPdfPageCountAsync(string pdfPath, string? password = null)
     {
         var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-        var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+        var pdfDoc = await LoadPdfAsync(file, password);
         return (int)pdfDoc.PageCount;
     }
 
-    public static async Task MergePdfsAsync(string[] pdfPaths, string outputPath, IProgress<int>? progress = null)
+    public static async Task MergePdfsAsync(string[] pdfPaths, string outputPath, IProgress<int>? progress = null, IReadOnlyList<string?>? passwords = null)
     {
         string tempDir = CreateTempDir("merge");
         try
@@ -333,8 +374,9 @@ public static class FileToolsService
             var pageCounts = new int[pdfPaths.Length];
             for (int f = 0; f < pdfPaths.Length; f++)
             {
+                string? password = passwords != null && f < passwords.Count ? passwords[f] : null;
                 var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPaths[f]);
-                var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+                var pdfDoc = await LoadPdfAsync(file, password);
                 pageCounts[f] = (int)pdfDoc.PageCount;
                 totalPages += pageCounts[f];
             }
@@ -344,8 +386,9 @@ public static class FileToolsService
             // Second pass: render all pages
             for (int f = 0; f < pdfPaths.Length; f++)
             {
+                string? password = passwords != null && f < passwords.Count ? passwords[f] : null;
                 var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPaths[f]);
-                var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+                var pdfDoc = await LoadPdfAsync(file, password);
 
                 for (uint i = 0; i < pdfDoc.PageCount; i++)
                 {
@@ -376,7 +419,7 @@ public static class FileToolsService
         }
     }
 
-    public static async Task<string[]> SplitPdfAsync(string pdfPath, string outputDir, int fromPage, int toPage, IProgress<int>? progress = null)
+    public static async Task<string[]> SplitPdfAsync(string pdfPath, string outputDir, int fromPage, int toPage, IProgress<int>? progress = null, string? password = null)
     {
         Directory.CreateDirectory(outputDir);
         string tempDir = CreateTempDir("split");
@@ -384,7 +427,7 @@ public static class FileToolsService
         try
         {
             var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfAsync(file, password);
 
             int totalPages = toPage - fromPage + 1;
             var outputPaths = new string[totalPages];
@@ -419,13 +462,13 @@ public static class FileToolsService
         }
     }
 
-    public static async Task RotatePdfAsync(string pdfPath, string outputPath, int degrees, IProgress<int>? progress = null)
+    public static async Task RotatePdfAsync(string pdfPath, string outputPath, int degrees, IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("rotate");
         try
         {
             var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfAsync(file, password);
             uint pageCount = pdfDoc.PageCount;
 
             var tempImages = new List<string>();
@@ -464,13 +507,13 @@ public static class FileToolsService
         }
     }
 
-    public static async Task WatermarkPdfAsync(string pdfPath, string outputPath, string watermarkText, double opacity = 0.3, int fontSize = 48, IProgress<int>? progress = null)
+    public static async Task WatermarkPdfAsync(string pdfPath, string outputPath, string watermarkText, double opacity = 0.3, int fontSize = 48, IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("watermark");
         try
         {
             var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfAsync(file, password);
             uint pageCount = pdfDoc.PageCount;
 
             var tempImages = new List<string>();
@@ -531,13 +574,13 @@ public static class FileToolsService
         }
     }
 
-    public static async Task AddPageNumbersAsync(string pdfPath, string outputPath, string position = "bottom-center", IProgress<int>? progress = null)
+    public static async Task AddPageNumbersAsync(string pdfPath, string outputPath, string position = "bottom-center", IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("pagenums");
         try
         {
             var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfAsync(file, password);
             uint pageCount = pdfDoc.PageCount;
 
             var tempImages = new List<string>();
@@ -615,13 +658,13 @@ public static class FileToolsService
         }
     }
 
-    public static async Task ExtractPdfPagesAsync(string pdfPath, int[] pageNumbers, string outputPath, IProgress<int>? progress = null)
+    public static async Task ExtractPdfPagesAsync(string pdfPath, int[] pageNumbers, string outputPath, IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("extract");
         try
         {
             var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfAsync(file, password);
 
             int totalPages = pageNumbers.Length;
             var tempImages = new List<string>();
@@ -654,13 +697,13 @@ public static class FileToolsService
         }
     }
 
-    public static async Task InsertPdfPagesAsync(string basePdfPath, string[] insertImagePaths, int afterPage, string outputPath, IProgress<int>? progress = null)
+    public static async Task InsertPdfPagesAsync(string basePdfPath, string[] insertImagePaths, int afterPage, string outputPath, IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("insert");
         try
         {
             var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(basePdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfAsync(file, password);
             uint pageCount = pdfDoc.PageCount;
 
             var tempImages = new List<string>();
@@ -1368,7 +1411,7 @@ public static class FileToolsService
     public static bool IsOfficeExtension(string ext) =>
         ext.ToLowerInvariant() is ".docx" or ".xlsx" or ".pptx" or ".odt" or ".ods" or ".odp";
 
-    public static async Task<long> CompressFileAsync(string inputPath, string outputPath, int quality = 80, int maxDimension = 0, IProgress<int>? progress = null)
+    public static async Task<long> CompressFileAsync(string inputPath, string outputPath, int quality = 80, int maxDimension = 0, IProgress<int>? progress = null, string? password = null)
     {
         string ext = Path.GetExtension(inputPath).ToLowerInvariant();
 
@@ -1376,7 +1419,7 @@ public static class FileToolsService
             return await CompressImageAsync(inputPath, outputPath, quality, maxDimension);
 
         if (ext == ".pdf")
-            return await CompressPdfAsync(inputPath, outputPath, quality, progress);
+            return await CompressPdfAsync(inputPath, outputPath, quality, progress, password);
 
         if (IsOfficeExtension(ext))
             return await CompressOfficeDocAsync(inputPath, outputPath, quality, progress);
@@ -1384,10 +1427,10 @@ public static class FileToolsService
         return await CompressToZipAsync(inputPath, outputPath);
     }
 
-    public static async Task<long> CompressPdfAsync(string inputPath, string outputPath, int quality = 80, IProgress<int>? progress = null)
+    public static async Task<long> CompressPdfAsync(string inputPath, string outputPath, int quality = 80, IProgress<int>? progress = null, string? password = null)
     {
         var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(inputPath);
-        var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+        var pdfDoc = await LoadPdfAsync(file, password);
         uint pageCount = pdfDoc.PageCount;
 
         string tempDir = Path.Combine(Path.GetTempPath(), "llamashot_pdf_" + Guid.NewGuid().ToString("N")[..8]);

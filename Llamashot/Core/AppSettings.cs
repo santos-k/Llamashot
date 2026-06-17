@@ -94,6 +94,9 @@ public class AppSettings
     public bool QuickPreviewEnabled { get; set; } = true;
     public string ShortcutQuickPreview { get; set; } = "Space";
 
+    // File Tools appearance
+    public string FileToolsTheme { get; set; } = "System"; // "System" | "Light" | "Dark"
+
     public static void Load()
     {
         if (!File.Exists(SettingsPath))

@@ -3,6 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- The active theme color dictionary (Light/Dark) is added at runtime by ThemeManager.
+                     Only the shared control styles are merged statically here. -->
+                <ResourceDictionary Source="/Themes/Shared.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
         <!-- Global button style for toolbar buttons -->
         <Style x:Key="ToolbarButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -31,5 +38,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -24,27 +24,27 @@ public partial class FileToolsWindow : Window
 
     private static readonly (string id, string title, string desc, string color, string icon, string category)[] ToolDefs =
     {
-        ("merge_pdf",      "Merge PDF",       "Combine multiple PDFs into one",      "#E53935", "\u229E", "PDF Tools"),
-        ("split_pdf",      "Split PDF",       "Extract pages from PDF",              "#FF7043", "\u2016", "PDF Tools"),
-        ("compress_pdf",   "Compress PDF",    "Reduce PDF file size",                "#EF5350", "\u2B07", "PDF Tools"),
-        ("pdf_to_images",  "PDF to Images",   "Convert pages to JPG/PNG",            "#F44336", "\u29C9", "PDF Tools"),
-        ("images_to_pdf",  "Images to PDF",   "Combine images into PDF",             "#E91E63", "\u2B1C", "PDF Tools"),
-        ("rotate_pdf",     "Rotate PDF",      "Rotate PDF pages",                    "#FFA726", "\u21BB", "PDF Tools"),
-        ("watermark",      "Watermark PDF",   "Add text watermark",                  "#7E57C2", "\u2666", "PDF Tools"),
-        ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                  "#5C6BC0", "#",      "PDF Tools"),
-        ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",        "#FF8A65", "\u2398", "PDF Tools"),
-        ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",              "#A1887F", "\u2295", "PDF Tools"),
-        ("image_editor",   "Image Editor",    "All-in-one image editor",             "#7C4DFF", "\u2B1C", "Image Tools"),
-        ("compress_image", "Compress Image",  "Reduce image file size",              "#26C6DA", "\u2B07", "Image Tools"),
-        ("resize_image",   "Resize Image",    "Change dimensions",                   "#26A69A", "\u2922", "Image Tools"),
-        ("crop_image",     "Crop Image",      "Crop to selection",                   "#42A5F5", "\u2702", "Image Tools"),
-        ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",               "#AB47BC", "\u21BA", "Image Tools"),
-        ("convert_format", "Convert Format",  "Change image format",                 "#EC407A", "\u21C4", "Image Tools"),
-        ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",              "#78909C", "\u2263", "Office Tools"),
-        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F44336", "\u25B6", "Video & Audio"),
-        ("extract_audio", "Extract Audio",    "Extract audio from video",            "#00BCD4", "\u266B", "Video & Audio"),
-        ("trim_audio",    "Trim Audio",       "Cut start and end of audio",          "#009688", "\u2702", "Video & Audio"),
-        ("youtube_dl",    "YouTube Download", "Download video or audio from URL",    "#FF0000", "\u25B6", "Download"),
+        ("merge_pdf",      "Merge PDF",       "Combine multiple PDFs into one",      "#FF8A8A", "\u229E", "PDF Tools"),
+        ("split_pdf",      "Split PDF",       "Extract pages from PDF",              "#FFB088", "\u2016", "PDF Tools"),
+        ("compress_pdf",   "Compress PDF",    "Reduce PDF file size",                "#FF9B9B", "\u2B07", "PDF Tools"),
+        ("pdf_to_images",  "PDF to Images",   "Convert pages to JPG/PNG",            "#F58F8F", "\u29C9", "PDF Tools"),
+        ("images_to_pdf",  "Images to PDF",   "Combine images into PDF",             "#F48FB1", "\u2B1C", "PDF Tools"),
+        ("rotate_pdf",     "Rotate PDF",      "Rotate PDF pages",                    "#FFC777", "\u21BB", "PDF Tools"),
+        ("watermark",      "Watermark PDF",   "Add text watermark",                  "#B79CFF", "\u2666", "PDF Tools"),
+        ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                  "#90A0F0", "#",      "PDF Tools"),
+        ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",        "#FFB59B", "\u2398", "PDF Tools"),
+        ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",              "#C9B0A6", "\u2295", "PDF Tools"),
+        ("image_editor",   "Image Editor",    "All-in-one image editor",             "#A78BFA", "\u2B1C", "Image Tools"),
+        ("compress_image", "Compress Image",  "Reduce image file size",              "#6FD9E6", "\u2B07", "Image Tools"),
+        ("resize_image",   "Resize Image",    "Change dimensions",                   "#6FD0C3", "\u2922", "Image Tools"),
+        ("crop_image",     "Crop Image",      "Crop to selection",                   "#8FBEF7", "\u2702", "Image Tools"),
+        ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",               "#C99BDB", "\u21BA", "Image Tools"),
+        ("convert_format", "Convert Format",  "Change image format",                 "#F48FB1", "\u21C4", "Image Tools"),
+        ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",              "#A7B6C2", "\u2263", "Office Tools"),
+        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F58F8F", "\u25B6", "Video & Audio"),
+        ("extract_audio", "Extract Audio",    "Extract audio from video",            "#6FD3E6", "\u266B", "Video & Audio"),
+        ("trim_audio",    "Trim Audio",       "Cut start and end of audio",          "#6FD0C3", "\u2702", "Video & Audio"),
+        ("youtube_dl",    "YouTube Download", "Download video or audio from URL",    "#FF9B9B", "\u25B6", "Download"),
     };
 
     // =====================================================================
@@ -80,8 +80,11 @@ public partial class FileToolsWindow : Window
     // =====================================================================
 
     private string? _splitPdfPath;
+    private int _splitPageCount;
     private string? _compressPdfPath;
     private string? _pdfToImgPath;
+    // Passwords for unlocked PDFs, keyed by file path (absence means no password needed).
+    private readonly Dictionary<string, string> _pdfPasswords = new(StringComparer.OrdinalIgnoreCase);
     private string? _rotatePdfPath;
     private string? _watermarkPdfPath;
     private string? _pageNumPdfPath;
@@ -213,6 +216,10 @@ public partial class FileToolsWindow : Window
     {
         InitializeComponent();
         CreateToolCards();
+        BuildCategoryChips();
+        Core.ThemeManager.ThemeChanged += OnThemeChanged;
+        UpdateThemeToggleGlyph();
+        Closed += (s, e) => Core.ThemeManager.ThemeChanged -= OnThemeChanged;
         InitPanelMap();
 
         MergePdfList.ItemsSource = _mergePdfFiles;
@@ -237,19 +244,102 @@ public partial class FileToolsWindow : Window
         Loaded += (s, e) => RebuildCardPanel();
     }
 
+    // =====================================================================
+    //  Theme helpers
+    // =====================================================================
+
+    private static SolidColorBrush ThemeBrush(string key)
+        => (SolidColorBrush)System.Windows.Application.Current.Resources[key];
+
+    // =====================================================================
+    //  Password-protected PDF support
+    // =====================================================================
+
+    /// <summary>The stored password for a PDF path, or null if none.</summary>
+    private string? PwFor(string? path)
+        => path != null && _pdfPasswords.TryGetValue(path, out var p) ? p : null;
+
+    /// <summary>
+    /// Prompts for a password if the PDF is locked. Returns true to proceed,
+    /// false if the user cancelled (caller should abort loading that file).
+    /// </summary>
+    private async Task<bool> EnsurePdfUnlockedAsync(string path)
+    {
+        string? pw = await PasswordDialog.UnlockAsync(this, path);
+        if (pw == null) return false;            // cancelled
+        if (pw.Length > 0) _pdfPasswords[path] = pw;
+        else _pdfPasswords.Remove(path);
+        return true;
+    }
+
+    /// <summary>Loads a PDF for previews/thumbnails, using a stored password if present.</summary>
+    private async Task<Windows.Data.Pdf.PdfDocument> LoadPdfDocAsync(string path)
+    {
+        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+        var pw = PwFor(path);
+        return string.IsNullOrEmpty(pw)
+            ? await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file)
+            : await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file, pw);
+    }
+
+    private string _activeCategory = "All";
+
+    private void BuildCategoryChips()
+    {
+        CategoryChips.Items.Clear();
+        string[] cats = { "All", "PDF Tools", "Image Tools", "Office Tools", "Video & Audio", "Download" };
+        foreach (var cat in cats)
+        {
+            bool active = cat == _activeCategory;
+            var chip = new Border
+            {
+                Background = ThemeBrush(active ? "AccentBrush" : "SurfaceAltBrush"),
+                CornerRadius = new CornerRadius(16), Margin = new Thickness(0, 0, 8, 8),
+                Padding = new Thickness(14, 6, 14, 6), Cursor = Cursors.Hand, Tag = cat
+            };
+            chip.Child = new TextBlock
+            {
+                Text = cat, FontSize = 12, FontWeight = FontWeights.Medium,
+                Foreground = ThemeBrush(active ? "AccentTextBrush" : "TextSecondaryBrush")
+            };
+            chip.MouseLeftButtonDown += (s, _) =>
+            {
+                _activeCategory = (string)((Border)s).Tag;
+                RebuildCardPanel();
+                BuildCategoryChips();
+            };
+            CategoryChips.Items.Add(chip);
+        }
+    }
+
+    private void ThemeToggle_Click(object sender, RoutedEventArgs e) => Core.ThemeManager.Toggle();
+
+    private void OnThemeChanged()
+    {
+        UpdateThemeToggleGlyph();
+        RebuildCardPanel();   // cards capture ThemeBrush() snapshots, so rebuild to repaint
+        BuildCategoryChips(); // chips likewise
+    }
+
+    private void UpdateThemeToggleGlyph()
+        => BtnThemeToggle.Content = Core.ThemeManager.Current == Core.ThemeManager.Dark ? "☀" : "\U0001F319";
+
     private Border CreateCard(string id, string title, string desc, string color, string icon)
     {
         var accentColor = (Color)ColorConverter.ConvertFromString(color);
         var accentBrush = new SolidColorBrush(accentColor);
 
+        var surfaceBrush = ThemeBrush("SurfaceBrush");
+        var hoverBrush = ThemeBrush("SurfaceHoverBrush");
+
         var card = new Border
         {
             MinWidth = 250, Height = 88, Margin = new Thickness(5),
-            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1E1E24")),
+            Background = surfaceBrush,
             BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x44, accentColor.R, accentColor.G, accentColor.B)),
-            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18),
             Cursor = Cursors.Hand, Tag = id,
-            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 2, Opacity = 0.3, Color = Colors.Black },
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 12, ShadowDepth = 2, Opacity = 0.12, Color = (Color)ColorConverter.ConvertFromString("#3A4A8A") },
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1)
         };
 
@@ -260,7 +350,7 @@ public partial class FileToolsWindow : Window
 
         var iconBorder = new Border
         {
-            Width = 48, Height = 48, CornerRadius = new CornerRadius(14),
+            Width = 48, Height = 48, CornerRadius = new CornerRadius(16),
             VerticalAlignment = VerticalAlignment.Center,
             Background = new LinearGradientBrush(
                 System.Windows.Media.Color.FromArgb(0x44, accentColor.R, accentColor.G, accentColor.B),
@@ -276,10 +366,10 @@ public partial class FileToolsWindow : Window
         grid.Children.Add(iconBorder);
 
         var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
-        textStack.Children.Add(new TextBlock { Text = title, Foreground = Brushes.White, FontSize = 15, FontWeight = FontWeights.SemiBold });
+        textStack.Children.Add(new TextBlock { Text = title, Foreground = ThemeBrush("TextPrimaryBrush"), FontSize = 15, FontWeight = FontWeights.SemiBold });
         textStack.Children.Add(new TextBlock
         {
-            Text = desc, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#777")),
+            Text = desc, Foreground = ThemeBrush("TextSecondaryBrush"),
             FontSize = 12, Margin = new Thickness(0, 3, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
         });
         Grid.SetColumn(textStack, 1);
@@ -287,7 +377,7 @@ public partial class FileToolsWindow : Window
 
         var arrow = new TextBlock
         {
-            Text = "\u276F", FontSize = 18, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#555")),
+            Text = "\u276F", FontSize = 18, Foreground = ThemeBrush("TextMutedBrush"),
             VerticalAlignment = VerticalAlignment.Center
         };
         Grid.SetColumn(arrow, 2);
@@ -298,7 +388,7 @@ public partial class FileToolsWindow : Window
         card.MouseEnter += (s, _) =>
         {
             var b = (Border)s;
-            b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282830"));
+            b.Background = hoverBrush;
             b.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x88, accentColor.R, accentColor.G, accentColor.B));
             ((ScaleTransform)b.RenderTransform).ScaleX = 1.02;
             ((ScaleTransform)b.RenderTransform).ScaleY = 1.02;
@@ -306,7 +396,7 @@ public partial class FileToolsWindow : Window
         card.MouseLeave += (s, _) =>
         {
             var b = (Border)s;
-            b.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1E1E24"));
+            b.Background = surfaceBrush;
             b.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x44, accentColor.R, accentColor.G, accentColor.B));
             ((ScaleTransform)b.RenderTransform).ScaleX = 1.0;
             ((ScaleTransform)b.RenderTransform).ScaleY = 1.0;
@@ -321,6 +411,10 @@ public partial class FileToolsWindow : Window
         int sortMode = CmbToolSort?.SelectedIndex ?? 0;
 
         var tools = ToolDefs.AsEnumerable();
+
+        // Filter by active category chip
+        if (_activeCategory != "All")
+            tools = tools.Where(t => t.category == _activeCategory);
 
         // Filter by search
         if (!string.IsNullOrEmpty(filter))
@@ -346,7 +440,7 @@ public partial class FileToolsWindow : Window
                     var header = new TextBlock
                     {
                         Text = t.category, FontSize = 14, FontWeight = FontWeights.SemiBold,
-                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#666")),
+                        Foreground = ThemeBrush("TextMutedBrush"),
                         Margin = new Thickness(6, lastCategory == "PDF Tools" ? 0 : 16, 0, 6)
                     };
                     CardPanel.Children.Add(header);
@@ -733,6 +827,15 @@ public partial class FileToolsWindow : Window
     private void Card_Click(object sender, MouseButtonEventArgs e)
     {
         string id = (string)((Border)sender).Tag;
+
+        // New unified workspace (rolling out tool-by-tool).
+        if (id == "merge_pdf" || id == "split_pdf" || id == "compress_pdf")
+        {
+            var ws = new ToolWorkspaceWindow(id) { Owner = this };
+            ws.ShowDialog();
+            return;
+        }
+
         _currentToolId = id;
         FadeOut(HomePanel, 150, () =>
         {
@@ -859,8 +962,7 @@ public partial class FileToolsWindow : Window
     private bool CheckFFmpeg()
     {
         if (FileToolsService.IsFFmpegAvailable()) return true;
-        System.Windows.MessageBox.Show("FFmpeg is required for video tools.\n\nInstall FFmpeg and add it to your system PATH:\nhttps://ffmpeg.org/download.html",
-            "FFmpeg Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+        ConfirmDialog.Alert(this, "FFmpeg Required", "FFmpeg is required for video tools.\n\nInstall FFmpeg and add it to your system PATH:\nhttps://ffmpeg.org/download.html");
         return false;
     }
 
@@ -987,11 +1089,12 @@ public partial class FileToolsWindow : Window
         foreach (var path in paths)
         {
             if (_mergePdfFiles.Any(f => f.FilePath == path)) continue;
+            if (!await EnsurePdfUnlockedAsync(path)) continue; // locked & cancelled — skip this file
             var info = new FileInfo(path);
             string extra = "";
             try
             {
-                int pages = await FileToolsService.GetPdfPageCountAsync(path);
+                int pages = await FileToolsService.GetPdfPageCountAsync(path, PwFor(path));
                 extra = $"{pages} page(s)";
             }
             catch { /* ignore */ }
@@ -1011,7 +1114,11 @@ public partial class FileToolsWindow : Window
 
     private async void MergePdf_Execute(object sender, RoutedEventArgs e)
     {
-        if (_mergePdfFiles.Count < 2) return;
+        if (_mergePdfFiles.Count < 2)
+        {
+            ConfirmDialog.Alert(this, "Can't Merge PDF", "Add at least 2 PDF files to merge — a single file has nothing to combine.");
+            return;
+        }
 
         var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "PDF|*.pdf", FileName = "merged.pdf" };
         if (dlg.ShowDialog() != true) return;
@@ -1020,7 +1127,8 @@ public partial class FileToolsWindow : Window
         try
         {
             var paths = _mergePdfFiles.Select(f => f.FilePath).ToArray();
-            await FileToolsService.MergePdfsAsync(paths, dlg.FileName, CreateProgress());
+            var passwords = paths.Select(PwFor).ToList();
+            await FileToolsService.MergePdfsAsync(paths, dlg.FileName, CreateProgress(), passwords);
             var info = new FileInfo(dlg.FileName);
             ShowComplete("PDFs merged successfully!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
@@ -1029,7 +1137,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1053,29 +1161,58 @@ public partial class FileToolsWindow : Window
 
     private async Task LoadSplitPdf(string path)
     {
-        _splitPdfPath = path;
-        TxtSplitFileName.Text = System.IO.Path.GetFileName(path);
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
+
+        int pages;
         try
         {
-            int pages = await FileToolsService.GetPdfPageCountAsync(path);
-            TxtSplitInfo.Text = $"Total pages: {pages}";
-            TxtSplitFrom.Text = "1";
-            TxtSplitTo.Text = pages.ToString();
+            pages = await FileToolsService.GetPdfPageCountAsync(path, PwFor(path));
         }
         catch (Exception ex)
         {
-            TxtSplitInfo.Text = $"Error: {ex.Message}";
+            _splitPdfPath = null;
+            ConfirmDialog.Alert(this, "Can't Open PDF", ex.Message, ConfirmDialog.AlertKind.Error);
+            return; // stay on the select screen
         }
+
+        // A single-page PDF can't be split — don't advance to the config screen.
+        if (pages <= 1)
+        {
+            _splitPdfPath = null;
+            _splitPageCount = 0;
+            ConfirmDialog.Alert(this, "Can't Split PDF", "This PDF has only 1 page, so there's nothing to split.");
+            return; // stay on the select screen
+        }
+
+        _splitPdfPath = path;
+        _splitPageCount = pages;
+        TxtSplitFileName.Text = System.IO.Path.GetFileName(path);
+        TxtSplitInfo.Text = $"Total pages: {pages}";
+        TxtSplitFrom.Text = "1";
+        TxtSplitTo.Text = pages.ToString();
         ShowConfigState("split_pdf");
     }
 
     private async void SplitPdf_Execute(object sender, RoutedEventArgs e)
     {
         if (_splitPdfPath == null) return;
+
+        if (_splitPageCount <= 1)
+        {
+            ConfirmDialog.Alert(this, "Can't Split PDF", "This PDF has only 1 page, so there's nothing to split.");
+            return;
+        }
+
         if (!int.TryParse(TxtSplitFrom.Text, out int from) || !int.TryParse(TxtSplitTo.Text, out int to)
             || from < 1 || to < from)
         {
-            System.Windows.MessageBox.Show("Enter a valid page range.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Invalid Input", "Enter a valid page range.");
+            return;
+        }
+
+        if (to > _splitPageCount)
+        {
+            ConfirmDialog.Alert(this, "Page Range Too Large", $"This PDF has only {_splitPageCount} page(s). Choose a range within 1–{_splitPageCount}.");
             return;
         }
 
@@ -1085,7 +1222,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Splitting PDF...");
         try
         {
-            var results = await FileToolsService.SplitPdfAsync(_splitPdfPath, folderDlg.SelectedPath, from, to, CreateProgress());
+            var results = await FileToolsService.SplitPdfAsync(_splitPdfPath, folderDlg.SelectedPath, from, to, CreateProgress(), PwFor(_splitPdfPath));
             ShowComplete($"Extracted {results.Length} page(s)!",
                 $"Saved to {folderDlg.SelectedPath}",
                 folderPath: folderDlg.SelectedPath);
@@ -1093,7 +1230,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1101,22 +1238,23 @@ public partial class FileToolsWindow : Window
     //  3. Compress PDF
     // =====================================================================
 
-    private void CompressPdf_SelectFiles(object sender, RoutedEventArgs e)
+    private async void CompressPdf_SelectFiles(object sender, RoutedEventArgs e)
     {
         var dlg = CreatePdfOpenDialog(false);
         if (dlg.ShowDialog() != true) return;
-        LoadCompressPdf(dlg.FileName);
+        await LoadCompressPdf(dlg.FileName);
     }
 
-    private void CompressPdf_SelectDrop(object sender, DragEventArgs e)
+    private async void CompressPdf_SelectDrop(object sender, DragEventArgs e)
     {
         var files = GetDroppedFiles(e, IsPdfFile);
         if (files.Length == 0) return;
-        LoadCompressPdf(files[0]);
+        await LoadCompressPdf(files[0]);
     }
 
-    private void LoadCompressPdf(string path)
+    private async Task LoadCompressPdf(string path)
     {
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
         _compressPdfPath = path;
         TxtCompressPdfFileName.Text = System.IO.Path.GetFileName(path);
         var info = new FileInfo(path);
@@ -1142,7 +1280,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Compressing PDF...");
         try
         {
-            long result = await FileToolsService.CompressFileAsync(_compressPdfPath, dlg.FileName, quality, 0, CreateProgress());
+            long result = await FileToolsService.CompressFileAsync(_compressPdfPath, dlg.FileName, quality, 0, CreateProgress(), PwFor(_compressPdfPath));
             long original = new FileInfo(_compressPdfPath).Length;
             long saved = original - result;
             double pct = original > 0 ? (saved * 100.0 / original) : 0;
@@ -1154,7 +1292,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1178,11 +1316,12 @@ public partial class FileToolsWindow : Window
 
     private async Task LoadPdfToImg(string path)
     {
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
         _pdfToImgPath = path;
         TxtPdfToImgFileName.Text = System.IO.Path.GetFileName(path);
         try
         {
-            int pages = await FileToolsService.GetPdfPageCountAsync(path);
+            int pages = await FileToolsService.GetPdfPageCountAsync(path, PwFor(path));
             TxtPdfToImgInfo.Text = $"Pages: {pages}";
         }
         catch
@@ -1207,7 +1346,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Converting PDF to images...");
         try
         {
-            var results = await FileToolsService.PdfToImagesAsync(_pdfToImgPath, folderDlg.SelectedPath, format, dpi, CreateProgress());
+            var results = await FileToolsService.PdfToImagesAsync(_pdfToImgPath, folderDlg.SelectedPath, format, dpi, CreateProgress(), PwFor(_pdfToImgPath));
             ShowComplete($"Converted {results.Length} pages!",
                 $"Saved to {folderDlg.SelectedPath}",
                 folderPath: folderDlg.SelectedPath);
@@ -1215,7 +1354,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1250,7 +1389,11 @@ public partial class FileToolsWindow : Window
 
     private async void ImgToPdf_Execute(object sender, RoutedEventArgs e)
     {
-        if (_imgToPdfFiles.Count == 0) return;
+        if (_imgToPdfFiles.Count == 0)
+        {
+            ConfirmDialog.Alert(this, "No Images Added", "Add at least one image to create a PDF.");
+            return;
+        }
 
         var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "PDF|*.pdf", FileName = "output.pdf" };
         if (dlg.ShowDialog() != true) return;
@@ -1268,7 +1411,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1292,11 +1435,12 @@ public partial class FileToolsWindow : Window
 
     private async Task LoadRotatePdf(string path)
     {
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
         _rotatePdfPath = path;
         TxtRotatePdfFileName.Text = System.IO.Path.GetFileName(path);
         try
         {
-            int pages = await FileToolsService.GetPdfPageCountAsync(path);
+            int pages = await FileToolsService.GetPdfPageCountAsync(path, PwFor(path));
             TxtRotatePdfInfo.Text = $"Pages: {pages}";
         }
         catch
@@ -1313,8 +1457,7 @@ public partial class FileToolsWindow : Window
     {
         try
         {
-            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfDocAsync(pdfPath);
             using var page = pdfDoc.GetPage(0);
             using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
             var options = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 400 };
@@ -1363,7 +1506,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Rotating PDF...");
         try
         {
-            await FileToolsService.RotatePdfAsync(_rotatePdfPath, dlg.FileName, (int)_rpAngle, CreateProgress());
+            await FileToolsService.RotatePdfAsync(_rotatePdfPath, dlg.FileName, (int)_rpAngle, CreateProgress(), PwFor(_rotatePdfPath));
             var info = new FileInfo(dlg.FileName);
             ShowComplete("PDF rotated!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
@@ -1372,7 +1515,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             ProcessingOverlay.Visibility = Visibility.Collapsed;
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1380,22 +1523,23 @@ public partial class FileToolsWindow : Window
     //  7. Watermark PDF
     // =====================================================================
 
-    private void Watermark_SelectFiles(object sender, RoutedEventArgs e)
+    private async void Watermark_SelectFiles(object sender, RoutedEventArgs e)
     {
         var dlg = CreatePdfOpenDialog(false);
         if (dlg.ShowDialog() != true) return;
-        LoadWatermarkPdf(dlg.FileName);
+        await LoadWatermarkPdf(dlg.FileName);
     }
 
-    private void Watermark_SelectDrop(object sender, DragEventArgs e)
+    private async void Watermark_SelectDrop(object sender, DragEventArgs e)
     {
         var files = GetDroppedFiles(e, IsPdfFile);
         if (files.Length == 0) return;
-        LoadWatermarkPdf(files[0]);
+        await LoadWatermarkPdf(files[0]);
     }
 
-    private void LoadWatermarkPdf(string path)
+    private async Task LoadWatermarkPdf(string path)
     {
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
         _watermarkPdfPath = path;
         TxtWatermarkFileName.Text = System.IO.Path.GetFileName(path);
         ShowConfigState("watermark");
@@ -1418,7 +1562,7 @@ public partial class FileToolsWindow : Window
         if (_watermarkPdfPath == null) return;
         if (string.IsNullOrWhiteSpace(TxtWatermarkText.Text))
         {
-            System.Windows.MessageBox.Show("Enter watermark text.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Input Required", "Enter watermark text.");
             return;
         }
 
@@ -1435,7 +1579,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Adding watermark...");
         try
         {
-            await FileToolsService.WatermarkPdfAsync(_watermarkPdfPath, dlg.FileName, TxtWatermarkText.Text.Trim(), opacity, fontSize, CreateProgress());
+            await FileToolsService.WatermarkPdfAsync(_watermarkPdfPath, dlg.FileName, TxtWatermarkText.Text.Trim(), opacity, fontSize, CreateProgress(), PwFor(_watermarkPdfPath));
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Watermark added successfully!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
@@ -1444,7 +1588,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1452,22 +1596,23 @@ public partial class FileToolsWindow : Window
     //  8. Page Numbers
     // =====================================================================
 
-    private void PageNum_SelectFiles(object sender, RoutedEventArgs e)
+    private async void PageNum_SelectFiles(object sender, RoutedEventArgs e)
     {
         var dlg = CreatePdfOpenDialog(false);
         if (dlg.ShowDialog() != true) return;
-        LoadPageNumPdf(dlg.FileName);
+        await LoadPageNumPdf(dlg.FileName);
     }
 
-    private void PageNum_SelectDrop(object sender, DragEventArgs e)
+    private async void PageNum_SelectDrop(object sender, DragEventArgs e)
     {
         var files = GetDroppedFiles(e, IsPdfFile);
         if (files.Length == 0) return;
-        LoadPageNumPdf(files[0]);
+        await LoadPageNumPdf(files[0]);
     }
 
-    private void LoadPageNumPdf(string path)
+    private async Task LoadPageNumPdf(string path)
     {
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
         _pageNumPdfPath = path;
         TxtPageNumFileName.Text = System.IO.Path.GetFileName(path);
         ShowConfigState("page_numbers");
@@ -1489,7 +1634,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Adding page numbers...");
         try
         {
-            await FileToolsService.AddPageNumbersAsync(_pageNumPdfPath, dlg.FileName, position, CreateProgress());
+            await FileToolsService.AddPageNumbersAsync(_pageNumPdfPath, dlg.FileName, position, CreateProgress(), PwFor(_pageNumPdfPath));
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Page numbers added!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
@@ -1498,7 +1643,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1521,11 +1666,12 @@ public partial class FileToolsWindow : Window
 
     private async Task LoadExtractPdf(string path)
     {
+        if (!await EnsurePdfUnlockedAsync(path)) return; // locked & cancelled
         _extractPdfPath = path;
         TxtExtractFileName.Text = System.IO.Path.GetFileName(path);
         try
         {
-            int pages = await FileToolsService.GetPdfPageCountAsync(path);
+            int pages = await FileToolsService.GetPdfPageCountAsync(path, PwFor(path));
             TxtExtractInfo.Text = $"Pages: {pages}";
         }
         catch { TxtExtractInfo.Text = ""; }
@@ -1537,7 +1683,7 @@ public partial class FileToolsWindow : Window
     {
         if (_extractPdfPath == null || _extractSelectedPages.Count == 0)
         {
-            System.Windows.MessageBox.Show("Select at least one page to extract.", "Extract Pages", MessageBoxButton.OK);
+            ConfirmDialog.Alert(this, "Extract Pages", "Select at least one page to extract.");
             return;
         }
 
@@ -1552,7 +1698,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Extracting pages...");
         try
         {
-            await FileToolsService.ExtractPdfPagesAsync(_extractPdfPath, pageNumbers, dlg.FileName, CreateProgress());
+            await FileToolsService.ExtractPdfPagesAsync(_extractPdfPath, pageNumbers, dlg.FileName, CreateProgress(), PwFor(_extractPdfPath));
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Pages extracted!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {pageNumbers.Length} pages \u2014 {FileToolsService.FormatFileSize(info.Length)}",
@@ -1561,7 +1707,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             ProcessingOverlay.Visibility = Visibility.Collapsed;
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1589,8 +1735,7 @@ public partial class FileToolsWindow : Window
 
         try
         {
-            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfDocAsync(pdfPath);
             uint pageCount = pdfDoc.PageCount;
 
             for (uint i = 0; i < pageCount; i++)
@@ -1733,11 +1878,12 @@ public partial class FileToolsWindow : Window
     {
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "PDF Files|*.pdf" };
         if (dlg.ShowDialog() != true) return;
+        if (!await EnsurePdfUnlockedAsync(dlg.FileName)) return; // locked & cancelled
         _insertBasePath = dlg.FileName;
         TxtInsertBaseName.Text = System.IO.Path.GetFileName(dlg.FileName);
         try
         {
-            int pages = await FileToolsService.GetPdfPageCountAsync(dlg.FileName);
+            int pages = await FileToolsService.GetPdfPageCountAsync(dlg.FileName, PwFor(dlg.FileName));
             TxtInsertBaseInfo.Text = $"Pages: {pages}";
         }
         catch { TxtInsertBaseInfo.Text = ""; }
@@ -1750,11 +1896,12 @@ public partial class FileToolsWindow : Window
         var files = GetDroppedFiles(e, IsPdfFile);
         if (files.Length > 0)
         {
+            if (!await EnsurePdfUnlockedAsync(files[0])) return; // locked & cancelled
             _insertBasePath = files[0];
             TxtInsertBaseName.Text = System.IO.Path.GetFileName(files[0]);
             try
             {
-                int pages = await FileToolsService.GetPdfPageCountAsync(files[0]);
+                int pages = await FileToolsService.GetPdfPageCountAsync(files[0], PwFor(files[0]));
                 TxtInsertBaseInfo.Text = $"Pages: {pages}";
             }
             catch { TxtInsertBaseInfo.Text = ""; }
@@ -1770,8 +1917,7 @@ public partial class FileToolsWindow : Window
 
         try
         {
-            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(pdfPath);
-            var pdfDoc = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var pdfDoc = await LoadPdfDocAsync(pdfPath);
             uint pageCount = pdfDoc.PageCount;
 
             // Add initial insertion point (before page 1)
@@ -1909,7 +2055,16 @@ public partial class FileToolsWindow : Window
 
     private async void Insert_Execute(object sender, RoutedEventArgs e)
     {
-        if (_insertBasePath == null || _insertImages.Count == 0) return;
+        if (_insertBasePath == null)
+        {
+            ConfirmDialog.Alert(this, "No PDF Selected", "Select a base PDF to insert pages into.");
+            return;
+        }
+        if (_insertImages.Count == 0)
+        {
+            ConfirmDialog.Alert(this, "Nothing to Insert", "Add at least one page (image) to insert.");
+            return;
+        }
         int afterPage = _insertAfterPage;
 
         var dlg = new Microsoft.Win32.SaveFileDialog
@@ -1923,7 +2078,7 @@ public partial class FileToolsWindow : Window
         try
         {
             var imagePaths = _insertImages.Select(f => f.FilePath).ToArray();
-            await FileToolsService.InsertPdfPagesAsync(_insertBasePath, imagePaths, afterPage, dlg.FileName, CreateProgress());
+            await FileToolsService.InsertPdfPagesAsync(_insertBasePath, imagePaths, afterPage, dlg.FileName, CreateProgress(), PwFor(_insertBasePath));
             var info = new FileInfo(dlg.FileName);
             ShowComplete("Pages inserted!",
                 $"{System.IO.Path.GetFileName(dlg.FileName)} \u2014 {FileToolsService.FormatFileSize(info.Length)}",
@@ -1932,7 +2087,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             ProcessingOverlay.Visibility = Visibility.Collapsed;
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -1973,7 +2128,11 @@ public partial class FileToolsWindow : Window
 
     private async void CompressImg_Execute(object sender, RoutedEventArgs e)
     {
-        if (_compressImgFiles.Count == 0) return;
+        if (_compressImgFiles.Count == 0)
+        {
+            ConfirmDialog.Alert(this, "No Images Added", "Add at least one image to compress.");
+            return;
+        }
 
         int quality = (int)SldImgQuality.Value;
         int maxDim = 0;
@@ -2016,7 +2175,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -2176,7 +2335,7 @@ public partial class FileToolsWindow : Window
         var (w, h) = GetResizePixels();
         if (w <= 0 || h <= 0)
         {
-            System.Windows.MessageBox.Show("Enter valid dimensions.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Invalid Input", "Enter valid dimensions.");
             return;
         }
 
@@ -2199,7 +2358,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -2585,14 +2744,14 @@ public partial class FileToolsWindow : Window
     {
         if (_cropSourcePath == null || _cropSelectionRect.IsEmpty)
         {
-            System.Windows.MessageBox.Show("Load an image and draw a crop area first.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Input Required", "Load an image and draw a crop area first.");
             return;
         }
 
         var r = _cropSelectionRect;
         if (r.Width < 1 || r.Height < 1)
         {
-            System.Windows.MessageBox.Show("Draw a crop area on the image.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Input Required", "Draw a crop area on the image.");
             return;
         }
 
@@ -2606,7 +2765,7 @@ public partial class FileToolsWindow : Window
 
         if (imgW < 1 || imgH < 1)
         {
-            System.Windows.MessageBox.Show("Invalid crop area.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Error", "Invalid crop area.");
             return;
         }
 
@@ -2630,7 +2789,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -2753,7 +2912,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             ProcessingOverlay.Visibility = Visibility.Collapsed;
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -2816,6 +2975,16 @@ public partial class FileToolsWindow : Window
             _ => ".png"
         };
 
+        // Block converting an image to the format it already is.
+        string sourceExt = System.IO.Path.GetExtension(_convertSourcePath).ToLowerInvariant();
+        if (sourceExt == ".jpeg") sourceExt = ".jpg";
+        if (sourceExt == ".tif") sourceExt = ".tiff";
+        if (sourceExt == ext)
+        {
+            ConfirmDialog.Alert(this, "Already This Format", $"This image is already in {targetFormat} format. Choose a different output format.");
+            return;
+        }
+
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Filter = $"{targetFormat}|*{ext}",
@@ -2837,7 +3006,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -3660,7 +3829,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -3769,7 +3938,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             FadeOut(ProcessingOverlay);
-            System.Windows.MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -4197,7 +4366,7 @@ public partial class FileToolsWindow : Window
         catch (Exception ex)
         {
             ProcessingOverlay.Visibility = Visibility.Collapsed;
-            System.Windows.MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmDialog.Alert(this, "Export Failed", ex.Message, ConfirmDialog.AlertKind.Error);
         }
     }
 
@@ -4401,8 +4570,7 @@ public partial class FileToolsWindow : Window
         if (fbd.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
         var files = ScanFolderForVideos(fbd.SelectedPath);
         if (files.Length > 0) AddVideosToExtractList(files);
-        else MessageBox.Show("No video files found in that folder.", "Nothing to add",
-                             MessageBoxButton.OK, MessageBoxImage.Information);
+        else ConfirmDialog.Alert(this, "Nothing to add", "No video files found in that folder.", ConfirmDialog.AlertKind.Info);
     }
 
     private void ExtractAudio_Remove(object sender, RoutedEventArgs e)
@@ -4610,7 +4778,7 @@ public partial class FileToolsWindow : Window
     private async void ExtractAudio_Execute(object sender, RoutedEventArgs e)
     {
         var selected = _extractAudioFiles.Where(f => f.IsSelected).ToList();
-        if (selected.Count == 0) { MessageBox.Show("Select at least one file."); return; }
+        if (selected.Count == 0) { ConfirmDialog.Alert(this, "No File Selected", "Select at least one file."); return; }
 
         var format = (CmbExtAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
         string ext = format switch { "wav" => ".wav", "aac" => ".aac", "flac" => ".flac", _ => ".mp3" };
@@ -4620,7 +4788,7 @@ public partial class FileToolsWindow : Window
         string? outputDir = overwrite ? null : _extAudioOutputFolder;
         if (!overwrite && string.IsNullOrEmpty(outputDir))
         {
-            MessageBox.Show("Select an output folder first.", "No Output Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "No Output Folder", "Select an output folder first.");
             return;
         }
 
@@ -4676,7 +4844,7 @@ public partial class FileToolsWindow : Window
                 ShowComplete($"{completed} audio track(s) extracted!", detail,
                     filePath: completed == 1 ? lastFile : null, folderPath: folder);
         }
-        catch (Exception ex) { System.Windows.MessageBox.Show(ex.Message); }
+        catch (Exception ex) { ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error); }
         finally
         {
             _extAudioBusy = false;
@@ -5377,8 +5545,7 @@ public partial class FileToolsWindow : Window
         var src = _activeTrimItem ?? (_trimAudioItems.Count > 0 ? _trimAudioItems[0] : null);
         if (src == null || src.Duration.TotalSeconds <= 0)
         {
-            MessageBox.Show("Set the cut points on a file first (drag its handles or use Suggest trims).",
-                            "No active file", MessageBoxButton.OK, MessageBoxImage.Information);
+            ConfirmDialog.Alert(this, "No active file", "Set the cut points on a file first (drag its handles or use Suggest trims).", ConfirmDialog.AlertKind.Info);
             return;
         }
 
@@ -5446,8 +5613,7 @@ public partial class FileToolsWindow : Window
         }
 
         if (adjusted == 0)
-            MessageBox.Show("No quiet intro/outro was detected — handles left unchanged. Low-peak markers (if any) are shown on the waveform.",
-                            "Nothing to snap", MessageBoxButton.OK, MessageBoxImage.Information);
+            ConfirmDialog.Alert(this, "Nothing to snap", "No quiet intro/outro was detected — handles left unchanged. Low-peak markers (if any) are shown on the waveform.", ConfirmDialog.AlertKind.Info);
     }
 
     private void TrimAudio_BrowseFolder(object sender, RoutedEventArgs e)
@@ -5467,7 +5633,7 @@ public partial class FileToolsWindow : Window
         string outputDir = _trimOutputFolder ?? System.IO.Path.GetDirectoryName(_trimAudioItems[0].FilePath)!;
         if (!Directory.Exists(outputDir))
         {
-            MessageBox.Show("Select a valid output folder.", "Invalid Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "Invalid Folder", "Select a valid output folder.");
             return;
         }
 
@@ -5508,7 +5674,7 @@ public partial class FileToolsWindow : Window
             ShowComplete($"{count} audio file(s) trimmed!", detail,
                 filePath: count == 1 ? lastFile : null, folderPath: outputDir);
         }
-        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; MessageBox.Show(ex.Message); }
+        catch (Exception ex) { ProcessingOverlay.Visibility = Visibility.Collapsed; ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error); }
     }
 
     // =====================================================================
@@ -5531,11 +5697,10 @@ public partial class FileToolsWindow : Window
 
     private async Task RunYtFetchAsync(string url, bool playlistMode, bool fromHero)
     {
-        if (string.IsNullOrEmpty(url)) { MessageBox.Show("Enter a YouTube URL or a search term."); return; }
+        if (string.IsNullOrEmpty(url)) { ConfirmDialog.Alert(this, "URL Required", "Enter a YouTube URL or a search term."); return; }
         if (!FileToolsService.IsYtDlpAvailable())
         {
-            MessageBox.Show("yt-dlp is required.\n\nInstall: https://github.com/yt-dlp/yt-dlp",
-                "yt-dlp Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmDialog.Alert(this, "yt-dlp Required", "yt-dlp is required.\n\nInstall: https://github.com/yt-dlp/yt-dlp");
             return;
         }
 
@@ -5771,7 +5936,7 @@ public partial class FileToolsWindow : Window
     private void Yt_GoToDownload(object sender, RoutedEventArgs e)
     {
         var selected = _ytVideos.Where(v => v.IsSelected).ToList();
-        if (selected.Count == 0) { MessageBox.Show("Select at least one video."); return; }
+        if (selected.Count == 0) { ConfirmDialog.Alert(this, "No Videos Selected", "Select at least one video."); return; }
 
         _ytSearchCache.Clear();
         _ytSearchCache.AddRange(_ytVideos);
@@ -5826,7 +5991,7 @@ public partial class FileToolsWindow : Window
         var lb = _ytGridView ? (System.Windows.Controls.ListBox)YtVideoGrid : YtVideoList;
         if (lb.SelectedItem is not YtVideoItem pl || !pl.IsPlaylist)
         {
-            MessageBox.Show("Select a playlist to open."); return;
+            ConfirmDialog.Alert(this, "No Playlist Selected", "Select a playlist to open."); return;
         }
         await YtOpenPlaylistAsync(pl);
     }
@@ -5863,7 +6028,7 @@ public partial class FileToolsWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show("Failed to load playlist: " + ex.Message);
+            ConfirmDialog.Alert(this, "Error", "Failed to load playlist: " + ex.Message, ConfirmDialog.AlertKind.Error);
             TxtYtDetail.Text = _ytResultsDetail;
         }
         finally
@@ -5937,7 +6102,7 @@ public partial class FileToolsWindow : Window
     private async void Yt_Download(object sender, RoutedEventArgs e)
     {
         var selected = _ytVideos.Where(v => v.IsSelected).ToList();
-        if (selected.Count == 0) { MessageBox.Show("Select at least one video."); return; }
+        if (selected.Count == 0) { ConfirmDialog.Alert(this, "No Videos Selected", "Select at least one video."); return; }
 
         bool confirmAudio = RbYtAudio.IsChecked == true;
         string confirmQuality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Best";

@@ -61,6 +61,7 @@ public partial class App : Application
         {
             // Load settings
             AppSettings.Load();
+            ThemeManager.Initialize(AppSettings.Instance.FileToolsTheme);
             HistoryManager.Load();
 
             // Create hidden window for hotkey handling

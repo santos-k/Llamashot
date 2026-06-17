@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Llamashot · Unified PDF Tools UI — Design Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e0f14; --bg2:#12131a;
+    --surface:#191b24; --surface2:#1f2230; --surface3:#262a3a;
+    --line:#2c3142; --line2:#3a4055;
+    --txt:#eef0f7; --txt2:#a7adc4; --txt3:#6f7690;
+    --accent:#7c9cff; --accent2:#9b86ff; --mint:#5bd0a4; --amber:#ffba6b;
+    --cta:#ff7a45; --cta2:#ff9b45; --danger:#ff6b6b;
+    --radius:16px; --radius-sm:10px;
+    --glass: linear-gradient(160deg, rgba(40,44,62,.66), rgba(22,24,33,.78));
+    --shadow: 0 18px 50px -20px rgba(0,0,0,.7);
+    --font-d:"Sora",sans-serif; --font-b:"Manrope",sans-serif; --font-m:"JetBrains Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--font-b); color:var(--txt); background:var(--bg);
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 500px at 12% -5%, rgba(124,156,255,.16), transparent 60%),
+      radial-gradient(800px 600px at 100% 0%, rgba(155,134,255,.12), transparent 55%),
+      radial-gradient(700px 500px at 50% 120%, rgba(255,122,69,.08), transparent 60%);
+    background-attachment:fixed;
+  }
+  body::before{ /* grain */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:1320px;margin:0 auto;padding:0 28px;position:relative;z-index:2}
+  a{color:var(--accent);text-decoration:none}
+
+  /* ---------- HERO ---------- */
+  header.hero{padding:84px 0 54px;position:relative}
+  .eyebrow{
+    font-family:var(--font-m);font-size:12px;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--accent);display:inline-flex;align-items:center;gap:10px;margin-bottom:22px;
+    padding:7px 14px;border:1px solid var(--line2);border-radius:999px;background:rgba(124,156,255,.07);
+  }
+  .eyebrow b{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint)}
+  h1.title{font-family:var(--font-d);font-weight:800;font-size:clamp(38px,6vw,76px);line-height:1.02;letter-spacing:-.02em}
+  h1.title .grad{background:linear-gradient(100deg,var(--accent),var(--accent2) 55%,var(--cta));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{max-width:680px;margin-top:22px;font-size:19px;color:var(--txt2)}
+  .meta{display:flex;gap:26px;flex-wrap:wrap;margin-top:34px;font-family:var(--font-m);font-size:12.5px;color:var(--txt3)}
+  .meta span b{color:var(--txt);font-weight:600}
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:46px 0;position:relative}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:30px}
+  .sec-num{font-family:var(--font-m);font-size:13px;color:var(--cta);border:1px solid var(--line2);border-radius:8px;padding:4px 9px}
+  h2{font-family:var(--font-d);font-weight:700;font-size:clamp(26px,3.4vw,40px);letter-spacing:-.015em}
+  .sub{color:var(--txt2);max-width:760px;margin-top:8px;font-size:16.5px}
+
+  /* problem cards */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .pcard{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);padding:24px;backdrop-filter:blur(14px);position:relative;overflow:hidden}
+  .pcard .tag{font-family:var(--font-m);font-size:11px;color:var(--danger);letter-spacing:.1em;text-transform:uppercase}
+  .pcard h3{font-family:var(--font-d);font-size:19px;margin:10px 0 8px;font-weight:600}
+  .pcard p{color:var(--txt2);font-size:14.5px}
+  .pcard .fix{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line2);color:var(--mint);font-size:13.5px;display:flex;gap:9px;align-items:flex-start}
+  .pcard .fix svg{flex:0 0 auto;margin-top:3px}
+  .pcard::after{content:"";position:absolute;right:-40px;top:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(255,122,69,.18),transparent 70%)}
+
+  /* anatomy */
+  .anatomy{display:grid;grid-template-columns:1.1fr .9fr;gap:26px;align-items:center}
+  .blueprint{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:22px;font-family:var(--font-m);font-size:12px;color:var(--txt3);line-height:1.9;overflow-x:auto;box-shadow:var(--shadow)}
+  .legend{display:flex;flex-direction:column;gap:14px}
+  .legend .li{display:flex;gap:14px;align-items:flex-start}
+  .legend .dot{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-family:var(--font-m);font-size:13px;font-weight:600;color:#0e0f14}
+  .legend .li h4{font-family:var(--font-d);font-size:15.5px;font-weight:600}
+  .legend .li p{color:var(--txt2);font-size:13.5px}
+
+  /* ---------- LIVE MOCKUP ---------- */
+  .demo-frame{
+    border:1px solid var(--line2);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);
+    background:var(--bg);
+  }
+  .titlebar{display:flex;align-items:center;gap:9px;padding:12px 16px;background:#0b0c11;border-bottom:1px solid var(--line)}
+  .titlebar .dot{width:12px;height:12px;border-radius:50%}
+  .titlebar .r{background:#ff5f57}.titlebar .y{background:#febc2e}.titlebar .g{background:#28c840}
+  .titlebar .tname{margin-left:12px;font-family:var(--font-m);font-size:12px;color:var(--txt3)}
+
+  .app{display:grid;grid-template-columns:230px 1fr;min-height:760px;background:var(--bg)}
+  /* left rail */
+  .rail{background:linear-gradient(180deg,#121420,#0d0e15);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+  .brand{display:flex;align-items:center;gap:11px;padding:6px 8px 14px}
+  .brand .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(145deg,var(--accent),var(--accent2));display:grid;place-items:center;font-family:var(--font-d);font-weight:800;color:#10121a;font-size:15px;box-shadow:0 6px 18px -6px var(--accent)}
+  .brand b{font-family:var(--font-d);font-size:16px;font-weight:700;display:block}
+  .brand small{color:var(--txt3);font-size:11px;font-family:var(--font-m)}
+  .addbtn{margin:6px 4px 14px;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0e1018;font-family:var(--font-d);font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 10px 24px -10px var(--accent);transition:transform .15s}
+  .addbtn:hover{transform:translateY(-1px)}
+  .railgroup{font-family:var(--font-m);font-size:10.5px;letter-spacing:.18em;color:var(--txt3);text-transform:uppercase;padding:14px 10px 7px}
+  .navitem{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;color:var(--txt2);font-size:13.5px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:.14s;position:relative}
+  .navitem .ic{width:18px;text-align:center;opacity:.85}
+  .navitem .badge{margin-left:auto;font-family:var(--font-m);font-size:11px;background:var(--surface3);color:var(--txt2);padding:1px 7px;border-radius:999px}
+  .navitem:hover{background:var(--surface);color:var(--txt)}
+  .navitem.active{background:linear-gradient(100deg,rgba(124,156,255,.22),rgba(155,134,255,.10));color:#fff;border-color:rgba(124,156,255,.35)}
+  .navitem.active::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--cta)}
+  .premium{margin-top:auto;padding:13px;border-radius:13px;border:1px solid var(--line2);background:linear-gradient(135deg,rgba(255,186,107,.12),rgba(255,122,69,.06));display:flex;gap:11px;align-items:center;cursor:pointer}
+  .premium .crown{font-size:18px}
+  .premium b{font-family:var(--font-d);font-size:13.5px;display:block}
+  .premium small{color:var(--txt3);font-size:11px}
+
+  /* main */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 26px;border-bottom:1px solid var(--line)}
+  .topbar h3{font-family:var(--font-d);font-size:24px;font-weight:700}
+  .topbar p{color:var(--txt3);font-size:13.5px;margin-top:2px}
+  .topbar .right{display:flex;gap:12px;align-items:center}
+  .chip{display:flex;align-items:center;gap:7px;padding:8px 13px;border:1px solid var(--line2);border-radius:10px;font-size:13px;color:var(--txt2);background:var(--surface);cursor:pointer}
+  .avatar{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--mint),var(--accent));display:grid;place-items:center;font-weight:700;color:#0e1018;font-size:13px}
+
+  .cols{display:grid;grid-template-columns:1fr 1.15fr .78fr;gap:18px;padding:22px 26px;flex:1;min-height:0}
+  .panel{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(12px)}
+  .panel.pad{padding:20px}
+  .panel-title{font-family:var(--font-d);font-size:17px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:9px}
+
+  /* preview column */
+  .filehdr{display:flex;gap:11px;align-items:center;padding:16px;border-bottom:1px solid var(--line)}
+  .fileicon{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,#ff8a8a,#f06262);display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;font-family:var(--font-m)}
+  .filehdr b{font-size:14px;display:block}.filehdr small{color:var(--txt3);font-size:12px}
+  .pvwrap{padding:18px;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .doc{width:230px;height:300px;border-radius:8px;background:
+      linear-gradient(180deg,#f7f8fc,#e9edf6);position:relative;box-shadow:0 16px 40px -16px rgba(0,0,0,.7);overflow:hidden}
+  .doc .accentbar{height:46px;background:linear-gradient(90deg,#e8eefc,#dfe6f7);border-bottom:1px solid #cdd6ea}
+  .doc .ln{height:7px;margin:11px 16px;border-radius:4px;background:#cfd6e6}
+  .doc .ln.s{width:55%}.doc .ln.m{width:78%}.doc .ln.q{height:54px;width:60px;margin-top:18px;border-radius:6px;background:#dde3f0;border:1px solid #c7cfe0}
+  .pager{display:flex;align-items:center;gap:10px}
+  .pager button,.zoom button{width:32px;height:32px;border-radius:8px;border:1px solid var(--line2);background:var(--surface2);color:var(--txt2);cursor:pointer;font-size:14px}
+  .pager .pp{font-family:var(--font-m);font-size:12px;color:var(--txt2);padding:6px 16px;border:1px solid var(--line2);border-radius:8px}
+  .zoom{display:flex;align-items:center;gap:8px}
+  .zoom .zv{font-family:var(--font-m);font-size:12px;color:var(--txt2);min-width:48px;text-align:center}
+  .thumbs{display:flex;gap:10px;padding:0 18px 18px;flex-wrap:wrap}
+  .thumb{width:74px;border-radius:8px;border:2px solid var(--cta);overflow:hidden;cursor:pointer;position:relative}
+  .thumb .mini{height:96px;background:linear-gradient(180deg,#f7f8fc,#e9edf6)}
+  .thumb .cap{font-size:10px;text-align:center;padding:4px;color:var(--txt2);background:var(--surface)}
+  .thumb .pgno{position:absolute;top:4px;right:4px;background:var(--cta);color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;font-family:var(--font-m)}
+
+  /* settings primitives */
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+  .segcard{border:1px solid var(--line2);border-radius:12px;padding:14px;cursor:pointer;display:flex;gap:11px;align-items:flex-start;transition:.14s;background:var(--surface)}
+  .segcard:hover{border-color:var(--line2);background:var(--surface2)}
+  .segcard.on{border-color:var(--cta);background:rgba(255,122,69,.08)}
+  .segcard .rd{flex:0 0 auto;width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);margin-top:2px;display:grid;place-items:center}
+  .segcard.on .rd{border-color:var(--cta)}
+  .segcard.on .rd::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--cta)}
+  .segcard b{font-family:var(--font-d);font-size:14px;font-weight:600;display:block}
+  .segcard small{color:var(--txt3);font-size:12px}
+  .grouplabel{font-family:var(--font-d);font-weight:600;font-size:15.5px;margin:22px 0 12px}
+  .grouplabel:first-child{margin-top:0}
+  .field2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .field label{font-size:12px;color:var(--txt3);font-family:var(--font-m);display:block;margin-bottom:7px}
+  .input{width:100%;background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;color:var(--txt);font-family:var(--font-b);font-size:14px}
+  .pills{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+  .pill{padding:8px 14px;border:1px solid var(--line2);border-radius:999px;background:var(--surface);color:var(--txt2);font-size:12.5px;cursor:pointer}
+  .pill:hover,.pill.on{border-color:var(--accent);color:#fff;background:rgba(124,156,255,.12)}
+  .checks{display:flex;flex-direction:column;gap:13px}
+  .ck{display:flex;gap:11px;align-items:center;font-size:13.5px;color:var(--txt2);cursor:pointer}
+  .ck .box{width:20px;height:20px;border-radius:6px;border:1px solid var(--line2);background:var(--surface2);display:grid;place-items:center;flex:0 0 auto}
+  .ck.on .box{background:var(--cta);border-color:var(--cta);color:#fff;font-size:12px;font-weight:700}
+  .est{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+  .est .e{background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:13px;text-align:center}
+  .est .e small{color:var(--txt3);font-size:11px;font-family:var(--font-m);display:block;text-transform:uppercase;letter-spacing:.08em}
+  .est .e b{font-family:var(--font-d);font-size:17px;display:block;margin-top:5px}
+  .est .e.hi b{color:var(--mint)}
+  .stepper{display:flex;align-items:center;border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:var(--surface2)}
+  .stepper input{flex:1;background:transparent;border:none;color:var(--txt);padding:11px 13px;font-size:14px}
+  .stepper .sb{width:34px;border:none;background:var(--surface3);color:var(--txt2);cursor:pointer}
+  .folder{display:flex;gap:10px;margin-top:8px}
+  .folder .input{flex:1;font-family:var(--font-m);font-size:12px;color:var(--txt2)}
+  .browse{padding:0 16px;border:1px solid var(--line2);border-radius:10px;background:var(--surface2);color:var(--txt2);cursor:pointer;font-size:13px}
+  .rotrow{display:flex;gap:12px}
+  .rotbtn{flex:1;padding:18px 0;border:1px solid var(--line2);border-radius:12px;background:var(--surface);cursor:pointer;text-align:center;font-size:22px;color:var(--txt)}
+  .rotbtn:hover{border-color:var(--accent)}
+  .posgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:200px}
+  .posgrid .p{aspect-ratio:1.3;border:1px solid var(--line2);border-radius:8px;background:var(--surface);cursor:pointer}
+  .posgrid .p.on{border-color:var(--cta);background:rgba(255,122,69,.12)}
+  .slider{appearance:none;width:100%;height:6px;border-radius:6px;background:var(--surface3);outline:none;margin-top:6px}
+  .slider::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 0 4px rgba(124,156,255,.2)}
+
+  /* right column */
+  .info .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .info .row:last-child{border-bottom:none}
+  .info .row .k{color:var(--txt3)}.info .row .v{color:var(--txt);font-weight:600;font-family:var(--font-m);font-size:12.5px}
+  .tips{background:linear-gradient(150deg,rgba(124,156,255,.12),rgba(155,134,255,.05));}
+  .tips .panel-title{color:var(--accent)}
+  .tips p{font-size:13px;color:var(--txt2)}
+  .recent .ri{display:flex;gap:11px;align-items:center;padding:9px 0}
+  .recent .ri .fi{width:28px;height:28px;border-radius:7px;background:linear-gradient(145deg,#ff8a8a,#f06262);display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--font-m)}
+  .recent .ri b{font-size:12.5px;display:block}.recent .ri small{color:var(--txt3);font-size:11px}
+
+  /* bottom bar */
+  .actionbar{display:flex;align-items:center;justify-content:space-between;padding:16px 26px;border-top:1px solid var(--line);background:#0b0c11}
+  .clearbtn{display:flex;gap:8px;align-items:center;padding:11px 18px;border:1px solid var(--line2);border-radius:11px;background:var(--surface);color:var(--txt2);cursor:pointer;font-size:13.5px}
+  .selnote{display:flex;gap:9px;align-items:center;color:var(--txt2);font-size:13.5px}
+  .selnote .box{width:19px;height:19px;border-radius:6px;background:var(--cta);display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
+  .process{display:flex;gap:10px;align-items:center;padding:14px 34px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--cta),var(--cta2));color:#fff;font-family:var(--font-d);font-weight:700;font-size:15.5px;cursor:pointer;box-shadow:0 12px 30px -10px var(--cta);transition:transform .15s}
+  .process:hover{transform:translateY(-1px)}
+
+  /* component contract / code */
+  .codeblk{background:#0b0c11;border:1px solid var(--line);border-radius:14px;padding:22px;font-family:var(--font-m);font-size:13px;line-height:1.75;overflow-x:auto;color:#cdd3e6;box-shadow:var(--shadow)}
+  .codeblk .k{color:#9b86ff}.codeblk .s{color:#5bd0a4}.codeblk .c{color:#6f7690}.codeblk .p{color:#ffba6b}.codeblk .f{color:#7c9cff}
+
+  /* matrix table */
+  .tablewrap{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  thead th{background:var(--surface2);text-align:left;padding:13px 16px;font-family:var(--font-d);font-weight:600;color:var(--txt);font-size:13px;border-bottom:1px solid var(--line2)}
+  tbody td{padding:12px 16px;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:rgba(124,156,255,.04)}
+  td b{color:var(--txt);font-family:var(--font-d);font-weight:600}
+  .mini-tag{display:inline-block;font-family:var(--font-m);font-size:11px;padding:2px 8px;border-radius:6px;background:var(--surface3);color:var(--txt2);margin:2px 3px 2px 0}
+
+  /* success + suggestions */
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+  .success{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);padding:28px;text-align:center}
+  .success .badge{width:72px;height:72px;border-radius:50%;background:rgba(91,208,164,.15);border:1px solid rgba(91,208,164,.4);display:grid;place-items:center;margin:0 auto 16px;font-size:32px;color:var(--mint)}
+  .success h4{font-family:var(--font-d);font-size:22px}
+  .success .meta{justify-content:center;color:var(--txt2);margin-top:10px}
+  .succ-actions{display:flex;gap:12px;justify-content:center;margin-top:22px;flex-wrap:wrap}
+  .ba{padding:11px 22px;border-radius:11px;font-weight:600;font-size:13.5px;cursor:pointer;border:1px solid var(--line2);background:var(--surface);color:var(--txt)}
+  .ba.primary{background:linear-gradient(135deg,var(--mint),#3bb88a);color:#08130d;border:none}
+  .next-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+  .nextcard{border:1px solid var(--line2);border-radius:12px;padding:16px;background:var(--surface);cursor:pointer;display:flex;gap:12px;align-items:center;transition:.15s}
+  .nextcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .nextcard .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:16px}
+
+  /* priority */
+  .bars{display:flex;flex-direction:column;gap:11px}
+  .bar{display:grid;grid-template-columns:150px 1fr 48px;gap:14px;align-items:center}
+  .bar .nm{font-size:13.5px;color:var(--txt2)}
+  .bar .track{height:11px;border-radius:6px;background:var(--surface2);overflow:hidden}
+  .bar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--cta))}
+  .bar .pv{font-family:var(--font-m);font-size:12.5px;color:var(--txt);text-align:right}
+
+  footer{padding:60px 0 70px;color:var(--txt3);font-size:13px;border-top:1px solid var(--line);margin-top:40px}
+  footer b{color:var(--txt2)}
+
+  @media(max-width:1080px){.cols{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}.anatomy{grid-template-columns:1fr}.twocol{grid-template-columns:1fr}.app{grid-template-columns:1fr}.rail{flex-direction:row;flex-wrap:wrap;overflow-x:auto}}
+  .reveal{opacity:0;transform:translateY(18px);transition:.7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  /* focus mode — render a single tool prototype full-bleed (for per-tool capture) */
+  body.focus .wrap>*:not(#proto){display:none}
+  body.focus #proto{padding-top:18px}
+  body.focus #proto .sec-head{display:none}
+  body.focus .reveal{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow"><b></b> Llamashot · PDF Suite · Design Report</div>
+    <h1 class="title">One workspace.<br><span class="grad">Every PDF tool.</span></h1>
+    <p class="lede">A single reusable layout that replaces 14 disconnected utility screens. Same shell, same muscle memory — only the center settings and the action change per tool. Built on your soft light/dark theme, Adobe-Acrobat / Canva-class polish.</p>
+    <div class="meta">
+      <span><b>Scope</b> · Merge · Split · Compress · PDF↔Images · Rotate · Watermark · Page Numbers · Extract · Insert · Edit · Fill · Sign · Protect</span>
+      <span><b>Pattern</b> · Rail + Preview + Settings + Info + Action Bar</span>
+      <span><b>Date</b> · 2026-06-17</span>
+    </div>
+  </header>
+
+  <!-- 1. PROBLEM -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">01</span><div><h2>What's broken today</h2><p class="sub">Each tool is its own near-empty page: a title, a filename, a couple of inputs, and a giant button floating in a sea of dark.</p></div></div>
+    <div class="grid3">
+      <div class="pcard">
+        <span class="tag">Issue 01</span>
+        <h3>~90% empty space</h3>
+        <p>A single column of controls centred in a maximised window. No use of width, no density, nothing to anchor the eye.</p>
+        <div class="fix"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5bd0a4" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg><span>Three-column workspace fills the canvas: preview · settings · info.</span></div>
+      </div>
+      <div class="pcard">
+        <span class="tag">Issue 02</span>
+        <h3>No file preview</h3>
+        <p>Users can't see the document or page order, so they don't trust merge/split/extract results before committing.</p>
+        <div class="fix"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5bd0a4" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg><span>Persistent live preview + page thumbnails on every tool.</span></div>
+      </div>
+      <div class="pcard">
+        <span class="tag">Issue 03</span>
+        <h3>Disconnected action</h3>
+        <p>The lone primary button sits far from the files it acts on, with no sense of "what" or "how many".</p>
+        <div class="fix"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5bd0a4" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg><span>Sticky action bar: Clear · selection count · Process — always in reach.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. ANATOMY -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">02</span><div><h2>Anatomy of the universal layout</h2><p class="sub">Five regions. Four are 100% shared across every tool. Only region ③ swaps its contents.</p></div></div>
+    <div class="anatomy">
+      <pre class="blueprint">┌──────────┬───────────────────────┬──────────┐
+│          │  Split PDF        ⚙ 👤 │          │   ← top bar (shared)
+│   ①      ├───────────┬───────────┤    ④     │
+│  TOOL    │           │           │  FILE    │
+│  RAIL    │    ②      │    ③      │  INFO    │
+│          │ PREVIEW   │ SETTINGS  │  + TIPS  │
+│ +Add     │ + thumbs  │ (per-tool)│ + recent │
+│ Workspace│  pager    │           │          │
+│ Tools…   │  zoom     │           │          │
+├──────────┴───────────┴───────────┴──────────┤
+│ ⑤  Clear All   ☑ 1 selected   Process → │   ← action bar (shared)
+└──────────────────────────────────────────────┘</pre>
+      <div class="legend">
+        <div class="li"><div class="dot" style="background:#7c9cff">①</div><div><h4>Tool rail</h4><p>Add Files, Workspace (All/Recent/Starred/Trash), and the full tool list. Shared file context — switch tools without re-uploading.</p></div></div>
+        <div class="li"><div class="dot" style="background:#5bd0a4">②</div><div><h4>Preview canvas</h4><p>Live page render, thumbnail strip, pager, zoom & rotate. Identical component everywhere — users always see what they selected.</p></div></div>
+        <div class="li"><div class="dot" style="background:#ff7a45">③</div><div><h4>Settings (the only variable)</h4><p>The per-tool widget. Same primitives — segmented cards, ranges, checkboxes, sliders — composed differently per tool.</p></div></div>
+        <div class="li"><div class="dot" style="background:#ffba6b">④</div><div><h4>Info panel</h4><p>File details, contextual Helpful Tips, and Recent Files. Pure shared chrome.</p></div></div>
+        <div class="li"><div class="dot" style="background:#9b86ff">⑤</div><div><h4>Action bar</h4><p>Clear All · live selection count · the Process button. Sticky, consistent label per tool.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. LIVE MOCKUP -->
+  <section class="reveal" id="proto">
+    <div class="sec-head"><span class="sec-num">03</span><div><h2>Live prototype — click any tool</h2><p class="sub">The shell never moves. Pick a tool in the rail and watch only region ③ and the Process action change. This is the whole pitch in one interaction.</p></div></div>
+
+    <div class="demo-frame">
+      <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tname">Llamashot — PDF Suite</span></div>
+      <div class="app">
+        <!-- RAIL -->
+        <aside class="rail">
+          <div class="brand"><div class="logo">L</div><div><b>Llamashot</b><small>PDF Tools</small></div></div>
+          <button class="addbtn">＋ Add Files</button>
+          <div class="railgroup">Workspace</div>
+          <div class="navitem"><span class="ic">🗂</span> All Files <span class="badge">8</span></div>
+          <div class="navitem"><span class="ic">🕒</span> Recent Files</div>
+          <div class="navitem"><span class="ic">⭐</span> Starred</div>
+          <div class="navitem"><span class="ic">🗑</span> Trash</div>
+          <div class="railgroup">PDF Tools</div>
+          <div id="toolnav"></div>
+          <div class="premium"><span class="crown">👑</span><div><b>Go Premium</b><small>Unlock all features</small></div></div>
+        </aside>
+
+        <!-- MAIN -->
+        <div class="main">
+          <div class="topbar">
+            <div><h3 id="toolTitle">Split PDF</h3><p id="toolDesc">Split PDF pages into multiple files</p></div>
+            <div class="right"><div class="chip">🌙 Theme</div><div class="avatar">SK</div></div>
+          </div>
+
+          <div class="cols">
+            <!-- ② preview -->
+            <div class="panel">
+              <div class="filehdr">
+                <div class="fileicon">PDF</div>
+                <div><b>Santosh pancard.pdf</b><small id="pvPages">Total Pages: 1</small></div>
+              </div>
+              <div class="pvwrap">
+                <div class="doc"><div class="accentbar"></div><div class="ln m"></div><div class="ln s"></div><div class="ln"></div><div class="ln s"></div><div class="ln q"></div></div>
+                <div class="pager"><button>‹</button><span class="pp">1 / 1</span><button>›</button></div>
+                <div class="zoom"><button>−</button><span class="zv">100%</span><button>+</button><button title="fit">⤢</button></div>
+              </div>
+              <div class="thumbs">
+                <div class="thumb"><span class="pgno">1</span><div class="mini"></div><div class="cap">Page 1</div></div>
+              </div>
+            </div>
+
+            <!-- ③ settings (dynamic) -->
+            <div class="panel pad" id="settings"></div>
+
+            <!-- ④ info -->
+            <div style="display:flex;flex-direction:column;gap:18px">
+              <div class="panel pad info">
+                <div class="panel-title">File Information</div>
+                <div class="row"><span class="k">File Name</span><span class="v">Santosh pancard.pdf</span></div>
+                <div class="row"><span class="k">File Size</span><span class="v">344.1 KB</span></div>
+                <div class="row"><span class="k">Total Pages</span><span class="v">1</span></div>
+                <div class="row"><span class="k">Page Size</span><span class="v">595 × 842 pt</span></div>
+                <div class="row"><span class="k">Modified</span><span class="v">May 25, 2024</span></div>
+              </div>
+              <div class="panel pad tips">
+                <div class="panel-title">💡 Helpful Tips</div>
+                <p id="tipText">Choose a split method, set your page range, and pick an output folder. Reverse order and metadata are optional.</p>
+              </div>
+              <div class="panel pad recent">
+                <div class="panel-title">Recent Files</div>
+                <div class="ri"><div class="fi">PDF</div><div><b>S2 update form.pdf</b><small>5 pages</small></div></div>
+                <div class="ri"><div class="fi">PDF</div><div><b>santosh passport.pdf</b><small>1 page</small></div></div>
+                <div class="ri"><div class="fi">PDF</div><div><b>Santosh pancard.pdf</b><small>1 page</small></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑤ action bar -->
+          <div class="actionbar">
+            <button class="clearbtn">🗑 Clear All</button>
+            <div class="selnote"><span class="box">✓</span> <span id="selText">1 file selected</span></div>
+            <button class="process"><span id="procLabel">Split PDF</span> →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. COMPONENT CONTRACT -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">04</span><div><h2>One component, every tool</h2><p class="sub">A single <code>ToolPage</code> shell. Each tool is just data + a settings widget — no new screens, no duplicated chrome.</p></div></div>
+    <div class="codeblk"><span class="c">// Shared shell — built once, reused by all 14 tools.</span>
+<span class="k">class</span> <span class="f">ToolPage</span> {
+  <span class="p">title</span>:        <span class="s">"Split PDF"</span>,
+  <span class="p">subtitle</span>:     <span class="s">"Split PDF pages into multiple files"</span>,
+  <span class="p">previewPanel</span>: <span class="k">true</span>,        <span class="c">// ② live render + thumbnails + pager + zoom</span>
+  <span class="p">infoPanel</span>:    <span class="k">true</span>,        <span class="c">// ④ file info · tips · recent</span>
+  <span class="p">settings</span>:     <span class="f">SplitSettings</span>(),  <span class="c">// ③ the ONLY per-tool part</span>
+  <span class="p">actionLabel</span>:  <span class="s">"Split PDF"</span>,    <span class="c">// ⑤ sticky bar button</span>
+  <span class="p">multiFile</span>:    <span class="k">true</span>,        <span class="c">// selected-files dock + "apply to" scope</span>
+  <span class="p">onProcess</span>:    files => FileToolsService.<span class="f">splitPdf</span>(files, opts),
+  <span class="p">suggestNext</span>:  [<span class="s">"compress"</span>, <span class="s">"watermark"</span>, <span class="s">"page_numbers"</span>],
+}
+
+<span class="c">// Every tool collapses to one line.</span>
+<span class="f">ToolPage</span>(<span class="f">MergeSettings</span>)   <span class="f">ToolPage</span>(<span class="f">CompressSettings</span>)
+<span class="f">ToolPage</span>(<span class="f">SplitSettings</span>)   <span class="f">ToolPage</span>(<span class="f">RotateSettings</span>)
+<span class="f">ToolPage</span>(<span class="f">WatermarkSettings</span>) <span class="f">ToolPage</span>(<span class="f">PdfToImageSettings</span>) …</div>
+    <p class="sub" style="margin-top:16px">In WPF terms: one <b>UserControl</b> (<code>ToolPageView</code>) with three <code>ContentPresenter</code> slots. The current 21 hand-built panels collapse into 14 small <b>settings DataTemplates</b> + a shared preview/info/action chrome — deleting thousands of duplicated XAML lines.</p>
+  </section>
+
+  <!-- 5. SETTINGS MATRIX -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">05</span><div><h2>Per-tool settings matrix</h2><p class="sub">Region ③ for each tool — assembled from the same six primitives (segmented cards · radio list · range · checkbox · slider · position grid).</p></div></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th style="width:150px">Tool</th><th>Settings (region ③)</th><th style="width:140px">Action</th></tr></thead>
+      <tbody>
+        <tr><td><b>Merge PDF</b></td><td>Reorderable file cards · Output name · <span class="mini-tag">Preserve bookmarks</span> · Quality: Original/Optimized</td><td>Merge PDF</td></tr>
+        <tr><td><b>Split PDF</b></td><td>Method: Custom range / Every page / Fixed size / Extract · From–To range + quick-select · <span class="mini-tag">Separate files</span> <span class="mini-tag">Reverse</span> <span class="mini-tag">Keep metadata</span> · Output folder</td><td>Split PDF</td></tr>
+        <tr><td><b>Compress PDF</b></td><td>Level: Low/Medium/High/Maximum · Live estimate (current → estimated, quality ★)</td><td>Compress PDF</td></tr>
+        <tr><td><b>PDF → Images</b></td><td>Format PNG/JPG/WEBP · DPI 72/150/300/600 · <span class="mini-tag">Separate</span> <span class="mini-tag">ZIP</span> · output estimate</td><td>Export Images</td></tr>
+        <tr><td><b>Images → PDF</b></td><td>Page size A4/Letter/Fit · Orientation · Margin · one image per page</td><td>Create PDF</td></tr>
+        <tr><td><b>Rotate PDF</b></td><td>↺90 / ↻90 / 180 · Apply to All / Current / Range</td><td>Rotate PDF</td></tr>
+        <tr><td><b>Watermark</b></td><td>Text · Font size · Opacity slider · Position grid · live preview</td><td>Add Watermark</td></tr>
+        <tr><td><b>Page Numbers</b></td><td>Style 1 / 1/20 / Page 1 / Page 1 of 20 · Position · Start at</td><td>Add Numbers</td></tr>
+        <tr><td><b>Extract Pages</b></td><td>Page picker (thumbnail multi-select) · Pages field · single PDF / ZIP</td><td>Extract Pages</td></tr>
+        <tr><td><b>Insert Pages</b></td><td>Insert after page N · source images/PDF · position preview</td><td>Insert Pages</td></tr>
+        <tr><td><b>Delete Pages</b></td><td>Page picker · ranges field · confirm count</td><td>Delete Pages</td></tr>
+        <tr><td><b>Edit PDF</b></td><td>Canvas toolbar: text · image · highlight · draw · shapes</td><td>Save PDF</td></tr>
+        <tr><td><b>Fill &amp; Sign</b></td><td>Detected fields list · Add field (text/checkbox/date/sign) · Signature: draw/type/upload</td><td>Apply &amp; Save</td></tr>
+        <tr><td><b>Protect PDF</b></td><td>Password + confirm · permissions (print/copy/edit) · encryption level</td><td>Protect PDF</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- 6. MULTI-FILE + SUCCESS -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">06</span><div><h2>Shared behaviours</h2><p class="sub">Because the shell is shared, three high-value behaviours come for free on every tool.</p></div></div>
+    <div class="twocol">
+      <div>
+        <h3 style="font-family:var(--font-d);font-size:18px;margin-bottom:10px">Multi-file &amp; batch</h3>
+        <p class="sub" style="margin-bottom:14px">The selected-files dock + an "Apply to" scope turns every tool into a batch tool — Compress 20 PDFs, Watermark 20 PDFs — without reopening anything.</p>
+        <div class="panel pad">
+          <div class="checks">
+            <div class="ck on"><span class="box">✓</span> contract.pdf <span style="margin-left:auto;color:var(--txt3);font-family:var(--font-m);font-size:12px">24 p</span></div>
+            <div class="ck on"><span class="box">✓</span> invoice.pdf <span style="margin-left:auto;color:var(--txt3);font-family:var(--font-m);font-size:12px">3 p</span></div>
+            <div class="ck"><span class="box"></span> report.pdf <span style="margin-left:auto;color:var(--txt3);font-family:var(--font-m);font-size:12px">12 p</span></div>
+          </div>
+          <div class="grouplabel">Apply to</div>
+          <div class="seg" style="grid-template-columns:1fr 1fr">
+            <div class="segcard on"><span class="rd"></span><div><b>Selected files</b><small>2 documents</small></div></div>
+            <div class="segcard"><span class="rd"></span><div><b>All files</b><small>3 documents</small></div></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-family:var(--font-d);font-size:18px;margin-bottom:10px">Success → keep working</h3>
+        <p class="sub" style="margin-bottom:14px">Completion isn't a dead end — it's a launchpad into the next likely step, carrying the same files forward.</p>
+        <div class="success">
+          <div class="badge">✓</div>
+          <h4>Merge Complete</h4>
+          <div class="meta" style="display:flex"><span><b style="color:var(--txt)">merged.pdf</b> · 7 pages · 3.1 MB</span></div>
+          <div class="succ-actions"><button class="ba primary">Open</button><button class="ba">Download</button><button class="ba">Share</button></div>
+          <div class="next-grid" style="margin-top:22px">
+            <div class="nextcard"><span class="ic" style="background:rgba(91,208,164,.16);color:var(--mint)">⬇</span><div><b style="font-family:var(--font-d);font-size:14px">Compress</b></div></div>
+            <div class="nextcard"><span class="ic" style="background:rgba(124,156,255,.16);color:var(--accent)">＃</span><div><b style="font-family:var(--font-d);font-size:14px">Page Numbers</b></div></div>
+            <div class="nextcard"><span class="ic" style="background:rgba(155,134,255,.16);color:var(--accent2)">◆</span><div><b style="font-family:var(--font-d);font-size:14px">Watermark</b></div></div>
+            <div class="nextcard"><span class="ic" style="background:rgba(255,186,107,.16);color:var(--amber)">✎</span><div><b style="font-family:var(--font-d);font-size:14px">Sign PDF</b></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. PRIORITY -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">07</span><div><h2>Build order</h2><p class="sub">Ship the shell once, then light up tools by user value. The four already-built tools just move into the new layout first.</p></div></div>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <footer>
+    <b>Llamashot PDF Suite</b> — Unified Tool UI design report. The shell (rail · preview · info · action bar) is built once; each tool contributes only a settings widget + an action. Interactive prototype above reflects the soft dark theme; a light variant follows the same tokens.
+  </footer>
+</div>
+
+<script>
+const TOOLS = {
+  merge_pdf:{name:"Merge PDF",icon:"🔀",desc:"Combine multiple PDFs into one",label:"Merge PDF",
+    tip:"Drag the file cards to set the merge order. The preview shows the first page of each document.",
+    s:()=>`<div class="panel-title">Merge Settings</div>
+      <div class="grouplabel">Files (3) — drag to reorder</div>
+      <div class="checks">
+        ${fileRow("S2-update.pdf","5 pages · 2.8 MB")}${fileRow("passport.pdf","1 page · 452 KB")}${fileRow("pancard.pdf","1 page · 344 KB")}
+      </div>
+      <div class="grouplabel">Output name</div>
+      <input class="input" value="merged.pdf">
+      <div class="grouplabel">Output quality</div>
+      ${seg([["Original","No re-compression",1],["Optimized","Smaller file",0]])}
+      <div style="margin-top:16px">${ck("Preserve bookmarks & outline",1)}</div>`},
+
+  split_pdf:{name:"Split PDF",icon:"✂",desc:"Split PDF pages into multiple files",label:"Split PDF",
+    tip:"Enter the page range you want to extract. For example, from page 1 to 5 will extract the first 5 pages.",
+    s:()=>`<div class="panel-title">Split Method</div>
+      ${seg([["Custom Range","Split specific pages",1],["Every Page","Extract every page",0],["Fixed Size","Split by page count",0],["Extract Pages","Select specific pages",0]])}
+      <div class="grouplabel">Page Range</div>
+      <div class="field2"><div class="field"><label>FROM PAGE</label>${stepper(1)}</div><div class="field"><label>TO PAGE</label>${stepper(1)}</div></div>
+      <div class="field" style="margin-top:14px"><label>QUICK SELECT</label><div class="pills"><span class="pill">All Pages</span><span class="pill">First Half</span><span class="pill">Second Half</span><span class="pill">Odd</span><span class="pill">Even</span></div></div>
+      <div class="grouplabel">Output Options</div>
+      <div class="checks">${ck("Create separate files for each range",1)}${ck("Extract pages in reverse order",0)}${ck("Preserve document properties",1)}${ck("Add page range to file name",1)}</div>
+      <div class="grouplabel">Output Folder</div>
+      <div class="folder"><input class="input" value="C:\\Users\\Santosh\\Documents\\Llamashot\\Split"><button class="browse">Browse</button></div>`},
+
+  compress_pdf:{name:"Compress PDF",icon:"⬇",desc:"Reduce PDF file size",label:"Compress PDF",
+    tip:"Higher compression means smaller files with some quality loss. Medium is the best balance for most documents.",
+    s:()=>`<div class="panel-title">Compression Level</div>
+      ${radioList([["Low","Near-lossless",0],["Medium","Recommended",1],["High","Smaller",0],["Maximum","Smallest",0]])}
+      <div class="grouplabel">Expected Result</div>
+      <div class="est"><div class="e"><small>Current</small><b>2.4 MB</b></div><div class="e hi"><small>Estimated</small><b>850 KB</b></div><div class="e"><small>Quality</small><b>★★★★☆</b></div></div>`},
+
+  pdf_to_images:{name:"PDF to Images",icon:"⧉",desc:"Convert pages to images",label:"Export Images",
+    tip:"300 DPI is ideal for printing; 72–150 DPI is great for screen and the web.",
+    s:()=>`<div class="panel-title">Output Format</div>
+      ${radioList([["PNG","Lossless, transparency",1],["JPG","Small, photos",0],["WEBP","Modern, tiny",0]])}
+      <div class="grouplabel">Resolution</div>
+      <div class="pills"><span class="pill">72 DPI</span><span class="pill on">150 DPI</span><span class="pill">300 DPI</span><span class="pill">600 DPI</span></div>
+      <div class="grouplabel">Output</div>
+      <div class="checks">${ck("Separate files per page",1)}${ck("Bundle as ZIP",1)}</div>
+      <div class="est"><div class="e"><small>Pages</small><b>1</b></div><div class="e hi"><small>Images</small><b>1</b></div><div class="e"><small>Est. size</small><b>0.4 MB</b></div></div>`},
+
+  images_to_pdf:{name:"Images to PDF",icon:"⬛",desc:"Combine images into a PDF",label:"Create PDF",
+    tip:"Reorder images to set page order. Choose Fit to keep each image's native aspect ratio.",
+    s:()=>`<div class="panel-title">Page Setup</div>
+      ${seg([["A4","210 × 297 mm",1],["Letter","8.5 × 11 in",0],["Fit to image","Native size",0],["Square","1:1",0]])}
+      <div class="grouplabel">Orientation</div>
+      <div class="pills"><span class="pill on">Auto</span><span class="pill">Portrait</span><span class="pill">Landscape</span></div>
+      <div class="grouplabel">Margin</div><input type="range" class="slider" value="20">
+      <div style="margin-top:16px">${ck("One image per page",1)}</div>`},
+
+  rotate_pdf:{name:"Rotate PDF",icon:"↻",desc:"Rotate PDF pages",label:"Rotate PDF",
+    tip:"Use the preview to confirm orientation before applying. Rotation can target all pages or a range.",
+    s:()=>`<div class="panel-title">Rotation</div>
+      <div class="rotrow"><div class="rotbtn">↺ 90°</div><div class="rotbtn">↻ 90°</div><div class="rotbtn">⇅ 180°</div></div>
+      <div class="grouplabel">Apply To</div>
+      ${radioList([["All Pages","Rotate the whole document",1],["Current Page","Only the visible page",0],["Custom Range","Specify pages",0]])}`},
+
+  watermark:{name:"Watermark PDF",icon:"◆",desc:"Add a text watermark",label:"Add Watermark",
+    tip:"The preview updates live. Lower the opacity for a subtle background stamp.",
+    s:()=>`<div class="panel-title">Watermark</div>
+      <div class="field"><label>TEXT</label><input class="input" value="CONFIDENTIAL"></div>
+      <div class="grouplabel">Font size</div><input type="range" class="slider" value="40">
+      <div class="grouplabel">Opacity — 50%</div><input type="range" class="slider" value="50">
+      <div class="grouplabel">Position</div>
+      <div class="posgrid"><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p on"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div></div>`},
+
+  page_numbers:{name:"Page Numbers",icon:"＃",desc:"Add numbers to a PDF",label:"Add Numbers",
+    tip:"Pick a style and a corner. Numbering can start from any page.",
+    s:()=>`<div class="panel-title">Number Style</div>
+      ${radioList([["1","Plain number",1],["1 / 20","With total",0],["Page 1","Labelled",0],["Page 1 of 20","Full label",0]])}
+      <div class="grouplabel">Position</div>
+      <div class="posgrid"><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p on"></div><div class="p"></div></div>
+      <div class="grouplabel">Start at</div>${stepper(1)}`},
+
+  extract_pages:{name:"Extract Pages",icon:"⎘",desc:"Pick specific pages",label:"Extract Pages",
+    tip:"Click page thumbnails to select them, or type ranges like 1-3, 7, 10.",
+    s:()=>`<div class="panel-title">Pages to Extract</div>
+      <p class="sub" style="font-size:13px;margin-bottom:12px">Select pages in the preview, or enter ranges.</p>
+      <div class="field"><label>PAGES</label><input class="input" value="1, 3-5, 8"></div>
+      <div class="grouplabel">Output</div>${seg([["Single PDF","Combine selected",1],["ZIP","One file per page",0]])}`},
+
+  insert_pages:{name:"Insert Pages",icon:"⊕",desc:"Add new pages",label:"Insert Pages",
+    tip:"Choose where to insert. The preview marks the insertion point.",
+    s:()=>`<div class="panel-title">Insertion Point</div>
+      <div class="field"><label>INSERT AFTER PAGE</label>${stepper(1)}</div>
+      <div class="grouplabel">Source</div>${seg([["Images","JPG / PNG",1],["PDF pages","From another PDF",0]])}`},
+
+  delete_pages:{name:"Delete Pages",icon:"🗑",desc:"Remove pages",label:"Delete Pages",
+    tip:"Select the pages to remove. The remaining pages keep their order.",
+    s:()=>`<div class="panel-title">Pages to Delete</div>
+      <div class="field"><label>PAGES</label><input class="input" value="2, 4"></div>
+      <div class="grouplabel">Result</div><div class="est"><div class="e"><small>Before</small><b>24</b></div><div class="e hi"><small>After</small><b>22</b></div><div class="e"><small>Removing</small><b>2</b></div></div>`},
+
+  edit_pdf:{name:"Edit PDF",icon:"✎",desc:"Edit text, images & annotations",label:"Save PDF",
+    tip:"Use the canvas toolbar to add text, images, highlights and shapes directly on the page.",
+    s:()=>`<div class="panel-title">Canvas Tools</div>
+      <div class="pills"><span class="pill on">Select</span><span class="pill">Text</span><span class="pill">Image</span><span class="pill">Highlight</span><span class="pill">Draw</span><span class="pill">Shapes</span><span class="pill">Comment</span></div>
+      <div class="grouplabel">Properties</div>
+      <div class="field2"><div class="field"><label>FONT SIZE</label>${stepper(14)}</div><div class="field"><label>COLOR</label><input class="input" value="#1F2430"></div></div>`},
+
+  fill_sign:{name:"Fill & Sign",icon:"🖊",desc:"Fill forms and sign",label:"Apply & Save",
+    tip:"Detected form fields appear below. Add a signature by drawing, typing, or uploading.",
+    s:()=>`<div class="panel-title">Detected Fields</div>
+      <div class="checks">${ck("Name",1)}${ck("Email",1)}${ck("Date",0)}${ck("Signature",0)}</div>
+      <div class="grouplabel">Signature</div>
+      <div class="pills"><span class="pill on">Draw</span><span class="pill">Type</span><span class="pill">Upload</span></div>`},
+
+  protect_pdf:{name:"Protect PDF",icon:"🔒",desc:"Encrypt with a password",label:"Protect PDF",
+    tip:"Set a password to open the file. Permissions control printing, copying and editing.",
+    s:()=>`<div class="panel-title">Password</div>
+      <div class="field"><label>PASSWORD</label><input class="input" type="password" value="••••••••"></div>
+      <div class="field" style="margin-top:12px"><label>CONFIRM</label><input class="input" type="password" value="••••••••"></div>
+      <div class="grouplabel">Permissions</div>
+      <div class="checks">${ck("Allow printing",1)}${ck("Allow copying text",0)}${ck("Allow editing",0)}</div>`},
+};
+
+const ORDER=["merge_pdf","split_pdf","compress_pdf","pdf_to_images","images_to_pdf","rotate_pdf","extract_pages","insert_pages","delete_pages","page_numbers","watermark","edit_pdf","fill_sign","protect_pdf"];
+
+function seg(items){return `<div class="seg">${items.map(([t,d,on])=>`<div class="segcard ${on?'on':''}"><span class="rd"></span><div><b>${t}</b><small>${d}</small></div></div>`).join("")}</div>`}
+function radioList(items){return `<div class="checks">${items.map(([t,d,on])=>`<div class="segcard ${on?'on':''}" style="grid-column:auto"><span class="rd"></span><div><b>${t}</b><small>${d}</small></div></div>`).join("")}</div>`}
+function ck(t,on){return `<div class="ck ${on?'on':''}"><span class="box">${on?'✓':''}</span> ${t}</div>`}
+function stepper(v){return `<div class="stepper"><input value="${v}"><div style="display:flex;flex-direction:column"><button class="sb" style="height:21px">▲</button><button class="sb" style="height:21px">▼</button></div></div>`}
+function fileRow(n,m){return `<div class="ck on" style="cursor:grab"><span style="color:var(--txt3)">☰</span><span class="box">✓</span> ${n} <span style="margin-left:auto;color:var(--txt3);font-family:var(--font-m);font-size:11px">${m}</span></div>`}
+
+function buildNav(){
+  const nav=document.getElementById("toolnav");
+  nav.innerHTML=ORDER.map(id=>`<div class="navitem" data-id="${id}"><span class="ic">${TOOLS[id].icon}</span> ${TOOLS[id].name}</div>`).join("");
+  nav.querySelectorAll(".navitem").forEach(el=>el.onclick=()=>select(el.dataset.id));
+}
+function select(id){
+  const t=TOOLS[id];
+  document.querySelectorAll("#toolnav .navitem").forEach(el=>el.classList.toggle("active",el.dataset.id===id));
+  document.getElementById("toolTitle").textContent=t.name;
+  document.getElementById("toolDesc").textContent=t.desc;
+  document.getElementById("settings").innerHTML=t.s();
+  document.getElementById("procLabel").textContent=t.label;
+  document.getElementById("tipText").textContent=t.tip;
+  // wire up the in-settings segmented/checkbox/pill toggles for feel
+  const root=document.getElementById("settings");
+  root.querySelectorAll(".segcard").forEach(c=>c.onclick=()=>{const sib=c.parentElement.querySelectorAll(".segcard");sib.forEach(s=>s.classList.remove("on"));c.classList.add("on")});
+  root.querySelectorAll(".ck").forEach(c=>c.onclick=()=>{c.classList.toggle("on");c.querySelector(".box").textContent=c.classList.contains("on")?"✓":""});
+  root.querySelectorAll(".pill").forEach(p=>p.onclick=()=>{p.parentElement.querySelectorAll(".pill").forEach(s=>s.classList.remove("on"));p.classList.add("on")});
+  root.querySelectorAll(".posgrid .p").forEach(p=>p.onclick=()=>{p.parentElement.querySelectorAll(".p").forEach(s=>s.classList.remove("on"));p.classList.add("on")});
+}
+
+const PRIORITY=[["Merge PDF",100],["Split PDF",95],["Edit PDF",95],["Compress PDF",90],["Fill & Sign",90],["PDF to Images",85],["Images to PDF",85],["OCR",80],["Watermark",75],["Page Numbers",70]];
+function buildBars(){
+  document.getElementById("bars").innerHTML=PRIORITY.map(([n,v])=>`<div class="bar"><span class="nm">${n}</span><div class="track"><div class="fill" style="width:${v}%"></div></div><span class="pv">${v}</span></div>`).join("");
+}
+
+buildNav();buildBars();
+// focus mode: #focus=<toolid> renders just that tool's prototype full-bleed
+(function(){
+  const m=location.hash.match(/^#focus=(\w+)/);
+  if(m && TOOLS[m[1]]){document.body.classList.add("focus");select(m[1]);}
+  else select("split_pdf");
+})();
+
+// reveal on scroll
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}),{threshold:.12});
+document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

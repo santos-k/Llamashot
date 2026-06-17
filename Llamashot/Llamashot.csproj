@@ -15,9 +15,9 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <Version>8.4.9</Version>
-    <AssemblyVersion>8.4.9</AssemblyVersion>
-    <FileVersion>8.4.9</FileVersion>
+    <Version>8.6.0</Version>
+    <AssemblyVersion>8.6.0</AssemblyVersion>
+    <FileVersion>8.6.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
