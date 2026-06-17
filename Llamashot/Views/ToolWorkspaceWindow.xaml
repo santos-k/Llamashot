@@ -145,10 +145,19 @@
                                             Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Padding="14,8" Cursor="Hand"/>
                                 </Grid>
                             </Border>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14">
-                                <ItemsControl x:Name="MergeList">
-                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                </ItemsControl>
+                            <!-- reorderable file list (capped height; preview gets the rest) -->
+                            <Border DockPanel.Dock="Top" MaxHeight="240" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,12">
+                                    <ItemsControl x:Name="MergeList">
+                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                            <!-- merged preview -->
+                            <TextBlock DockPanel.Dock="Top" x:Name="TxtMergePreviewLabel" Text="MERGED PREVIEW"
+                                       FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}" Margin="16,12,0,4"/>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="14,4,14,14">
+                                <WrapPanel x:Name="MergeThumbs"/>
                             </ScrollViewer>
                         </DockPanel>
                         <!-- loaded state -->

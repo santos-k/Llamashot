@@ -53,6 +53,7 @@ public partial class ToolWorkspaceWindow : Window
     private readonly Dictionary<string, int> _mergePages = new();
     private readonly Dictionary<string, string?> _mergePw = new();
     private TextBox _mergeNameBox = null!;
+    private int _previewRunId;
 
     // pdf-to-images settings
     private string _imgFormat = "png";
@@ -882,6 +883,91 @@ public partial class ToolWorkspaceWindow : Window
             MergeList.Items.Add(MergeRow(i));
         string noun = _toolId == "images_to_pdf" ? "image" : "file";
         TxtMergeCount.Text = $"{_mergeFiles.Count} {noun}{(_mergeFiles.Count == 1 ? "" : "s")}";
+        _ = BuildMergePreview();
+    }
+
+    /// <summary>Renders the combined page preview (every page of every file, in current order).</summary>
+    private async System.Threading.Tasks.Task BuildMergePreview()
+    {
+        if (MergeThumbs == null) return;
+        int run = ++_previewRunId;
+        MergeThumbs.Children.Clear();
+
+        bool images = _toolId == "images_to_pdf";
+        TxtMergePreviewLabel.Text = images ? "PDF PREVIEW · PAGE ORDER" : "MERGED PREVIEW";
+        if (_mergeFiles.Count == 0)
+        {
+            MergeThumbs.Children.Add(new TextBlock
+            {
+                Text = images ? "Add images to preview the PDF." : "Add PDFs to preview the merged result.",
+                Foreground = B("TextMutedBrush"), FontSize = 13, Margin = new Thickness(2, 4, 0, 0)
+            });
+            return;
+        }
+
+        for (int fi = 0; fi < _mergeFiles.Count; fi++)
+        {
+            string path = _mergeFiles[fi];
+            string? pw = _mergePw.TryGetValue(path, out var p) ? p : null;
+
+            if (images)
+            {
+                AddThumbCard(out var img, $"{fi + 1}");
+                try { img.Source = new BitmapImage(new System.Uri(path)); } catch { }
+            }
+            else
+            {
+                int pages = _mergePages.TryGetValue(path, out var pc) ? pc : 0;
+                for (int pg = 1; pg <= pages; pg++)
+                {
+                    AddThumbCard(out var img, $"{fi + 1}.{pg}");
+                    var bmp = await RenderThumbAsync(path, pw, pg, 200);
+                    if (run != _previewRunId) return; // a newer rebuild superseded this one
+                    img.Source = bmp;
+                }
+            }
+            if (run != _previewRunId) return;
+        }
+    }
+
+    private void AddThumbCard(out Image img, string label)
+    {
+        var card = new Border
+        {
+            Width = 104, Margin = new Thickness(0, 0, 10, 10), CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1), BorderBrush = B("BorderSoftBrush"),
+            Background = B("SurfaceAltBrush"), ClipToBounds = true
+        };
+        var stack = new StackPanel();
+        img = new Image { Height = 132, Stretch = Stretch.UniformToFill };
+        stack.Children.Add(img);
+        stack.Children.Add(new Border
+        {
+            Background = B("SurfaceBrush"),
+            Child = new TextBlock { Text = label, FontSize = 10, Foreground = B("TextMutedBrush"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 3, 0, 3) }
+        });
+        card.Child = stack;
+        MergeThumbs.Children.Add(card);
+    }
+
+    private async System.Threading.Tasks.Task<BitmapImage?> RenderThumbAsync(string path, string? pw, int page1, uint width)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            var doc = string.IsNullOrEmpty(pw)
+                ? await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file)
+                : await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file, pw);
+            if (page1 < 1 || page1 > (int)doc.PageCount) return null;
+            using var pg = doc.GetPage((uint)(page1 - 1));
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            await pg.RenderToStreamAsync(stream, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = width });
+            stream.Seek(0);
+            var bmp = new BitmapImage();
+            bmp.BeginInit(); bmp.StreamSource = stream.AsStreamForRead(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.EndInit(); bmp.Freeze();
+            return bmp;
+        }
+        catch { return null; }
     }
 
     private Border MergeRow(int idx)
