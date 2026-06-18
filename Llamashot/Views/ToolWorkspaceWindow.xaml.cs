@@ -110,16 +110,32 @@ public partial class ToolWorkspaceWindow : Window
     private string? _chainPath;       // last single-PDF export, fed into the next tool the user opens
     private bool _leftCollapsed;
     private bool _infoCollapsed;
+    private bool _tipCollapsed;
+    private bool _settingsCollapsed;
+    private bool _navCollapsed;
+    private bool _rightCollapsed;
+    private bool _picking;             // guards against re-entrant file-picker dialogs
     private double _dispW, _dispH;     // on-screen size of the current preview page (px)
 
-    // insert-pages settings
+    // insert-pages settings (items may be images or PDFs)
     private readonly List<string> _insertImages = new();
+    private readonly Dictionary<string, string?> _insertPw = new();   // password per inserted PDF
+    private readonly Dictionary<string, int> _insertItemPages = new(); // page count per inserted item
     private TextBox _insertAfterBox = null!;
     private TextBlock _insertCountText = null!;
 
     // protect settings
     private System.Windows.Controls.PasswordBox _protectPwBox = null!;
     private System.Windows.Controls.PasswordBox _protectConfirmBox = null!;
+    private string _protectMode = "add";              // add | remove | break
+    private string _breakCharsetKey = "digits";
+    private int _breakMaxLen = 4;
+    private bool _pdfLocked;                            // a break-mode file we couldn't open (no preview)
+    private StackPanel _protectModeHost = null!;        // mode-specific settings slot
+    private readonly Dictionary<string, Border> _protectModeCards = new();
+    private readonly Dictionary<string, Border> _breakCharsetCards = new();
+    private readonly Dictionary<string, Border> _breakLenCards = new();
+    private System.Threading.CancellationTokenSource? _recoverCts;
 
     private static readonly string[] ImageExts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff" };
 
@@ -150,8 +166,8 @@ public partial class ToolWorkspaceWindow : Window
         "extract_pages" => ("Extract Pages", "Pull specific pages into a new PDF",
             "List the pages you want with commas and ranges, e.g. 1, 3, 5-8. Pages keep the order you enter.",
             "Extract  →"),
-        "insert_pages" => ("Insert Pages", "Insert images as pages into a PDF",
-            "Pick images to insert, then choose which page they go after. Each image becomes one new page.",
+        "insert_pages" => ("Insert Pages", "Insert images or PDF pages into a PDF",
+            "Add images or PDFs to insert, then choose which page they go after. Images add one page; PDFs add all their pages.",
             "Insert  →"),
         "page_numbers" => ("Page Numbers", "Stamp page numbers onto every page",
             "Choose where the number sits on each page. Numbering starts at 1 on the first page.",
@@ -159,8 +175,8 @@ public partial class ToolWorkspaceWindow : Window
         "watermark" => ("Watermark PDF", "Overlay text across every page",
             "Enter your watermark text and tune the size and opacity. It's drawn diagonally across each page.",
             "Add Watermark  →"),
-        "protect_pdf" => ("Protect PDF", "Lock a PDF with a password",
-            "Set a password that will be required to open the PDF. Keep it somewhere safe — it can't be recovered.",
+        "protect_pdf" => ("PDF Password", "Add, remove, or recover a password",
+            "Add a password to lock a PDF, remove a known password, or recover an unknown one. Choose what to do on the right.",
             "Protect  →"),
         "compress_pdf" => ("Compress PDF", "Reduce file size while keeping quality",
             "Higher compression means a smaller file but lower image quality. Recommended works well for most documents.",
@@ -175,7 +191,7 @@ public partial class ToolWorkspaceWindow : Window
         ("merge_pdf","Merge PDF"), ("split_pdf","Split PDF"), ("compress_pdf","Compress PDF"),
         ("pdf_to_images","PDF to Images"), ("images_to_pdf","Images to PDF"), ("rotate_pdf","Rotate PDF"),
         ("extract_pages","Extract Pages"), ("insert_pages","Insert Pages"), ("page_numbers","Page Numbers"),
-        ("watermark","Watermark PDF"), ("protect_pdf","Protect PDF"),
+        ("watermark","Watermark PDF"), ("protect_pdf","PDF Password"),
     };
 
     public ToolWorkspaceWindow(string toolId = "split_pdf")
@@ -197,7 +213,9 @@ public partial class ToolWorkspaceWindow : Window
         TxtTitle.Text = m.title;
         TxtSubtitle.Text = m.sub;
         TxtTip.Text = m.tip;
-        TxtProcess.Text = m.action;
+        TxtProcess.Text = _toolId == "protect_pdf"
+            ? _protectMode switch { "remove" => "Remove Password  →", "break" => "Break Password  →", _ => "Protect  →" }
+            : m.action;
 
         bool multi = IsMultiFile;
         TxtLeftTitle.Text = multi ? (_toolId == "images_to_pdf" ? "Images" : "Uploaded Files") : "Source File";
@@ -689,45 +707,76 @@ public partial class ToolWorkspaceWindow : Window
     // =====================================================================
     private void BuildInsertSettings()
     {
-        SettingsHost.Children.Add(SectionTitle("Images to Insert"));
-        var addBtn = SoftButton("＋  Choose Images", InsertChooseImages_Click);
-        addBtn.Background = B("AccentBrush");
-        addBtn.Foreground = B("AccentTextBrush");
-        addBtn.Padding = new Thickness(16, 11, 16, 11);
-        addBtn.HorizontalAlignment = HorizontalAlignment.Left;
-        SettingsHost.Children.Add(addBtn);
-        _insertCountText = new TextBlock { FontSize = 12.5, Foreground = B("TextMutedBrush"), Margin = new Thickness(2, 10, 0, 0) };
-        SettingsHost.Children.Add(_insertCountText);
-        UpdateInsertCount();
-
-        SettingsHost.Children.Add(MutedLabel("INSERT AFTER PAGE", 22));
+        SettingsHost.Children.Add(SectionTitle("Insert Position"));
+        SettingsHost.Children.Add(MutedLabel("INSERT AFTER PAGE"));
         _insertAfterBox = ThemedBox(_pageCount > 0 ? _pageCount.ToString() : "0");
+        _insertAfterBox.TextChanged += (_, _) => { RebuildPreviewModel(); _ = RenderPreviewUi(); };
         SettingsHost.Children.Add(_insertAfterBox);
-        SettingsHost.Children.Add(Hint("0 places the images before page 1. Each image becomes one new page."));
+        SettingsHost.Children.Add(Hint("0 places the inserts before page 1. Images add one page; PDFs add all their pages. Add and reorder them on the left."));
 
         SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
         SettingsHost.Children.Add(BuildFolderRow(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Inserted")));
     }
 
-    private void InsertChooseImages_Click(object sender, RoutedEventArgs e)
+    private async void InsertChooseImages_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog
+        if (_picking) return;
+        _picking = true;
+        string[]? chosen = null;
+        try
         {
-            Multiselect = true,
-            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff"
-        };
-        if (dlg.ShowDialog() == true)
-        {
-            foreach (var f in dlg.FileNames) if (!_insertImages.Contains(f)) _insertImages.Add(f);
-            UpdateInsertCount();
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Multiselect = true,
+                Filter = "Images & PDF|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff;*.pdf"
+            };
+            if (dlg.ShowDialog() == true) chosen = dlg.FileNames;
         }
+        finally { _picking = false; }
+
+        if (chosen != null) await AddInsertItems(chosen);
+    }
+
+    /// <summary>Adds images and/or PDFs to the insert list, unlocking protected PDFs and counting pages.</summary>
+    private async System.Threading.Tasks.Task AddInsertItems(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (_insertImages.Contains(path)) continue;
+            bool isPdf = path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            bool isImg = ImageExts.Any(x => path.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+            if (!isPdf && !isImg) continue;
+
+            if (isPdf)
+            {
+                string? pw = await PasswordDialog.UnlockAsync(this, path);
+                if (pw == null) continue; // cancelled
+                string? realPw = string.IsNullOrEmpty(pw) ? null : pw;
+                int pages;
+                try { pages = await FileToolsService.GetPdfPageCountAsync(path, realPw); }
+                catch (Exception ex)
+                {
+                    ConfirmDialog.Alert(this, "Can't Open PDF", $"{Path.GetFileName(path)}:\n{ex.Message}", ConfirmDialog.AlertKind.Error);
+                    continue;
+                }
+                _insertImages.Add(path); _insertPw[path] = realPw; _insertItemPages[path] = pages;
+            }
+            else
+            {
+                _insertImages.Add(path); _insertPw[path] = null; _insertItemPages[path] = 1;
+            }
+        }
+        RefreshAll();
     }
 
     private void UpdateInsertCount()
-        => _insertCountText.Text = _insertImages.Count == 0
+    {
+        if (_insertCountText == null) return;
+        _insertCountText.Text = _insertImages.Count == 0
             ? "No images chosen yet."
             : $"{_insertImages.Count} image{(_insertImages.Count == 1 ? "" : "s")} ready to insert";
+    }
 
     // =====================================================================
     //  Page Numbers settings
@@ -849,18 +898,77 @@ public partial class ToolWorkspaceWindow : Window
     // =====================================================================
     private void BuildProtectSettings()
     {
-        SettingsHost.Children.Add(SectionTitle("Set Password"));
-        SettingsHost.Children.Add(MutedLabel("PASSWORD"));
-        _protectPwBox = ThemedPasswordBox();
-        SettingsHost.Children.Add(_protectPwBox);
+        _protectModeCards.Clear();
+        SettingsHost.Children.Add(SectionTitle("What do you want to do?"));
+        SettingsHost.Children.Add(RadioCard(_protectModeCards, "add", "Add password", "Lock the PDF so a password is required to open it", () => SelectProtectMode("add")));
+        SettingsHost.Children.Add(RadioCard(_protectModeCards, "remove", "Remove password", "Save an unprotected copy (you must know the password)", () => SelectProtectMode("remove")));
+        SettingsHost.Children.Add(RadioCard(_protectModeCards, "break", "Break password", "Recover an unknown open-password by trying combinations", () => SelectProtectMode("break")));
+        HighlightRadio(_protectModeCards, _protectMode);
 
-        SettingsHost.Children.Add(MutedLabel("CONFIRM PASSWORD", 16));
-        _protectConfirmBox = ThemedPasswordBox();
-        SettingsHost.Children.Add(_protectConfirmBox);
-        SettingsHost.Children.Add(Hint("This password will be required to open the PDF. It can't be recovered if lost."));
+        _protectModeHost = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        SettingsHost.Children.Add(_protectModeHost);
+        BuildProtectModeBody();
+    }
 
-        SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
-        SettingsHost.Children.Add(BuildFolderRow(
+    private void SelectProtectMode(string mode)
+    {
+        if (_protectMode == mode) return;
+        _protectMode = mode;
+        HighlightRadio(_protectModeCards, mode);
+        BuildProtectModeBody();
+        ApplyToolMeta(); // refresh the action-button label
+    }
+
+    private void BuildProtectModeBody()
+    {
+        _protectModeHost.Children.Clear();
+        _breakCharsetCards.Clear();
+        _breakLenCards.Clear();
+
+        if (_protectMode == "add")
+        {
+            _protectModeHost.Children.Add(MutedLabel("PASSWORD"));
+            _protectPwBox = ThemedPasswordBox();
+            _protectModeHost.Children.Add(_protectPwBox);
+            _protectModeHost.Children.Add(MutedLabel("CONFIRM PASSWORD", 16));
+            _protectConfirmBox = ThemedPasswordBox();
+            _protectModeHost.Children.Add(_protectConfirmBox);
+            _protectModeHost.Children.Add(Hint("This password will be required to open the PDF. It can't be recovered if lost."));
+        }
+        else if (_protectMode == "remove")
+        {
+            _protectModeHost.Children.Add(Hint(_pdfPath == null
+                ? "Open the protected PDF — you'll be asked for its password. Then a decrypted copy is saved."
+                : "A decrypted copy will be saved with no password required to open it."));
+        }
+        else // break
+        {
+            _protectModeHost.Children.Add(MutedLabel("CHARACTERS TO TRY"));
+            var csGrid = new Grid();
+            for (int i = 0; i < 3; i++) csGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            int c = 0;
+            foreach (var (key, label, _) in FileToolsService.RecoveryCharsets)
+                AddChip(csGrid, c++, _breakCharsetCards, key, label, () => { _breakCharsetKey = key; HighlightChips(_breakCharsetCards, key); });
+            _protectModeHost.Children.Add(csGrid);
+            HighlightChips(_breakCharsetCards, _breakCharsetKey);
+
+            _protectModeHost.Children.Add(MutedLabel("MAX LENGTH", 16));
+            var lenGrid = new Grid();
+            for (int i = 0; i < 4; i++) lenGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            int col = 0;
+            foreach (var n in new[] { 3, 4, 5, 6 })
+            {
+                int len = n;
+                AddChip(lenGrid, col++, _breakLenCards, n.ToString(), n.ToString(), () => { _breakMaxLen = len; HighlightChips(_breakLenCards, len.ToString()); });
+            }
+            _protectModeHost.Children.Add(lenGrid);
+            HighlightChips(_breakLenCards, _breakMaxLen.ToString());
+
+            _protectModeHost.Children.Add(Hint("Tries common passwords first, then every combination up to the chosen length. Longer passwords can take a very long time — press Stop anytime."));
+        }
+
+        _protectModeHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
+        _protectModeHost.Children.Add(BuildFolderRow(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Protected")));
     }
 
@@ -981,8 +1089,7 @@ public partial class ToolWorkspaceWindow : Window
     {
         var cb = new ComboBox
         {
-            FontSize = 13, Padding = new Thickness(8, 6, 8, 6),
-            Background = B("SurfaceAltBrush"), Foreground = B("TextPrimaryBrush"), BorderBrush = B("BorderSoftBrush")
+            FontSize = 13, Style = (Style)Resources["ThemedCombo"]
         };
         foreach (var f in BasicFonts) cb.Items.Add(new ComboBoxItem { Content = f, FontFamily = new FontFamily(f) });
         cb.SelectedIndex = Math.Max(0, Array.IndexOf(BasicFonts, current));
@@ -1153,11 +1260,111 @@ public partial class ToolWorkspaceWindow : Window
             LeftHost.Children.Add(DropCard());
             LeftHost.Children.Add(TipsCard());
         }
+        else if (_toolId == "insert_pages")
+        {
+            LeftHost.Children.Add(_pdfPath != null ? SingleFileCard() : DropCard());
+            LeftHost.Children.Add(InsertImagesSection());
+            LeftHost.Children.Add(TipsCard());
+        }
         else
         {
             LeftHost.Children.Add(_pdfPath != null ? SingleFileCard() : DropCard());
             LeftHost.Children.Add(TipsCard());
         }
+    }
+
+    /// <summary>Left-panel "Images to Insert" list with add / reorder / remove + drag-drop.</summary>
+    private UIElement InsertImagesSection()
+    {
+        var sp = new StackPanel { Margin = new Thickness(0, 4, 0, 12) };
+        var header = new Grid { Margin = new Thickness(2, 0, 2, 8) };
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var t = new TextBlock { Text = "Files to Insert", FontWeight = FontWeights.SemiBold, FontSize = 14, Foreground = B("TextPrimaryBrush"), VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(t, 0);
+        var add = SoftButton("+ Add More", InsertChooseImages_Click);
+        add.Padding = new Thickness(12, 7, 12, 7);
+        Grid.SetColumn(add, 1);
+        header.Children.Add(t); header.Children.Add(add);
+        sp.Children.Add(header);
+
+        if (_insertImages.Count == 0)
+        {
+            sp.Children.Add(new TextBlock
+            {
+                Text = "No files yet. Click “+ Add More” or drop images / PDFs here.",
+                Foreground = B("TextMutedBrush"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 0, 0)
+            });
+        }
+        else
+        {
+            for (int i = 0; i < _insertImages.Count; i++) sp.Children.Add(InsertImageRow(i));
+        }
+        return sp;
+    }
+
+    private Border InsertImageRow(int idx)
+    {
+        string path = _insertImages[idx];
+        var fi = new FileInfo(path);
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        bool isPdf = path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+        var thumb = new Border
+        {
+            Width = 34, Height = 34, CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 0, 12, 0),
+            VerticalAlignment = VerticalAlignment.Center, ClipToBounds = true, Background = Hex(isPdf ? "#F06262" : "#5BB98B")
+        };
+        var im = isPdf ? null : SafeImage(path);
+        thumb.Child = im != null
+            ? new Image { Source = im, Stretch = Stretch.UniformToFill }
+            : new TextBlock { Text = isPdf ? "PDF" : "🖼", Foreground = Brushes.White, FontSize = isPdf ? 9.5 : 14, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(thumb, 0);
+
+        int itemPages = _insertItemPages.TryGetValue(path, out var ipc) ? ipc : 1;
+        string meta = isPdf
+            ? $"#{idx + 1} · PDF · {itemPages} page{(itemPages == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(fi.Length)}"
+            : $"#{idx + 1} · {fi.Extension.TrimStart('.').ToUpperInvariant()} · {FileToolsService.FormatFileSize(fi.Length)}";
+        var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        info.Children.Add(new TextBlock { Text = fi.Name, Foreground = B("TextPrimaryBrush"), FontWeight = FontWeights.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis });
+        info.Children.Add(new TextBlock { Text = meta, Foreground = B("TextMutedBrush"), FontSize = 12 });
+        Grid.SetColumn(info, 1);
+
+        var ctrls = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        ctrls.Children.Add(MiniBtn("↑", () => MoveInsert(idx, -1), idx > 0));
+        ctrls.Children.Add(MiniBtn("↓", () => MoveInsert(idx, +1), idx < _insertImages.Count - 1));
+        ctrls.Children.Add(MiniBtn("✕", () => RemoveInsert(idx), true));
+        Grid.SetColumn(ctrls, 2);
+
+        grid.Children.Add(thumb); grid.Children.Add(info); grid.Children.Add(ctrls);
+        var row = new Border
+        {
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 9),
+            Background = B("SurfaceAltBrush"), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1), Child = grid
+        };
+        EnableRowReorder(row, idx, (f, to) => { MoveInList(_insertImages, f, to); RefreshAll(); });
+        return row;
+    }
+
+    private void MoveInsert(int idx, int dir)
+    {
+        int j = idx + dir;
+        if (j < 0 || j >= _insertImages.Count) return;
+        (_insertImages[idx], _insertImages[j]) = (_insertImages[j], _insertImages[idx]);
+        RefreshAll();
+    }
+
+    private void RemoveInsert(int idx)
+    {
+        if (idx < 0 || idx >= _insertImages.Count) return;
+        string path = _insertImages[idx];
+        _insertImages.RemoveAt(idx);
+        _insertPw.Remove(path); _insertItemPages.Remove(path);
+        RefreshAll();
     }
 
     private Border DropCard()
@@ -1213,8 +1420,10 @@ public partial class ToolWorkspaceWindow : Window
         sp.Children.Add(new TextBlock
         {
             Text = IsMultiFile
-                ? "Use ↑ ↓ on each file to change the order. They are combined in this sequence."
-                : "Use the preview to check the pages before processing.",
+                ? "Use ↑ ↓ or drag a file to change the order. They are combined in this sequence."
+                : _toolId == "insert_pages"
+                    ? "Add images or PDFs to insert. Use ↑ ↓ or drag to reorder; the preview shows where they land after your chosen page."
+                    : "Use the preview to check the pages before processing.",
             TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = B("TextSecondaryBrush")
         });
         return new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Background = B("SurfaceAltBrush"), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1), Child = sp };
@@ -1236,6 +1445,22 @@ public partial class ToolWorkspaceWindow : Window
                 int n = _mergePages.TryGetValue(path, out var pc) ? pc : 0;
                 for (int pg = 1; pg <= n; pg++) _previewPages.Add(new PreviewPage(path, pw, pg, false));
             }
+        }
+        else if (_toolId == "insert_pages" && _pdfPath != null)
+        {
+            int after = 0;
+            int.TryParse(_insertAfterBox?.Text?.Trim(), out after);
+            after = Math.Max(0, Math.Min(after, _pageCount));
+            for (int pg = 1; pg <= after; pg++) _previewPages.Add(new PreviewPage(_pdfPath, _password, pg, false));
+            foreach (var item in _insertImages)
+            {
+                bool isImg = ImageExts.Any(x => item.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+                if (isImg) { _previewPages.Add(new PreviewPage(item, null, 1, true)); continue; }
+                string? ipw = _insertPw.TryGetValue(item, out var p) ? p : null;
+                int n = _insertItemPages.TryGetValue(item, out var c) ? c : 0;
+                for (int pg = 1; pg <= n; pg++) _previewPages.Add(new PreviewPage(item, ipw, pg, false));
+            }
+            for (int pg = after + 1; pg <= _pageCount; pg++) _previewPages.Add(new PreviewPage(_pdfPath, _password, pg, false));
         }
         else if (_pdfPath != null)
         {
@@ -1363,12 +1588,14 @@ public partial class ToolWorkspaceWindow : Window
         Grid.SetColumn(ctrls, 2);
 
         grid.Children.Add(badge); grid.Children.Add(info); grid.Children.Add(ctrls);
-        return new Border
+        var row = new Border
         {
             CornerRadius = new CornerRadius(10), Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 9),
             Background = B("SurfaceAltBrush"), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1),
             Child = grid
         };
+        EnableRowReorder(row, idx, (f, to) => { MoveInList(_mergeFiles, f, to); RefreshAll(); });
+        return row;
     }
 
     private Button MiniBtn(string glyph, Action onClick, bool enabled)
@@ -1389,6 +1616,46 @@ public partial class ToolWorkspaceWindow : Window
         if (j < 0 || j >= _mergeFiles.Count) return;
         (_mergeFiles[idx], _mergeFiles[j]) = (_mergeFiles[j], _mergeFiles[idx]);
         RefreshAll();
+    }
+
+    private static void MoveInList<T>(List<T> list, int from, int to)
+    {
+        if (from < 0 || from >= list.Count || to < 0 || to >= list.Count || from == to) return;
+        var item = list[from];
+        list.RemoveAt(from);
+        list.Insert(to, item);
+    }
+
+    /// <summary>Wires button-free drag-and-drop reordering onto a left-panel row.</summary>
+    private void EnableRowReorder(Border row, int index, Action<int, int> move)
+    {
+        const string Fmt = "llama-reorder";
+        row.AllowDrop = true;
+        Point start = default;
+        bool down = false;
+        row.PreviewMouseLeftButtonDown += (_, e) => { start = e.GetPosition(row); down = true; };
+        row.PreviewMouseLeftButtonUp += (_, _) => down = false;
+        row.MouseMove += (_, e) =>
+        {
+            if (!down) return;
+            var p = e.GetPosition(row);
+            if (Math.Abs(p.Y - start.Y) < 8 && Math.Abs(p.X - start.X) < 8) return;
+            down = false;
+            try { System.Windows.DragDrop.DoDragDrop(row, new System.Windows.DataObject(Fmt, index), DragDropEffects.Move); } catch { }
+        };
+        row.DragOver += (_, e) =>
+        {
+            if (e.Data.GetDataPresent(Fmt)) { e.Effects = DragDropEffects.Move; e.Handled = true; row.BorderBrush = B("AccentBrush"); }
+        };
+        row.DragLeave += (_, _) => row.BorderBrush = B("BorderSoftBrush");
+        row.Drop += (_, e) =>
+        {
+            row.BorderBrush = B("BorderSoftBrush");
+            if (!e.Data.GetDataPresent(Fmt)) return;
+            int from = (int)e.Data.GetData(Fmt)!;
+            move(from, index);
+            e.Handled = true;
+        };
     }
 
     private void RemoveMerge(int idx)
@@ -1482,18 +1749,25 @@ public partial class ToolWorkspaceWindow : Window
     // =====================================================================
     private async void AddFiles_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog
+        if (_picking) return;
+        _picking = true;
+        string[]? chosen = null;
+        try
         {
-            Multiselect = IsMultiFile,
-            Filter = _toolId == "images_to_pdf"
-                ? "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff"
-                : "PDF Files|*.pdf"
-        };
-        if (dlg.ShowDialog() == true)
-        {
-            if (IsMultiFile) await AddMergeFiles(dlg.FileNames);
-            else await LoadPdf(dlg.FileName);
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Multiselect = IsMultiFile,
+                Filter = _toolId == "images_to_pdf"
+                    ? "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff"
+                    : "PDF Files|*.pdf"
+            };
+            if (dlg.ShowDialog() == true) chosen = dlg.FileNames;
         }
+        finally { _picking = false; }
+
+        if (chosen == null) return;
+        if (IsMultiFile) await AddMergeFiles(chosen);
+        else await LoadPdf(chosen[0]);
     }
 
     private void Preview_DragOver(object sender, DragEventArgs e)
@@ -1504,20 +1778,60 @@ public partial class ToolWorkspaceWindow : Window
 
     private async void Preview_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
+
+        if (_toolId == "insert_pages")
         {
-            var accepted = files.Where(AcceptsFile).ToArray();
-            if (accepted.Length == 0) return;
-            if (IsMultiFile) await AddMergeFiles(accepted);
-            else await LoadPdf(accepted[0]);
+            var imgs = files.Where(f => ImageExts.Any(x => f.EndsWith(x, StringComparison.OrdinalIgnoreCase))).ToList();
+            var pdfs = files.Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            // With no base PDF yet, the first dropped PDF becomes the source; the rest are inserts.
+            string? source = null;
+            if (_pdfPath == null && pdfs.Count > 0) { source = pdfs[0]; pdfs.RemoveAt(0); }
+
+            var inserts = new List<string>(pdfs);
+            inserts.AddRange(imgs);
+            if (source != null) await LoadPdf(source);
+            if (inserts.Count > 0) await AddInsertItems(inserts);
+            return;
         }
+
+        var accepted = files.Where(AcceptsFile).ToArray();
+        if (accepted.Length == 0) return;
+        if (IsMultiFile) await AddMergeFiles(accepted);
+        else await LoadPdf(accepted[0]);
+    }
+
+    /// <summary>Registers an encrypted file we can't open yet (Break mode) — no preview, no page count.</summary>
+    private void LoadLocked(string path)
+    {
+        _pdfPath = path; _password = null; _pageCount = 0; _curPage = 1; _zoom = 1.0;
+        _chainPath = path; _pdfLocked = true;
+        RefreshAll();
+        BuildProtectModeBody(); // refresh the hint now that a file is loaded
     }
 
     private async System.Threading.Tasks.Task LoadPdf(string path)
     {
-        // unlock if protected
-        string? pw = await PasswordDialog.UnlockAsync(this, path);
+        bool inProtect = _toolId == "protect_pdf";
+
+        // Break mode already chosen: accept a protected file we can't open yet — no prompt, no preview.
+        if (inProtect && _protectMode == "break" && await FileToolsService.IsPdfEncryptedAsync(path))
+        {
+            LoadLocked(path);
+            return;
+        }
+        _pdfLocked = false;
+
+        // unlock if protected — in the Protect tool, offer a "recover" escape for unknown passwords
+        string? pw = await PasswordDialog.UnlockAsync(this, path, allowRecover: inProtect);
         if (pw == null) return; // cancelled
+        if (pw == PasswordDialog.RecoverSentinel)
+        {
+            SelectProtectMode("break");   // switch the right panel to Break mode
+            LoadLocked(path);             // load the file in its locked state
+            return;
+        }
         string? realPw = string.IsNullOrEmpty(pw) ? null : pw;
 
         int pages;
@@ -1705,7 +2019,7 @@ public partial class ToolWorkspaceWindow : Window
     {
         _pdfPath = null; _password = null; _pageCount = 0; _curPage = 1; _zoom = 1.0; _chainPath = null;
         _mergeFiles.Clear(); _mergePages.Clear(); _mergePw.Clear();
-        _insertImages.Clear();
+        _insertImages.Clear(); _insertPw.Clear(); _insertItemPages.Clear();
         if (_toolId == "insert_pages") UpdateInsertCount();
         BtnAddMore.Content = IsMultiFile ? "+ Add More" : "Open";
         RefreshAll();
@@ -1731,11 +2045,64 @@ public partial class ToolWorkspaceWindow : Window
         BtnInfoToggle.ToolTip = _infoCollapsed ? "Expand" : "Collapse";
     }
 
+    private void CollapseTip_Click(object sender, RoutedEventArgs e)
+    {
+        _tipCollapsed = !_tipCollapsed;
+        TxtTip.Visibility = _tipCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        BtnTipToggle.Content = _tipCollapsed ? "▸" : "▾";
+        BtnTipToggle.ToolTip = _tipCollapsed ? "Expand" : "Collapse";
+    }
+
+    private void CollapseSettings_Click(object sender, RoutedEventArgs e)
+    {
+        _settingsCollapsed = !_settingsCollapsed;
+        SettingsScroller.Visibility = _settingsCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        BtnSettingsToggle.Content = _settingsCollapsed ? "▸" : "▾";
+        BtnSettingsToggle.ToolTip = _settingsCollapsed ? "Expand" : "Collapse";
+    }
+
+    // ---- sidebar (left navigation) collapse ----
+    private void CollapseNav_Click(object sender, RoutedEventArgs e) => SetNavCollapsed(true);
+    private void ExpandNav_Click(object sender, RoutedEventArgs e) => SetNavCollapsed(false);
+    private void ExpandNav_Click(object sender, MouseButtonEventArgs e) => SetNavCollapsed(false);
+
+    private void SetNavCollapsed(bool collapsed)
+    {
+        _navCollapsed = collapsed;
+        NavPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        NavRail.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        ColNav.Width = collapsed ? GridLength.Auto : new GridLength(240);
+    }
+
+    // ---- right info/settings panel collapse (to a rail, like the left panel) ----
+    private void CollapseRight_Click(object sender, RoutedEventArgs e) => SetRightCollapsed(true);
+    private void ExpandRight_Click(object sender, MouseButtonEventArgs e) => SetRightCollapsed(false);
+
+    private void SetRightCollapsed(bool collapsed)
+    {
+        _rightCollapsed = collapsed;
+        RightPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        RightRail.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        ColInfo.Width = collapsed ? GridLength.Auto : new GridLength(0.95, GridUnitType.Star);
+    }
+
     private void ShowPreviewState()
     {
         bool has = _previewPages.Count > 0;
         CenterEmpty.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
         PreviewState.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_pdfLocked)
+        {
+            TxtCenterEmptyIcon.Text = "🔒";
+            TxtCenterEmptyTitle.Text = "Locked PDF — preview unavailable";
+            TxtCenterEmptySub.Text = "Pick a character set and length on the right, then click Break Password.";
+        }
+        else
+        {
+            TxtCenterEmptyIcon.Text = "📄";
+            TxtCenterEmptyTitle.Text = "Nothing to preview yet";
+        }
     }
 
     private void UpdateSelection()
@@ -1750,6 +2117,7 @@ public partial class ToolWorkspaceWindow : Window
         else
         {
             if (_pdfPath == null) { TxtSelection.Text = "No file selected"; return; }
+            if (_pdfLocked) { TxtSelection.Text = $"{Path.GetFileName(_pdfPath)} · 🔒 locked · {FileToolsService.FormatFileSize(new FileInfo(_pdfPath).Length)}"; return; }
             TxtSelection.Text = $"{Path.GetFileName(_pdfPath)} · {_pageCount} page{(_pageCount == 1 ? "" : "s")} · {FileToolsService.FormatFileSize(new FileInfo(_pdfPath).Length)}";
         }
     }
@@ -1810,7 +2178,7 @@ public partial class ToolWorkspaceWindow : Window
     {
         if (_insertImages.Count == 0)
         {
-            ConfirmDialog.Alert(this, "No Images", "Choose at least one image to insert.");
+            ConfirmDialog.Alert(this, "Nothing to Insert", "Add at least one image or PDF to insert.");
             return;
         }
         if (!int.TryParse(_insertAfterBox.Text.Trim(), out int afterPage) || afterPage < 0 || afterPage > _pageCount)
@@ -1824,10 +2192,11 @@ public partial class ToolWorkspaceWindow : Window
         catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
 
         string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_inserted.pdf");
+        var insertPws = _insertImages.Select(p => _insertPw.TryGetValue(p, out var pw) ? pw : null).ToList();
 
-        await RunJob("Inserting pages…", $"Adding {_insertImages.Count} image(s)", "Inserting…",
-            () => FileToolsService.InsertPdfPagesAsync(_pdfPath!, _insertImages.ToArray(), afterPage, outPath, null, _password),
-            "Insert Complete", $"Inserted {_insertImages.Count} page(s) into:\n{outPath}", outPath, select: true);
+        await RunJob("Inserting pages…", $"Adding {_insertImages.Count} item(s)", "Inserting…",
+            () => FileToolsService.InsertPdfPagesAsync(_pdfPath!, _insertImages.ToArray(), afterPage, outPath, null, _password, insertPws),
+            "Insert Complete", $"Inserted {_insertImages.Count} item(s) into:\n{outPath}", outPath, select: true);
     }
 
     private async System.Threading.Tasks.Task ProcessPageNumbers()
@@ -1865,6 +2234,16 @@ public partial class ToolWorkspaceWindow : Window
 
     private async System.Threading.Tasks.Task ProcessProtect()
     {
+        if (_pdfPath == null) { ConfirmDialog.Alert(this, "No File", "Open a PDF first."); return; }
+
+        string outDir = _folderBox.Text.Trim();
+        try { Directory.CreateDirectory(outDir); }
+        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
+
+        if (_protectMode == "remove") { await ProcessRemovePassword(outDir); return; }
+        if (_protectMode == "break") { await ProcessBreakPassword(outDir); return; }
+
+        // ---- add password ----
         string pw = _protectPwBox.Password;
         if (string.IsNullOrEmpty(pw))
         {
@@ -1877,16 +2256,84 @@ public partial class ToolWorkspaceWindow : Window
             return;
         }
 
-        string outDir = _folderBox.Text.Trim();
-        try { Directory.CreateDirectory(outDir); }
-        catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
-
         string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_protected.pdf");
-
         await RunJob("Protecting PDF…", "Encrypting with your password", "Protecting…",
             () => FileToolsService.ProtectPdfAsync(_pdfPath!, outPath, pw, _password),
             "PDF Protected", $"Saved a password-protected copy to:\n{outPath}", outPath, select: true);
     }
+
+    private async System.Threading.Tasks.Task ProcessRemovePassword(string outDir)
+    {
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_unlocked.pdf");
+        await RunJob("Removing password…", "Saving a decrypted copy", "Removing…",
+            () => FileToolsService.RemovePdfPasswordAsync(_pdfPath!, outPath, _password),
+            "Password Removed", $"Saved an unprotected copy to:\n{outPath}", outPath, select: true);
+    }
+
+    private async System.Threading.Tasks.Task ProcessBreakPassword(string outDir)
+    {
+        string charset = FileToolsService.RecoveryCharsets.First(c => c.key == _breakCharsetKey).chars;
+
+        _recoverCts = new System.Threading.CancellationTokenSource();
+        var token = _recoverCts.Token;
+        var progress = new Progress<(long tried, long total, string current)>(p =>
+        {
+            TxtBusySub.Text = p.total > 0
+                ? $"Tried {p.tried:N0} of {p.total:N0}…  ({p.current})"
+                : $"Trying common passwords…  ({p.current})";
+        });
+
+        BtnProcess.IsEnabled = false;
+        TxtProcess.Text = "Breaking…";
+        ShowBusy("Recovering password…", "Trying common passwords…");
+        BtnBusyCancel.Visibility = Visibility.Visible;
+        string? found = null;
+        bool cancelled = false;
+        try
+        {
+            found = await FileToolsService.RecoverPdfPasswordAsync(_pdfPath!, charset, _breakMaxLen, progress, token);
+        }
+        catch (OperationCanceledException) { cancelled = true; }
+        catch (Exception ex) { HideBusy(); BtnBusyCancel.Visibility = Visibility.Collapsed; ConfirmDialog.Alert(this, "Error", ex.Message, ConfirmDialog.AlertKind.Error); BtnProcess.IsEnabled = true; ApplyToolMeta(); return; }
+
+        HideBusy();
+        BtnBusyCancel.Visibility = Visibility.Collapsed;
+        BtnProcess.IsEnabled = true;
+        ApplyToolMeta();
+        _recoverCts.Dispose(); _recoverCts = null;
+
+        if (cancelled) { ConfirmDialog.Alert(this, "Stopped", "Password recovery was stopped."); return; }
+        if (found == null)
+        {
+            ConfirmDialog.Alert(this, "Not Found",
+                "Couldn't recover the password with these settings. Try a larger character set or a longer max length.",
+                ConfirmDialog.AlertKind.Info);
+            return;
+        }
+
+        // found it — unlock the file in-app and save a decrypted copy
+        _password = string.IsNullOrEmpty(found) ? null : found;
+        _pdfLocked = false;
+        string shown = string.IsNullOrEmpty(found) ? "(no open password — owner-protected only)" : found;
+        string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_unlocked.pdf");
+        try
+        {
+            await FileToolsService.RemovePdfPasswordAsync(_pdfPath!, outPath, _password);
+            RememberChain(outPath);
+            ConfirmDialog.Alert(this, "Password Recovered",
+                $"Password: {shown}\n\nSaved an unprotected copy to:\n{outPath}", ConfirmDialog.AlertKind.Success, "Done");
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
+        }
+        catch (Exception ex)
+        {
+            ConfirmDialog.Alert(this, "Password Recovered",
+                $"Password: {shown}\n\nBut saving an unprotected copy failed: {ex.Message}", ConfirmDialog.AlertKind.Info);
+        }
+        // try to render the now-unlocked file
+        try { _pageCount = await FileToolsService.GetPdfPageCountAsync(_pdfPath!, _password); RefreshAll(); } catch { }
+    }
+
+    private void BtnBusyCancel_Click(object sender, RoutedEventArgs e) => _recoverCts?.Cancel();
 
     /// <summary>Shared run wrapper: spinner + min-dwell, themed success, open result, advance.</summary>
     private async System.Threading.Tasks.Task RunJob(

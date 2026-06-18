@@ -49,4 +49,82 @@
         <Setter Property="Height" Value="20"/>
         <Setter Property="IsMoveToPointEnabled" Value="True"/>
     </Style>
+
+    <!-- ============================================================= -->
+    <!--  Themed ComboBox (readable popup in dark & light themes)       -->
+    <!-- ============================================================= -->
+    <ControlTemplate x:Key="ThemedComboToggle" TargetType="ToggleButton">
+        <Border x:Name="bd" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="26"/>
+                </Grid.ColumnDefinitions>
+                <ContentPresenter Grid.Column="0" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                      Data="M 0 0 L 8 0 L 4 5 Z" Fill="{DynamicResource TextSecondaryBrush}"/>
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="ThemedComboItem" TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="ib" Background="Transparent" Padding="{TemplateBinding Padding}" CornerRadius="6">
+                        <ContentPresenter/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="ib" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ThemedCombo" TargetType="ComboBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource ThemedComboItem}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton Template="{StaticResource ThemedComboToggle}" Focusable="False"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
+                        <ContentPresenter Margin="11,0,30,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
+                        <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                               AllowsTransparency="True" PopupAnimation="Slide" Focusable="False">
+                            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                                    BorderThickness="1" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.32" Color="#000000"/>
+                                </Border.Effect>
+                                <ScrollViewer MaxHeight="280" Margin="3">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Apply the themed combo look app-wide so every dropdown matches the theme. -->
+    <Style TargetType="ComboBox" BasedOn="{StaticResource ThemedCombo}"/>
+    <Style TargetType="ComboBoxItem" BasedOn="{StaticResource ThemedComboItem}"/>
 </ResourceDictionary>

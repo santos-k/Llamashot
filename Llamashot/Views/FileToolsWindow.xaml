@@ -99,10 +99,22 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
-                        BorderThickness="1" CornerRadius="18" Height="38">
+                <Border BorderThickness="1.5" CornerRadius="18" Height="38">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <TextBox x:Name="TxtToolSearch" FontSize="13" Padding="14,6" BorderThickness="0"
                              Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
+                             CaretBrush="{DynamicResource AccentBrush}"
                              VerticalContentAlignment="Center" TextChanged="ToolSearch_Changed"/>
                 </Border>
                 <TextBlock Text="&#x1F50D; Search tools..." Foreground="{DynamicResource TextMutedBrush}" FontSize="13"
@@ -2453,8 +2465,19 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSoftBrush}"
-                                BorderThickness="1" Height="50">
+                        <Border Grid.Column="0" CornerRadius="10" BorderThickness="1.5" Height="50">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                                            <Setter Property="BorderBrush" Value="#FF0000"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -2464,7 +2487,7 @@
                                            Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="16,0,10,0"/>
                                 <TextBox x:Name="TxtYtUrl" Grid.Column="1" BorderThickness="0" Background="Transparent"
                                          Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" VerticalContentAlignment="Center"
-                                         KeyDown="Yt_UrlKeyDown" Margin="0,0,12,0"/>
+                                         CaretBrush="#FF0000" KeyDown="Yt_UrlKeyDown" Margin="0,0,12,0"/>
                             </Grid>
                         </Border>
                         <Button Grid.Column="1" Content="Search" Width="120" Height="50" FontSize="15" FontWeight="SemiBold"
@@ -2523,7 +2546,19 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Height="44">
+                    <Border Grid.Column="0" CornerRadius="8" BorderThickness="1.5" Height="44">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                                        <Setter Property="BorderBrush" Value="#FF0000"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -2534,7 +2569,7 @@
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="14,0,10,0"/>
                             <TextBox x:Name="TxtYtUrlTop" Grid.Column="1" BorderThickness="0" Background="Transparent"
                                      Foreground="{DynamicResource TextPrimaryBrush}" FontSize="14" VerticalContentAlignment="Center"
-                                     KeyDown="Yt_UrlTopKeyDown"/>
+                                     CaretBrush="#FF0000" KeyDown="Yt_UrlTopKeyDown"/>
                             <Button x:Name="BtnYtClear" Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
                                     Width="30" Height="30" FontSize="11" Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"
                                     BorderThickness="0" Cursor="Hand" Click="Yt_ClearResults" Margin="0,0,8,0"/>

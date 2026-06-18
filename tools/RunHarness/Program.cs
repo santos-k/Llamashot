@@ -52,9 +52,27 @@ internal static class Program
             return;
         }
 
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_EDITORTEST") == "1")
+        {
+            await VerifyEditorOnFile(Environment.GetEnvironmentVariable("LLAMASHOT_PDF") ?? @"C:\Users\DELL\Downloads\137.pdf");
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_EDITORUI") == "1")
+        {
+            await VerifyEditorLogic(Environment.GetEnvironmentVariable("LLAMASHOT_PDF") ?? @"C:\Users\DELL\Downloads\137.pdf");
+            return;
+        }
+
         if (Environment.GetEnvironmentVariable("LLAMASHOT_MERGEPREVIEW") == "1")
         {
             await CaptureMergePreview();
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_PROTECT") == "1")
+        {
+            await VerifyProtect(Environment.GetEnvironmentVariable("LLAMASHOT_PDF") ?? @"C:\Users\DELL\Downloads\137.pdf");
             return;
         }
 
@@ -191,7 +209,18 @@ internal static class Program
         try
         {
             // 1) build a 3-page sample PDF from existing PNGs
-            var pngs = Directory.GetFiles(Dir, "*.png").Take(3).ToArray();
+            var pngs = Directory.GetFiles(Dir, "*.png").Where(p => !Path.GetFileName(p).StartsWith("verify")).Take(3).ToArray();
+            if (pngs.Length == 0)
+            {
+                // seed Dir with plain white pages so VERIFY works on a clean temp dir
+                for (int i = 0; i < 3; i++)
+                {
+                    using var b = new SD.Bitmap(850, 1100);
+                    using (var g = SD.Graphics.FromImage(b)) g.Clear(SD.Color.White);
+                    b.Save(Path.Combine(Dir, $"seed_{i}.png"), SD.Imaging.ImageFormat.Png);
+                }
+                pngs = Directory.GetFiles(Dir, "seed_*.png");
+            }
             if (pngs.Length == 0) { L("FAIL: no PNGs available to build a sample PDF"); File.WriteAllText(Path.Combine(Dir, "verify.txt"), log.ToString()); return; }
             string sample = Path.Combine(Dir, "sample.pdf");
             await FileToolsService.ImagesToPdfAsync(pngs, sample);
@@ -205,6 +234,13 @@ internal static class Program
                 new() { Page = 0, Type = FillElementType.Check, X = 60, Y = 110, Width = 24,  Height = 24, Text = "X", FontSize = 22, ColorHex = "#1E6FC8" },
                 new() { Page = 0, Type = FillElementType.DateTime, X = 60, Y = 150, Width = 240, Height = 22, Text = "June 17, 2026", FontSize = 14, ColorHex = "#222222" },
                 new() { Page = 0, Type = FillElementType.Signature, X = 60, Y = 190, Width = 180, Height = 70, ImagePath = pngs[0] },
+                // new editor features: mark glyphs, underline, alignment
+                new() { Page = 0, Type = FillElementType.Check, X = 60, Y = 280, Width = 28, Height = 24, Text = "✓", FontFamily = "Segoe UI Symbol", FontSize = 18, ColorHex = "#137A3F" },
+                new() { Page = 0, Type = FillElementType.Check, X = 100, Y = 280, Width = 28, Height = 24, Text = "✗", FontFamily = "Segoe UI Symbol", FontSize = 18, ColorHex = "#C0392B" },
+                new() { Page = 0, Type = FillElementType.Check, X = 140, Y = 280, Width = 28, Height = 24, Text = "●", FontFamily = "Segoe UI Symbol", FontSize = 18, ColorHex = "#1C3FAA" },
+                new() { Page = 0, Type = FillElementType.Text, X = 60, Y = 320, Width = 300, Height = 22, Text = "Underlined text", FontSize = 16, Underline = true, ColorHex = "#222222" },
+                new() { Page = 0, Type = FillElementType.Text, X = 60, Y = 360, Width = 360, Height = 22, Text = "Center aligned", FontSize = 16, Align = "center", ColorHex = "#0E7490" },
+                new() { Page = 0, Type = FillElementType.Text, X = 60, Y = 390, Width = 360, Height = 22, Text = "Right aligned", FontSize = 16, Align = "right", ColorHex = "#6D28D9" },
             };
             string signed = Path.Combine(Dir, "verify_signed.pdf");
             FillSignExporter.Export(sample, els, signed);
@@ -233,6 +269,179 @@ internal static class Program
         catch (Exception ex) { L("EXCEPTION: " + ex); }
 
         File.WriteAllText(Path.Combine(Dir, "verify.txt"), log.ToString());
+    }
+
+    /// <summary>Drives the PDF Editor's place/move/edit/delete/undo/redo code paths via reflection (no UI clicks).</summary>
+    static async Task VerifyProtect(string pdf)
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string s) => log.AppendLine(s);
+        string outDir = Dir;
+        try
+        {
+            if (!File.Exists(pdf)) { L($"FAIL: file not found: {pdf}"); File.WriteAllText(Path.Combine(outDir, "protect.txt"), log.ToString()); return; }
+
+            // 1) Add password
+            string locked = Path.Combine(outDir, "protect_locked.pdf");
+            await FileToolsService.ProtectPdfAsync(pdf, locked, "1234");
+            bool enc = await FileToolsService.IsPdfEncryptedAsync(locked);
+            L($"add password: encrypted={enc}  [{(enc ? "PASS" : "FAIL")}]");
+
+            // 2) Remove password (known)
+            string unlocked = Path.Combine(outDir, "protect_unlocked.pdf");
+            await FileToolsService.RemovePdfPasswordAsync(locked, unlocked, "1234");
+            bool stillEnc = await FileToolsService.IsPdfEncryptedAsync(unlocked);
+            int upc = await FileToolsService.GetPdfPageCountAsync(unlocked);
+            L($"remove password: encrypted={stillEnc}, pages={upc}  [{(!stillEnc && upc > 0 ? "PASS" : "FAIL")}]");
+
+            // 3) Break password (unknown) — digits up to length 4 should recover "1234"
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var cts = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(120));
+            string? found = await FileToolsService.RecoverPdfPasswordAsync(locked, "0123456789", 4, null, cts.Token);
+            sw.Stop();
+            L($"break (dictionary '1234'): found='{found}' in {sw.ElapsedMilliseconds} ms  [{(found == "1234" ? "PASS" : "FAIL")}]");
+
+            // brute-force-only: a non-dictionary numeric password
+            string locked2 = Path.Combine(outDir, "protect_locked2.pdf");
+            await FileToolsService.ProtectPdfAsync(pdf, locked2, "8254");
+            var sw2 = System.Diagnostics.Stopwatch.StartNew();
+            string? found2 = await FileToolsService.RecoverPdfPasswordAsync(locked2, "0123456789", 4, null, cts.Token);
+            sw2.Stop();
+            L($"break (brute '8254'): found='{found2}' in {sw2.ElapsedMilliseconds} ms  [{(found2 == "8254" ? "PASS" : "FAIL")}]");
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(outDir, "protect.txt"), log.ToString());
+    }
+
+    static async Task VerifyEditorLogic(string pdf)
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string s) => log.AppendLine(s);
+        const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var t = typeof(PdfMarkupWindow);
+        object? Inv(object w, string m, params object?[] a) => t.GetMethod(m, BF)!.Invoke(w, a);
+        try
+        {
+            if (!File.Exists(pdf)) { L($"FAIL: file not found {pdf}"); File.WriteAllText(Path.Combine(Dir, "editorui.txt"), log.ToString()); return; }
+            var w = new PdfMarkupWindow();
+            await (Task)Inv(w, "LoadPdfFile", pdf)!;
+            var elsF = t.GetField("_elements", BF)!;
+            var els = (System.Collections.Generic.List<FillElement>)elsF.GetValue(w)!;
+            void Count(string label, int expect) => L($"{label}: {els.Count} (expect {expect})  [{(els.Count == expect ? "PASS" : "FAIL")}]");
+            Count("after load", 0);
+
+            Inv(w, "PlaceText", 100.0, 100.0, "Hello", FillElementType.Text);
+            Inv(w, "PlaceText", 120.0, 200.0, "World", FillElementType.Text);
+            Inv(w, "PlaceMark", 140.0, 300.0, "✓");
+            Count("placed 2 text + 1 mark", 3);
+
+            // move element 0 (+50 X) and commit through the edit/undo pipeline
+            var e0 = els[0];
+            Inv(w, "Select", e0);
+            double oldX = e0.X; e0.X = oldX + 50;
+            Inv(w, "EditCommit", e0);
+            L($"move: X {oldX:0}->{els[0].X:0}  [{(System.Math.Abs(els[0].X - oldX - 50) < 0.5 ? "PASS" : "FAIL")}]");
+
+            Inv(w, "Undo");
+            L($"undo move: X={els[0].X:0} (expect {oldX:0})  [{(System.Math.Abs(els[0].X - oldX) < 0.5 ? "PASS" : "FAIL")}]");
+
+            // delete element 0
+            Inv(w, "Select", els[0]);
+            Inv(w, "DeleteSelected");
+            Count("after delete", 2);
+
+            Inv(w, "Undo");
+            Count("undo delete", 3);
+
+            Inv(w, "Redo");
+            Count("redo delete", 2);
+
+            // edit text content of element 0, commit, undo
+            var te = els[0];
+            string oldText = te.Text;
+            Inv(w, "Select", te);
+            te.Text = "Changed";
+            Inv(w, "EditCommit", te);
+            L($"edit text: '{oldText}'->'{els[0].Text}'  [{(els[0].Text == "Changed" ? "PASS" : "FAIL")}]");
+            Inv(w, "Undo");
+            L($"undo edit: '{els[0].Text}' (expect '{oldText}')  [{(els[0].Text == oldText ? "PASS" : "FAIL")}]");
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(Dir, "editorui.txt"), log.ToString());
+    }
+
+    /// <summary>Exercises the new PDF Editor element types (text, marks, date/time, cover, blur) against a real file.</summary>
+    static async Task VerifyEditorOnFile(string pdf)
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string s) => log.AppendLine(s);
+        string outDir = Dir;
+        try
+        {
+            if (!File.Exists(pdf)) { L($"FAIL: file not found: {pdf}"); File.WriteAllText(Path.Combine(outDir, "editor.txt"), log.ToString()); return; }
+            int pc = await FileToolsService.GetPdfPageCountAsync(pdf);
+            var (wPt, hPt, _) = await FillSignRender.GetPageSizeAsync(pdf, 0);
+            L($"{Path.GetFileName(pdf)}: {pc} pages, page1 = {wPt:0}×{hPt:0} pt  [PASS]");
+
+            // coordinates are in PDF points for an A4 page (595×842)
+            var els = new List<FillElement>
+            {
+                new() { Page = 0, Type = FillElementType.Text, X = 150, Y = 300, Width = 240, Height = 18, Text = "Santosh Kumar", FontFamily = "Segoe UI", FontSize = 13, ColorHex = "#1C3FAA" },
+                new() { Page = 0, Type = FillElementType.Check, X = 300, Y = 350, Width = 22, Height = 18, Text = "✓", FontFamily = "Segoe UI Symbol", FontSize = 16, ColorHex = "#137A3F" },
+                new() { Page = 0, Type = FillElementType.Check, X = 330, Y = 350, Width = 22, Height = 18, Text = "✗", FontFamily = "Segoe UI Symbol", FontSize = 16, ColorHex = "#C0392B" },
+                new() { Page = 0, Type = FillElementType.Check, X = 360, Y = 350, Width = 22, Height = 18, Text = "●", FontFamily = "Segoe UI Symbol", FontSize = 16, ColorHex = "#1C3FAA" },
+                new() { Page = 0, Type = FillElementType.DateTime, X = 150, Y = 330, Width = 130, Height = 16, Text = "Jun 18, 2026", FontSize = 13, ColorHex = "#222222" },
+                new() { Page = 0, Type = FillElementType.DateTime, X = 300, Y = 330, Width = 90, Height = 16, Text = "3:37 PM", FontSize = 13, ColorHex = "#222222" },
+                // Cover (redact): white strip then black strip
+                new() { Page = 0, Type = FillElementType.Redact, X = 150, Y = 400, Width = 200, Height = 16, ColorHex = "#FFFFFF" },
+                new() { Page = 0, Type = FillElementType.Redact, X = 150, Y = 420, Width = 200, Height = 16, ColorHex = "#222222" },
+                // Blur over the top title block (with 60% opacity)
+                new() { Page = 0, Type = FillElementType.Blur, X = 150, Y = 38, Width = 320, Height = 24, FontSize = 16, Opacity = 60 },
+                // Rotated text + rotated cover to exercise the new rotation export path
+                new() { Page = 0, Type = FillElementType.Text, X = 400, Y = 500, Width = 160, Height = 18, Text = "Rotated 30°", FontSize = 13, ColorHex = "#6D28D9", Rotation = 30 },
+                new() { Page = 0, Type = FillElementType.Redact, X = 400, Y = 560, Width = 120, Height = 20, ColorHex = "#C0392B", Rotation = 45, Opacity = 50 },
+            };
+
+            // pre-render blur regions to images (mirrors PdfMarkupWindow.RenderBlursAsync)
+            const int dpi = 200;
+            string blurDir = Path.Combine(outDir, "blurs");
+            Directory.CreateDirectory(blurDir);
+            foreach (var grp in els.FindAll(e => e.Type == FillElementType.Blur).GroupBy(e => e.Page))
+            {
+                using var bmp = await FillSignRender.RenderPageToBitmapAsync(pdf, grp.Key, dpi);
+                int i = 0;
+                foreach (var e in grp)
+                {
+                    int x = (int)(e.X * dpi / 72.0), y = (int)(e.Y * dpi / 72.0), w = (int)(e.Width * dpi / 72.0), h = (int)(e.Height * dpi / 72.0);
+                    x = Math.Clamp(x, 0, bmp.Width - 1); y = Math.Clamp(y, 0, bmp.Height - 1);
+                    w = Math.Clamp(w, 1, bmp.Width - x); h = Math.Clamp(h, 1, bmp.Height - y);
+                    using var crop = bmp.Clone(new SD.Rectangle(x, y, w, h), bmp.PixelFormat);
+                    int factor = Math.Clamp((int)(e.FontSize * dpi / 120.0) / 2, 3, 24);
+                    int sw = Math.Max(1, crop.Width / factor), sh = Math.Max(1, crop.Height / factor);
+                    using var small = new SD.Bitmap(sw, sh);
+                    using (var g = SD.Graphics.FromImage(small)) { g.InterpolationMode = SD.Drawing2D.InterpolationMode.HighQualityBilinear; g.DrawImage(crop, 0, 0, sw, sh); }
+                    var big = new SD.Bitmap(crop.Width, crop.Height);
+                    using (var g = SD.Graphics.FromImage(big)) { g.InterpolationMode = SD.Drawing2D.InterpolationMode.HighQualityBilinear; g.DrawImage(small, 0, 0, crop.Width, crop.Height); }
+                    string f = Path.Combine(blurDir, $"b{grp.Key}_{i++}.png");
+                    big.Save(f, SD.Imaging.ImageFormat.Png); big.Dispose();
+                    e.ImagePath = f;
+                }
+            }
+
+            string outPdf = Path.Combine(outDir, "editor_137.pdf");
+            FillSignExporter.Export(pdf, els, outPdf);
+            bool ok = File.Exists(outPdf) && new FileInfo(outPdf).Length > 0;
+            int opc = ok ? await FileToolsService.GetPdfPageCountAsync(outPdf) : 0;
+            L($"editor_137.pdf: exists={ok}, pages={opc}  [{(ok && opc == pc ? "PASS" : "FAIL")}]");
+            if (ok)
+            {
+                using var rb = await FillSignRender.RenderPageToBitmapAsync(outPdf, 0, 150);
+                rb.Save(Path.Combine(outDir, "editor_137.png"), SD.Imaging.ImageFormat.Png);
+                L("rendered editor_137.png (page 1)");
+            }
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(outDir, "editor.txt"), log.ToString());
     }
 
     static async Task CaptureMergePreview()

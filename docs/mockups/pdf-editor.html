@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Llamashot — PDF Editor (mockup)</title>
+<style>
+  /* ===== Theme tokens (mirror DarkTheme.xaml / LightTheme.xaml exactly) ===== */
+  :root[data-theme="dark"] {
+    --window:#14151A; --header:#1B1C24; --surface:#1E2029; --surface-alt:#262833;
+    --surface-hover:#2A2D38; --border:#313443; --text1:#E8EAF0; --text2:#A8AEC0;
+    --text3:#6B7080; --accent:#7C9CFF; --accent-text:#0E1018; --success:#5BD0A4; --danger:#FF7A7A;
+    --page:#FFFFFF; --page-ink:#222; --shadow:rgba(0,0,0,.45);
+  }
+  :root[data-theme="light"] {
+    --window:#F5F6FB; --header:#FFFFFF; --surface:#FFFFFF; --surface-alt:#EEF1F8;
+    --surface-hover:#EDF0FA; --border:#E2E6F0; --text1:#1F2430; --text2:#5B6172;
+    --text3:#9AA0B0; --accent:#6E8BFF; --accent-text:#FFFFFF; --success:#43C59E; --danger:#FF6B6B;
+    --page:#FFFFFF; --page-ink:#222; --shadow:rgba(60,70,100,.20);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body {
+    font-family:"Segoe UI",system-ui,sans-serif; background:var(--window); color:var(--text1);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden; font-size:13.5px;
+  }
+  /* ===== Top bar ===== */
+  .topbar {
+    display:flex; align-items:center; padding:14px 22px; border-bottom:1px solid var(--border);
+    background:var(--window); gap:16px;
+  }
+  .topbar h1 { font-size:22px; font-weight:700; letter-spacing:-.2px; }
+  .topbar .sub { font-size:12.5px; color:var(--text3); margin-top:2px; }
+  .spacer { flex:1; }
+  .btn {
+    border:1px solid var(--border); background:var(--surface); color:var(--text2);
+    border-radius:10px; padding:9px 16px; font-size:13px; cursor:pointer; font-family:inherit;
+    display:inline-flex; align-items:center; gap:7px; transition:.12s; white-space:nowrap;
+  }
+  .btn:hover { background:var(--surface-hover); color:var(--text1); }
+  .btn.accent { background:var(--accent); color:var(--accent-text); border-color:transparent; font-weight:600; }
+  .btn.accent:hover { filter:brightness(1.07); }
+  .btn.ghost { background:transparent; }
+  .icon-btn {
+    width:34px; height:34px; padding:0; justify-content:center; border-radius:9px; font-size:15px;
+  }
+  /* ===== Body layout ===== */
+  .body { flex:1; display:flex; min-height:0; }
+  /* Left tool rail */
+  .rail {
+    width:218px; background:var(--header); border-right:1px solid var(--border);
+    overflow-y:auto; padding:16px 12px; flex-shrink:0;
+  }
+  .rail-label {
+    font-size:10.5px; font-weight:600; letter-spacing:.8px; color:var(--text3);
+    margin:16px 6px 7px; text-transform:uppercase;
+  }
+  .rail-label:first-child { margin-top:2px; }
+  .tool {
+    display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:10px;
+    cursor:pointer; color:var(--text2); font-size:13.5px; margin:1px 0; transition:.1s; user-select:none;
+  }
+  .tool:hover { background:var(--surface-hover); color:var(--text1); }
+  .tool.active { background:var(--accent); color:var(--accent-text); font-weight:600; }
+  .tool .gi {
+    width:20px; text-align:center; font-size:15px; flex-shrink:0;
+  }
+  .tool .kbd {
+    margin-left:auto; font-size:10px; color:var(--text3); border:1px solid var(--border);
+    border-radius:4px; padding:1px 5px;
+  }
+  .tool.active .kbd { color:var(--accent-text); border-color:rgba(0,0,0,.25); }
+  /* Canvas area */
+  .canvas-wrap {
+    flex:1; overflow:auto; padding:30px; display:flex; justify-content:center; align-items:flex-start;
+    background:
+      radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+    background-size:22px 22px;
+  }
+  .page {
+    width:612px; min-height:792px; background:var(--page); border-radius:2px;
+    box-shadow:0 10px 40px var(--shadow); position:relative; flex-shrink:0; color:var(--page-ink);
+    padding:54px 60px; font-size:13px; line-height:1.7;
+  }
+  .page h2 { font-size:18px; color:#1a1a1a; margin-bottom:4px; }
+  .page .muted { color:#888; font-size:12px; }
+  .page .line { height:1px; background:#e3e3e3; margin:18px 0; }
+  .page .row { color:#444; margin:9px 0; }
+  .page .blank { display:inline-block; border-bottom:1px solid #bbb; min-width:160px; }
+  /* placed elements */
+  .el {
+    position:absolute; border:1.5px solid transparent; border-radius:3px; cursor:move;
+    padding:1px 4px; font-size:13px;
+  }
+  .el:hover { border-color:color-mix(in srgb, var(--accent) 55%, transparent); }
+  .el.sel { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent); }
+  .el.sel::after, .el.sel::before {
+    content:""; position:absolute; width:8px; height:8px; background:var(--accent);
+    border:1.5px solid var(--page); border-radius:2px;
+  }
+  .el.sel::before { left:-5px; top:-5px; }
+  .el.sel::after { right:-5px; bottom:-5px; }
+  .el.text { color:#1c3faa; font-weight:500; }
+  .el.mark { font-size:18px; color:#137a3f; font-weight:700; }
+  .el.mark.cross { color:#c0392b; }
+  .el.sig { font-family:"Segoe Script","Brush Script MT",cursive; font-size:26px; color:#13294b; border-bottom:1px solid #999; }
+  /* Right properties panel */
+  .props {
+    width:264px; background:var(--header); border-left:1px solid var(--border);
+    padding:18px 16px; overflow-y:auto; flex-shrink:0;
+  }
+  .props h3 { font-size:13px; font-weight:700; margin-bottom:3px; }
+  .props .ctx { font-size:11.5px; color:var(--text3); margin-bottom:16px; }
+  .field { margin-bottom:15px; }
+  .field > label { display:block; font-size:11px; color:var(--text3); margin-bottom:6px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; }
+  select, input[type=text], input[type=number] {
+    width:100%; background:var(--surface); color:var(--text1); border:1px solid var(--border);
+    border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit;
+  }
+  select:focus, input:focus { outline:none; border-color:var(--accent); }
+  .seg { display:flex; gap:6px; }
+  .seg .pill {
+    flex:1; text-align:center; padding:8px 0; border:1px solid var(--border); border-radius:8px;
+    background:var(--surface); color:var(--text2); cursor:pointer; font-size:14px; transition:.1s;
+  }
+  .seg .pill:hover { background:var(--surface-hover); }
+  .seg .pill.on { background:var(--accent); color:var(--accent-text); border-color:transparent; }
+  .swatches { display:flex; flex-wrap:wrap; gap:8px; }
+  .sw { width:26px; height:26px; border-radius:7px; cursor:pointer; border:2px solid transparent; }
+  .sw.on { border-color:var(--text1); box-shadow:0 0 0 2px var(--header); }
+  .size-row { display:flex; gap:8px; align-items:center; }
+  .size-row input { flex:1; }
+  .style-row { display:flex; gap:6px; }
+  .style-row .pill { flex:1; }
+  .mark-style { display:flex; gap:8px; }
+  .mark-style .pill { flex:1; font-size:18px; padding:6px 0; }
+  .hint {
+    margin-top:8px; font-size:11.5px; color:var(--text3); background:var(--surface);
+    border:1px solid var(--border); border-radius:9px; padding:10px 12px; line-height:1.5;
+  }
+  /* Bottom action bar */
+  .actionbar {
+    display:flex; align-items:center; padding:12px 22px; border-top:1px solid var(--border);
+    background:var(--header); gap:12px;
+  }
+  .pager { display:flex; align-items:center; gap:12px; margin:0 auto; }
+  .pager .pg { font-size:13px; color:var(--text2); min-width:60px; text-align:center; }
+  .zoom { display:flex; align-items:center; gap:8px; color:var(--text2); font-size:12.5px; }
+  .badge { font-size:11px; color:var(--text3); }
+  .note {
+    position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+    background:var(--surface-alt); border:1px solid var(--border); color:var(--text2);
+    padding:7px 14px; border-radius:20px; font-size:12px; opacity:0; transition:.25s; pointer-events:none;
+  }
+  .note.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- ===== TOP BAR ===== -->
+<div class="topbar">
+  <div>
+    <h1>PDF Editor</h1>
+    <div class="sub">Add text, checks, dates, signatures &amp; more — then save</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn ghost icon-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  <button class="btn ghost icon-btn" title="Undo">↶</button>
+  <button class="btn ghost icon-btn" title="Redo">↷</button>
+  <button class="btn">📂&nbsp; Open PDF</button>
+</div>
+
+<!-- ===== BODY ===== -->
+<div class="body">
+
+  <!-- LEFT TOOL RAIL -->
+  <div class="rail" id="rail">
+    <div class="rail-label">Select</div>
+    <div class="tool active" data-tool="select"><span class="gi">↖</span> Select &amp; move <span class="kbd">V</span></div>
+
+    <div class="rail-label">Fields</div>
+    <div class="tool" data-tool="text"><span class="gi">🆃</span> Text <span class="kbd">T</span></div>
+    <div class="tool" data-tool="check"><span class="gi">✓</span> Check mark</div>
+    <div class="tool" data-tool="cross"><span class="gi">✗</span> Cross</div>
+    <div class="tool" data-tool="radio"><span class="gi">⦿</span> Radio / dot</div>
+    <div class="tool" data-tool="dropdown"><span class="gi">▾</span> Dropdown</div>
+
+    <div class="rail-label">Date &amp; Time</div>
+    <div class="tool" data-tool="date"><span class="gi">📅</span> Date</div>
+    <div class="tool" data-tool="time"><span class="gi">🕐</span> Time</div>
+
+    <div class="rail-label">Sign</div>
+    <div class="tool" data-tool="signature"><span class="gi">✍</span> Signature</div>
+    <div class="tool" data-tool="initials"><span class="gi">🅰</span> Initials</div>
+    <div class="tool" data-tool="image"><span class="gi">🖼</span> Image / stamp</div>
+
+    <div class="rail-label">Draw</div>
+    <div class="tool" data-tool="pen"><span class="gi">✎</span> Pen</div>
+    <div class="tool" data-tool="line"><span class="gi">╱</span> Line</div>
+    <div class="tool" data-tool="rect"><span class="gi">▭</span> Rectangle</div>
+    <div class="tool" data-tool="highlight"><span class="gi">▥</span> Highlight</div>
+
+    <div class="rail-label">Assist</div>
+    <div class="tool" data-tool="detect"><span class="gi">✨</span> Auto-detect fields</div>
+    <div class="tool" style="color:var(--danger)" data-tool="delete"><span class="gi">🗑</span> Delete selected</div>
+  </div>
+
+  <!-- CENTER CANVAS -->
+  <div class="canvas-wrap">
+    <div class="page" id="page">
+      <h2>Membership Application Form</h2>
+      <div class="muted">Please complete all fields and sign at the bottom.</div>
+      <div class="line"></div>
+      <div class="row">Full name: <span class="blank"></span></div>
+      <div class="row">Date of birth: <span class="blank" style="min-width:120px"></span></div>
+      <div class="row">Email address: <span class="blank"></span></div>
+      <div class="row" style="margin-top:18px">Membership type:</div>
+      <div class="row" style="margin-left:10px">▢ &nbsp;Standard &nbsp;&nbsp;&nbsp; ▢ &nbsp;Premium &nbsp;&nbsp;&nbsp; ▢ &nbsp;Student</div>
+      <div class="row" style="margin-top:18px">I agree to the terms and conditions:&nbsp; ▢</div>
+      <div class="line" style="margin-top:40px"></div>
+      <div class="row">Signature: <span class="blank" style="min-width:220px"></span></div>
+      <div class="row">Date signed: <span class="blank" style="min-width:120px"></span></div>
+
+      <!-- Placed sample elements -->
+      <div class="el text" style="left:150px; top:152px;">Jane A. Doe</div>
+      <div class="el text sel" style="left:206px; top:233px;" data-name="Email field">jane.doe@email.com</div>
+      <div class="el mark" style="left:73px; top:336px;">✓</div>
+      <div class="el mark cross" style="left:73px; top:386px;">✗</div>
+      <div class="el sig" style="left:150px; top:512px;">Jane Doe</div>
+      <div class="el text" style="left:165px; top:556px;">Jun 18, 2026</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PROPERTIES PANEL -->
+  <div class="props">
+    <h3>Properties</h3>
+    <div class="ctx" id="ctx">Text field selected</div>
+
+    <div class="field">
+      <label>Content</label>
+      <input type="text" value="jane.doe@email.com" />
+    </div>
+
+    <div class="field">
+      <label>Font</label>
+      <select>
+        <option>Segoe UI</option><option>Arial</option><option selected>Helvetica</option>
+        <option>Times New Roman</option><option>Calibri</option><option>Courier New</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Size</label>
+      <div class="size-row">
+        <input type="number" value="12" />
+        <div class="seg" style="flex:0 0 auto">
+          <div class="pill">−</div><div class="pill">+</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Style</label>
+      <div class="style-row">
+        <div class="pill" style="font-weight:700">B</div>
+        <div class="pill" style="font-style:italic">I</div>
+        <div class="pill" style="text-decoration:underline">U</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Align</label>
+      <div class="seg">
+        <div class="pill on">⬅</div><div class="pill">⬌</div><div class="pill">➡</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Color</label>
+      <div class="swatches">
+        <div class="sw" style="background:#222"></div>
+        <div class="sw on" style="background:#1c3faa"></div>
+        <div class="sw" style="background:#137a3f"></div>
+        <div class="sw" style="background:#c0392b"></div>
+        <div class="sw" style="background:#b8860b"></div>
+        <div class="sw" style="background:#6d28d9"></div>
+        <div class="sw" style="background:#0e7490"></div>
+        <div class="sw" style="background:#555"></div>
+      </div>
+    </div>
+
+    <div class="field" id="markStyleField" style="display:none">
+      <label>Mark style</label>
+      <div class="mark-style">
+        <div class="pill on">✓</div><div class="pill">✗</div><div class="pill">⦿</div><div class="pill">■</div>
+      </div>
+    </div>
+
+    <div class="hint">Tip: pick a tool on the left, then click the page to place it. Drag any item to reposition, double-click text to edit.</div>
+  </div>
+</div>
+
+<!-- ===== BOTTOM ACTION BAR ===== -->
+<div class="actionbar">
+  <span class="badge">6 items placed</span>
+  <div class="pager">
+    <button class="btn ghost icon-btn">‹</button>
+    <span class="pg">1 / 3</span>
+    <button class="btn ghost icon-btn">›</button>
+  </div>
+  <div class="zoom">
+    <button class="btn ghost icon-btn">−</button>
+    <span>100%</span>
+    <button class="btn ghost icon-btn">+</button>
+    <button class="btn ghost icon-btn" title="Fullscreen">⛶</button>
+  </div>
+  <button class="btn accent" style="padding:11px 26px">Save PDF&nbsp; →</button>
+</div>
+
+<div class="note" id="note"></div>
+
+<script>
+  // Theme toggle
+  const root = document.documentElement;
+  root.setAttribute("data-theme","dark");
+  themeBtn.onclick = () => {
+    const d = root.getAttribute("data-theme")==="dark";
+    root.setAttribute("data-theme", d?"light":"dark");
+    themeBtn.textContent = d?"☀":"🌙";
+  };
+  // Tool selection
+  const note = document.getElementById("note");
+  let noteT;
+  function toast(msg){ note.textContent=msg; note.classList.add("show"); clearTimeout(noteT); noteT=setTimeout(()=>note.classList.remove("show"),1400); }
+  document.querySelectorAll(".tool").forEach(t=>{
+    t.onclick = () => {
+      document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));
+      t.classList.add("active");
+      const tool = t.dataset.tool;
+      const markFld = document.getElementById("markStyleField");
+      markFld.style.display = ["check","cross","radio"].includes(tool) ? "" : "none";
+      document.getElementById("ctx").textContent = t.textContent.trim().replace(/\s+[A-Z]$/,"") + " tool";
+      toast("Tool: " + t.textContent.trim());
+    };
+  });
+  // Element selection
+  document.querySelectorAll(".el").forEach(el=>{
+    el.onclick = (e)=>{ e.stopPropagation();
+      document.querySelectorAll(".el").forEach(x=>x.classList.remove("sel"));
+      el.classList.add("sel");
+      document.getElementById("ctx").textContent = (el.dataset.name||"Item")+" selected";
+    };
+  });
+  document.querySelectorAll(".seg .pill, .style-row .pill, .mark-style .pill").forEach(p=>{
+    p.onclick = ()=>{ const sibs=p.parentElement.querySelectorAll(".pill"); sibs.forEach(s=>s.classList.remove("on")); p.classList.add("on"); };
+  });
+  document.querySelectorAll(".sw").forEach(s=>{
+    s.onclick = ()=>{ document.querySelectorAll(".sw").forEach(x=>x.classList.remove("on")); s.classList.add("on"); };
+  });
+</script>
+</body>
+</html>

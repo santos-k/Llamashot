@@ -666,6 +666,116 @@ public static class FileToolsService
         });
     }
 
+    /// <summary>Saves an unprotected copy of a PDF. currentPassword unlocks the source (required if it is encrypted).</summary>
+    public static async Task RemovePdfPasswordAsync(string inputPath, string outputPath, string? currentPassword = null)
+    {
+        await Task.Run(() =>
+        {
+            // Import every page into a fresh document — the new file carries no encryption.
+            var src = string.IsNullOrEmpty(currentPassword)
+                ? PdfSharp.Pdf.IO.PdfReader.Open(inputPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
+                : PdfSharp.Pdf.IO.PdfReader.Open(inputPath, currentPassword, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            using (src)
+            using (var outDoc = new PdfSharp.Pdf.PdfDocument())
+            {
+                for (int i = 0; i < src.PageCount; i++) outDoc.AddPage(src.Pages[i]);
+                outDoc.Save(outputPath);
+            }
+        });
+    }
+
+    /// <summary>Common-password preset names mapped to their character sets, for the recovery tool.</summary>
+    public static readonly (string key, string label, string chars)[] RecoveryCharsets =
+    {
+        ("digits",  "Digits (0–9)",       "0123456789"),
+        ("lower",   "Lowercase (a–z)",    "abcdefghijklmnopqrstuvwxyz"),
+        ("alnum",   "Letters + digits",   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"),
+    };
+
+    // A short built-in dictionary of frequently used passwords, tried before brute force.
+    private static readonly string[] CommonPasswords =
+    {
+        "", "password", "123456", "12345678", "1234", "12345", "123456789", "1234567890",
+        "qwerty", "abc123", "111111", "000000", "1234567", "admin", "letmein", "welcome",
+        "monkey", "dragon", "master", "login", "passw0rd", "password1", "p@ssw0rd",
+        "iloveyou", "sunshine", "princess", "football", "654321", "121212", "qwerty123",
+        "secret", "test", "test123", "pass", "pass123", "root", "user", "guest", "demo",
+        "india", "1q2w3e4r", "zaq12wsx", "qazwsx", "aaaaaa", "888888", "555555", "222222",
+        "abcd1234", "a1b2c3d4", "changeme", "default", "temp", "temp123", "company",
+        "december", "january", "summer", "winter", "spring", "autumn",
+    };
+
+    /// <summary>
+    /// Attempts to recover an unknown open-password by trying a built-in dictionary, then brute force
+    /// over <paramref name="charset"/> up to <paramref name="maxLength"/>. Returns the password (which may
+    /// be the empty string for owner-only protection) or null if not found / cancelled.
+    /// </summary>
+    public static async Task<string?> RecoverPdfPasswordAsync(
+        string inputPath, string charset, int maxLength,
+        IProgress<(long tried, long total, string current)>? progress,
+        System.Threading.CancellationToken token)
+    {
+        byte[] bytes = await File.ReadAllBytesAsync(inputPath, token);
+
+        bool Try(string pw)
+        {
+            try
+            {
+                using var ms = new MemoryStream(bytes, false);
+                using var doc = PdfSharp.Pdf.IO.PdfReader.Open(ms, pw, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+                return doc.PageCount >= 0; // opened without throwing → correct password
+            }
+            catch { return false; }
+        }
+
+        return await Task.Run(() =>
+        {
+            long tried = 0;
+
+            // 1) dictionary of common passwords
+            foreach (var pw in CommonPasswords)
+            {
+                token.ThrowIfCancellationRequested();
+                tried++;
+                if (Try(pw)) return pw;
+                progress?.Report((tried, -1, pw.Length == 0 ? "(no password)" : pw));
+            }
+
+            // 2) brute force, shortest first
+            long total = 0, pow = 1;
+            for (int len = 1; len <= maxLength; len++) { pow *= charset.Length; total += pow; }
+
+            var buf = new char[maxLength];
+            for (int len = 1; len <= maxLength; len++)
+            {
+                var found = BruteForce(charset, len, buf, Try, ref tried, total, progress, token);
+                if (found != null) return found;
+            }
+            return null;
+        }, token);
+    }
+
+    private static string? BruteForce(string cs, int len, char[] buf, Func<string, bool> Try,
+        ref long tried, long total, IProgress<(long, long, string)>? progress, System.Threading.CancellationToken token)
+    {
+        int n = cs.Length;
+        var idx = new int[len];
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            for (int i = 0; i < len; i++) buf[i] = cs[idx[i]];
+            string cand = new string(buf, 0, len);
+            tried++;
+            if (Try(cand)) return cand;
+            if ((tried & 0x3FF) == 0) progress?.Report((tried, total, cand));
+
+            int p = len - 1;
+            while (p >= 0) { if (++idx[p] < n) break; idx[p] = 0; p--; }
+            if (p < 0) break; // exhausted this length
+        }
+        return null;
+    }
+
     public static async Task ExtractPdfPagesAsync(string pdfPath, int[] pageNumbers, string outputPath, IProgress<int>? progress = null, string? password = null)
     {
         string tempDir = CreateTempDir("extract");
@@ -705,7 +815,12 @@ public static class FileToolsService
         }
     }
 
-    public static async Task InsertPdfPagesAsync(string basePdfPath, string[] insertImagePaths, int afterPage, string outputPath, IProgress<int>? progress = null, string? password = null)
+    /// <summary>
+    /// Inserts pages into a base PDF after <paramref name="afterPage"/>. Each insert item may be an
+    /// image (one page) or a PDF (all its pages, expanded in order). insertPasswords unlocks any
+    /// protected insert PDFs (parallel to insertItemPaths).
+    /// </summary>
+    public static async Task InsertPdfPagesAsync(string basePdfPath, string[] insertItemPaths, int afterPage, string outputPath, IProgress<int>? progress = null, string? password = null, IList<string?>? insertPasswords = null)
     {
         string tempDir = CreateTempDir("insert");
         try
@@ -734,12 +849,40 @@ public static class FileToolsService
                 progress?.Report((int)((i + 1) * 40 / pageCount));
             }
 
-            // Build ordered list: base pages 1..afterPage, then insert images, then remaining base pages
+            // Expand insert items: images pass through, PDFs are rasterized to one image per page.
+            var insertExpanded = new List<string>();
+            for (int k = 0; k < insertItemPaths.Length; k++)
+            {
+                string ip = insertItemPaths[k];
+                if (ip.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? ipw = insertPasswords != null && k < insertPasswords.Count ? insertPasswords[k] : null;
+                    var ifile = await Windows.Storage.StorageFile.GetFileFromPathAsync(ip);
+                    var idoc = await LoadPdfAsync(ifile, ipw);
+                    for (uint pi = 0; pi < idoc.PageCount; pi++)
+                    {
+                        using var ipage = idoc.GetPage(pi);
+                        var ibmp = await RenderPdfPageAsync(ipage);
+                        string itf = Path.Combine(tempDir, $"ins_{k:D3}_{pi:D5}.jpg");
+                        await Task.Run(() =>
+                        {
+                            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+                            encoder.Frames.Add(BitmapFrame.Create(ibmp));
+                            using var fs = new FileStream(itf, FileMode.Create);
+                            encoder.Save(fs);
+                        });
+                        insertExpanded.Add(itf);
+                    }
+                }
+                else insertExpanded.Add(ip);
+            }
+
+            // Build ordered list: base pages 1..afterPage, then expanded inserts, then remaining base pages
             var allImages = new List<string>();
             for (int i = 0; i < afterPage; i++)
                 allImages.Add(tempImages[i]);
 
-            allImages.AddRange(insertImagePaths);
+            allImages.AddRange(insertExpanded);
 
             for (int i = afterPage; i < tempImages.Count; i++)
                 allImages.Add(tempImages[i]);

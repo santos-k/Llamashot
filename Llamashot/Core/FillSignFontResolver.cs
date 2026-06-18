@@ -18,6 +18,8 @@ public class FillSignFontResolver : IFontResolver
         {
             "times" or "times new roman" => Pick(bold, italic, "times.ttf", "timesbd.ttf", "timesi.ttf", "timesbi.ttf"),
             "courier" or "courier new"   => Pick(bold, italic, "cour.ttf", "courbd.ttf", "couri.ttf", "courbi.ttf"),
+            // symbol font carries glyphs Arial lacks (✓ ✗ ● ■ …) so marks embed correctly
+            "segoe ui symbol"            => "seguisym.ttf",
             _                             => Pick(bold, italic, "arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf"),
         };
         return new FontResolverInfo(Path.Combine(Fonts, file));

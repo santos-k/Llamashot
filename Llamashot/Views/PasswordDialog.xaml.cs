@@ -14,14 +14,20 @@ public partial class PasswordDialog : Window
 
     public string Password => PwBox.Password;
 
+    /// <summary>Returned by <see cref="UnlockAsync"/> when the user chooses "Recover" instead of entering a password.</summary>
+    public const string RecoverSentinel = "\0__RECOVER__\0";
+
+    private bool _recover;
+
     /// <summary>
     /// Ensures a PDF can be opened. Returns:
     ///  - "" when the PDF is not protected (no password needed),
     ///  - the working password when the user unlocks it,
+    ///  - <see cref="RecoverSentinel"/> when the user clicks "Recover" (only when <paramref name="allowRecover"/>),
     ///  - null when the user cancels.
     /// Re-prompts on an incorrect password.
     /// </summary>
-    public static async Task<string?> UnlockAsync(Window owner, string pdfPath)
+    public static async Task<string?> UnlockAsync(Window owner, string pdfPath, bool allowRecover = false)
     {
         if (!await FileToolsService.IsPdfEncryptedAsync(pdfPath))
             return "";
@@ -35,6 +41,7 @@ public partial class PasswordDialog : Window
             else dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
             dlg.TxtMessage.Text = $"“{fileName}” is password-protected. Enter its password to open it.";
+            if (allowRecover) dlg.BtnRecover.Visibility = Visibility.Visible;
             if (error != null)
             {
                 dlg.TxtError.Text = error;
@@ -43,6 +50,8 @@ public partial class PasswordDialog : Window
 
             if (dlg.ShowDialog() != true)
                 return null; // cancelled
+
+            if (dlg._recover) return RecoverSentinel;
 
             string pw = dlg.Password;
             if (pw.Length > 0 && await FileToolsService.TryUnlockPdfAsync(pdfPath, pw))
@@ -53,6 +62,8 @@ public partial class PasswordDialog : Window
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+
+    private void Recover_Click(object sender, RoutedEventArgs e) { _recover = true; DialogResult = true; }
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 

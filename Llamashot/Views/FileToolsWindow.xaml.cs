@@ -34,9 +34,8 @@ public partial class FileToolsWindow : Window
         ("page_numbers",   "Page Numbers",    "Add numbers to PDF",                  "#90A0F0", "#",      "PDF Tools"),
         ("extract_pages",  "Extract Pages",   "Pick specific pages from PDF",        "#FFB59B", "\u2398", "PDF Tools"),
         ("insert_pages",   "Insert Pages",    "Add new pages to a PDF",              "#C9B0A6", "\u2295", "PDF Tools"),
-        ("protect_pdf",    "Protect PDF",     "Lock a PDF with a password",          "#8FB0F7", "\U0001F512", "PDF Tools"),
-        ("fill_sign",      "Fill & Sign",     "Fill fields and sign a PDF",          "#7FD1B0", "\u270D", "PDF Tools"),
-        ("pdf_editor",     "Edit PDF",        "Add text, images & marks to a PDF",   "#C7A6F0", "\u270E", "PDF Tools"),
+        ("protect_pdf",    "PDF Password",     "Add, remove, or recover a password",  "#8FB0F7", "\U0001F512", "PDF Tools"),
+        ("pdf_editor",     "PDF Editor",      "Fill, sign, add text, checks & dates", "#7FD1B0", "\u270E", "PDF Tools"),
         ("image_editor",   "Image Editor",    "All-in-one image editor",             "#A78BFA", "\u2B1C", "Image Tools"),
         ("compress_image", "Compress Image",  "Reduce image file size",              "#6FD9E6", "\u2B07", "Image Tools"),
         ("resize_image",   "Resize Image",    "Change dimensions",                   "#6FD0C3", "\u2922", "Image Tools"),
@@ -827,16 +826,35 @@ public partial class FileToolsWindow : Window
     //  Navigation
     // =====================================================================
 
+    /// <summary>
+    /// Brings a just-opened non-modal window to the foreground. The card opens it on
+    /// MouseLeftButtonDown, so the trailing MouseLeftButtonUp would otherwise re-activate
+    /// this window — defer activation until the click is fully processed.
+    /// </summary>
+    private static void BringToFront(Window w)
+    {
+        w.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!w.IsLoaded) return;
+            if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Maximized;
+            w.Activate();
+            w.Topmost = true;
+            w.Topmost = false;
+            w.Focus();
+        }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+    }
+
     private void Card_Click(object sender, MouseButtonEventArgs e)
     {
         string id = (string)((Border)sender).Tag;
 
-        // Interactive PDF editors (their own windows — not the convert-and-save shell).
-        if (id is "fill_sign" or "pdf_editor")
+        // Unified interactive PDF editor (its own window — not the convert-and-save shell).
+        if (id is "pdf_editor")
         {
             // Non-modal + no owner so the user can freely switch back to File Tools.
-            var ed = new PdfMarkupWindow(id == "pdf_editor" ? "edit" : "fillsign");
+            var ed = new PdfMarkupWindow();
             ed.Show();
+            BringToFront(ed);
             return;
         }
 
@@ -847,6 +865,7 @@ public partial class FileToolsWindow : Window
             // Non-modal + no owner so the user can freely switch back to File Tools.
             var ws = new ToolWorkspaceWindow(id);
             ws.Show();
+            BringToFront(ws);
             return;
         }
 
