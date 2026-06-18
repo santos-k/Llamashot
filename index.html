@@ -391,6 +391,140 @@
             section { padding: 64px 0; }
             .feature-visual { min-height: 260px; padding: 20px; }
         }
+
+        /* ============================================================= */
+        /*  File Tools — interactive unified workspace prototype          */
+        /* ============================================================= */
+        .ft-intro { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 0 auto 40px; max-width: 980px; }
+        .ft-region { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 14px; text-align: center; }
+        .ft-region .n { font-family: 'Consolas', monospace; font-size: 0.78rem; color: var(--orange); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; display: inline-block; margin-bottom: 8px; }
+        .ft-region h5 { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+        .ft-region p { color: var(--muted); font-size: 0.74rem; line-height: 1.4; }
+
+        .ft-demo { border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: var(--bg2); box-shadow: 0 28px 70px -28px rgba(0,0,0,0.8); }
+        .ft-titlebar { display: flex; align-items: center; gap: 8px; padding: 11px 16px; background: #0b0e14; border-bottom: 1px solid var(--border); }
+        .ft-titlebar .d { width: 11px; height: 11px; border-radius: 50%; }
+        .ft-titlebar .r { background: #ff5f57; } .ft-titlebar .y { background: #febc2e; } .ft-titlebar .g { background: #28c840; }
+        .ft-titlebar .t { margin-left: 10px; font-family: 'Consolas', monospace; font-size: 12px; color: var(--muted); }
+
+        .ft-app { display: grid; grid-template-columns: 212px 1fr; }
+        .ft-rail { background: linear-gradient(180deg, #10141d, #0c0f16); border-right: 1px solid var(--border); padding: 16px 12px; display: flex; flex-direction: column; gap: 3px; max-height: 760px; overflow-y: auto; }
+        .ft-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px; }
+        .ft-brand .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(145deg, var(--accent), #7c9cff); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #0a0e14; }
+        .ft-brand b { font-weight: 700; font-size: 15px; display: block; line-height: 1.2; }
+        .ft-brand small { color: var(--muted); font-size: 11px; }
+        .ft-add { margin: 2px 2px 8px; padding: 11px; border: none; border-radius: 11px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+        .ft-group { font-size: 10px; letter-spacing: 0.16em; color: var(--muted); text-transform: uppercase; padding: 12px 8px 5px; }
+        .ft-nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; color: var(--muted); font-size: 12.8px; cursor: pointer; border: 1px solid transparent; transition: background 0.14s, color 0.14s; }
+        .ft-nav .ic { width: 18px; text-align: center; font-size: 0.95rem; }
+        .ft-nav:hover { background: var(--card); color: var(--text); }
+        .ft-nav.active { background: linear-gradient(100deg, rgba(66,165,245,0.22), rgba(124,156,255,0.08)); color: #fff; border-color: rgba(66,165,245,0.35); }
+
+        .ft-main { display: flex; flex-direction: column; min-width: 0; }
+        .ft-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; border-bottom: 1px solid var(--border); }
+        .ft-top h3 { font-size: 21px; font-weight: 700; }
+        .ft-top p { color: var(--muted); font-size: 13px; margin-top: 2px; }
+        .ft-top .chip { display: flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 9px; font-size: 12.5px; color: var(--muted); background: var(--card); }
+
+        .ft-cols { display: grid; grid-template-columns: 0.95fr 1.1fr 0.8fr; gap: 16px; padding: 18px 22px; flex: 1; }
+        .ft-panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
+        .ft-panel.pad { padding: 18px; }
+        .ft-ptitle { font-size: 15px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+        .ft-filehdr { display: flex; gap: 11px; align-items: center; padding: 15px; border-bottom: 1px solid var(--border); }
+        .ft-fi { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(145deg, #ff8a8a, #f06262); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; font-family: 'Consolas', monospace; }
+        .ft-filehdr b { font-size: 13.5px; display: block; }
+        .ft-filehdr small { color: var(--muted); font-size: 11.5px; }
+        .ft-pvwrap { padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 13px; }
+        .ft-doc { width: 200px; height: 264px; border-radius: 8px; background: linear-gradient(180deg, #f7f8fc, #e9edf6); position: relative; box-shadow: 0 16px 40px -16px rgba(0,0,0,0.7); overflow: hidden; }
+        .ft-doc .bar { height: 42px; background: linear-gradient(90deg, #e8eefc, #dfe6f7); border-bottom: 1px solid #cdd6ea; }
+        .ft-doc .ln { height: 7px; margin: 10px 15px; border-radius: 4px; background: #cfd6e6; }
+        .ft-doc .ln.s { width: 55%; } .ft-doc .ln.m { width: 78%; }
+        .ft-doc .wm { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: rgba(124,80,80,0.18); transform: rotate(-28deg); letter-spacing: 2px; }
+        .ft-pager { display: flex; align-items: center; gap: 8px; }
+        .ft-pager button, .ft-zoom button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--card2); color: var(--muted); cursor: pointer; }
+        .ft-pager .pp { font-family: 'Consolas', monospace; font-size: 12px; color: var(--muted); padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; }
+        .ft-zoom { display: flex; align-items: center; gap: 7px; }
+        .ft-zoom .zv { font-family: 'Consolas', monospace; font-size: 12px; color: var(--muted); min-width: 44px; text-align: center; }
+
+        .ft-info .r { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+        .ft-info .r:last-child { border-bottom: none; }
+        .ft-info .k { color: var(--muted); } .ft-info .v { color: var(--text); font-weight: 600; font-family: 'Consolas', monospace; font-size: 12px; }
+        .ft-tips { background: linear-gradient(150deg, rgba(66,165,245,0.12), rgba(124,156,255,0.04)); }
+        .ft-tips .ft-ptitle { color: var(--accent); }
+        .ft-tips p { font-size: 12.5px; color: var(--muted); }
+        .ft-col-stack { display: flex; flex-direction: column; gap: 16px; }
+
+        .ft-actionbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; border-top: 1px solid var(--border); background: #0b0e14; flex-wrap: wrap; gap: 10px; }
+        .ft-clear { padding: 10px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--muted); cursor: pointer; font-size: 13px; }
+        .ft-sel { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+        .ft-sel .b { width: 18px; height: 18px; border-radius: 5px; background: var(--orange); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; }
+        .ft-process { padding: 12px 28px; border: none; border-radius: 11px; background: linear-gradient(135deg, var(--orange), #ff8a4c); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 12px 26px -12px var(--orange); transition: transform 0.15s; }
+        .ft-process:hover { transform: translateY(-1px); }
+
+        /* settings primitives */
+        .ft-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+        .ft-segcard { border: 1px solid var(--border); border-radius: 11px; padding: 12px; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; transition: 0.14s; background: var(--card2); }
+        .ft-segcard:hover { border-color: var(--line2, var(--accent)); }
+        .ft-segcard.on { border-color: var(--orange); background: rgba(255,167,38,0.08); }
+        .ft-segcard .rd { flex: 0 0 auto; width: 17px; height: 17px; border-radius: 50%; border: 2px solid var(--border); margin-top: 2px; display: grid; place-items: center; }
+        .ft-segcard.on .rd { border-color: var(--orange); }
+        .ft-segcard.on .rd::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+        .ft-segcard b { font-size: 13px; font-weight: 600; display: block; }
+        .ft-segcard small { color: var(--muted); font-size: 11px; }
+        .ft-glabel { font-weight: 600; font-size: 14px; margin: 18px 0 10px; }
+        .ft-glabel:first-child { margin-top: 0; }
+        .ft-field label { font-size: 11px; color: var(--muted); font-family: 'Consolas', monospace; display: block; margin-bottom: 6px; letter-spacing: 0.04em; }
+        .ft-field2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .ft-input { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; color: var(--text); font-size: 13.5px; font-family: inherit; }
+        .ft-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ft-pill { padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--card2); color: var(--muted); font-size: 12px; cursor: pointer; }
+        .ft-pill:hover, .ft-pill.on { border-color: var(--accent); color: #fff; background: rgba(66,165,245,0.12); }
+        .ft-checks { display: flex; flex-direction: column; gap: 11px; }
+        .ft-ck { display: flex; gap: 10px; align-items: center; font-size: 12.8px; color: var(--muted); cursor: pointer; }
+        .ft-ck .box { width: 19px; height: 19px; border-radius: 6px; border: 1px solid var(--border); background: var(--card2); display: grid; place-items: center; flex: 0 0 auto; font-size: 11px; }
+        .ft-ck.on .box { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 700; }
+        .ft-est { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+        .ft-est .e { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+        .ft-est .e small { color: var(--muted); font-size: 10.5px; font-family: 'Consolas', monospace; display: block; text-transform: uppercase; letter-spacing: 0.06em; }
+        .ft-est .e b { font-size: 16px; display: block; margin-top: 4px; }
+        .ft-est .e.hi b { color: var(--green); }
+        .ft-stepper { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; background: var(--card2); }
+        .ft-stepper input { flex: 1; background: transparent; border: none; color: var(--text); padding: 10px 12px; font-size: 13.5px; width: 100%; }
+        .ft-folder { display: flex; gap: 8px; }
+        .ft-folder .ft-input { font-family: 'Consolas', monospace; font-size: 11.5px; color: var(--muted); }
+        .ft-browse { padding: 0 15px; border: 1px solid var(--border); border-radius: 9px; background: var(--card2); color: var(--muted); cursor: pointer; font-size: 12.5px; }
+        .ft-rotrow { display: flex; gap: 10px; }
+        .ft-rotbtn { flex: 1; padding: 16px 0; border: 1px solid var(--border); border-radius: 11px; background: var(--card2); cursor: pointer; text-align: center; font-size: 20px; color: var(--text); }
+        .ft-rotbtn:hover { border-color: var(--accent); }
+        .ft-posgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; max-width: 180px; }
+        .ft-posgrid .p { aspect-ratio: 1.4; border: 1px solid var(--border); border-radius: 7px; background: var(--card2); cursor: pointer; }
+        .ft-posgrid .p.on { border-color: var(--orange); background: rgba(255,167,38,0.14); }
+        .ft-slider { appearance: none; -webkit-appearance: none; width: 100%; height: 6px; border-radius: 6px; background: var(--card2); outline: none; margin-top: 8px; }
+        .ft-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 0 4px rgba(66,165,245,0.2); }
+
+        /* category tool grid */
+        .ft-cats { display: flex; flex-direction: column; gap: 36px; margin-top: 12px; }
+        .ft-cat h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .ft-cat .ft-cat-sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 18px; }
+        .ft-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+        .ft-tool { background: var(--card); border: 1px solid var(--border); border-radius: 13px; padding: 18px; display: flex; gap: 13px; align-items: flex-start; transition: border-color 0.25s, transform 0.2s; }
+        .ft-tool:hover { border-color: var(--accent); transform: translateY(-3px); }
+        .ft-tool .ft-tic { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex: 0 0 auto; font-weight: 700; }
+        .ft-tool h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 3px; }
+        .ft-tool p { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+        .ft-tool .new { font-size: 0.64rem; font-weight: 700; color: var(--bg); background: var(--green); border-radius: 5px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+
+        @media (max-width: 1024px) {
+            .ft-intro { grid-template-columns: repeat(2, 1fr); }
+            .ft-app { grid-template-columns: 1fr; }
+            .ft-rail { flex-direction: row; flex-wrap: wrap; max-height: none; }
+            .ft-cols { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .ft-intro { grid-template-columns: 1fr; }
+            .ft-cat-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -406,9 +540,9 @@
         </a>
         <div class="nav-links">
             <a href="#features">Features</a>
-            <a href="#tools">Tools</a>
+            <a href="#filetools">File Tools</a>
+            <a href="#tools">Annotate</a>
             <a href="#shortcuts">Shortcuts</a>
-            <a href="#settings">Settings</a>
             <a href="#download" class="btn btn-primary btn-sm">Download</a>
         </div>
     </div>
@@ -418,12 +552,13 @@
 <header class="hero">
     <img src="assets/icon-web.png" alt="Llamashot icon" class="hero-icon" />
     <h1><span>Llama</span>shot</h1>
-    <p class="tagline">The only app you need for screenshots, screen recording, and file preview on Windows.</p>
-    <p class="sub-tagline">Capture. Annotate. Record. Preview any file. Extract text. One lightweight app replaces them all.</p>
+    <p class="tagline">The only app you need for screenshots, screen recording, file preview, and a full PDF &amp; media toolkit on Windows.</p>
+    <p class="sub-tagline">Capture. Annotate. Record. Preview any file. Extract text. Edit PDFs, images, video &amp; audio. One lightweight app replaces them all.</p>
     <div class="hero-badges">
         <span class="badge badge-blue">WPF / .NET 10</span>
         <span class="badge badge-green">Free &amp; Open Source</span>
         <span class="badge badge-purple">Windows 10/11</span>
+        <span class="badge badge-blue">23 File Tools</span>
     </div>
     <div class="cta-buttons">
         <a href="https://github.com/santos-k/Llamashot/releases/latest" class="btn btn-primary">Download Installer</a>
@@ -433,11 +568,11 @@
 
 <!-- Stats Bar -->
 <div class="stats-bar">
+    <div class="stat"><div class="num">23</div><div class="label">File Tools</div></div>
     <div class="stat"><div class="num">12</div><div class="label">Annotation Tools</div></div>
-    <div class="stat"><div class="num">28+</div><div class="label">Keyboard Shortcuts</div></div>
+    <div class="stat"><div class="num">5</div><div class="label">Tool Categories</div></div>
+    <div class="stat"><div class="num">200+</div><div class="label">File Types Previewed</div></div>
     <div class="stat"><div class="num">~28</div><div class="label">MB RAM Usage</div></div>
-    <div class="stat"><div class="num">9</div><div class="label">Capture Combos</div></div>
-    <div class="stat"><div class="num">200+</div><div class="label">File Types Previewed (incl. Office)</div></div>
 </div>
 
 <main id="main">
@@ -1250,6 +1385,157 @@
     </div>
 </section>
 
+<!-- ========== FILE TOOLS (PDF & MEDIA SUITE) ========== -->
+<section id="filetools">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-label label-orange">New &mdash; Built-in File Toolkit</span>
+            <h2>One Workspace. <span class="accent">Every File Tool.</span></h2>
+            <p>23 PDF, image, Office, video, audio &amp; download tools in a single unified workspace &mdash; same shell, same muscle memory. Only the center settings and the action change per tool.</p>
+        </div>
+
+        <!-- Anatomy of the shared layout -->
+        <div class="ft-intro fade-in">
+            <div class="ft-region"><span class="n">&#9312;</span><h5>Tool Rail</h5><p>Add files once &mdash; switch tools without re-uploading</p></div>
+            <div class="ft-region"><span class="n">&#9313;</span><h5>Live Preview</h5><p>Page render, thumbnails, pager, zoom &amp; rotate</p></div>
+            <div class="ft-region"><span class="n">&#9314;</span><h5>Settings</h5><p>The only part that changes per tool</p></div>
+            <div class="ft-region"><span class="n">&#9315;</span><h5>Info &amp; Tips</h5><p>File details, helpful tips &amp; recent files</p></div>
+            <div class="ft-region"><span class="n">&#9316;</span><h5>Action Bar</h5><p>Clear &middot; selection count &middot; Process</p></div>
+        </div>
+
+        <!-- Interactive prototype -->
+        <div class="ft-demo fade-in" aria-label="Interactive File Tools workspace preview">
+            <div class="ft-titlebar">
+                <span class="d r"></span><span class="d y"></span><span class="d g"></span>
+                <span class="t">Llamashot &mdash; File Tools</span>
+            </div>
+            <div class="ft-app">
+                <!-- Rail -->
+                <aside class="ft-rail">
+                    <div class="ft-brand"><div class="logo">L</div><div><b>Llamashot</b><small>File Tools</small></div></div>
+                    <button class="ft-add" type="button">&#65291; Add Files</button>
+                    <div id="ftNav"></div>
+                </aside>
+                <!-- Main -->
+                <div class="ft-main">
+                    <div class="ft-top">
+                        <div><h3 id="ftTitle">Merge PDF</h3><p id="ftDesc">Combine multiple PDFs into one</p></div>
+                        <div class="ft-top-right" style="display:flex;gap:10px;align-items:center;">
+                            <span class="chip">&#127769; Theme</span>
+                        </div>
+                    </div>
+                    <div class="ft-cols">
+                        <!-- Preview -->
+                        <div class="ft-panel">
+                            <div class="ft-filehdr">
+                                <div class="ft-fi">PDF</div>
+                                <div><b id="ftFileName">report.pdf</b><small id="ftFilePages">Total Pages: 8</small></div>
+                            </div>
+                            <div class="ft-pvwrap">
+                                <div class="ft-doc">
+                                    <div class="bar"></div>
+                                    <div class="ln m"></div><div class="ln s"></div><div class="ln"></div>
+                                    <div class="ln s"></div><div class="ln m"></div><div class="ln"></div>
+                                    <div class="wm" id="ftWm" style="display:none;">CONFIDENTIAL</div>
+                                </div>
+                                <div class="ft-pager"><button>&lsaquo;</button><span class="pp">1 / 8</span><button>&rsaquo;</button></div>
+                                <div class="ft-zoom"><button>&minus;</button><span class="zv">100%</span><button>+</button><button title="Fit">&#10530;</button></div>
+                            </div>
+                        </div>
+                        <!-- Settings (dynamic) -->
+                        <div class="ft-panel pad" id="ftSettings"></div>
+                        <!-- Info -->
+                        <div class="ft-col-stack">
+                            <div class="ft-panel pad ft-info">
+                                <div class="ft-ptitle">File Information</div>
+                                <div class="r"><span class="k">File Name</span><span class="v">report.pdf</span></div>
+                                <div class="r"><span class="k">File Size</span><span class="v">2.4 MB</span></div>
+                                <div class="r"><span class="k">Total Pages</span><span class="v">8</span></div>
+                                <div class="r"><span class="k">Page Size</span><span class="v">595 &times; 842 pt</span></div>
+                                <div class="r"><span class="k">Modified</span><span class="v">Jun 18, 2026</span></div>
+                            </div>
+                            <div class="ft-panel pad ft-tips">
+                                <div class="ft-ptitle">&#128161; Helpful Tips</div>
+                                <p id="ftTip">Drag the file cards to set the merge order. The preview shows the first page of each document.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Action bar -->
+                    <div class="ft-actionbar">
+                        <button class="ft-clear" type="button">&#128465; Clear All</button>
+                        <div class="ft-sel"><span class="b">&check;</span> <span id="ftSel">2 files selected</span></div>
+                        <button class="ft-process" type="button"><span id="ftAction">Merge PDF</span> &rarr;</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="text-center" style="color:var(--muted);font-size:0.85rem;margin-top:16px;">Click any tool in the rail &mdash; the shell never moves, only the settings and the action change.</p>
+
+        <!-- All tools by category -->
+        <div class="ft-cats" style="margin-top:72px;">
+            <div class="ft-cat fade-in">
+                <h3><span style="color:var(--red);">&#9636;</span> PDF Tools <span style="color:var(--muted);font-weight:400;font-size:0.9rem;">&mdash; 12 tools</span></h3>
+                <p class="ft-cat-sub">A complete PDF suite &mdash; merge, split, convert, edit, sign, secure.</p>
+                <div class="ft-cat-grid">
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(255,138,138,0.14);color:#FF8A8A;">&#8862;</div><div><h4>Merge PDF</h4><p>Combine multiple PDFs into one, drag to reorder.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(255,176,136,0.14);color:#FFB088;">&#8214;</div><div><h4>Split PDF</h4><p>Extract pages by range, every page, or fixed size.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(255,155,155,0.14);color:#FF9B9B;">&#11015;</div><div><h4>Compress PDF</h4><p>Shrink file size with a live before/after estimate.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(245,143,143,0.14);color:#F58F8F;">&#10697;</div><div><h4>PDF to Images</h4><p>Export pages to PNG/JPG/WEBP at up to 600 DPI.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(244,143,177,0.14);color:#F48FB1;">&#11036;</div><div><h4>Images to PDF</h4><p>Combine images into a PDF with live merged preview.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(255,199,119,0.14);color:#FFC777;">&#8635;</div><div><h4>Rotate PDF</h4><p>Rotate all, current, or a range of pages.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(183,156,255,0.14);color:#B79CFF;">&#9670;</div><div><h4>Watermark PDF</h4><p>Text watermark with opacity, position &amp; live preview.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(144,160,240,0.14);color:#90A0F0;">#</div><div><h4>Page Numbers</h4><p>Four styles, any corner, start from any page.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(255,181,155,0.14);color:#FFB59B;">&#9112;</div><div><h4>Extract Pages</h4><p>Pick pages by thumbnail or range to a new PDF.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(201,176,166,0.14);color:#C9B0A6;">&#8853;</div><div><h4>Insert Pages</h4><p>Add images or PDF pages at any insertion point.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(143,176,247,0.14);color:#8FB0F7;">&#128274;</div><div><h4>PDF Password <span class="new">NEW</span></h4><p>Add, remove, or recover an unknown password.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(127,209,176,0.14);color:#7FD1B0;">&#9998;</div><div><h4>PDF Editor <span class="new">NEW</span></h4><p>Fill, sign, add text, checks, dates &amp; redaction.</p></div></div>
+                </div>
+            </div>
+
+            <div class="ft-cat fade-in">
+                <h3><span style="color:var(--purple);">&#127912;</span> Image Tools <span style="color:var(--muted);font-weight:400;font-size:0.9rem;">&mdash; 6 tools</span></h3>
+                <p class="ft-cat-sub">Edit, optimize and convert images without a heavyweight editor.</p>
+                <div class="ft-cat-grid">
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(167,139,250,0.14);color:#A78BFA;">&#9998;</div><div><h4>Image Editor</h4><p>All-in-one editor: crop, rotate, adjust &amp; annotate.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(111,217,230,0.14);color:#6FD9E6;">&#11015;</div><div><h4>Compress Image</h4><p>Reduce image file size with quality control.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(111,208,195,0.14);color:#6FD0C3;">&#10530;</div><div><h4>Resize Image</h4><p>Change dimensions with aspect-ratio lock.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(143,190,247,0.14);color:#8FBEF7;">&#9986;</div><div><h4>Crop Image</h4><p>Crop to a precise selection.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(201,155,219,0.14);color:#C99BDB;">&#8634;</div><div><h4>Rotate &amp; Flip</h4><p>Rotate or flip images horizontally/vertically.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(244,143,177,0.14);color:#F48FB1;">&#8644;</div><div><h4>Convert Format</h4><p>Convert between PNG, JPG, WEBP, BMP &amp; more.</p></div></div>
+                </div>
+            </div>
+
+            <div class="ft-cat fade-in">
+                <h3><span style="color:var(--cyan);">&#9776;</span> Office, Media &amp; Download <span style="color:var(--muted);font-weight:400;font-size:0.9rem;">&mdash; 5 tools</span></h3>
+                <p class="ft-cat-sub">Shrink Office files, edit media, and pull video or audio from the web.</p>
+                <div class="ft-cat-grid">
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(167,182,194,0.14);color:#A7B6C2;">&#8803;</div><div><h4>Compress Office</h4><p>Reduce DOCX, XLSX &amp; PPTX file sizes.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(245,143,143,0.14);color:#F58F8F;">&#9654;</div><div><h4>Video Tools</h4><p>Trim, crop, rotate, flip &amp; extract from video.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(111,211,230,0.14);color:#6FD3E6;">&#9835;</div><div><h4>Extract Audio</h4><p>Pull the audio track out of any video.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(111,208,195,0.14);color:#6FD0C3;">&#9986;</div><div><h4>Trim Audio</h4><p>Cut the start and end of an audio file.</p></div></div>
+                    <div class="ft-tool"><div class="ft-tic" style="background:rgba(255,155,155,0.14);color:#FF9B9B;">&#9654;</div><div><h4>YouTube Download</h4><p>Download video or audio from a URL.</p></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent improvements / fixes -->
+        <div style="margin-top:72px;">
+            <div class="section-title" style="margin-bottom:32px;">
+                <h2 style="font-size:1.8rem;">Polished &amp; <span class="accent">Battle-tested</span></h2>
+                <p>Recent improvements across the file tools and capture engine</p>
+            </div>
+            <div class="features-grid-3 fade-in">
+                <div class="qf-card"><div class="qf-icon blue">&#128274;</div><h4>PDF Password &mdash; 3-in-1</h4><p>Add a password, remove a known one, or <strong>recover an unknown password</strong> via dictionary + brute-force, with a live progress bar and cancel.</p></div>
+                <div class="qf-card"><div class="qf-icon green">&#9998;</div><h4>Interactive PDF Editor</h4><p>Place text, signatures, checks, dates, redaction &amp; blur with resize, 360&deg; rotate, opacity, full keyboard/mouse shortcuts and reliable undo/redo.</p></div>
+                <div class="qf-card"><div class="qf-icon purple">&#128065;</div><h4>Live Merged Preview</h4><p>Merge PDF and Images&rarr;PDF show a true combined preview before you commit, with a fullscreen page viewer.</p></div>
+                <div class="qf-card"><div class="qf-icon orange">&#127919;</div><h4>Default Work-area Selection</h4><p>Capture now opens with the whole screen (minus the taskbar) pre-selected &mdash; act instantly or drag a custom region.</p></div>
+                <div class="qf-card"><div class="qf-icon red">&#128433;</div><h4>Cursor in Recordings</h4><p>Video &amp; GIF recordings now include the mouse pointer with an optional yellow highlight circle &mdash; perfect for tutorials.</p></div>
+                <div class="qf-card"><div class="qf-icon cyan">&#127912;</div><h4>Unified, Themed UI</h4><p>One reusable workspace for every tool, fully themed light/dark dropdowns, and fixed search-box focus &amp; caret visibility.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- ========== ANNOTATION TOOLS DETAIL ========== -->
 <section id="tools">
     <div class="container">
@@ -1563,7 +1849,7 @@
             <a href="https://github.com/santos-k/Llamashot" class="btn btn-outline">View Source on GitHub</a>
         </div>
         <!-- UPDATE THIS VERSION when releasing a new build -->
-        <p class="version-note">Version 7.0.0 &bull; Self-contained, no runtime needed</p>
+        <p class="version-note">Version 8.9.12 &bull; Self-contained, no runtime needed</p>
     </div>
 </section>
 
@@ -1598,6 +1884,134 @@
         entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
     }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
     document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // ===== File Tools interactive workspace =====
+    (function () {
+        const seg = items => `<div class="ft-seg">${items.map(([t, d, on]) => `<div class="ft-segcard ${on ? 'on' : ''}"><span class="rd"></span><div><b>${t}</b><small>${d}</small></div></div>`).join('')}</div>`;
+        const radio = items => `<div class="ft-checks">${items.map(([t, d, on]) => `<div class="ft-segcard ${on ? 'on' : ''}" style="grid-column:auto"><span class="rd"></span><div><b>${t}</b><small>${d}</small></div></div>`).join('')}</div>`;
+        const ck = (t, on) => `<div class="ft-ck ${on ? 'on' : ''}"><span class="box">${on ? '✓' : ''}</span> ${t}</div>`;
+        const checks = items => `<div class="ft-checks">${items.map(([t, on]) => ck(t, on)).join('')}</div>`;
+        const step = v => `<div class="ft-stepper"><input value="${v}"><div style="display:flex;flex-direction:column"><button class="ft-browse" style="border:none;border-left:1px solid var(--border);padding:0 8px;height:20px">▲</button><button class="ft-browse" style="border:none;border-left:1px solid var(--border);padding:0 8px;height:20px">▼</button></div></div>`;
+        const pills = items => `<div class="ft-pills">${items.map(([t, on]) => `<span class="ft-pill ${on ? 'on' : ''}">${t}</span>`).join('')}</div>`;
+        const pos = a => `<div class="ft-posgrid">${Array.from({ length: 9 }, (_, i) => `<div class="p ${i === a ? 'on' : ''}"></div>`).join('')}</div>`;
+        const field = (l, html) => `<div class="ft-field"><label>${l}</label>${html}</div>`;
+        const input = (v, type) => `<input class="ft-input" ${type ? `type="${type}"` : ''} value="${v}">`;
+        const est = items => `<div class="ft-est">${items.map(([s, b, hi]) => `<div class="e ${hi ? 'hi' : ''}"><small>${s}</small><b>${b}</b></div>`).join('')}</div>`;
+        const folder = p => `<div class="ft-folder"><input class="ft-input" value="${p}"><button class="ft-browse">Browse</button></div>`;
+        const fileRow = (n, m) => `<div class="ft-ck on" style="cursor:grab"><span style="color:var(--muted)">☰</span><span class="box">✓</span> ${n} <span style="margin-left:auto;color:var(--muted);font-family:'Consolas',monospace;font-size:11px">${m}</span></div>`;
+
+        const T = {
+            // ---- PDF ----
+            merge_pdf: { n: 'Merge PDF', i: '⊞', d: 'Combine multiple PDFs into one', a: 'Merge PDF', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Drag the file cards to set the merge order. The preview shows the first page of each document.',
+                s: () => `<div class="ft-ptitle">Merge Settings</div><div class="ft-glabel">Files (3) — drag to reorder</div><div class="ft-checks">${fileRow('S2-update.pdf', '5 p · 2.8 MB')}${fileRow('passport.pdf', '1 p · 452 KB')}${fileRow('pancard.pdf', '1 p · 344 KB')}</div><div class="ft-glabel">Output name</div>${input('merged.pdf')}<div class="ft-glabel">Output quality</div>${seg([['Original', 'No re-compression', 1], ['Optimized', 'Smaller file', 0]])}<div style="margin-top:14px">${ck('Preserve bookmarks & outline', 1)}</div>` },
+            split_pdf: { n: 'Split PDF', i: '‖', d: 'Split pages into multiple files', a: 'Split PDF', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Enter the page range to extract — e.g. 1 to 5 extracts the first five pages.',
+                s: () => `<div class="ft-ptitle">Split Method</div>${seg([['Custom Range', 'Specific pages', 1], ['Every Page', 'One file each', 0], ['Fixed Size', 'By page count', 0], ['Extract', 'Pick pages', 0]])}<div class="ft-glabel">Page Range</div><div class="ft-field2">${field('FROM PAGE', step(1))}${field('TO PAGE', step(8))}</div><div class="ft-field" style="margin-top:12px"><label>QUICK SELECT</label>${pills([['All', 0], ['First Half', 0], ['Second Half', 0], ['Odd', 0], ['Even', 0]])}</div><div class="ft-glabel">Output</div>${checks([['Separate file per range', 1], ['Reverse order', 0], ['Keep metadata', 1]])}<div class="ft-glabel">Output Folder</div>${folder('C:\\Users\\You\\Documents\\Llamashot\\Split')}` },
+            compress_pdf: { n: 'Compress PDF', i: '⬇', d: 'Reduce PDF file size', a: 'Compress PDF', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Medium is the best balance for most documents. Higher levels trade quality for size.',
+                s: () => `<div class="ft-ptitle">Compression Level</div>${radio([['Low', 'Near-lossless', 0], ['Medium', 'Recommended', 1], ['High', 'Smaller', 0], ['Maximum', 'Smallest', 0]])}<div class="ft-glabel">Expected Result</div>${est([['Current', '2.4 MB'], ['Estimated', '850 KB', 1], ['Quality', '★★★★☆']])}` },
+            pdf_to_images: { n: 'PDF to Images', i: '⧉', d: 'Convert pages to JPG/PNG', a: 'Export Images', f: ['report.pdf', 8], fi: 'PDF',
+                tip: '300 DPI is ideal for printing; 72–150 DPI is great for screen and the web.',
+                s: () => `<div class="ft-ptitle">Output Format</div>${radio([['PNG', 'Lossless, transparency', 1], ['JPG', 'Small, photos', 0], ['WEBP', 'Modern, tiny', 0]])}<div class="ft-glabel">Resolution</div>${pills([['72 DPI', 0], ['150 DPI', 1], ['300 DPI', 0], ['600 DPI', 0]])}<div class="ft-glabel">Output</div>${checks([['Separate file per page', 1], ['Bundle as ZIP', 1]])}${est([['Pages', '8'], ['Images', '8', 1], ['Est. size', '3.1 MB']])}` },
+            images_to_pdf: { n: 'Images to PDF', i: '⬜', d: 'Combine images into a PDF', a: 'Create PDF', f: ['photos (6)', 6], fi: 'IMG',
+                tip: 'Reorder images to set page order. Live merged preview shows the result before you save.',
+                s: () => `<div class="ft-ptitle">Page Setup</div>${seg([['A4', '210 × 297 mm', 1], ['Letter', '8.5 × 11 in', 0], ['Fit to image', 'Native size', 0], ['Square', '1:1', 0]])}<div class="ft-glabel">Orientation</div>${pills([['Auto', 1], ['Portrait', 0], ['Landscape', 0]])}<div class="ft-glabel">Margin</div><input type="range" class="ft-slider" value="20"><div style="margin-top:14px">${ck('One image per page', 1)}</div>` },
+            rotate_pdf: { n: 'Rotate PDF', i: '↻', d: 'Rotate PDF pages', a: 'Rotate PDF', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Use the preview to confirm orientation before applying. Target all pages or a range.',
+                s: () => `<div class="ft-ptitle">Rotation</div><div class="ft-rotrow"><div class="ft-rotbtn">↺ 90°</div><div class="ft-rotbtn">↻ 90°</div><div class="ft-rotbtn">⇅ 180°</div></div><div class="ft-glabel">Apply To</div>${radio([['All Pages', 'Whole document', 1], ['Current Page', 'Visible page only', 0], ['Custom Range', 'Specify pages', 0]])}` },
+            watermark: { n: 'Watermark PDF', i: '◆', d: 'Add a text watermark', a: 'Add Watermark', f: ['report.pdf', 8], fi: 'PDF', wm: 1,
+                tip: 'The preview updates live. Lower the opacity for a subtle background stamp.',
+                s: () => `<div class="ft-ptitle">Watermark</div>${field('TEXT', input('CONFIDENTIAL'))}<div class="ft-glabel">Font size</div><input type="range" class="ft-slider" value="40"><div class="ft-glabel">Opacity — 50%</div><input type="range" class="ft-slider" value="50"><div class="ft-glabel">Position</div>${pos(4)}` },
+            page_numbers: { n: 'Page Numbers', i: '#', d: 'Add numbers to a PDF', a: 'Add Numbers', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Pick a style and a corner. Numbering can start from any page.',
+                s: () => `<div class="ft-ptitle">Number Style</div>${radio([['1', 'Plain number', 1], ['1 / 20', 'With total', 0], ['Page 1', 'Labelled', 0], ['Page 1 of 20', 'Full label', 0]])}<div class="ft-glabel">Position</div>${pos(7)}<div class="ft-glabel">Start at</div>${step(1)}` },
+            extract_pages: { n: 'Extract Pages', i: '⎘', d: 'Pick specific pages', a: 'Extract Pages', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Click page thumbnails to select them, or type ranges like 1-3, 7, 10.',
+                s: () => `<div class="ft-ptitle">Pages to Extract</div>${field('PAGES', input('1, 3-5, 8'))}<div class="ft-glabel">Output</div>${seg([['Single PDF', 'Combine selected', 1], ['ZIP', 'One file per page', 0]])}` },
+            insert_pages: { n: 'Insert Pages', i: '⊕', d: 'Add new pages', a: 'Insert Pages', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Choose where to insert. The preview marks the insertion point.',
+                s: () => `<div class="ft-ptitle">Insertion Point</div>${field('INSERT AFTER PAGE', step(1))}<div class="ft-glabel">Source</div>${seg([['Images', 'JPG / PNG', 1], ['PDF pages', 'Another PDF', 0]])}` },
+            protect_pdf: { n: 'PDF Password', i: '🔒', d: 'Add, remove, or recover a password', a: 'Protect PDF', f: ['report.pdf', 8], fi: 'PDF',
+                tip: 'Don\'t know the password? Switch to Recover and Llamashot tries dictionary + brute-force.',
+                s: () => `<div class="ft-ptitle">Mode</div>${radio([['Add password', 'Lock the PDF', 1], ['Remove password', 'Decrypt a known PDF', 0], ['Recover password', 'Crack an unknown one', 0]])}<div class="ft-glabel">Password</div>${field('PASSWORD', input('••••••••', 'password'))}<div class="ft-field" style="margin-top:10px">${field('CONFIRM', input('••••••••', 'password'))}</div>` },
+            pdf_editor: { n: 'PDF Editor', i: '✎', d: 'Fill, sign, add text, checks & dates', a: 'Save PDF', f: ['form.pdf', 3], fi: 'PDF',
+                tip: 'Place text, signatures, checks, dates, redaction & blur. Resize, rotate 360°, set opacity.',
+                s: () => `<div class="ft-ptitle">Place Items</div>${pills([['Text', 1], ['Signature', 0], ['Check', 0], ['Cross', 0], ['Date', 0], ['Redact', 0], ['Blur', 0]])}<div class="ft-glabel">Signature</div>${pills([['Draw', 1], ['Type', 0], ['Upload', 0]])}<div class="ft-glabel">Properties</div><div class="ft-field2">${field('FONT SIZE', step(14))}${field('OPACITY %', step(100))}</div>` },
+            // ---- Image ----
+            image_editor: { n: 'Image Editor', i: '✎', d: 'All-in-one image editor', a: 'Save Image', f: ['photo.jpg', 1], fi: 'IMG',
+                tip: 'Crop, rotate, adjust brightness/contrast, and annotate — all in one canvas.',
+                s: () => `<div class="ft-ptitle">Tools</div>${pills([['Crop', 1], ['Rotate', 0], ['Draw', 0], ['Text', 0], ['Adjust', 0]])}<div class="ft-glabel">Brightness</div><input type="range" class="ft-slider" value="50"><div class="ft-glabel">Contrast</div><input type="range" class="ft-slider" value="50">` },
+            compress_image: { n: 'Compress Image', i: '⬇', d: 'Reduce image file size', a: 'Compress Image', f: ['photo.jpg', 1], fi: 'IMG',
+                tip: 'Drop quality slightly for big size savings — most photos stay sharp at 80%.',
+                s: () => `<div class="ft-ptitle">Quality — 80%</div><input type="range" class="ft-slider" value="80"><div class="ft-glabel">Result</div>${est([['Current', '4.1 MB'], ['Estimated', '1.2 MB', 1], ['Quality', '★★★★☆']])}` },
+            resize_image: { n: 'Resize Image', i: '⤢', d: 'Change dimensions', a: 'Resize Image', f: ['photo.jpg', 1], fi: 'IMG',
+                tip: 'Lock the aspect ratio to avoid stretching. Enter width or height — the other follows.',
+                s: () => `<div class="ft-ptitle">Dimensions</div><div class="ft-field2">${field('WIDTH', input('1920'))}${field('HEIGHT', input('1080'))}</div><div style="margin-top:14px">${ck('Lock aspect ratio', 1)}</div><div class="ft-glabel">Presets</div>${pills([['25%', 0], ['50%', 1], ['75%', 0], ['HD', 0], ['4K', 0]])}` },
+            crop_image: { n: 'Crop Image', i: '✂', d: 'Crop to selection', a: 'Crop Image', f: ['photo.jpg', 1], fi: 'IMG',
+                tip: 'Drag the handles in the preview, or pick a fixed aspect ratio.',
+                s: () => `<div class="ft-ptitle">Aspect Ratio</div>${pills([['Free', 1], ['1:1', 0], ['4:3', 0], ['16:9', 0], ['3:2', 0]])}<div class="ft-glabel">Selection</div><div class="ft-field2">${field('WIDTH', input('1280'))}${field('HEIGHT', input('720'))}</div>` },
+            rotate_flip: { n: 'Rotate & Flip', i: '↺', d: 'Rotate or flip images', a: 'Apply', f: ['photo.jpg', 1], fi: 'IMG',
+                tip: 'Rotate in 90° steps or flip along either axis.',
+                s: () => `<div class="ft-ptitle">Rotate</div><div class="ft-rotrow"><div class="ft-rotbtn">↺ 90°</div><div class="ft-rotbtn">↻ 90°</div><div class="ft-rotbtn">⇅ 180°</div></div><div class="ft-glabel">Flip</div>${pills([['Horizontal', 0], ['Vertical', 0]])}` },
+            convert_format: { n: 'Convert Format', i: '⇄', d: 'Change image format', a: 'Convert', f: ['photo.jpg', 1], fi: 'IMG',
+                tip: 'Convert between common formats. WEBP gives the smallest files for the web.',
+                s: () => `<div class="ft-ptitle">Convert To</div>${radio([['PNG', 'Lossless', 0], ['JPG', 'Small, photos', 1], ['WEBP', 'Modern, tiny', 0], ['BMP', 'Uncompressed', 0]])}` },
+            // ---- Office / Media / Download ----
+            compress_office: { n: 'Compress Office', i: '≣', d: 'Reduce DOCX/XLSX/PPTX', a: 'Compress', f: ['deck.pptx', 24], fi: 'PPT',
+                tip: 'Recompresses embedded images and media inside Office files without changing content.',
+                s: () => `<div class="ft-ptitle">Compression Level</div>${radio([['Light', 'Best quality', 0], ['Balanced', 'Recommended', 1], ['Strong', 'Smallest', 0]])}<div class="ft-glabel">Result</div>${est([['Current', '18 MB'], ['Estimated', '6 MB', 1], ['Saving', '67%']])}` },
+            video_tools: { n: 'Video Tools', i: '▶', d: 'Trim, crop, rotate, flip & extract', a: 'Export Video', f: ['clip.mp4', 1], fi: 'VID',
+                tip: 'Set in/out points to trim, then crop, rotate or extract frames — all in one pass.',
+                s: () => `<div class="ft-ptitle">Operation</div>${pills([['Trim', 1], ['Crop', 0], ['Rotate', 0], ['Flip', 0], ['Extract frame', 0]])}<div class="ft-glabel">Trim Range</div><div class="ft-field2">${field('START', input('00:00:05'))}${field('END', input('00:01:20'))}</div>` },
+            extract_audio: { n: 'Extract Audio', i: '♫', d: 'Extract audio from video', a: 'Extract Audio', f: ['clip.mp4', 1], fi: 'VID',
+                tip: 'Pull the audio track from a video into MP3, WAV, or AAC.',
+                s: () => `<div class="ft-ptitle">Audio Format</div>${radio([['MP3', 'Universal', 1], ['WAV', 'Lossless', 0], ['AAC', 'Efficient', 0]])}<div class="ft-glabel">Bitrate</div>${pills([['128k', 0], ['192k', 1], ['320k', 0]])}` },
+            trim_audio: { n: 'Trim Audio', i: '✂', d: 'Cut start and end of audio', a: 'Trim Audio', f: ['song.mp3', 1], fi: 'AUD',
+                tip: 'Drag the waveform handles or type exact timestamps to trim.',
+                s: () => `<div class="ft-ptitle">Trim Range</div><div class="ft-field2">${field('START', input('00:00:10'))}${field('END', input('00:02:45'))}</div><div style="margin-top:14px">${ck('Fade in / out', 1)}</div>` },
+            youtube_dl: { n: 'YouTube Download', i: '▶', d: 'Download video or audio from URL', a: 'Download', f: ['paste a URL', 1], fi: 'URL',
+                tip: 'Paste a video URL, pick video or audio-only, choose a quality, and download.',
+                s: () => `<div class="ft-ptitle">Source</div>${field('VIDEO URL', input('https://youtu.be/…'))}<div class="ft-glabel">Download as</div>${seg([['Video (MP4)', 'With audio', 1], ['Audio (MP3)', 'Audio only', 0]])}<div class="ft-glabel">Quality</div>${pills([['1080p', 1], ['720p', 0], ['480p', 0], ['Best', 0]])}` },
+        };
+
+        const GROUPS = [
+            ['PDF Tools', ['merge_pdf', 'split_pdf', 'compress_pdf', 'pdf_to_images', 'images_to_pdf', 'rotate_pdf', 'watermark', 'page_numbers', 'extract_pages', 'insert_pages', 'protect_pdf', 'pdf_editor']],
+            ['Image Tools', ['image_editor', 'compress_image', 'resize_image', 'crop_image', 'rotate_flip', 'convert_format']],
+            ['Office Tools', ['compress_office']],
+            ['Video & Audio', ['video_tools', 'extract_audio', 'trim_audio']],
+            ['Download', ['youtube_dl']],
+        ];
+
+        const nav = document.getElementById('ftNav');
+        if (!nav) return;
+        nav.innerHTML = GROUPS.map(([g, ids]) =>
+            `<div class="ft-group">${g}</div>` + ids.map(id =>
+                `<div class="ft-nav" data-id="${id}"><span class="ic">${T[id].i}</span> ${T[id].n}</div>`).join('')
+        ).join('');
+
+        function select(id) {
+            const t = T[id];
+            nav.querySelectorAll('.ft-nav').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+            document.getElementById('ftTitle').textContent = t.n;
+            document.getElementById('ftDesc').textContent = t.d;
+            document.getElementById('ftAction').textContent = t.a;
+            document.getElementById('ftTip').textContent = t.tip;
+            document.getElementById('ftFileName').textContent = t.f[0];
+            document.getElementById('ftFilePages').textContent = t.fi === 'PDF' ? `Total Pages: ${t.f[1]}` : t.d;
+            const fi = document.querySelector('.ft-fi'); if (fi) fi.textContent = t.fi;
+            document.getElementById('ftWm').style.display = t.wm ? 'flex' : 'none';
+            const set = document.getElementById('ftSettings');
+            set.innerHTML = t.s();
+            // wire toggles for feel
+            set.querySelectorAll('.ft-segcard').forEach(c => c.onclick = () => { c.parentElement.querySelectorAll('.ft-segcard').forEach(s => s.classList.remove('on')); c.classList.add('on'); });
+            set.querySelectorAll('.ft-ck').forEach(c => c.onclick = () => { c.classList.toggle('on'); c.querySelector('.box').textContent = c.classList.contains('on') ? '✓' : ''; });
+            set.querySelectorAll('.ft-pill').forEach(p => p.onclick = () => { p.parentElement.querySelectorAll('.ft-pill').forEach(s => s.classList.remove('on')); p.classList.add('on'); });
+            set.querySelectorAll('.ft-posgrid .p').forEach(p => p.onclick = () => { p.parentElement.querySelectorAll('.p').forEach(s => s.classList.remove('on')); p.classList.add('on'); });
+        }
+        nav.querySelectorAll('.ft-nav').forEach(el => el.onclick = () => select(el.dataset.id));
+        select('merge_pdf');
+    })();
 </script>
 
 </body>
