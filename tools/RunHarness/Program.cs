@@ -76,6 +76,18 @@ internal static class Program
             return;
         }
 
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_CURSORTEST") == "1")
+        {
+            VerifyCursorOverlay();
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_OVERLAYTEST") == "1")
+        {
+            await VerifyOverlaySelection();
+            return;
+        }
+
         // Workspace-only mode: skip the flaky FileToolsWindow/alert/password captures.
         if (Environment.GetEnvironmentVariable("LLAMASHOT_WS_ONLY") == "1")
         {
@@ -442,6 +454,134 @@ internal static class Program
         }
         catch (Exception ex) { L("EXCEPTION: " + ex); }
         File.WriteAllText(Path.Combine(outDir, "editor.txt"), log.ToString());
+    }
+
+    // Exercises ScreenRecorder's private cursor compositor: grabs the screen, draws the
+    // live cursor + yellow highlight onto it, and writes a PNG for visual inspection.
+    static void VerifyCursorOverlay()
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string m) { log.AppendLine(m); Console.WriteLine(m); }
+        try
+        {
+            var nm = typeof(ScreenCapture).Assembly.GetType("Llamashot.Core.NativeMethods")!;
+
+            // Move the cursor to a known spot (screen center) so we know where to look.
+            var vb = ScreenCapture.GetVirtualScreenBounds();
+            int cx = (int)(vb.X + vb.Width / 2), cy = (int)(vb.Y + vb.Height / 2);
+            nm.GetMethod("SetCursorPos")!.Invoke(null, new object[] { cx, cy });
+            System.Threading.Thread.Sleep(120);
+
+            // Capture the full virtual screen into a System.Drawing bitmap.
+            var src = ScreenCapture.CaptureFullScreen();
+            using var bmp = ScreenCapture.BitmapSourceToDrawingBitmap(src);
+
+            // Configure a recorder over the whole captured region and invoke the private compositor.
+            var rec = new ScreenRecorder(10) { CaptureCursor = true, HighlightCursor = true };
+            var t = typeof(ScreenRecorder);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            t.GetField("_regionX", flags)!.SetValue(rec, (int)vb.X);
+            t.GetField("_regionY", flags)!.SetValue(rec, (int)vb.Y);
+            t.GetField("_regionW", flags)!.SetValue(rec, bmp.Width);
+            t.GetField("_regionH", flags)!.SetValue(rec, bmp.Height);
+            t.GetMethod("DrawCursorOnFrame", flags)!.Invoke(rec, new object[] { bmp });
+
+            string outPath = Path.Combine(Dir, "cursor_overlay.png");
+            bmp.Save(outPath, SD.Imaging.ImageFormat.Png);
+            L($"cursor at screen ({cx},{cy}); region {bmp.Width}x{bmp.Height}");
+
+            // Sample pixels in a box around the cursor for yellow-ish highlight pixels.
+            int lx = (int)(bmp.Width / 2), ly = (int)(bmp.Height / 2);
+            int yellow = 0, sampled = 0;
+            for (int dy = -30; dy <= 30; dy++)
+                for (int dx = -30; dx <= 30; dx++)
+                {
+                    int px = lx + dx, py = ly + dy;
+                    if (px < 0 || py < 0 || px >= bmp.Width || py >= bmp.Height) continue;
+                    var c = bmp.GetPixel(px, py);
+                    sampled++;
+                    if (c.R > 180 && c.G > 150 && c.B < 140) yellow++;
+                }
+            L($"yellow-ish pixels near cursor: {yellow}/{sampled}");
+            L(yellow > 0 ? "PASS: highlight rendered" : "FAIL: no highlight detected");
+
+            // Crop a 240x240 region around the cursor for easy viewing.
+            int half = 120;
+            int rx = Math.Max(0, lx - half), ry = Math.Max(0, ly - half);
+            int rw = Math.Min(half * 2, bmp.Width - rx), rh = Math.Min(half * 2, bmp.Height - ry);
+            using var crop = bmp.Clone(new SD.Rectangle(rx, ry, rw, rh), bmp.PixelFormat);
+            crop.Save(Path.Combine(Dir, "cursor_overlay_crop.png"), SD.Imaging.ImageFormat.Png);
+            L("wrote cursor_overlay.png + cursor_overlay_crop.png");
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(Dir, "cursor.txt"), log.ToString());
+    }
+
+    // Drives OverlayWindow.StartCapture and inspects internal state to confirm the
+    // default work-area selection, persistent mode picker, and mode switching.
+    static async Task VerifyOverlaySelection()
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string m) { log.AppendLine(m); Console.WriteLine(m); }
+        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        try
+        {
+            var ot = typeof(OverlayWindow);
+            var overlay = (OverlayWindow)Activator.CreateInstance(ot)!;
+            var modeEnum = ot.GetNestedType("CaptureMode", System.Reflection.BindingFlags.NonPublic);
+            object screenshotMode = Enum.Parse(modeEnum!, "Screenshot");
+            ot.GetMethod("StartCapture", flags)!.Invoke(overlay, new object[] { screenshotMode });
+
+            await Task.Delay(700); // let the Loaded dispatcher apply the default selection
+
+            T GetF<T>(string n) => (T)ot.GetField(n, flags)!.GetValue(overlay)!;
+            Visibility Vis(string n) => ((UIElement)ot.GetField(n, flags)!.GetValue(overlay)!).Visibility;
+
+            bool hasSel = GetF<bool>("_hasSelection");
+            bool full = GetF<bool>("_isFullRegion");
+            var sel = GetF<Rect>("_selection");
+            var wa = SystemParameters.WorkArea;
+            L($"_hasSelection={hasSel} _isFullRegion={full} _selection={(int)sel.Width}x{(int)sel.Height}  workArea={(int)wa.Width}x{(int)wa.Height}");
+            L($"picker(SnippingToolbarCanvas)={Vis("SnippingToolbarCanvas")}  drawingToolbar(ToolbarCanvas)={Vis("ToolbarCanvas")}  handles={Vis("HandleCanvas")}");
+            bool p1 = hasSel && full
+                && Math.Abs(sel.Width - wa.Width) < 2 && Math.Abs(sel.Height - wa.Height) < 2
+                && Vis("SnippingToolbarCanvas") == Visibility.Visible
+                && Vis("ToolbarCanvas") == Visibility.Visible;
+            L(p1 ? "PASS: screenshot pre-selected to work area, picker + toolbar visible"
+                 : "FAIL: screenshot default selection wrong");
+
+            // Switch to Video — selection should persist, video toolbar appears, picker stays.
+            ot.GetMethod("ModeVideo_Click", flags)!.Invoke(overlay, new object[] { overlay, new RoutedEventArgs() });
+            await Task.Delay(150);
+            bool p2 = GetF<bool>("_hasSelection")
+                && Vis("VideoToolbarCanvas") == Visibility.Visible
+                && Vis("SnippingToolbarCanvas") == Visibility.Collapsed;
+            L($"after Video: hasSel={GetF<bool>("_hasSelection")} videoToolbar={Vis("VideoToolbarCanvas")} picker={Vis("SnippingToolbarCanvas")}");
+            L(p2 ? "PASS: video keeps selection, shows ONLY start bar (picker hidden)"
+                 : "FAIL: video mode switch wrong");
+
+            // Switch to OCR — region selection cleared back to idle.
+            ot.GetMethod("ModeOcr_Click", flags)!.Invoke(overlay, new object[] { overlay, new RoutedEventArgs() });
+            await Task.Delay(150);
+            var interaction = ot.GetField("_interaction", flags)!.GetValue(overlay)!.ToString();
+            bool p3 = !GetF<bool>("_hasSelection") && interaction == "ToolbarIdle"
+                && Vis("SnippingToolbarCanvas") == Visibility.Visible;
+            L($"after OCR: hasSel={GetF<bool>("_hasSelection")} interaction={interaction} picker={Vis("SnippingToolbarCanvas")}");
+            L(p3 ? "PASS: OCR clears selection to idle, picker stays"
+                 : "FAIL: OCR mode switch wrong");
+
+            // Back to Screenshot — default selection re-applied.
+            ot.GetMethod("ModeScreenshot_Click", flags)!.Invoke(overlay, new object[] { overlay, new RoutedEventArgs() });
+            await Task.Delay(150);
+            bool p4 = GetF<bool>("_hasSelection") && GetF<bool>("_isFullRegion");
+            L($"back to Screenshot: hasSel={GetF<bool>("_hasSelection")} full={GetF<bool>("_isFullRegion")}");
+            L(p4 ? "PASS: screenshot re-applies default selection" : "FAIL: re-apply wrong");
+
+            try { overlay.Close(); } catch { }
+            L((p1 && p2 && p3 && p4) ? "ALL OVERLAY CHECKS PASSED" : "SOME OVERLAY CHECKS FAILED");
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(Dir, "overlay.txt"), log.ToString());
     }
 
     static async Task CaptureMergePreview()

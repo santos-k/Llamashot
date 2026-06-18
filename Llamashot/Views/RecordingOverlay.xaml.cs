@@ -42,6 +42,8 @@ public partial class RecordingOverlay : Window
         _pixelX = pixelX; _pixelY = pixelY; _pixelW = pixelW; _pixelH = pixelH;
 
         _recorder = new ScreenRecorder(fps: 10);
+        _recorder.CaptureCursor = AppSettings.Instance.RecordMouseCursor;
+        _recorder.HighlightCursor = AppSettings.Instance.HighlightMouseCursor;
         _recorder.OnTick += () => Dispatcher.Invoke(UpdateTimer);
 
         _micEnabled = micEnabled;

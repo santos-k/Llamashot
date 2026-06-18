@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using DrawBitmap = System.Drawing.Bitmap;
 using DrawImaging = System.Drawing.Imaging;
@@ -31,6 +32,11 @@ public class ScreenRecorder : IDisposable
     public bool IsPaused => _paused;
     public bool HasMic { get; private set; }
     public bool HasSystemAudio { get; private set; }
+
+    /// <summary>Draw the live mouse cursor onto each captured frame (BitBlt doesn't include it).</summary>
+    public bool CaptureCursor { get; set; } = true;
+    /// <summary>Draw a translucent yellow circle behind the cursor to make it stand out.</summary>
+    public bool HighlightCursor { get; set; } = true;
     public bool MicActive { get; private set; }
     public bool SystemAudioActive { get; private set; }
     public bool AudioGraphRunning => _audioGraph != null;
@@ -518,6 +524,9 @@ public class ScreenRecorder : IDisposable
             NativeMethods.DeleteDC(memDc);
             NativeMethods.ReleaseDC(IntPtr.Zero, hdc);
 
+            if (CaptureCursor)
+                DrawCursorOnFrame(bmp);
+
             var framePath = Path.Combine(_framesDir, $"frame_{_frameCount:D6}.jpg");
             bmp.Save(framePath, DrawImaging.ImageFormat.Jpeg);
 
@@ -526,6 +535,62 @@ public class ScreenRecorder : IDisposable
         catch { }
 
         OnTick?.Invoke();
+    }
+
+    /// <summary>
+    /// Composites the current mouse cursor (and an optional yellow highlight ring)
+    /// onto a freshly captured frame. BitBlt/CAPTUREBLT does not include the cursor,
+    /// so we fetch it via GetCursorInfo and blit it with DrawIconEx at the hotspot.
+    /// </summary>
+    private void DrawCursorOnFrame(DrawBitmap bmp)
+    {
+        try
+        {
+            var ci = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
+            if (!NativeMethods.GetCursorInfo(ref ci)) return;
+            if ((ci.flags & NativeMethods.CURSOR_SHOWING) == 0 || ci.hCursor == IntPtr.Zero) return;
+
+            // Cursor hotspot (the actual pointer/click point) relative to the capture region.
+            int hotX = ci.ptScreenPos.X - _regionX;
+            int hotY = ci.ptScreenPos.Y - _regionY;
+
+            // Skip when the pointer is well outside the recorded region.
+            const int margin = 64;
+            if (hotX < -margin || hotY < -margin || hotX > _regionW + margin || hotY > _regionH + margin)
+                return;
+
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            // Yellow highlight circle centered on the pointer.
+            if (HighlightCursor)
+            {
+                const int radius = 22;
+                using var fill = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(70, 255, 221, 0));
+                g.FillEllipse(fill, hotX - radius, hotY - radius, radius * 2, radius * 2);
+                using var ring = new System.Drawing.Pen(System.Drawing.Color.FromArgb(160, 255, 193, 7), 2f);
+                g.DrawEllipse(ring, hotX - radius, hotY - radius, radius * 2, radius * 2);
+            }
+
+            // Draw the actual cursor bitmap, offset so its hotspot lands on the pointer.
+            IntPtr hIcon = NativeMethods.CopyIcon(ci.hCursor);
+            if (hIcon == IntPtr.Zero) hIcon = ci.hCursor;
+            int drawX = hotX, drawY = hotY;
+            if (NativeMethods.GetIconInfo(hIcon, out var ii))
+            {
+                if (ii.hbmMask != IntPtr.Zero) NativeMethods.DeleteObject(ii.hbmMask);
+                if (ii.hbmColor != IntPtr.Zero) NativeMethods.DeleteObject(ii.hbmColor);
+                drawX = hotX - ii.xHotspot;
+                drawY = hotY - ii.yHotspot;
+            }
+
+            var dc = g.GetHdc();
+            NativeMethods.DrawIconEx(dc, drawX, drawY, hIcon, 0, 0, 0, IntPtr.Zero, NativeMethods.DI_NORMAL);
+            g.ReleaseHdc(dc);
+
+            if (hIcon != ci.hCursor) NativeMethods.DestroyIcon(hIcon);
+        }
+        catch { /* cursor overlay is best-effort */ }
     }
 
     public void Dispose()

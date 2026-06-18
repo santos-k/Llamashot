@@ -60,7 +60,8 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <CheckBox x:Name="ChkAutoStart" Content="Start with Windows" />
-                        <CheckBox x:Name="ChkCaptureCursor" Content="Capture mouse cursor" />
+                        <CheckBox x:Name="ChkRecordCursor" Content="Show mouse cursor in recordings" />
+                        <CheckBox x:Name="ChkHighlightCursor" Content="Highlight cursor with a yellow circle" Margin="20,2,0,0" />
                         <CheckBox x:Name="ChkShowNotifications" Content="Show notifications" />
                         <CheckBox x:Name="ChkMinimizeToTray" Content="Minimize to system tray" />
                     </StackPanel>

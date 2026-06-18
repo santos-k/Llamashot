@@ -70,9 +70,12 @@ public class AppSettings
 
     // Behavior
     public bool AutoStart { get; set; } = false;
-    public bool CaptureCursor { get; set; } = false;
     public bool ShowNotifications { get; set; } = true;
     public bool MinimizeToTray { get; set; } = true;
+
+    // Recording — mouse cursor
+    public bool RecordMouseCursor { get; set; } = true;
+    public bool HighlightMouseCursor { get; set; } = true;
 
     // Drawing defaults
     public string DefaultColor { get; set; } = "#FFFF00";

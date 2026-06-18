@@ -150,7 +150,8 @@ public partial class SettingsWindow : Window
         var s = AppSettings.Instance;
 
         ChkAutoStart.IsChecked = s.AutoStart;
-        ChkCaptureCursor.IsChecked = s.CaptureCursor;
+        ChkRecordCursor.IsChecked = s.RecordMouseCursor;
+        ChkHighlightCursor.IsChecked = s.HighlightMouseCursor;
         ChkShowNotifications.IsChecked = s.ShowNotifications;
         ChkMinimizeToTray.IsChecked = s.MinimizeToTray;
 
@@ -353,7 +354,8 @@ public partial class SettingsWindow : Window
         var s = AppSettings.Instance;
 
         s.AutoStart = ChkAutoStart.IsChecked ?? false;
-        s.CaptureCursor = ChkCaptureCursor.IsChecked ?? false;
+        s.RecordMouseCursor = ChkRecordCursor.IsChecked ?? true;
+        s.HighlightMouseCursor = ChkHighlightCursor.IsChecked ?? true;
         s.ShowNotifications = ChkShowNotifications.IsChecked ?? true;
         s.MinimizeToTray = ChkMinimizeToTray.IsChecked ?? true;
 

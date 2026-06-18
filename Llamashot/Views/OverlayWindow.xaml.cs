@@ -159,7 +159,34 @@ public partial class OverlayWindow : Window
         Activate();
         Focus();
 
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, PositionSnippingToolbar);
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+        {
+            PositionSnippingToolbar();
+
+            // Default selection = full work area (whole screen minus the taskbar) for the
+            // region-based capture modes, so the user can act immediately or re-drag.
+            // OCR / Long Shot keep their own click-to-target flow.
+            if (_captureMode is CaptureMode.Screenshot or CaptureMode.Video or CaptureMode.Gif)
+                SetSelectionAndShowToolbar(GetDefaultFullRegion(), isFullRegion: true);
+        });
+    }
+
+    /// <summary>
+    /// Work area of the primary monitor (full screen excluding the taskbar), expressed
+    /// in this overlay's local coordinates and clamped to the overlay bounds.
+    /// </summary>
+    private Rect GetDefaultFullRegion()
+    {
+        var wa = SystemParameters.WorkArea; // DIP, primary-screen origin
+        double rx = wa.X - Left;            // Left/Top = overlay (virtual-screen) origin
+        double ry = wa.Y - Top;
+        double x = Math.Max(0, rx);
+        double y = Math.Max(0, ry);
+        double right = Math.Min(ActualWidth, rx + wa.Width);
+        double bottom = Math.Min(ActualHeight, ry + wa.Height);
+        if (right - x < 1 || bottom - y < 1)
+            return new Rect(0, 0, ActualWidth, ActualHeight); // fallback: whole overlay
+        return new Rect(x, y, right - x, bottom - y);
     }
 
     private void InitializeColorPalette()
@@ -563,10 +590,66 @@ public partial class OverlayWindow : Window
             ? Visibility.Visible : Visibility.Collapsed;
         if (_captureMode == CaptureMode.Scroll) UpdateScrollToggleUI();
 
-        // Update cursor tooltip for current mode
-        UpdateCursorTooltip();
+        if (_captureMode is CaptureMode.Screenshot or CaptureMode.Video or CaptureMode.Gif)
+        {
+            // Region modes share the selection — keep the current one (or create the
+            // default work-area selection) and just swap in the correct per-mode toolbar.
+            var rect = _hasSelection ? _selection : GetDefaultFullRegion();
+            bool full = _hasSelection ? _isFullRegion : true;
+            CursorTooltip.Visibility = Visibility.Collapsed;
+            SetSelectionAndShowToolbar(rect, full);
+        }
+        else
+        {
+            // OCR / Long Shot don't use a persistent region selection — clear back to
+            // idle so their drag-to-extract / click-a-window flows work.
+            ClearSelectionToIdle();
+            UpdateCursorTooltip();
+        }
 
         Cursor = Cursors.Cross;
+    }
+
+    /// <summary>Tear down the current selection and return to the idle (pick-a-mode) state.</summary>
+    private void ClearSelectionToIdle()
+    {
+        HideToolbars();
+        SnippingToolbarCanvas.Visibility = Visibility.Visible;
+        PositionSnippingToolbar();
+        DrawingCanvas.Children.Clear();
+        _undoStack.Clear();
+        _redoStack.Clear();
+        _hasSelection = false;
+        _isFullRegion = false;
+        _currentTool = null;
+        _currentToolTag = null;
+        _interaction = Interaction.ToolbarIdle;
+        SelectionBorder.Visibility = Visibility.Collapsed;
+        OcrDashBorder.Visibility = Visibility.Collapsed;
+        DimensionBorder.Visibility = Visibility.Collapsed;
+        HandleCanvas.Visibility = Visibility.Collapsed;
+        UpdateDimming(Rect.Empty);
+        Cursor = Cursors.Cross;
+    }
+
+    /// <summary>Drop the existing selection and begin dragging a brand-new region from <paramref name="pos"/>.</summary>
+    private void BeginRegionSelection(Point pos)
+    {
+        HideToolbars();
+        DrawingCanvas.Children.Clear();
+        _undoStack.Clear();
+        _redoStack.Clear();
+        _hasSelection = false;
+        _isFullRegion = false;
+        _currentTool = null;
+        _currentToolTag = null;
+        _interaction = Interaction.Selecting;
+        _selStart = pos;
+        _selEnd = pos;
+        MainCanvas.CaptureMouse();
+        SelectionBorder.Visibility = Visibility.Visible;
+        DimensionBorder.Visibility = Visibility.Visible;
+        UpdateSelectionVisuals();
     }
 
     private void Delay_Click(object sender, RoutedEventArgs e)
@@ -607,6 +690,7 @@ public partial class OverlayWindow : Window
         _selection = rect;
         _hasSelection = true;
         _isFullRegion = isFullRegion;
+        if (isFullRegion) _originalSelection = rect;
         _interaction = Interaction.None;
 
         SelectionBorder.Visibility = Visibility.Visible;
@@ -1004,7 +1088,6 @@ public partial class OverlayWindow : Window
                     return;
                 }
 
-                SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
                 CursorTooltip.Visibility = Visibility.Collapsed;
 
                 _interaction = Interaction.Selecting;
@@ -1060,9 +1143,16 @@ public partial class OverlayWindow : Window
                     // Delegate to drawing canvas
                     return; // Let DrawingCanvas handle it
                 }
+                else if (_isFullRegion)
+                {
+                    // Still the untouched default (full work area): dragging carves a new region.
+                    BeginRegionSelection(pos);
+                    e.Handled = true;
+                    return;
+                }
                 else
                 {
-                    // No tool selected = move
+                    // Custom selection, no tool = move
                     _interaction = Interaction.Moving;
                     _dragStart = pos;
                     _dragOrigSelection = _selection;
@@ -1178,6 +1268,12 @@ public partial class OverlayWindow : Window
                                 : Color.FromRgb(0xF4, 0x43, 0x36));
                         CursorTooltip.Visibility = Visibility.Visible;
                     }
+                }
+                else if (_captureMode is CaptureMode.Screenshot or CaptureMode.Video or CaptureMode.Gif)
+                {
+                    // A click without a real drag: fall back to the default full-area selection
+                    // instead of leaving the user with nothing selected.
+                    SetSelectionAndShowToolbar(GetDefaultFullRegion(), isFullRegion: true);
                 }
                 break;
 
@@ -1399,7 +1495,7 @@ public partial class OverlayWindow : Window
         else
         {
             _originalSelection = _selection;
-            _selection = new Rect(0, 0, ActualWidth, ActualHeight);
+            _selection = GetDefaultFullRegion();
             _isFullRegion = true;
         }
         RefreshSelectionUI();
@@ -1409,8 +1505,10 @@ public partial class OverlayWindow : Window
 
     private void ShowToolbars()
     {
-        SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
-
+        // Screenshot mode keeps the mode picker visible so the user can switch modes
+        // (it gets hidden once they commit to Recording / GIF — see ShowVideoToolbar).
+        SnippingToolbarCanvas.Visibility = Visibility.Visible;
+        PositionSnippingToolbar();
         DelayPopupCanvas.Visibility = Visibility.Collapsed;
         ToolbarCanvas.Visibility = Visibility.Visible;
         DrawingCanvas.Visibility = Visibility.Visible;
@@ -1425,6 +1523,7 @@ public partial class OverlayWindow : Window
 
     private void ShowVideoToolbar()
     {
+        // Recording / GIF: hide the mode picker so only the Start bar remains.
         SnippingToolbarCanvas.Visibility = Visibility.Collapsed;
         ToolbarCanvas.Visibility = Visibility.Collapsed;
         VideoToolbarCanvas.Visibility = Visibility.Visible;
@@ -1885,6 +1984,14 @@ public partial class OverlayWindow : Window
             _dragStart = handlePos;
             _dragOrigSelection = _selection;
             MainCanvas.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
+        // Untouched default (full work area) + no tool: dragging carves a new region.
+        if (_isFullRegion && !_spaceHeld && _currentTool == null)
+        {
+            BeginRegionSelection(e.GetPosition(MainCanvas));
             e.Handled = true;
             return;
         }
@@ -2393,6 +2500,13 @@ public partial class OverlayWindow : Window
         }
 
         var s = AppSettings.Instance;
+
+        // Mode switches stay available after a region is selected (picker is still shown)
+        if (ShortcutHelper.Matches(e, s.ShortcutModeScreenshot)) { ModeScreenshot_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (ShortcutHelper.Matches(e, s.ShortcutModeVideo)) { ModeVideo_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (ShortcutHelper.Matches(e, s.ShortcutModeGif)) { ModeGif_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (ShortcutHelper.Matches(e, s.ShortcutModeScroll)) { ModeScroll_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (ShortcutHelper.Matches(e, s.ShortcutModeOcr)) { ModeOcr_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
 
         // Action shortcuts
         if (ShortcutHelper.Matches(e, s.ShortcutSave))
