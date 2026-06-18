@@ -834,8 +834,9 @@ public partial class FileToolsWindow : Window
         // Interactive PDF editors (their own windows — not the convert-and-save shell).
         if (id is "fill_sign" or "pdf_editor")
         {
-            var ed = new PdfMarkupWindow(id == "pdf_editor" ? "edit" : "fillsign") { Owner = this };
-            ed.ShowDialog();
+            // Non-modal + no owner so the user can freely switch back to File Tools.
+            var ed = new PdfMarkupWindow(id == "pdf_editor" ? "edit" : "fillsign");
+            ed.Show();
             return;
         }
 
@@ -843,8 +844,9 @@ public partial class FileToolsWindow : Window
         if (id is "merge_pdf" or "split_pdf" or "compress_pdf" or "pdf_to_images" or "images_to_pdf"
             or "rotate_pdf" or "extract_pages" or "insert_pages" or "page_numbers" or "watermark" or "protect_pdf")
         {
-            var ws = new ToolWorkspaceWindow(id) { Owner = this };
-            ws.ShowDialog();
+            // Non-modal + no owner so the user can freely switch back to File Tools.
+            var ws = new ToolWorkspaceWindow(id);
+            ws.Show();
             return;
         }
 

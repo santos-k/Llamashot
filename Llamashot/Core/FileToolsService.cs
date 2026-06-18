@@ -507,7 +507,8 @@ public static class FileToolsService
         }
     }
 
-    public static async Task WatermarkPdfAsync(string pdfPath, string outputPath, string watermarkText, double opacity = 0.3, int fontSize = 48, IProgress<int>? progress = null, string? password = null)
+    public static async Task WatermarkPdfAsync(string pdfPath, string outputPath, string watermarkText, double opacity = 0.3, int fontSize = 48, IProgress<int>? progress = null, string? password = null,
+        string fontFamily = "Segoe UI", string colorHex = "#808080", string orientation = "diagonal-up", string position = "center")
     {
         string tempDir = CreateTempDir("watermark");
         try
@@ -524,30 +525,35 @@ public static class FileToolsService
                 var bmp = await RenderPdfPageAsync(page);
 
                 string tempFile = Path.Combine(tempDir, $"page_{i:D3}.jpg");
-                int capturedFontSize = fontSize;
+                double capturedFontSize = fontSize * 150.0 / 72.0; // pt -> 150-dpi pixels
                 double capturedOpacity = opacity;
                 string capturedText = watermarkText;
+                string capturedFont = fontFamily;
+                var capturedBrush = new SolidColorBrush(ParseColor(colorHex, Color.FromRgb(0x80, 0x80, 0x80)));
+                capturedBrush.Freeze();
+                double capturedAngle = AngleFor(orientation);
+                string capturedPos = position;
 
                 var thread = new Thread(() =>
                 {
                     var watermarked = RenderOverlay(bmp, (dc, w, h) =>
                     {
-                        dc.PushOpacity(capturedOpacity);
-                        dc.PushTransform(new RotateTransform(-45, w / 2.0, h / 2.0));
-
                         var formattedText = new FormattedText(
                             capturedText,
                             CultureInfo.InvariantCulture,
                             System.Windows.FlowDirection.LeftToRight,
-                            new Typeface("Segoe UI"),
+                            new Typeface(capturedFont),
                             capturedFontSize,
-                            Brushes.Gray,
+                            capturedBrush,
                             VisualTreeHelper.GetDpi(new DrawingVisual()).PixelsPerDip);
 
-                        double textX = (w - formattedText.Width) / 2;
-                        double textY = (h - formattedText.Height) / 2;
-                        dc.DrawText(formattedText, new Point(textX, textY));
+                        var (textX, textY) = PlaceText(capturedPos, w, h, formattedText.Width, formattedText.Height, w * 0.05);
+                        double cx = textX + formattedText.Width / 2;
+                        double cy = textY + formattedText.Height / 2;
 
+                        dc.PushOpacity(capturedOpacity);
+                        dc.PushTransform(new RotateTransform(capturedAngle, cx, cy));
+                        dc.DrawText(formattedText, new Point(textX, textY));
                         dc.Pop(); // RotateTransform
                         dc.Pop(); // Opacity
                     });
@@ -574,7 +580,8 @@ public static class FileToolsService
         }
     }
 
-    public static async Task AddPageNumbersAsync(string pdfPath, string outputPath, string position = "bottom-center", IProgress<int>? progress = null, string? password = null)
+    public static async Task AddPageNumbersAsync(string pdfPath, string outputPath, string position = "bottom-center", IProgress<int>? progress = null, string? password = null,
+        string fontFamily = "Segoe UI", double fontSizePt = 11, string colorHex = "#404040")
     {
         string tempDir = CreateTempDir("pagenums");
         try
@@ -594,6 +601,10 @@ public static class FileToolsService
                 uint capturedI = i;
                 uint capturedCount = pageCount;
                 string capturedPosition = position;
+                string capturedFont = fontFamily;
+                double capturedSize = fontSizePt * 150.0 / 72.0; // pt -> 150-dpi pixels
+                var capturedBrush = new SolidColorBrush(ParseColor(colorHex, Color.FromRgb(64, 64, 64)));
+                capturedBrush.Freeze();
 
                 var thread = new Thread(() =>
                 {
@@ -605,34 +616,12 @@ public static class FileToolsService
                             pageText,
                             CultureInfo.InvariantCulture,
                             System.Windows.FlowDirection.LeftToRight,
-                            new Typeface("Segoe UI"),
-                            14,
-                            new SolidColorBrush(Color.FromRgb(64, 64, 64)),
+                            new Typeface(capturedFont),
+                            capturedSize,
+                            capturedBrush,
                             VisualTreeHelper.GetDpi(new DrawingVisual()).PixelsPerDip);
 
-                        double textX, textY;
-                        double margin = 20;
-
-                        switch (capturedPosition)
-                        {
-                            case "bottom-right":
-                                textX = w - formattedText.Width - margin;
-                                textY = h - formattedText.Height - margin;
-                                break;
-                            case "top-center":
-                                textX = (w - formattedText.Width) / 2;
-                                textY = margin;
-                                break;
-                            case "top-right":
-                                textX = w - formattedText.Width - margin;
-                                textY = margin;
-                                break;
-                            default: // bottom-center
-                                textX = (w - formattedText.Width) / 2;
-                                textY = h - formattedText.Height - margin;
-                                break;
-                        }
-
+                        var (textX, textY) = PlaceText(capturedPosition, w, h, formattedText.Width, formattedText.Height, w * 0.04);
                         dc.DrawText(formattedText, new Point(textX, textY));
                     });
 
@@ -1612,6 +1601,34 @@ public static class FileToolsService
         bmp.Freeze();
         return bmp;
     }
+
+    /// <summary>Parses a "#RRGGBB" hex color, falling back to <paramref name="fallback"/> on failure.</summary>
+    private static Color ParseColor(string? hex, Color fallback)
+    {
+        try { if (!string.IsNullOrWhiteSpace(hex)) return (Color)System.Windows.Media.ColorConverter.ConvertFromString(hex); } catch { }
+        return fallback;
+    }
+
+    /// <summary>Maps a watermark orientation key to a rotation angle (degrees).</summary>
+    private static double AngleFor(string orientation) => orientation switch
+    {
+        "horizontal" => 0,
+        "vertical" => -90,
+        "diagonal-down" => 45,   // "\"
+        _ => -45,                // "diagonal-up"  "/"
+    };
+
+    /// <summary>Computes the top-left draw point for a text block given a 9-position key.</summary>
+    private static (double x, double y) PlaceText(string position, double w, double h, double tw, double th, double margin) => position switch
+    {
+        "top-left" => (margin, margin),
+        "top-center" => ((w - tw) / 2, margin),
+        "top-right" => (w - tw - margin, margin),
+        "center" => ((w - tw) / 2, (h - th) / 2),
+        "bottom-left" => (margin, h - th - margin),
+        "bottom-right" => (w - tw - margin, h - th - margin),
+        _ => ((w - tw) / 2, h - th - margin), // bottom-center
+    };
 
     private static BitmapSource RenderOverlay(BitmapSource source, Action<DrawingContext, int, int> drawAction)
     {

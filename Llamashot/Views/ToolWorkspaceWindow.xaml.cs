@@ -76,14 +76,41 @@ public partial class ToolWorkspaceWindow : Window
 
     // page-numbers settings
     private string _pnPos = "bottom-center";
+    private string _pnFont = "Segoe UI";
+    private double _pnFontSize = 11;
+    private string _pnColorHex = "#404040";
     private readonly Dictionary<string, Border> _pnCards = new();
+    private readonly Dictionary<string, Border> _pnSizeCards = new();
+    private readonly Dictionary<string, Border> _pnColorCards = new();
 
     // watermark settings
     private TextBox _wmTextBox = null!;
     private double _wmOpacity = 0.3;
     private int _wmFontSize = 48;
+    private string _wmFont = "Segoe UI";
+    private string _wmColorHex = "#808080";
+    private string _wmOrient = "diagonal-up";
+    private string _wmPos = "center";
     private readonly Dictionary<string, Border> _wmOpacityCards = new();
     private readonly Dictionary<string, Border> _wmSizeCards = new();
+    private readonly Dictionary<string, Border> _wmOrientCards = new();
+    private readonly Dictionary<string, Border> _wmColorCards = new();
+
+    // basic font family choices shared by Page Numbers + Watermark
+    private static readonly string[] BasicFonts =
+        { "Segoe UI", "Arial", "Times New Roman", "Calibri", "Verdana", "Georgia", "Courier New" };
+    // swatch palette (label -> hex)
+    private static readonly (string name, string hex)[] BasicColors =
+    {
+        ("Black", "#000000"), ("Gray", "#666666"), ("Red", "#D7263D"), ("Blue", "#2563EB"),
+        ("Green", "#2E7D32"), ("Orange", "#E07B00"), ("Purple", "#7C3AED"), ("White", "#FFFFFF")
+    };
+
+    // result chaining + panel collapse state
+    private string? _chainPath;       // last single-PDF export, fed into the next tool the user opens
+    private bool _leftCollapsed;
+    private bool _infoCollapsed;
+    private double _dispW, _dispH;     // on-screen size of the current preview page (px)
 
     // insert-pages settings
     private readonly List<string> _insertImages = new();
@@ -193,8 +220,12 @@ public partial class ToolWorkspaceWindow : Window
         _dpiCards.Clear();
         _rotateCards.Clear();
         _pnCards.Clear();
+        _pnSizeCards.Clear();
+        _pnColorCards.Clear();
         _wmOpacityCards.Clear();
         _wmSizeCards.Clear();
+        _wmOrientCards.Clear();
+        _wmColorCards.Clear();
         if (_toolId == "merge_pdf") BuildMergeSettings();
         else if (_toolId == "images_to_pdf") BuildImagesToPdfSettings();
         else if (_toolId == "compress_pdf") BuildCompressSettings();
@@ -215,6 +246,13 @@ public partial class ToolWorkspaceWindow : Window
         BuildRail();
         BuildSettings();
         ApplyToolMeta();
+
+        // Carry the last exported PDF into the tool the user just opened (chaining).
+        if (_chainPath != null && File.Exists(_chainPath) && !IsMultiFile && _chainPath != _pdfPath && AcceptsFile(_chainPath))
+        {
+            _ = LoadPdf(_chainPath);
+            return;
+        }
 
         if (_pdfPath != null && _toolId == "split_pdf")
         {
@@ -244,6 +282,13 @@ public partial class ToolWorkspaceWindow : Window
     {
         var next = NextImplementedTool();
         if (next != _toolId) SwitchTool(next);
+    }
+
+    /// <summary>Remembers a freshly-exported single PDF so the next tool the user opens starts from it.</summary>
+    private void RememberChain(string path)
+    {
+        if (!string.IsNullOrEmpty(path) && path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(path))
+            _chainPath = path;
     }
 
     private static SolidColorBrush B(string key) => (SolidColorBrush)Application.Current.Resources[key];
@@ -690,21 +735,40 @@ public partial class ToolWorkspaceWindow : Window
     private void BuildPageNumbersSettings()
     {
         SettingsHost.Children.Add(SectionTitle("Number Position"));
-        SettingsHost.Children.Add(RadioCard(_pnCards, "top-left", "Top Left", "Header, left edge", () => SelectPnPos("top-left")));
-        SettingsHost.Children.Add(RadioCard(_pnCards, "top-center", "Top Center", "Header, centered", () => SelectPnPos("top-center")));
-        SettingsHost.Children.Add(RadioCard(_pnCards, "top-right", "Top Right", "Header, right edge", () => SelectPnPos("top-right")));
-        SettingsHost.Children.Add(RadioCard(_pnCards, "bottom-left", "Bottom Left", "Footer, left edge", () => SelectPnPos("bottom-left")));
-        SettingsHost.Children.Add(RadioCard(_pnCards, "bottom-center", "Bottom Center", "Footer, centered", () => SelectPnPos("bottom-center")));
-        SettingsHost.Children.Add(RadioCard(_pnCards, "bottom-right", "Bottom Right", "Footer, right edge", () => SelectPnPos("bottom-right")));
+        SettingsHost.Children.Add(PositionGrid(_pnCards, SelectPnPos, includeCenter: false));
+
+        SettingsHost.Children.Add(SectionTitle("Font", 22));
+        SettingsHost.Children.Add(FontCombo(_pnFont, f => { _pnFont = f; UpdatePreviewOverlay(); }));
+
+        SettingsHost.Children.Add(SectionTitle("Font Size", 22));
+        var pnSizes = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+        pnSizes.ColumnDefinitions.Add(new ColumnDefinition());
+        pnSizes.ColumnDefinitions.Add(new ColumnDefinition());
+        pnSizes.ColumnDefinitions.Add(new ColumnDefinition());
+        AddChip(pnSizes, 0, _pnSizeCards, "sm", "Small", () => SelectPnSize("sm"));
+        AddChip(pnSizes, 1, _pnSizeCards, "md", "Medium", () => SelectPnSize("md"));
+        AddChip(pnSizes, 2, _pnSizeCards, "lg", "Large", () => SelectPnSize("lg"));
+        SettingsHost.Children.Add(pnSizes);
+
+        SettingsHost.Children.Add(SectionTitle("Color", 22));
+        SettingsHost.Children.Add(ColorSwatches(_pnColorCards, _pnColorHex, hex => { _pnColorHex = hex; HighlightSwatches(_pnColorCards, hex); UpdatePreviewOverlay(); }));
 
         SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
         SettingsHost.Children.Add(BuildFolderRow(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Numbered")));
 
         SelectPnPos(_pnPos);
+        SelectPnSize(_pnFontSize <= 9 ? "sm" : _pnFontSize >= 16 ? "lg" : "md");
+        HighlightSwatches(_pnColorCards, _pnColorHex);
     }
 
-    private void SelectPnPos(string key) { _pnPos = key; HighlightRadio(_pnCards, key); }
+    private void SelectPnPos(string key) { _pnPos = key; HighlightPos(_pnCards, key); UpdatePreviewOverlay(); }
+    private void SelectPnSize(string key)
+    {
+        _pnFontSize = key switch { "sm" => 9, "lg" => 18, _ => 12 };
+        HighlightChips(_pnSizeCards, key);
+        UpdatePreviewOverlay();
+    }
 
     // =====================================================================
     //  Watermark settings
@@ -717,28 +781,68 @@ public partial class ToolWorkspaceWindow : Window
         SettingsHost.Children.Add(SectionTitle("Watermark Text"));
         _wmTextBox = ThemedBox("CONFIDENTIAL");
         _wmTextBox.Margin = new Thickness(0, 0, 0, 0);
+        _wmTextBox.TextChanged += (_, _) => UpdatePreviewOverlay();
         SettingsHost.Children.Add(_wmTextBox);
 
-        SettingsHost.Children.Add(SectionTitle("Opacity", 22));
-        SettingsHost.Children.Add(RadioCard(_wmOpacityCards, "light", "Light", "Subtle · 15%", () => SelectWmOpacity("light")));
-        SettingsHost.Children.Add(RadioCard(_wmOpacityCards, "medium", "Medium", "Balanced · 30%", () => SelectWmOpacity("medium")));
-        SettingsHost.Children.Add(RadioCard(_wmOpacityCards, "strong", "Strong", "Bold · 50%", () => SelectWmOpacity("strong")));
+        SettingsHost.Children.Add(SectionTitle("Orientation", 22));
+        var orient = new Grid();
+        orient.ColumnDefinitions.Add(new ColumnDefinition());
+        orient.ColumnDefinitions.Add(new ColumnDefinition());
+        orient.ColumnDefinitions.Add(new ColumnDefinition());
+        orient.ColumnDefinitions.Add(new ColumnDefinition());
+        AddChip(orient, 0, _wmOrientCards, "horizontal", "Horizontal", () => SelectWmOrient("horizontal"));
+        AddChip(orient, 1, _wmOrientCards, "vertical", "Vertical", () => SelectWmOrient("vertical"));
+        AddChip(orient, 2, _wmOrientCards, "diagonal-up", "Tilt /", () => SelectWmOrient("diagonal-up"));
+        AddChip(orient, 3, _wmOrientCards, "diagonal-down", "Tilt \\", () => SelectWmOrient("diagonal-down"));
+        SettingsHost.Children.Add(orient);
+
+        SettingsHost.Children.Add(SectionTitle("Position", 22));
+        SettingsHost.Children.Add(PositionGrid(_wmPosCards, SelectWmPos, includeCenter: true));
+
+        SettingsHost.Children.Add(SectionTitle("Font", 22));
+        SettingsHost.Children.Add(FontCombo(_wmFont, f => { _wmFont = f; UpdatePreviewOverlay(); }));
 
         SettingsHost.Children.Add(SectionTitle("Font Size", 22));
-        SettingsHost.Children.Add(RadioCard(_wmSizeCards, "small", "Small", "32 pt", () => SelectWmSize("small")));
-        SettingsHost.Children.Add(RadioCard(_wmSizeCards, "medium", "Medium", "48 pt", () => SelectWmSize("medium")));
-        SettingsHost.Children.Add(RadioCard(_wmSizeCards, "large", "Large", "72 pt", () => SelectWmSize("large")));
+        var wmSizes = new Grid();
+        wmSizes.ColumnDefinitions.Add(new ColumnDefinition());
+        wmSizes.ColumnDefinitions.Add(new ColumnDefinition());
+        wmSizes.ColumnDefinitions.Add(new ColumnDefinition());
+        AddChip(wmSizes, 0, _wmSizeCards, "small", "32 pt", () => SelectWmSize("small"));
+        AddChip(wmSizes, 1, _wmSizeCards, "medium", "48 pt", () => SelectWmSize("medium"));
+        AddChip(wmSizes, 2, _wmSizeCards, "large", "72 pt", () => SelectWmSize("large"));
+        SettingsHost.Children.Add(wmSizes);
+
+        SettingsHost.Children.Add(SectionTitle("Opacity", 22));
+        var wmOpac = new Grid();
+        wmOpac.ColumnDefinitions.Add(new ColumnDefinition());
+        wmOpac.ColumnDefinitions.Add(new ColumnDefinition());
+        wmOpac.ColumnDefinitions.Add(new ColumnDefinition());
+        AddChip(wmOpac, 0, _wmOpacityCards, "light", "Light", () => SelectWmOpacity("light"));
+        AddChip(wmOpac, 1, _wmOpacityCards, "medium", "Medium", () => SelectWmOpacity("medium"));
+        AddChip(wmOpac, 2, _wmOpacityCards, "strong", "Strong", () => SelectWmOpacity("strong"));
+        SettingsHost.Children.Add(wmOpac);
+
+        SettingsHost.Children.Add(SectionTitle("Color", 22));
+        SettingsHost.Children.Add(ColorSwatches(_wmColorCards, _wmColorHex, hex => { _wmColorHex = hex; HighlightSwatches(_wmColorCards, hex); UpdatePreviewOverlay(); }));
 
         SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
         SettingsHost.Children.Add(BuildFolderRow(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Watermarked")));
 
+        SelectWmOrient(_wmOrient);
+        SelectWmPos(_wmPos);
         SelectWmOpacity(_wmOpacity <= 0.15 ? "light" : _wmOpacity >= 0.5 ? "strong" : "medium");
         SelectWmSize(_wmFontSize <= 32 ? "small" : _wmFontSize >= 72 ? "large" : "medium");
+        HighlightSwatches(_wmColorCards, _wmColorHex);
     }
 
-    private void SelectWmOpacity(string key) { _wmOpacity = WmOpacityFor(key); HighlightRadio(_wmOpacityCards, key); }
-    private void SelectWmSize(string key) { _wmFontSize = WmSizeFor(key); HighlightRadio(_wmSizeCards, key); }
+    // watermark position uses its own card dictionary
+    private readonly Dictionary<string, Border> _wmPosCards = new();
+
+    private void SelectWmOpacity(string key) { _wmOpacity = WmOpacityFor(key); HighlightChips(_wmOpacityCards, key); UpdatePreviewOverlay(); }
+    private void SelectWmSize(string key) { _wmFontSize = WmSizeFor(key); HighlightChips(_wmSizeCards, key); UpdatePreviewOverlay(); }
+    private void SelectWmOrient(string key) { _wmOrient = key; HighlightChips(_wmOrientCards, key); UpdatePreviewOverlay(); }
+    private void SelectWmPos(string key) { _wmPos = key; HighlightPos(_wmPosCards, key); UpdatePreviewOverlay(); }
 
     // =====================================================================
     //  Protect settings
@@ -797,6 +901,169 @@ public partial class ToolWorkspaceWindow : Window
             var dot = (Border)((StackPanel)card.Child).Children[0];
             dot.BorderBrush = on ? B("AccentBrush") : B("BorderSoftBrush");
             dot.Child = on ? new Border { Width = 8, Height = 8, CornerRadius = new CornerRadius(4), Background = B("AccentBrush") } : null;
+        }
+    }
+
+    // ---- compact shared controls for Page Numbers / Watermark ----
+
+    /// <summary>A small selectable chip placed in a single grid column.</summary>
+    private void AddChip(Grid grid, int col, Dictionary<string, Border> dict, string key, string label, Action onClick)
+    {
+        var chip = new Border
+        {
+            Margin = new Thickness(col == 0 ? 0 : 6, 0, 0, 0), CornerRadius = new CornerRadius(9), Cursor = Cursors.Hand,
+            BorderThickness = new Thickness(1), BorderBrush = B("BorderSoftBrush"), Background = B("SurfaceBrush"),
+            Padding = new Thickness(4, 9, 4, 9)
+        };
+        chip.Child = new TextBlock { Text = label, FontSize = 12.5, Foreground = B("TextSecondaryBrush"), HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center };
+        chip.MouseLeftButtonUp += (_, _) => onClick();
+        Grid.SetColumn(chip, col);
+        grid.Children.Add(chip);
+        dict[key] = chip;
+    }
+
+    private void HighlightChips(Dictionary<string, Border> dict, string key)
+    {
+        foreach (var (k, chip) in dict)
+        {
+            bool on = k == key;
+            chip.Background = on ? Tint("AccentBrush") : B("SurfaceBrush");
+            chip.BorderBrush = on ? B("AccentBrush") : B("BorderSoftBrush");
+            if (chip.Child is TextBlock t) { t.Foreground = on ? B("AccentBrush") : B("TextSecondaryBrush"); t.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal; }
+        }
+    }
+
+    /// <summary>A 3×3 position picker (corners + edges, optionally center).</summary>
+    private UIElement PositionGrid(Dictionary<string, Border> dict, Action<string> onSelect, bool includeCenter)
+    {
+        dict.Clear();
+        var outer = new Border
+        {
+            CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), BorderBrush = B("BorderSoftBrush"),
+            Background = B("SurfaceAltBrush"), Padding = new Thickness(8)
+        };
+        var g = new Grid();
+        for (int c = 0; c < 3; c++) g.ColumnDefinitions.Add(new ColumnDefinition());
+        for (int r = 0; r < 3; r++) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(34) });
+
+        void Cell(int r, int c, string key)
+        {
+            var cell = new Border
+            {
+                Margin = new Thickness(3), CornerRadius = new CornerRadius(8), Cursor = Cursors.Hand,
+                BorderThickness = new Thickness(1), BorderBrush = B("BorderSoftBrush"), Background = B("SurfaceBrush")
+            };
+            cell.Child = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Background = B("TextMutedBrush"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            cell.MouseLeftButtonUp += (_, _) => onSelect(key);
+            Grid.SetRow(cell, r); Grid.SetColumn(cell, c);
+            g.Children.Add(cell);
+            dict[key] = cell;
+        }
+        Cell(0, 0, "top-left"); Cell(0, 1, "top-center"); Cell(0, 2, "top-right");
+        if (includeCenter) Cell(1, 1, "center");
+        Cell(2, 0, "bottom-left"); Cell(2, 1, "bottom-center"); Cell(2, 2, "bottom-right");
+        outer.Child = g;
+        return outer;
+    }
+
+    private void HighlightPos(Dictionary<string, Border> dict, string key)
+    {
+        foreach (var (k, cell) in dict)
+        {
+            bool on = k == key;
+            cell.Background = on ? B("AccentBrush") : B("SurfaceBrush");
+            cell.BorderBrush = on ? B("AccentBrush") : B("BorderSoftBrush");
+            if (cell.Child is Border dot) dot.Background = on ? B("AccentTextBrush") : B("TextMutedBrush");
+        }
+    }
+
+    private ComboBox FontCombo(string current, Action<string> onPick)
+    {
+        var cb = new ComboBox
+        {
+            FontSize = 13, Padding = new Thickness(8, 6, 8, 6),
+            Background = B("SurfaceAltBrush"), Foreground = B("TextPrimaryBrush"), BorderBrush = B("BorderSoftBrush")
+        };
+        foreach (var f in BasicFonts) cb.Items.Add(new ComboBoxItem { Content = f, FontFamily = new FontFamily(f) });
+        cb.SelectedIndex = Math.Max(0, Array.IndexOf(BasicFonts, current));
+        cb.SelectionChanged += (_, _) => { if (cb.SelectedItem is ComboBoxItem ci) onPick(ci.Content!.ToString()!); };
+        return cb;
+    }
+
+    private UIElement ColorSwatches(Dictionary<string, Border> dict, string current, Action<string> onPick)
+    {
+        dict.Clear();
+        var wrap = new WrapPanel();
+        foreach (var (name, hex) in BasicColors)
+        {
+            var sw = new Border
+            {
+                Width = 30, Height = 30, CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 0, 8, 8),
+                Background = Hex(hex), BorderThickness = new Thickness(2), BorderBrush = B("BorderSoftBrush"),
+                Cursor = Cursors.Hand, ToolTip = name
+            };
+            string h = hex;
+            sw.MouseLeftButtonUp += (_, _) => onPick(h);
+            dict[hex] = sw;
+            wrap.Children.Add(sw);
+        }
+        return wrap;
+    }
+
+    private void HighlightSwatches(Dictionary<string, Border> dict, string hex)
+    {
+        foreach (var (k, sw) in dict)
+            sw.BorderBrush = string.Equals(k, hex, StringComparison.OrdinalIgnoreCase) ? B("AccentBrush") : B("BorderSoftBrush");
+    }
+
+    // ---- live page-number / watermark overlay on the preview page ----
+    private TextBlock OverlayText(string text, string font, double px, string hex, double opacity) => new()
+    {
+        Text = text, FontFamily = new FontFamily(font), FontSize = Math.Max(6, px),
+        Foreground = Hex(hex), Opacity = opacity, TextWrapping = TextWrapping.NoWrap
+    };
+
+    private static (double x, double y) PlacePoint(string pos, double w, double h, double tw, double th, double margin) => pos switch
+    {
+        "top-left" => (margin, margin),
+        "top-center" => ((w - tw) / 2, margin),
+        "top-right" => (w - tw - margin, margin),
+        "center" => ((w - tw) / 2, (h - th) / 2),
+        "bottom-left" => (margin, h - th - margin),
+        "bottom-right" => (w - tw - margin, h - th - margin),
+        _ => ((w - tw) / 2, h - th - margin),
+    };
+
+    private void PlaceOverlay(TextBlock tb, string pos, double w, double h, double margin, double angle)
+    {
+        tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double tw = tb.DesiredSize.Width, th = tb.DesiredSize.Height;
+        if (angle != 0) { tb.RenderTransformOrigin = new Point(0.5, 0.5); tb.RenderTransform = new RotateTransform(angle); }
+        var (x, y) = PlacePoint(pos, w, h, tw, th, margin);
+        Canvas.SetLeft(tb, x);
+        Canvas.SetTop(tb, y);
+        OverlayCanvas.Children.Add(tb);
+    }
+
+    private void UpdatePreviewOverlay()
+    {
+        if (OverlayCanvas == null) return;
+        OverlayCanvas.Children.Clear();
+        if (_dispW <= 0 || _dispH <= 0 || _previewPages.Count == 0) return;
+        double w = _dispW, h = _dispH;
+
+        if (_toolId == "page_numbers")
+        {
+            var tb = OverlayText($"Page {_curPage} of {_previewPages.Count}", _pnFont, _pnFontSize * w / 612.0, _pnColorHex, 1.0);
+            PlaceOverlay(tb, _pnPos, w, h, w * 0.04, 0);
+        }
+        else if (_toolId == "watermark")
+        {
+            string text = _wmTextBox?.Text?.Trim() ?? "";
+            if (text.Length == 0) return;
+            double angle = _wmOrient switch { "horizontal" => 0, "vertical" => -90, "diagonal-down" => 45, _ => -45 };
+            var tb = OverlayText(text, _wmFont, _wmFontSize * w / 612.0, _wmColorHex, _wmOpacity);
+            PlaceOverlay(tb, _wmPos, w, h, w * 0.05, angle);
         }
     }
 
@@ -1272,6 +1539,7 @@ public partial class ToolWorkspaceWindow : Window
         _pageCount = pages;
         _curPage = 1;
         _zoom = 1.0;
+        _chainPath = path; // keep the working file as the carry-over for the next tool
 
         if (_toolId == "split_pdf") { SetRange(1, pages); SelectMethod(_method); }
         else if (_toolId == "extract_pages" && string.IsNullOrWhiteSpace(_extractBox.Text)) _extractBox.Text = $"1-{pages}";
@@ -1289,12 +1557,21 @@ public partial class ToolWorkspaceWindow : Window
 
         var pp = _previewPages[_curPage - 1];
         var bmp = pp.IsImage ? SafeImage(pp.Path) : await RenderThumbAsync(pp.Path, pp.Password, pp.Page, 1100);
-        if (bmp != null) PreviewImage.Source = bmp;
-        PreviewImage.Width = PreviewBaseWidth * _zoom;
+        double dw = PreviewBaseWidth * _zoom;
+        if (bmp != null)
+        {
+            PreviewImage.Source = bmp;
+            double dh = bmp.PixelWidth > 0 ? dw * bmp.PixelHeight / bmp.PixelWidth : dw * 1.3;
+            PreviewImage.Width = dw; PreviewImage.Height = dh;
+            OverlayCanvas.Width = dw; OverlayCanvas.Height = dh;
+            _dispW = dw; _dispH = dh;
+        }
+        else { PreviewImage.Width = dw; }
         TxtPager.Text = $"{_curPage} / {_previewPages.Count}";
         TxtPreviewSub.Text = $"Total {_previewPages.Count} page{(_previewPages.Count == 1 ? "" : "s")}";
         TxtZoom.Text = $"{(int)(_zoom * 100)}%";
         UpdateRotatePreview();
+        UpdatePreviewOverlay();
         HighlightFilmstrip();
         ScrollThumbIntoView();
     }
@@ -1426,12 +1703,32 @@ public partial class ToolWorkspaceWindow : Window
 
     private void Clear_Click(object sender, RoutedEventArgs e)
     {
-        _pdfPath = null; _password = null; _pageCount = 0; _curPage = 1; _zoom = 1.0;
+        _pdfPath = null; _password = null; _pageCount = 0; _curPage = 1; _zoom = 1.0; _chainPath = null;
         _mergeFiles.Clear(); _mergePages.Clear(); _mergePw.Clear();
         _insertImages.Clear();
         if (_toolId == "insert_pages") UpdateInsertCount();
         BtnAddMore.Content = IsMultiFile ? "+ Add More" : "Open";
         RefreshAll();
+    }
+
+    // ---- panel collapse (left files + right file-info) ----
+    private void CollapseLeft_Click(object sender, RoutedEventArgs e) => SetLeftCollapsed(true);
+    private void ExpandLeft_Click(object sender, MouseButtonEventArgs e) => SetLeftCollapsed(false);
+
+    private void SetLeftCollapsed(bool collapsed)
+    {
+        _leftCollapsed = collapsed;
+        LeftPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        LeftRail.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        ColFiles.Width = collapsed ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
+    }
+
+    private void CollapseInfo_Click(object sender, RoutedEventArgs e)
+    {
+        _infoCollapsed = !_infoCollapsed;
+        InfoRows.Visibility = _infoCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        BtnInfoToggle.Content = _infoCollapsed ? "▸" : "▾";
+        BtnInfoToggle.ToolTip = _infoCollapsed ? "Expand" : "Collapse";
     }
 
     private void ShowPreviewState()
@@ -1542,7 +1839,7 @@ public partial class ToolWorkspaceWindow : Window
         string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_numbered.pdf");
 
         await RunJob("Adding page numbers…", $"Stamping {_pageCount} page(s)", "Numbering…",
-            () => FileToolsService.AddPageNumbersAsync(_pdfPath!, outPath, _pnPos, null, _password),
+            () => FileToolsService.AddPageNumbersAsync(_pdfPath!, outPath, _pnPos, null, _password, _pnFont, _pnFontSize, _pnColorHex),
             "Page Numbers Added", $"Numbered {_pageCount} page(s) and saved to:\n{outPath}", outPath, select: true);
     }
 
@@ -1562,7 +1859,7 @@ public partial class ToolWorkspaceWindow : Window
         string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_watermarked.pdf");
 
         await RunJob("Adding watermark…", $"Overlaying “{text}”", "Stamping…",
-            () => FileToolsService.WatermarkPdfAsync(_pdfPath!, outPath, text, _wmOpacity, _wmFontSize, null, _password),
+            () => FileToolsService.WatermarkPdfAsync(_pdfPath!, outPath, text, _wmOpacity, _wmFontSize, null, _password, _wmFont, _wmColorHex, _wmOrient, _wmPos),
             "Watermark Added", $"Watermarked {_pageCount} page(s) and saved to:\n{outPath}", outPath, select: true);
     }
 
@@ -1604,9 +1901,9 @@ public partial class ToolWorkspaceWindow : Window
         {
             await System.Threading.Tasks.Task.WhenAll(work(), System.Threading.Tasks.Task.Delay(650));
             HideBusy();
+            RememberChain(resultPath);
             ConfirmDialog.Alert(this, okTitle, okMessage, ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", select ? $"/select,\"{resultPath}\"" : resultPath); } catch { }
-            MoveToNextTool();
         }
         catch (Exception ex)
         {
@@ -1641,7 +1938,7 @@ public partial class ToolWorkspaceWindow : Window
                 $"Rotated {_pageCount} page(s) by {_rotateDeg}° and saved to:\n{outPath}",
                 ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
-            MoveToNextTool();
+            RememberChain(outPath);
         }
         catch (Exception ex)
         {
@@ -1674,7 +1971,6 @@ public partial class ToolWorkspaceWindow : Window
                 $"Saved {results.Length} {_imgFormat.ToUpperInvariant()} image(s) to:\n{outDir}",
                 ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", outDir); } catch { }
-            MoveToNextTool();
         }
         catch (Exception ex)
         {
@@ -1721,7 +2017,7 @@ public partial class ToolWorkspaceWindow : Window
                 $"Combined {_mergeFiles.Count} files ({FileToolsService.FormatFileSize(size)}) into:\n{outPath}",
                 ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
-            MoveToNextTool();
+            RememberChain(outPath);
         }
         catch (Exception ex)
         {
@@ -1766,7 +2062,7 @@ public partial class ToolWorkspaceWindow : Window
                 $"Combined {_mergeFiles.Count} image(s) ({FileToolsService.FormatFileSize(size)}) into:\n{outPath}",
                 ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
-            MoveToNextTool();
+            RememberChain(outPath);
         }
         catch (Exception ex)
         {
@@ -1810,7 +2106,6 @@ public partial class ToolWorkspaceWindow : Window
             ConfirmDialog.Alert(this, "Split Complete",
                 $"Extracted {results.Length} page(s) to:\n{outDir}", ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", outDir); } catch { }
-            MoveToNextTool();
         }
         catch (Exception ex)
         {
@@ -1848,7 +2143,7 @@ public partial class ToolWorkspaceWindow : Window
                 $"{FileToolsService.FormatFileSize(original)}  →  {FileToolsService.FormatFileSize(newSize)}   ({change})\n{outPath}",
                 ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
-            MoveToNextTool();
+            RememberChain(outPath);
         }
         catch (Exception ex)
         {

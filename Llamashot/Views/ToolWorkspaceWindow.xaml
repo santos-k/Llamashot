@@ -111,30 +111,52 @@
             <!-- 3 columns: files | preview (large) | info + settings -->
             <Grid Grid.Row="1" Margin="26,22">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="1.6*"/>
-                    <ColumnDefinition Width="0.95*"/>
+                    <ColumnDefinition x:Name="ColFiles" Width="1*"/>
+                    <ColumnDefinition x:Name="ColPreview" Width="1.6*"/>
+                    <ColumnDefinition x:Name="ColInfo" Width="0.95*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ===== LEFT: files management ===== -->
-                <Border Grid.Column="0" Margin="0,0,9,0" Background="{DynamicResource SurfaceBrush}"
+                <Border x:Name="LeftPanel" Grid.Column="0" Margin="0,0,9,0" Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16"
                         AllowDrop="True" Drop="Preview_Drop" DragOver="Preview_DragOver">
                     <DockPanel>
                         <Border DockPanel.Dock="Top" Padding="18,16" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
                             <Grid>
-                                <StackPanel VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock x:Name="TxtLeftTitle" Text="Source File" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="15"/>
                                     <TextBlock x:Name="TxtLeftSub" Text="The PDF you want to work on" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0"/>
                                 </StackPanel>
-                                <Button x:Name="BtnAddMore" HorizontalAlignment="Right" Content="+ Add More" Click="AddFiles_Click" Template="{StaticResource SoftBtn}"
+                                <Button x:Name="BtnAddMore" Grid.Column="1" Content="+ Add More" Click="AddFiles_Click" Template="{StaticResource SoftBtn}"
                                         Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Padding="13,8" Cursor="Hand"/>
+                                <Button Grid.Column="2" Content="⟨" ToolTip="Collapse panel" Click="CollapseLeft_Click" Width="32" Height="32" Margin="8,0,0,0"
+                                        Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
                             </Grid>
                         </Border>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14">
                             <StackPanel x:Name="LeftHost"/>
                         </ScrollViewer>
                     </DockPanel>
+                </Border>
+
+                <!-- collapsed rail for the left files panel -->
+                <Border x:Name="LeftRail" Grid.Column="0" Margin="0,0,9,0" Width="46" Visibility="Collapsed"
+                        Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                        BorderThickness="1" CornerRadius="16" Cursor="Hand" ToolTip="Show files"
+                        MouseLeftButtonUp="ExpandLeft_Click">
+                    <StackPanel VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,14,0,0">
+                        <TextBlock Text="⟩" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📁" FontSize="18" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TxtRailLabel" Text="Files" FontSize="11" Margin="0,8,0,0"
+                                   Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center">
+                            <TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform>
+                        </TextBlock>
+                    </StackPanel>
                 </Border>
 
                 <!-- ===== CENTER: large unified preview ===== -->
@@ -185,8 +207,11 @@
                             </Border>
                             <!-- big page -->
                             <ScrollViewer x:Name="PreviewScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="20" Background="{DynamicResource WindowBrush}">
-                                <Image x:Name="PreviewImage" Stretch="Uniform" Width="540"
-                                       RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                <Grid x:Name="PreviewStack" HorizontalAlignment="Center" VerticalAlignment="Top">
+                                    <Image x:Name="PreviewImage" Stretch="Fill" Width="540"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False"/>
+                                </Grid>
                             </ScrollViewer>
                         </DockPanel>
                     </Grid>
@@ -197,7 +222,11 @@
                     <StackPanel>
                         <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="File Information" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                <Grid Margin="0,0,0,12">
+                                    <TextBlock Text="File Information" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <Button x:Name="BtnInfoToggle" HorizontalAlignment="Right" Content="▾" ToolTip="Collapse" Click="CollapseInfo_Click" Width="28" Height="28"
+                                            Template="{StaticResource SoftBtn}" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"/>
+                                </Grid>
                                 <StackPanel x:Name="InfoRows"/>
                             </StackPanel>
                         </Border>
