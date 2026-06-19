@@ -5,7 +5,193 @@
         Title="Llamashot - History"
         WindowStartupLocation="CenterScreen"
         Background="#1A1A1E"
+        MinWidth="520" MinHeight="360"
         SizeToContent="Manual">
+
+    <Window.Resources>
+        <!-- ===== Shared per-item right-click menu (works in every view mode) ===== -->
+        <ContextMenu x:Key="ItemMenu" x:Shared="False" Background="#2A2A2E" Foreground="#DDD" BorderBrush="#444">
+            <MenuItem Header="Open Preview" Click="OpenPreview_Click" Foreground="#DDD" />
+            <Separator Background="#444" />
+            <MenuItem Header="Copy to Clipboard" Click="CopyItem_Click" Foreground="#DDD" />
+            <MenuItem Header="Save As…" Click="SaveItem_Click" Foreground="#DDD" />
+            <MenuItem Header="Open in File Explorer" Click="OpenInExplorer_Click" Foreground="#DDD" />
+            <Separator Background="#444" />
+            <MenuItem Header="Delete" Click="DeleteItem_Click" Foreground="#EF9A9A" />
+        </ContextMenu>
+
+        <!-- ===== Reusable little action buttons (defined inline per template) ===== -->
+
+        <!-- ===== Icon view (Extra large / Large / Medium): thumbnail on top ===== -->
+        <DataTemplate x:Key="TplIcon">
+            <Border Background="#252528" CornerRadius="6" Margin="4" Padding="6"
+                    Cursor="Hand" MouseLeftButtonDown="Item_Click"
+                    BorderBrush="#333" BorderThickness="1"
+                    ContextMenu="{StaticResource ItemMenu}"
+                    ToolTip="{Binding ToolTipText}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#42A5F5" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel>
+                    <Grid>
+                        <Border Background="#1A1A1E" CornerRadius="4" Padding="2">
+                            <Image Source="{Binding ThumbnailPath}"
+                                   Height="{Binding ThumbHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <CheckBox HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4"
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  Click="ItemCheckbox_Click" Cursor="Hand" />
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                                CornerRadius="3" Padding="5,2" Margin="4">
+                            <Border.Background>
+                                <SolidColorBrush Color="{Binding TypeColor}" />
+                            </Border.Background>
+                            <TextBlock Text="{Binding TypeText}" Foreground="White"
+                                       FontSize="9" FontWeight="SemiBold" />
+                        </Border>
+                    </Grid>
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding DateText}" Foreground="#BBB" FontSize="11" />
+                            <TextBlock Text="{Binding SizeText}" Foreground="#666" FontSize="10" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Click="CopyItem_Click" Width="24" Height="24" Cursor="Hand"
+                                ToolTip="Copy to clipboard" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Rectangle Canvas.Left="3" Canvas.Top="3" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" />
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" Fill="#252528" />
+                            </Canvas>
+                        </Button>
+                        <Button Grid.Column="2" Click="SaveItem_Click" Width="24" Height="24" Cursor="Hand"
+                                ToolTip="Save to file" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Line X1="6" Y1="1" X2="6" Y2="8" Stroke="#42A5F5" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Polyline Points="3,6 6,9 9,6" Stroke="#42A5F5" StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="2" Y1="11" X2="10" Y2="11" Stroke="#42A5F5" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                        <Button Grid.Column="3" Click="OpenInExplorer_Click" Width="24" Height="24" Cursor="Hand"
+                                ToolTip="Open in File Explorer" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Rectangle Canvas.Left="0" Canvas.Top="2" Width="12" Height="9" Stroke="#FFA726" StrokeThickness="1.2" RadiusX="1" RadiusY="1" />
+                                <Rectangle Canvas.Left="0" Canvas.Top="0" Width="5" Height="3" Fill="#FFA726" RadiusX="1" RadiusY="1" />
+                            </Canvas>
+                        </Button>
+                        <Button Grid.Column="4" Click="DeleteItem_Click" Width="24" Height="24" Cursor="Hand"
+                                ToolTip="Delete" Background="#333" BorderBrush="#444" BorderThickness="1">
+                            <Canvas Width="12" Height="12">
+                                <Line X1="2" Y1="2" X2="10" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
+                                <Line X1="10" Y1="2" X2="2" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
+                            </Canvas>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- ===== Content: full-width row, rich metadata + actions ===== -->
+        <DataTemplate x:Key="TplContent">
+            <Border Background="#252528" CornerRadius="6" Margin="4,3" Padding="10"
+                    Cursor="Hand" MouseLeftButtonDown="Item_Click"
+                    BorderBrush="#333" BorderThickness="1"
+                    ContextMenu="{StaticResource ItemMenu}"
+                    ToolTip="{Binding ToolTipText}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#42A5F5" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox VerticalAlignment="Center" Margin="0,0,8,0"
+                              IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="ItemCheckbox_Click" Cursor="Hand" />
+                    <Border Grid.Column="1" Background="#1A1A1E" CornerRadius="4" Width="96" Height="64" Margin="0,0,12,0">
+                        <Image Source="{Binding ThumbnailPath}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NameText}" Foreground="#EEE" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Foreground="#9A9AA0" FontSize="11.5" Margin="0,3,0,0">
+                            <Run Text="{Binding DateText}" /><Run Text="  ·  " Foreground="#555" /><Run Text="{Binding TypeDescText}" /><Run Text="  ·  " Foreground="#555" /><Run Text="{Binding SizeText}" />
+                        </TextBlock>
+                        <TextBlock Text="{Binding FilePath}" Foreground="#5E5E64" FontSize="10.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="CopyItem_Click" Width="26" Height="26" Cursor="Hand"
+                                ToolTip="Copy to clipboard" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Rectangle Canvas.Left="3" Canvas.Top="3" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" />
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" Fill="#252528" />
+                            </Canvas>
+                        </Button>
+                        <Button Click="SaveItem_Click" Width="26" Height="26" Cursor="Hand"
+                                ToolTip="Save to file" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Line X1="6" Y1="1" X2="6" Y2="8" Stroke="#42A5F5" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Polyline Points="3,6 6,9 9,6" Stroke="#42A5F5" StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="2" Y1="11" X2="10" Y2="11" Stroke="#42A5F5" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                        <Button Click="OpenInExplorer_Click" Width="26" Height="26" Cursor="Hand"
+                                ToolTip="Open in File Explorer" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Rectangle Canvas.Left="0" Canvas.Top="2" Width="12" Height="9" Stroke="#FFA726" StrokeThickness="1.2" RadiusX="1" RadiusY="1" />
+                                <Rectangle Canvas.Left="0" Canvas.Top="0" Width="5" Height="3" Fill="#FFA726" RadiusX="1" RadiusY="1" />
+                            </Canvas>
+                        </Button>
+                        <Button Click="DeleteItem_Click" Width="26" Height="26" Cursor="Hand"
+                                ToolTip="Delete" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                            <Canvas Width="12" Height="12">
+                                <Line X1="2" Y1="2" X2="10" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
+                                <Line X1="10" Y1="2" X2="2" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- ===== Panels ===== -->
+        <ItemsPanelTemplate x:Key="PanelWrapH">
+            <WrapPanel ItemWidth="{Binding ItemBoxWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="PanelStack">
+            <StackPanel />
+        </ItemsPanelTemplate>
+
+        <!-- ===== View-mode menu ===== -->
+        <ContextMenu x:Key="ViewMenu" Background="#2A2A2E" Foreground="#DDD" BorderBrush="#444">
+            <MenuItem x:Name="MiExtraLarge" Header="Extra large icons" Tag="ExtraLargeIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
+            <MenuItem x:Name="MiLarge" Header="Large icons" Tag="LargeIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
+            <MenuItem x:Name="MiMedium" Header="Medium icons" Tag="MediumIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
+            <MenuItem x:Name="MiSmall" Header="Small icons" Tag="SmallIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
+            <Separator Background="#444" />
+            <MenuItem x:Name="MiContent" Header="Content" Tag="Content" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
+        </ContextMenu>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -29,11 +215,18 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtCount" Foreground="#777" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <Button x:Name="BtnView" Click="ViewMenu_Open" Height="26" Padding="10,0" Margin="0,0,12,0"
+                                Cursor="Hand" FontSize="11" Background="#333" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                ToolTip="Change view (Ctrl + mouse wheel to zoom)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="View" VerticalAlignment="Center" />
+                                <Path Data="M0,0 L8,0 L4,4 Z" Fill="#CCC" Margin="6,2,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <CheckBox x:Name="ChkSelectAll" Content="Select All" Foreground="#AAA" FontSize="11"
                                   VerticalAlignment="Center" Click="SelectAll_Click" Cursor="Hand" />
                     </StackPanel>
                 </Grid>
-                <!-- Category filter pills -->
                 <StackPanel x:Name="FilterPanel" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button x:Name="BtnFilterAll" Content="All" Tag="All" Click="Filter_Click"
                             Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
@@ -55,110 +248,10 @@
         </Border>
 
         <!-- Content -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="12,12,12,0">
-            <ItemsControl x:Name="HistoryList">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel ItemWidth="225" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="#252528" CornerRadius="6" Margin="4" Padding="6"
-                                Cursor="Hand" MouseLeftButtonDown="Item_Click"
-                                BorderBrush="#333" BorderThickness="1"
-                                ToolTip="{Binding ToolTipText}">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="BorderBrush" Value="#42A5F5" />
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <StackPanel>
-                                <Grid>
-                                    <Border Background="#1A1A1E" CornerRadius="4" Padding="2">
-                                        <Image Source="{Binding ThumbnailPath}" Height="90"
-                                               Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    </Border>
-                                    <!-- Selection checkbox -->
-                                    <CheckBox HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                              Click="ItemCheckbox_Click" Cursor="Hand" />
-                                    <!-- Type badge -->
-                                    <Border HorizontalAlignment="Right" VerticalAlignment="Top"
-                                            CornerRadius="3" Padding="5,2" Margin="4">
-                                        <Border.Background>
-                                            <SolidColorBrush Color="{Binding TypeColor}" />
-                                        </Border.Background>
-                                        <TextBlock Text="{Binding TypeText}" Foreground="White"
-                                                   FontSize="9" FontWeight="SemiBold" />
-                                    </Border>
-                                </Grid>
-                                <Grid Margin="0,6,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding DateText}" Foreground="#BBB" FontSize="11" />
-                                        <TextBlock Text="{Binding SizeText}" Foreground="#666" FontSize="10" />
-                                    </StackPanel>
-                                    <!-- Copy button -->
-                                    <Button Grid.Column="1" Click="CopyItem_Click"
-                                            Width="24" Height="24" Cursor="Hand" ToolTip="Copy to clipboard"
-                                            Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
-                                        <Canvas Width="12" Height="12">
-                                            <Rectangle Canvas.Left="3" Canvas.Top="3" Width="8" Height="8"
-                                                       Stroke="#66BB6A" StrokeThickness="1.2" />
-                                            <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8"
-                                                       Stroke="#66BB6A" StrokeThickness="1.2" Fill="#252528" />
-                                        </Canvas>
-                                    </Button>
-                                    <!-- Save button -->
-                                    <Button Grid.Column="2" Click="SaveItem_Click"
-                                            Width="24" Height="24" Cursor="Hand" ToolTip="Save to file"
-                                            Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
-                                        <Canvas Width="12" Height="12">
-                                            <Line X1="6" Y1="1" X2="6" Y2="8" Stroke="#42A5F5" StrokeThickness="1.5"
-                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                            <Polyline Points="3,6 6,9 9,6" Stroke="#42A5F5" StrokeThickness="1.5"
-                                                      StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                            <Line X1="2" Y1="11" X2="10" Y2="11" Stroke="#42A5F5" StrokeThickness="1.5"
-                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                        </Canvas>
-                                    </Button>
-                                    <!-- Open in Explorer button -->
-                                    <Button Grid.Column="3" Click="OpenInExplorer_Click"
-                                            Width="24" Height="24" Cursor="Hand" ToolTip="Open in File Explorer"
-                                            Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
-                                        <Canvas Width="12" Height="12">
-                                            <Rectangle Canvas.Left="0" Canvas.Top="2" Width="12" Height="9"
-                                                       Stroke="#FFA726" StrokeThickness="1.2" RadiusX="1" RadiusY="1" />
-                                            <Rectangle Canvas.Left="0" Canvas.Top="0" Width="5" Height="3"
-                                                       Fill="#FFA726" RadiusX="1" RadiusY="1" />
-                                        </Canvas>
-                                    </Button>
-                                    <!-- Delete button -->
-                                    <Button Grid.Column="4" Click="DeleteItem_Click"
-                                            Width="24" Height="24" Cursor="Hand" ToolTip="Delete"
-                                            Background="#333" BorderBrush="#444" BorderThickness="1">
-                                        <Canvas Width="12" Height="12">
-                                            <Line X1="2" Y1="2" X2="10" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
-                                            <Line X1="10" Y1="2" X2="2" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
-                                        </Canvas>
-                                    </Button>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+        <ScrollViewer Grid.Row="1" x:Name="HistoryScroller" Margin="12,12,12,0"
+                      VerticalScrollBarVisibility="Auto"
+                      PreviewMouseWheel="HistoryScroller_PreviewMouseWheel">
+            <ItemsControl x:Name="HistoryList" />
         </ScrollViewer>
 
         <!-- Empty state -->
@@ -170,7 +263,6 @@
         <!-- Footer -->
         <Border Grid.Row="2" Background="#222" Padding="16,10" BorderBrush="#333" BorderThickness="0,1,0,0">
             <Grid>
-                <!-- Selection actions (left) -->
                 <StackPanel x:Name="SelectionActions" Orientation="Horizontal" HorizontalAlignment="Left"
                             Visibility="Collapsed">
                     <TextBlock x:Name="TxtSelected" Foreground="#42A5F5" FontSize="12"
@@ -185,7 +277,6 @@
                             Background="#333" Foreground="#EF5350" BorderBrush="#444"
                             FontSize="12" Cursor="Hand" />
                 </StackPanel>
-                <!-- Default actions (right) -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Clear All" Width="90" Height="30" Click="ClearHistory_Click"
                             Background="#333" Foreground="#EF5350" BorderBrush="#444"

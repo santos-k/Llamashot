@@ -21,11 +21,21 @@ public static class HistoryManager
     private static string IndexPath => Path.Combine(
         AppSettings.Instance.HistoryDirectory, "history.json");
     private static List<ScreenshotRecord> _records = new();
+    private static bool _loaded;
 
     public static IReadOnlyList<ScreenshotRecord> Records => _records.AsReadOnly();
 
+    // Guards against a capture (AddRecord/AddClipRecord/AddVideoRecord) running before the
+    // index was ever read this session, which would otherwise Save() an empty list over the
+    // existing history.json and appear to wipe everything.
+    private static void EnsureLoaded()
+    {
+        if (!_loaded) Load();
+    }
+
     public static void Load()
     {
+        _loaded = true;
         if (!File.Exists(IndexPath))
         {
             _records = new List<ScreenshotRecord>();
@@ -159,6 +169,7 @@ public static class HistoryManager
 
     public static void AddVideoRecord(string videoPath, int width, int height)
     {
+        EnsureLoaded();
         try
         {
             string thumbPath = "";
@@ -292,6 +303,7 @@ public static class HistoryManager
 
     public static void AddClipRecord(BitmapSource image)
     {
+        EnsureLoaded();
         try
         {
             // Ensure image is frozen
@@ -321,6 +333,7 @@ public static class HistoryManager
 
     private static void AddEntry(BitmapSource image, string filePath, RecordType type)
     {
+        EnsureLoaded();
         try
         {
             // Ensure image is frozen

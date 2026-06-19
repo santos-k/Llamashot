@@ -139,3 +139,100 @@ public static partial class FillSignDetector
             list.Add(r);
     }
 }
+
+/// <summary>A best-effort estimate of the text style under a point on the page.</summary>
+public record FontSample(double FontSizePt, string ColorHex, bool Bold, bool Italic);
+
+public static partial class FillSignDetector
+{
+    /// <summary>
+    /// Samples the rendered page around a pixel to estimate the document text's font size, ink color
+    /// and (best-effort) bold/italic, so a placed text field can match the surrounding text.
+    /// Returns null when no text is found near the point. <paramref name="px"/>/<paramref name="py"/> are
+    /// pixel coordinates in the bitmap rendered at <paramref name="dpi"/>.
+    /// </summary>
+    public static unsafe FontSample? DetectFontAt(Bitmap bmp, int px, int py, int dpi)
+    {
+        int w = bmp.Width, h = bmp.Height;
+        if (w == 0 || h == 0) return null;
+        px = Math.Clamp(px, 0, w - 1); py = Math.Clamp(py, 0, h - 1);
+
+        int wx = Math.Max(24, w / 30);                 // horizontal sampling half-width
+        int vy = Math.Max(20, (int)(dpi * 0.55));      // vertical search half-height
+        int x0 = Math.Max(0, px - wx), x1 = Math.Min(w - 1, px + wx);
+        int y0 = Math.Max(0, py - vy), y1 = Math.Min(h - 1, py + vy);
+        int bandW = x1 - x0 + 1;
+        int minCount = Math.Max(2, bandW / 8);
+
+        var rect = new System.Drawing.Rectangle(0, 0, w, h);
+        var data = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            int stride = data.Stride;
+            byte* p0 = (byte*)data.Scan0;
+
+            int Count(int y)
+            {
+                int n = 0; byte* row = p0 + y * stride;
+                for (int x = x0; x <= x1; x++)
+                {
+                    byte b = row[x * 4], g = row[x * 4 + 1], r = row[x * 4 + 2];
+                    if ((r * 299 + g * 587 + b * 114) / 1000 < DarkThreshold) n++;
+                }
+                return n;
+            }
+
+            // find the nearest text row to the click, then grow up/down through the run (tolerate 2-row gaps)
+            int seed = -1;
+            for (int d = 0; d <= vy; d++)
+            {
+                if (py - d >= y0 && Count(py - d) >= minCount) { seed = py - d; break; }
+                if (py + d <= y1 && Count(py + d) >= minCount) { seed = py + d; break; }
+            }
+            if (seed < 0) return null;
+
+            int top = seed, bottom = seed;
+            for (int y = seed - 1, g2 = 0; y >= y0; y--) { if (Count(y) >= minCount) { top = y; g2 = 0; } else if (++g2 > 2) break; }
+            for (int y = seed + 1, g2 = 0; y <= y1; y++) { if (Count(y) >= minCount) { bottom = y; g2 = 0; } else if (++g2 > 2) break; }
+            int heightPx = bottom - top + 1;
+            if (heightPx < 3) return null;
+
+            // ink color (avg of dark pixels), density (bold), and slant (italic)
+            long rs = 0, gs = 0, bs = 0, dark = 0;
+            double topCx = 0, botCx = 0; long topN = 0, botN = 0;
+            int third = Math.Max(1, heightPx / 3);
+            for (int y = top; y <= bottom; y++)
+            {
+                byte* row = p0 + y * stride;
+                for (int x = x0; x <= x1; x++)
+                {
+                    byte b = row[x * 4], g = row[x * 4 + 1], r = row[x * 4 + 2];
+                    if ((r * 299 + g * 587 + b * 114) / 1000 >= DarkThreshold) continue;
+                    rs += r; gs += g; bs += b; dark++;
+                    if (y < top + third) { topCx += x; topN++; }
+                    else if (y > bottom - third) { botCx += x; botN++; }
+                }
+            }
+            if (dark == 0) return null;
+
+            string hex = string.Format("#{0:X2}{1:X2}{2:X2}", rs / dark, gs / dark, bs / dark);
+
+            double density = (double)dark / (heightPx * (double)bandW);
+            bool bold = density > 0.30;
+
+            bool italic = false;
+            if (topN > 5 && botN > 5)
+            {
+                double slant = (topCx / topN) - (botCx / botN); // italic leans right: top centroid right of bottom
+                italic = slant > heightPx * 0.12;
+            }
+
+            // run height (cap-top..descender) is ~0.7 em for typical text → estimate em, then points
+            double emPx = heightPx / 0.7;
+            double sizePt = Math.Clamp(Math.Round(FillSignGeometry.PixelsToPoints(emPx, dpi)), 6, 96);
+
+            return new FontSample(sizePt, hex, bold, italic);
+        }
+        finally { bmp.UnlockBits(data); }
+    }
+}

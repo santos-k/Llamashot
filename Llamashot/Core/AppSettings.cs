@@ -89,6 +89,7 @@ public class AppSettings
 
     // History
     public bool SaveHistory { get; set; } = true;
+    public string HistoryViewMode { get; set; } = "LargeIcons"; // Explorer-style view mode
     public string HistoryDirectory { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Llamashot");
     public int MaxHistoryItems { get; set; } = 100;

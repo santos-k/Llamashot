@@ -48,6 +48,10 @@
                         FontSize="13" FontWeight="SemiBold" Foreground="White" Background="{DynamicResource DangerBrush}"
                         Cursor="Hand" BorderThickness="0" Template="{StaticResource DialogButton}"
                         IsDefault="True" Click="Confirm_Click"/>
+                <Button x:Name="BtnNeutral" Content="Save" MinWidth="120" Padding="16,9" Visibility="Collapsed"
+                        FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}"
+                        Background="{DynamicResource AccentBrush}" Cursor="Hand" BorderThickness="0"
+                        Template="{StaticResource DialogButton}" Click="Neutral_Click" Margin="10,0,0,0"/>
             </StackPanel>
         </StackPanel>
     </Border>

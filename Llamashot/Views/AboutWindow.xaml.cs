@@ -15,10 +15,12 @@ public partial class AboutWindow : Window
         // If a background check already found an update, show it immediately
         if (UpdateChecker.LatestUpdate != null)
         {
-            TxtUpdateStatus.Text = $"Version {UpdateChecker.LatestUpdate.Version} available";
-            TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A));
+            TxtUpdateHeadline.Text = $"Update available — v{UpdateChecker.LatestUpdate.Version}";
+            TxtUpdateHeadline.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x6B));
+            TxtUpdateStatus.Text = "A newer version is ready to install.";
+            TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x9F, 0xE6, 0xB0));
             TxtUpdateStatus.Visibility = Visibility.Visible;
-            BtnUpdate.Content = $"Update to v{UpdateChecker.LatestUpdate.Version}";
+            BtnUpdate.Content = $"Update now to v{UpdateChecker.LatestUpdate.Version}";
         }
     }
 
@@ -39,13 +41,18 @@ public partial class AboutWindow : Window
 
             if (update == null)
             {
-                TxtUpdateStatus.Text = "You're up to date";
-                TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A));
+                TxtUpdateHeadline.Text = "You're on the latest version";
+                TxtUpdateHeadline.Foreground = new SolidColorBrush(Color.FromRgb(0xEA, 0xEA, 0xF0));
+                TxtUpdateStatus.Text = "✓ Up to date";
+                TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x5B, 0xD0, 0xA4));
                 TxtUpdateStatus.Visibility = Visibility.Visible;
                 BtnUpdate.Content = "Check for Update";
                 BtnUpdate.IsEnabled = true;
                 return;
             }
+
+            TxtUpdateHeadline.Text = $"Update available — v{update.Version}";
+            TxtUpdateHeadline.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x6B));
 
             // Download silently with progress
             BtnUpdate.Content = $"Downloading v{update.Version}...";

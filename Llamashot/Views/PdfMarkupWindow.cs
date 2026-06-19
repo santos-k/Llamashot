@@ -23,6 +23,7 @@ namespace Llamashot.Views;
 public class PdfMarkupWindow : Window
 {
     private const int DisplayDpi = 120;
+    private const double ChipPad = 2;   // hoverable / clickable ring around each placed element
 
     private string? _pdfPath;
     private string? _pdfPw;
@@ -39,9 +40,12 @@ public class PdfMarkupWindow : Window
     private Image _pageImg = null!;
     private Canvas _overlay = null!;
     private Border _pageHost = null!;
+    private ScrollViewer _scroller = null!;
+    private bool _didFit;
     private TextBlock _txtPager = null!;
     private TextBlock _txtItems = null!;
-    private TextBlock _zoomLabel = null!;
+    private TextBox _zoomBox = null!;
+    private const double ZoomStep = 0.01;   // zoom in/out steps by 1%
     private Button _btnSave = null!;
     private Button _btnUndo = null!;
     private Button _btnRedo = null!;
@@ -74,6 +78,11 @@ public class PdfMarkupWindow : Window
     private readonly FillElement _def = new() { FontFamily = "Segoe UI", FontSize = 12, ColorHex = "#1C3FAA", Align = "left" };
     private string _redactColor = "#FFFFFF";
     private int _blurStrength = 14;
+    // draw-tool defaults
+    private string _drawColor = "#C0392B";
+    private int _drawWidth = 3;
+    private string _highlightColor = "#FFE100";
+    private int _highlightWidth = 16;
 
     // drag state (press-and-drag: move past threshold = move, click without move = edit)
     private bool _pendingDrag;
@@ -86,6 +95,12 @@ public class PdfMarkupWindow : Window
     private bool _drawingRegion;
     private Point _regionStart;
     private System.Windows.Shapes.Rectangle? _regionPreview;
+
+    // draw-tools (pen / highlight / line / arrow / rect / ellipse)
+    private bool _drawing;
+    private Point _drawStart;
+    private readonly List<Point> _drawPts = new();      // pixel points during a freehand stroke
+    private System.Windows.Shapes.Shape? _drawPreview;
 
     // live cursor ghost — previews what the active tool will place, centered on the pointer
     private TextBlock? _ghost;
@@ -105,12 +120,60 @@ public class PdfMarkupWindow : Window
     private Border? _rotChip;
     private List<FillElement>? _rotSnap;
 
-    // palettes
-    private static readonly string[] Fonts = { "Segoe UI", "Arial", "Helvetica", "Times New Roman", "Calibri", "Verdana", "Georgia", "Courier New" };
+    // palettes — 26 families incl. script/curly faces (all ship with Windows 10/11; resolver embeds them on export)
+    private static readonly string[] Fonts =
+    {
+        "Segoe UI", "Arial", "Calibri", "Candara", "Corbel", "Tahoma", "Trebuchet MS", "Verdana",
+        "Franklin Gothic Medium", "Bahnschrift", "Ebrima",
+        "Times New Roman", "Georgia", "Constantia", "Palatino Linotype",
+        "Consolas", "Courier New", "Lucida Console", "Impact",
+        // script / curly
+        "Segoe Script", "Segoe Print", "Ink Free", "Gabriola", "Lucida Handwriting", "Comic Sans MS"
+    };
+    // date / time format presets (≥6 each)
+    private static readonly (string label, string fmt)[] DateFormats =
+    {
+        ("Jun 19, 2026", "MMM d, yyyy"),
+        ("June 19, 2026", "MMMM d, yyyy"),
+        ("19 Jun 2026", "d MMM yyyy"),
+        ("06/19/2026", "MM/dd/yyyy"),
+        ("19/06/2026", "dd/MM/yyyy"),
+        ("2026-06-19", "yyyy-MM-dd"),
+        ("Fri, Jun 19, 2026", "ddd, MMM d, yyyy"),
+        ("Friday, June 19, 2026", "dddd, MMMM d, yyyy"),
+    };
+    private static readonly (string label, string fmt)[] TimeFormats =
+    {
+        ("2:30 PM", "h:mm tt"),
+        ("2:30:45 PM", "h:mm:ss tt"),
+        ("14:30", "HH:mm"),
+        ("14:30:45", "HH:mm:ss"),
+        ("Jun 19, 2026 2:30 PM", "MMM d, yyyy h:mm tt"),
+        ("2026-06-19 14:30", "yyyy-MM-dd HH:mm"),
+    };
+    private string _dateFmt = "MMM d, yyyy";
+    private string _timeFmt = "h:mm tt";
+    private System.Drawing.Bitmap? _pageBmp;   // cached render of the current page (page image source / blur preview)
+    // floating hover action bar (move / resize / delete) shown over the element under the pointer
+    private Canvas _barLayer = null!;   // screen-space layer so the bar keeps constant size regardless of zoom
+    private Border? _itemBar;
+    private FillElement? _barTarget;
+    private Border? _barChip;
+    private System.Windows.Threading.DispatcherTimer? _barHideTimer;
+    private bool _barMoving, _barResizing;
+    private Point _barDragStart;
+    private double _barOrigL, _barOrigT, _barW0, _barH0;
+    private List<FillElement>? _barDragSnap;
+    private FrameworkElement? _barResizeContent;
     private static readonly (string name, string hex)[] Swatches =
     {
         ("Black","#222222"), ("Ink Blue","#1C3FAA"), ("Green","#137A3F"), ("Red","#C0392B"),
         ("Amber","#B8860B"), ("Purple","#6D28D9"), ("Teal","#0E7490"), ("Gray","#555555")
+    };
+    private static readonly (string name, string hex)[] HighlightSwatches =
+    {
+        ("Yellow","#FFE100"), ("Green","#9BE15D"), ("Cyan","#73E8FF"), ("Pink","#FF9CC8"),
+        ("Orange","#FFB347"), ("Lilac","#C9A7FF")
     };
     private static readonly (string id, string glyph)[] MarkStyles =
     {
@@ -133,6 +196,23 @@ public class PdfMarkupWindow : Window
         DragOver += OnDragOver;
         DragLeave += (_, _) => HighlightDrop(false);
         Drop += OnDrop;
+        Closing += OnClosing;
+        Closed += (_, _) => { _pageBmp?.Dispose(); _pageBmp = null; };
+    }
+
+    private bool _dirty;        // unsaved placed/edited items
+    private bool _forceClose;   // set once the user confirms closing
+
+    private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_forceClose || !_dirty || _elements.Count == 0) return;
+        e.Cancel = true;
+        var choice = ConfirmDialog.PromptUnsaved(this, "Unsaved changes",
+            "You have unsaved changes to this PDF. Do you want to save before closing?");
+        if (choice == ConfirmDialog.CloseChoice.Cancel) return;             // stay open
+        if (choice == ConfirmDialog.CloseChoice.Save && !await Save()) return; // save failed → stay open
+        _forceClose = true;
+        Close();
     }
 
     private static bool HasPdf(System.Windows.IDataObject d) =>
@@ -261,10 +341,18 @@ public class PdfMarkupWindow : Window
         panel.Children.Add(ToolButton("select", "↖", "Select & move"));
 
         panel.Children.Add(RailLabel("FIELDS"));
-        panel.Children.Add(ToolButton("text", "\U0001F54A", "Text"));
+        panel.Children.Add(ToolButton("text", "T", "Text"));   // clear "text" glyph
         panel.Children.Add(ToolButton("check", "✓", "Check mark"));
         panel.Children.Add(ToolButton("cross", "✗", "Cross"));
         panel.Children.Add(ToolButton("radio", "◉", "Radio / dot"));
+
+        panel.Children.Add(RailLabel("DRAW"));
+        panel.Children.Add(ToolButton("pen", "✒", "Pen"));
+        panel.Children.Add(ToolButton("highlight", "\U0001F58D", "Highlight"));
+        panel.Children.Add(ToolButton("line", "╱", "Line"));
+        panel.Children.Add(ToolButton("arrow", "↗", "Arrow"));
+        panel.Children.Add(ToolButton("rect", "▭", "Rectangle"));
+        panel.Children.Add(ToolButton("ellipse", "◯", "Ellipse"));
 
         panel.Children.Add(RailLabel("DATE & TIME"));
         panel.Children.Add(ToolButton("date", "\U0001F4C5", "Date"));
@@ -280,10 +368,6 @@ public class PdfMarkupWindow : Window
         panel.Children.Add(ToolButton("blur", "\U0001F532", "Blur area"));
 
         panel.Children.Add(RailLabel("ASSIST"));
-        var detect = ChromeButton("✨  Auto-detect fields", false);
-        detect.Margin = new Thickness(0, 2, 0, 4); detect.HorizontalAlignment = HorizontalAlignment.Stretch;
-        detect.Click += async (_, _) => await AutoDetect();
-        panel.Children.Add(detect);
         var del = ChromeButton("\U0001F5D1  Delete selected", false);
         del.HorizontalAlignment = HorizontalAlignment.Stretch;
         del.Click += (_, _) => DeleteSelected();
@@ -302,13 +386,63 @@ public class PdfMarkupWindow : Window
     private Border ToolButton(string id, string glyph, string label)
     {
         var bd = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(11, 9, 11, 9), Margin = new Thickness(0, 1, 0, 1), Cursor = Cursors.Hand, Tag = id };
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(new TextBlock { Text = glyph, FontSize = 15, Width = 22, TextAlignment = TextAlignment.Center });
-        row.Children.Add(new TextBlock { Text = label, FontSize = 13.5, Margin = new Thickness(9, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // glyph
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });  // label
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // key hint
+        var gl = new TextBlock { Text = glyph, FontSize = 15, Width = 22, TextAlignment = TextAlignment.Center };
+        Grid.SetColumn(gl, 0); row.Children.Add(gl);
+        var lt = new TextBlock { Text = label, FontSize = 13.5, Margin = new Thickness(9, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(lt, 1); row.Children.Add(lt);
+        string key = KeyHintFor(id);
+        if (!string.IsNullOrEmpty(key))
+        {
+            // a small "keycap" badge with the shortcut letter, right-aligned next to the name
+            var cap = new Border
+            {
+                CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 0, 6, 1), MinWidth = 20, Tag = "keycap",
+                Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                Background = KeycapBrush(), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1),
+                Child = new TextBlock { Text = key, FontSize = 10.5, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center, Foreground = B("TextMutedBrush") }
+            };
+            Grid.SetColumn(cap, 2); row.Children.Add(cap);
+        }
         bd.Child = row;
-        bd.MouseLeftButtonUp += (_, _) => { _tool = id; Select(null); HighlightTool(); };
+        bd.ToolTip = string.IsNullOrEmpty(key) ? label : $"{label}  ({key})";
+        bd.MouseLeftButtonUp += (_, _) => SetTool(id);
         _toolButtons[id] = bd;
         return bd;
+    }
+
+    /// <summary>Switches the active tool and refreshes the rail highlight / cursor / ghost.</summary>
+    private void SetTool(string id) { _tool = id; Select(null); HighlightTool(); }
+
+    /// <summary>The single-key shortcut shown in a tool's tooltip (kept in sync with <see cref="ToolForKey"/>).</summary>
+    private static string KeyHintFor(string id)
+    {
+        var s = AppSettings.Instance;
+        return id switch
+        {
+            "select" => s.ShortcutMove,
+            "text" => s.ShortcutText,
+            "pen" => s.ShortcutPen,
+            "highlight" => s.ShortcutMarker,
+            "line" => s.ShortcutLine,
+            "arrow" => s.ShortcutArrow,
+            "rect" => s.ShortcutRectangle,
+            "ellipse" => s.ShortcutEllipse,
+            "blur" => s.ShortcutBlur,
+            "check" => s.ShortcutCheck,
+            "cross" => s.ShortcutCross,
+            "radio" => "O",
+            "date" => "C",
+            "time" => "W",
+            "signature" => "S",
+            "initials" => "I",
+            "image" => "M",
+            "redact" => "N",
+            _ => ""
+        };
     }
 
     private void HighlightTool()
@@ -317,10 +451,20 @@ public class PdfMarkupWindow : Window
         {
             bool on = id == _tool;
             bd.Background = on ? B("AccentBrush") : Brushes.Transparent;
-            foreach (var tb in ((StackPanel)bd.Child).Children.OfType<TextBlock>())
+            var panel = (System.Windows.Controls.Panel)bd.Child;
+            // direct children are the glyph + label
+            foreach (var tb in panel.Children.OfType<TextBlock>())
             {
                 tb.Foreground = on ? B("AccentTextBrush") : B("TextSecondaryBrush");
                 tb.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+            }
+            // recolor the keycap badge so the shortcut stays readable on the accent highlight
+            foreach (var cap in panel.Children.OfType<Border>())
+            {
+                if (cap.Tag as string != "keycap") continue;
+                cap.Background = on ? OnKeycapBrush() : KeycapBrush();
+                cap.BorderBrush = on ? Brushes.Transparent : B("BorderSoftBrush");
+                if (cap.Child is TextBlock ct) ct.Foreground = on ? B("AccentTextBrush") : B("TextMutedBrush");
             }
         }
         if (_overlay != null)
@@ -342,6 +486,7 @@ public class PdfMarkupWindow : Window
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Padding = new Thickness(28)
         };
+        _scroller = scroller;
         var pageStack = new Grid { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
 
         _pageHost = new Border { Background = Brushes.White, SnapsToDevicePixels = true, Visibility = Visibility.Collapsed };
@@ -367,6 +512,9 @@ public class PdfMarkupWindow : Window
         area.Children.Add(scroller);
         _dropZone = BuildDropZone();
         area.Children.Add(_dropZone);
+        // top, un-scaled layer for the hover action bar (positioned in screen space so it never shrinks with zoom)
+        _barLayer = new Canvas { Background = null, IsHitTestVisible = true };
+        area.Children.Add(_barLayer);
         return area;
     }
 
@@ -466,8 +614,12 @@ public class PdfMarkupWindow : Window
     {
         ["text"] = "Text", ["check"] = "Check mark", ["cross"] = "Cross", ["radio"] = "Radio / dot",
         ["date"] = "Date", ["time"] = "Time", ["initials"] = "Initials", ["signature"] = "Signature",
-        ["image"] = "Image / stamp", ["redact"] = "Cover", ["blur"] = "Blur"
+        ["image"] = "Image / stamp", ["redact"] = "Cover", ["blur"] = "Blur",
+        ["pen"] = "Pen", ["highlight"] = "Highlight", ["line"] = "Line", ["arrow"] = "Arrow",
+        ["rect"] = "Rectangle", ["ellipse"] = "Ellipse"
     };
+
+    private static bool IsDrawTool(string t) => t is "pen" or "highlight" or "line" or "arrow" or "rect" or "ellipse";
 
     // ---- properties: contextual rebuild ----
     private void RefreshProps()
@@ -511,7 +663,35 @@ public class PdfMarkupWindow : Window
             return;
         }
 
+        if (IsDrawTool(tool))
+        {
+            bool hi = tool == "highlight";
+            _propHost.Children.Add(SectionLabel(hi ? "HIGHLIGHT WIDTH" : "STROKE WIDTH"));
+            if (hi)
+                _propHost.Children.Add(SizeStepper(_highlightWidth, v => _highlightWidth = System.Math.Clamp(v, 4, 60), 4, 60, 2));
+            else
+                _propHost.Children.Add(SizeStepper(_drawWidth, v => _drawWidth = System.Math.Clamp(v, 1, 40), 1, 40, 1));
+            _propHost.Children.Add(SectionLabel("COLOR"));
+            _propHost.Children.Add(SwatchGrid(hi ? HighlightSwatches : Swatches, hi ? _highlightColor : _drawColor,
+                hex => { if (hi) _highlightColor = hex; else _drawColor = hex; }));
+            _propHost.Children.Add(Hint(tool switch
+            {
+                "pen" => "Drag on the page to draw freehand.",
+                "highlight" => "Drag across text to highlight it.",
+                "line" => "Drag from one point to another (hold Shift to snap to 0/45/90°).",
+                "arrow" => "Drag to draw an arrow (hold Shift to snap angle).",
+                "rect" => "Drag to draw a rectangle (hold Shift for a square).",
+                _ => "Drag to draw an ellipse (hold Shift for a circle)."
+            }));
+            return;
+        }
+
         bool isMark = tool is "check" or "cross" or "radio";
+        if (tool is "date" or "time")
+        {
+            _propHost.Children.Add(SectionLabel("FORMAT"));
+            _propHost.Children.Add(FormatCombo(tool == "date"));
+        }
         if (!isMark)
         {
             _propHost.Children.Add(SectionLabel("FONT"));
@@ -543,8 +723,25 @@ public class PdfMarkupWindow : Window
             FillElementType.Signature or FillElementType.Stamp => "Image selected",
             FillElementType.Check => "Mark selected",
             FillElementType.DateTime => "Date / time selected",
+            FillElementType.Draw => (e.Shape == "highlight" ? "Highlight" : "Drawing") + " selected",
             _ => "Text field selected"
         };
+
+        if (e.Type == FillElementType.Draw)
+        {
+            bool hi = e.Shape == "highlight";
+            _propHost.Children.Add(SectionLabel(hi ? "HIGHLIGHT WIDTH" : "STROKE WIDTH"));
+            _propHost.Children.Add(SizeStepper((int)System.Math.Round(e.StrokeWidth),
+                v => { e.StrokeWidth = System.Math.Clamp(v, hi ? 4 : 1, 60); EditCommit(e); }, hi ? 4 : 1, 60, hi ? 2 : 1));
+            _propHost.Children.Add(SectionLabel("COLOR"));
+            _propHost.Children.Add(SwatchGrid(hi ? HighlightSwatches : Swatches, e.ColorHex, hex => { e.ColorHex = hex; EditCommit(e); }));
+            _propHost.Children.Add(SectionLabel("ROTATION (°)"));
+            _propHost.Children.Add(RotationStepper(e));
+            _propHost.Children.Add(SectionLabel("OPACITY (%)"));
+            _propHost.Children.Add(OpacityStepper(e));
+            _propHost.Children.Add(Hint("Drag to move it, or tweak the width, color and angle here."));
+            return;
+        }
 
         if (isRedact)
         {
@@ -598,6 +795,11 @@ public class PdfMarkupWindow : Window
         }
         else
         {
+            if (e.Type == FillElementType.DateTime)
+            {
+                _propHost.Children.Add(SectionLabel("FORMAT"));
+                _propHost.Children.Add(ElementFormatCombo(e));
+            }
             _propHost.Children.Add(SectionLabel("CONTENT"));
             _propHost.Children.Add(ContentBox(e));
             _propHost.Children.Add(SectionLabel("FONT"));
@@ -655,7 +857,7 @@ public class PdfMarkupWindow : Window
         box.TextChanged += (_, _) =>
         {
             e.Text = box.Text;
-            if (_chips.TryGetValue(e, out var chip) && chip.Child is TextBox t) t.Text = box.Text;
+            if (ChipTextBox(e) is { } t) t.Text = box.Text;
         };
         return box;
     }
@@ -670,6 +872,100 @@ public class PdfMarkupWindow : Window
             if (cb.SelectedItem is ComboBoxItem ci) { e.FontFamily = (string)ci.Content; apply(); }
         };
         return cb;
+    }
+
+    /// <summary>Formats DateTime.Now with a pattern, falling back to a default if the pattern is invalid.</summary>
+    private static string SafeFormat(string fmt)
+    {
+        try { return System.DateTime.Now.ToString(string.IsNullOrWhiteSpace(fmt) ? "MMM d, yyyy" : fmt); }
+        catch { return System.DateTime.Now.ToString("MMM d, yyyy"); }
+    }
+
+    private TextBox ThemedTextBox(string text)
+    {
+        var box = new TextBox { Text = text, FontSize = 13, Padding = new Thickness(10, 8, 10, 8), BorderThickness = new Thickness(1) };
+        Dyn(box, System.Windows.Controls.Control.BackgroundProperty, "SurfaceBrush");
+        Dyn(box, System.Windows.Controls.Control.ForegroundProperty, "TextPrimaryBrush");
+        Dyn(box, System.Windows.Controls.Control.BorderBrushProperty, "BorderSoftBrush");
+        return box;
+    }
+
+    // format picker for the Date/Time tool defaults — presets + a custom pattern with live preview
+    private StackPanel FormatCombo(bool isDate)
+    {
+        var presets = isDate ? DateFormats : TimeFormats;
+        var sp = new StackPanel();
+        var cb = new ComboBox { Style = (Style)Application.Current.Resources["ThemedCombo"] };
+        foreach (var (label, _) in presets) cb.Items.Add(new ComboBoxItem { Content = label });
+        var customItem = new ComboBoxItem { Content = "Custom…", Tag = "custom" };
+        cb.Items.Add(customItem);
+        sp.Children.Add(cb);
+
+        var customBox = ThemedTextBox(isDate ? _dateFmt : _timeFmt);
+        customBox.Margin = new Thickness(0, 8, 0, 0);
+        customBox.Visibility = Visibility.Collapsed;
+        var preview = new TextBlock { FontSize = 11.5, Margin = new Thickness(2, 6, 0, 0), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        Dyn(preview, TextBlock.ForegroundProperty, "TextMutedBrush");
+        sp.Children.Add(customBox); sp.Children.Add(preview);
+
+        void Set(string f) { if (isDate) _dateFmt = f; else _timeFmt = f; }
+        void ShowCustom(bool on) { customBox.Visibility = preview.Visibility = on ? Visibility.Visible : Visibility.Collapsed; }
+        void Recompute() { preview.Text = "Preview:  " + SafeFormat(customBox.Text) + "   (e.g. dd-MMM-yyyy · ddd HH:mm)"; }
+
+        string cur = isDate ? _dateFmt : _timeFmt;
+        int idx = System.Array.FindIndex(presets, p => p.fmt == cur);
+        if (idx >= 0) cb.SelectedIndex = idx;
+        else { cb.SelectedItem = customItem; ShowCustom(true); Recompute(); }
+
+        cb.SelectionChanged += (_, _) =>
+        {
+            if (cb.SelectedItem == customItem) { ShowCustom(true); Set(customBox.Text); Recompute(); }
+            else if (cb.SelectedIndex >= 0 && cb.SelectedIndex < presets.Length) { ShowCustom(false); Set(presets[cb.SelectedIndex].fmt); }
+        };
+        customBox.TextChanged += (_, _) => { Set(customBox.Text); Recompute(); };
+        return sp;
+    }
+
+    // format picker for a selected Date/Time element — presets + Custom (free text or a pattern)
+    private StackPanel ElementFormatCombo(FillElement e)
+    {
+        var presets = DateFormats.Concat(TimeFormats).ToArray();
+        var now = System.DateTime.Now;
+        var sp = new StackPanel();
+        var cb = new ComboBox { Style = (Style)Application.Current.Resources["ThemedCombo"] };
+        foreach (var (_, fmt) in presets) cb.Items.Add(new ComboBoxItem { Content = now.ToString(fmt) });
+        var customItem = new ComboBoxItem { Content = "Custom…", Tag = "custom" };
+        cb.Items.Add(customItem);
+        sp.Children.Add(cb);
+
+        var customBox = ThemedTextBox(e.Text);
+        customBox.Margin = new Thickness(0, 8, 0, 0);
+        customBox.Visibility = Visibility.Collapsed;
+        var hint = new TextBlock { Text = "Type any custom date / time text", FontSize = 11, Margin = new Thickness(2, 6, 0, 0), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        Dyn(hint, TextBlock.ForegroundProperty, "TextMutedBrush");
+        sp.Children.Add(customBox); sp.Children.Add(hint);
+
+        void ShowCustom(bool on) { customBox.Visibility = hint.Visibility = on ? Visibility.Visible : Visibility.Collapsed; }
+
+        int idx = System.Array.FindIndex(presets, p => now.ToString(p.fmt) == e.Text);
+        if (idx >= 0) cb.SelectedIndex = idx;
+        else { cb.SelectedItem = customItem; ShowCustom(true); }
+
+        cb.SelectionChanged += (_, _) =>
+        {
+            if (cb.SelectedItem == customItem) { ShowCustom(true); customBox.Focus(); }
+            else if (cb.SelectedIndex >= 0 && cb.SelectedIndex < presets.Length)
+            {
+                ShowCustom(false);
+                e.Text = now.ToString(presets[cb.SelectedIndex].fmt);
+                EditCommit(e);
+            }
+        };
+        // commit the typed literal value on Enter or focus-out (live-update the chip text as they type)
+        customBox.TextChanged += (_, _) => { e.Text = customBox.Text; if (ChipTextBox(e) is { } cb2) cb2.Text = customBox.Text; };
+        customBox.LostFocus += (_, _) => EditCommit(e);
+        customBox.KeyDown += (_, ev) => { if (ev.Key == Key.Enter) EditCommit(e); };
+        return sp;
     }
 
     private Grid SizeStepper(int value, System.Action<int> apply, int min, int max, int step)
@@ -775,6 +1071,7 @@ public class PdfMarkupWindow : Window
     {
         var wp = new WrapPanel();
         var sws = new List<(string hex, Border sw)>();
+        string cur = current;
         foreach (var (name, hex) in colors)
         {
             var sw = new Border
@@ -787,12 +1084,64 @@ public class PdfMarkupWindow : Window
             sws.Add((hex, sw));
             sw.MouseLeftButtonUp += (_, _) =>
             {
+                cur = hex;
                 foreach (var (h, s) in sws) s.BorderBrush = h == hex ? B("AccentBrush") : B("BorderSoftBrush");
                 set(hex);
             };
             wp.Children.Add(sw);
         }
+
+        // custom color picker — pick any color; covers every tool's COLOR section
+        bool currentIsPreset = colors.Any(c => string.Equals(c.hex, current, System.StringComparison.OrdinalIgnoreCase));
+        var custom = new Border
+        {
+            Width = 28, Height = 28, CornerRadius = new CornerRadius(7), Margin = new Thickness(0, 0, 8, 8),
+            Cursor = Cursors.Hand, BorderThickness = new Thickness(2), ToolTip = "Custom color…",
+            Background = currentIsPreset ? RainbowBrush() : HexBrush(current),
+            BorderBrush = currentIsPreset ? B("BorderSoftBrush") : B("AccentBrush")
+        };
+        custom.Child = new TextBlock
+        {
+            Text = "+", FontSize = 15, FontWeight = FontWeights.Bold, Foreground = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 3, ShadowDepth = 0, Opacity = 0.7, Color = System.Windows.Media.Colors.Black }
+        };
+        custom.MouseLeftButtonUp += (_, _) =>
+        {
+            var picked = PickColor(cur);
+            if (picked == null) return;
+            cur = picked;
+            foreach (var (_, s) in sws) s.BorderBrush = B("BorderSoftBrush");
+            custom.Background = HexBrush(picked); custom.BorderBrush = B("AccentBrush");
+            set(picked);
+        };
+        wp.Children.Add(custom);
         return wp;
+    }
+
+    /// <summary>Opens the modern color picker seeded with the current color; returns a #RRGGBB hex or null if cancelled.</summary>
+    private string? PickColor(string currentHex)
+    {
+        var dlg = new ColorPickerDialog(currentHex) { Owner = this };
+        return dlg.ShowDialog() == true ? dlg.ResultHex : null;
+    }
+
+    private static LinearGradientBrush? _rainbow;
+    private static LinearGradientBrush RainbowBrush()
+    {
+        if (_rainbow == null)
+        {
+            var g = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+            g.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.Red, 0.0));
+            g.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.Orange, 0.2));
+            g.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.LimeGreen, 0.4));
+            g.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.DeepSkyBlue, 0.6));
+            g.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.Blue, 0.8));
+            g.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.Magenta, 1.0));
+            g.Freeze();
+            _rainbow = g;
+        }
+        return _rainbow;
     }
 
     // ---- small pill helpers ----
@@ -856,15 +1205,15 @@ public class PdfMarkupWindow : Window
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Visibility = Visibility.Collapsed };
         _actionControls = right;
-        var zout = IconButton("−", "Zoom out"); zout.Click += (_, _) => Zoom(-0.1);
-        _zoomLabel = new TextBlock { Text = "100%", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0), FontSize = 12.5, MinWidth = 38, TextAlignment = TextAlignment.Center };
-        Dyn(_zoomLabel, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-        var zin = IconButton("+", "Zoom in"); zin.Click += (_, _) => Zoom(+0.1);
+        var zout = IconButton("−", "Zoom out (1%)"); zout.Click += (_, _) => Zoom(-ZoomStep);
+        _zoomBox = MakeZoomBox();
+        var zin = IconButton("+", "Zoom in (1%)"); zin.Click += (_, _) => Zoom(+ZoomStep);
+        var fit = IconButton("⤢", "Fit width"); fit.Margin = new Thickness(8, 0, 0, 0); fit.Click += (_, _) => FitToWindow();
         var save = ChromeButton("Save PDF  →", true);
         save.Margin = new Thickness(16, 0, 0, 0); save.Padding = new Thickness(26, 10, 26, 10); save.FontWeight = FontWeights.Bold;
         save.Click += async (_, _) => await Save();
         _btnSave = save;
-        right.Children.Add(zout); right.Children.Add(_zoomLabel); right.Children.Add(zin); right.Children.Add(save);
+        right.Children.Add(zout); right.Children.Add(_zoomBox); right.Children.Add(zin); right.Children.Add(fit); right.Children.Add(save);
         g.Children.Add(right);
 
         bar.Child = g;
@@ -872,11 +1221,52 @@ public class PdfMarkupWindow : Window
         return bar;
     }
 
-    private void Zoom(double delta)
+    private void Zoom(double delta) => SetZoom(_zoom + delta);
+
+    private void SetZoom(double z)
     {
-        _zoom = System.Math.Clamp(_zoom + delta, 0.5, 3.0);
-        _pageHost.LayoutTransform = new ScaleTransform(_zoom, _zoom);
-        _zoomLabel.Text = $"{(int)System.Math.Round(_zoom * 100)}%";
+        _zoom = System.Math.Clamp(z, 0.08, 5.0);
+        _pageHost.LayoutTransform = _zoom == 1.0 ? null : new ScaleTransform(_zoom, _zoom);
+        // don't stomp the text the user is currently typing into the box
+        if (_zoomBox != null && !_zoomBox.IsKeyboardFocused)
+            _zoomBox.Text = $"{(int)System.Math.Round(_zoom * 100)}%";
+    }
+
+    /// <summary>Editable zoom % field — type a value and press Enter (or click away) to apply.</summary>
+    private TextBox MakeZoomBox()
+    {
+        var tb = new TextBox
+        {
+            Text = "100%", Width = 54, FontSize = 12.5, TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(2, 3, 2, 3), BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Brushes.Transparent, ToolTip = "Type a zoom % and press Enter"
+        };
+        Dyn(tb, TextBox.ForegroundProperty, "TextSecondaryBrush");
+        Dyn(tb, TextBox.BorderBrushProperty, "BorderSoftBrush");
+        Dyn(tb, TextBox.CaretBrushProperty, "TextSecondaryBrush");
+        tb.KeyDown += (_, ev) => { if (ev.Key == Key.Enter) { ApplyZoomFromBox(); Keyboard.ClearFocus(); ev.Handled = true; } };
+        tb.LostFocus += (_, _) => ApplyZoomFromBox();
+        tb.GotKeyboardFocus += (_, _) => tb.SelectAll();
+        return tb;
+    }
+
+    private void ApplyZoomFromBox()
+    {
+        var digits = new string(_zoomBox.Text.Where(char.IsDigit).ToArray());
+        if (int.TryParse(digits, out int pct) && pct > 0) SetZoom(pct / 100.0);
+        else SetZoom(_zoom);   // unparseable → restore the current value
+    }
+
+    /// <summary>Scales the page to fill the canvas width (scrolling vertically) — a document-reader default.</summary>
+    private void FitToWindow()
+    {
+        if (_pageImg?.Source == null) return;
+        // reserve ~18px for the vertical scrollbar that appears once the page is taller than the viewport
+        double vw = _scroller.ViewportWidth - _scroller.Padding.Left - _scroller.Padding.Right - 18;
+        if (vw < 20) vw = _scroller.ActualWidth - 64;
+        if (vw < 20 || _pageImg.Width < 1) return;
+        SetZoom(vw / _pageImg.Width);   // fit-to-width
     }
 
     // =====================================================================
@@ -942,17 +1332,23 @@ public class PdfMarkupWindow : Window
             _elements.Clear();
             _selected = null;
             ClearHistory();
+            _dirty = false;
             _curPage = 0;
-            _zoom = 1.0; _pageHost.LayoutTransform = null; _zoomLabel.Text = "100%";
+            _zoom = 1.0; _pageHost.LayoutTransform = null; _zoomBox.Text = "100%";
+            _didFit = false;
             _dropZone.Visibility = Visibility.Collapsed;
             _pageHost.Visibility = Visibility.Visible;
             _txtItems.Visibility = Visibility.Visible;
             _pagerPanel.Visibility = Visibility.Visible;
             _actionControls.Visibility = Visibility.Visible;
             await RenderPage();
+            ApplyPageScaleDefaults();   // size defaults to the page so elements aren't tiny on huge scanned pages
             UpdateDocInfo();
             RefreshProps();
             UpdateItemCount();
+            // default to a fit-to-window view once layout has settled (huge scanned pages otherwise open way over 100%)
+            Dispatcher.BeginInvoke(new System.Action(() => { if (!_didFit) { _didFit = true; FitToWindow(); } }),
+                System.Windows.Threading.DispatcherPriority.Loaded);
         }
         catch (System.Exception ex)
         {
@@ -960,13 +1356,27 @@ public class PdfMarkupWindow : Window
         }
     }
 
+    private double _pageScale = 1.0;
+
+    /// <summary>Scales the default element sizes to the page. Scanned PDFs whose MediaBox equals the scan's
+    /// pixel size (e.g. 4588×6493 pt) make a 12pt font microscopic; scaling keeps placed items readable.</summary>
+    private void ApplyPageScaleDefaults()
+    {
+        _pageScale = System.Math.Clamp(_pageHpt / 792.0, 1.0, 40.0);   // 792pt ≈ a normal Letter page
+        _def.FontSize = System.Math.Clamp(System.Math.Round(12 * _pageScale), 6, 480);
+        _drawWidth = (int)System.Math.Clamp(System.Math.Round(3 * _pageScale), 1, 120);
+        _highlightWidth = (int)System.Math.Clamp(System.Math.Round(16 * _pageScale), 2, 400);
+        _blurStrength = (int)System.Math.Clamp(System.Math.Round(14 * _pageScale), 4, 200);
+    }
+
     private async System.Threading.Tasks.Task RenderPage()
     {
         if (_pdfPath == null) return;
         var (wpt, hpt, _) = await FillSignRender.GetPageSizeAsync(_pdfPath, _curPage);
         _pageWpt = wpt; _pageHpt = hpt;
-        using var bmp = await FillSignRender.RenderPageToBitmapAsync(_pdfPath, _curPage, DisplayDpi);
-        _pageImg.Source = BitmapToSource(bmp);
+        _pageBmp?.Dispose();
+        _pageBmp = await FillSignRender.RenderPageToBitmapAsync(_pdfPath, _curPage, DisplayDpi);
+        _pageImg.Source = BitmapToSource(_pageBmp);   // kept alive for font detection
 
         double wpx = FillSignGeometry.PointsToPixels(wpt, DisplayDpi);
         double hpx = FillSignGeometry.PointsToPixels(hpt, DisplayDpi);
@@ -1041,7 +1451,8 @@ public class PdfMarkupWindow : Window
         Page = e.Page, Type = e.Type, X = e.X, Y = e.Y, Width = e.Width, Height = e.Height,
         Text = e.Text, FontFamily = e.FontFamily, FontSize = e.FontSize, Bold = e.Bold,
         Italic = e.Italic, Underline = e.Underline, Align = e.Align, ColorHex = e.ColorHex, ImagePath = e.ImagePath,
-        Rotation = e.Rotation, Opacity = e.Opacity
+        Rotation = e.Rotation, Opacity = e.Opacity,
+        Shape = e.Shape, StrokeWidth = e.StrokeWidth, Points = new List<(double, double)>(e.Points)
     };
 
     private List<FillElement> Snapshot() => _elements.Select(Clone).ToList();
@@ -1066,6 +1477,7 @@ public class PdfMarkupWindow : Window
     {
         _elements.Clear();
         _elements.AddRange(snap);
+        _dirty = true;
         _selected = null;
         LayoutChips();
         UpdateItemCount();
@@ -1087,7 +1499,7 @@ public class PdfMarkupWindow : Window
     private void PushSnap(List<FillElement>? snap)
     {
         if (snap == null) return;
-        _undo.Push(snap); _redo.Clear(); UpdateUndoButtons();
+        _undo.Push(snap); _redo.Clear(); _dirty = true; UpdateUndoButtons();
     }
 
     /// <summary>Commit a property change on a selected element: record the pre-edit snapshot, then redraw.</summary>
@@ -1125,6 +1537,10 @@ public class PdfMarkupWindow : Window
             img.Effect = new System.Windows.Media.Effects.BlurEffect { Radius = System.Math.Max(2, e.FontSize) };
             content = img; blurImg = img;
         }
+        else if (e.Type == FillElementType.Draw)
+        {
+            content = BuildDrawVisual(e, wpx, hpx);
+        }
         else
         {
             var tb = new TextBox
@@ -1136,7 +1552,12 @@ public class PdfMarkupWindow : Window
                 TextDecorations = e.Underline ? TextDecorations.Underline : null,
                 TextAlignment = e.Align switch { "center" => TextAlignment.Center, "right" => TextAlignment.Right, _ => TextAlignment.Left },
                 IsReadOnly = true, Padding = new Thickness(2, 0, 2, 0),
-                MinWidth = 24, FontFamily = new System.Windows.Media.FontFamily(e.FontFamily),
+                // read-only fields don't grab clicks (so a click reaches the chip → enters edit);
+                // EnterEdit re-enables hit testing for caret placement while typing
+                IsHitTestVisible = false,
+                // small min so an empty field is just a caret box that grows with what you type; marks hug their glyph
+                MinWidth = e.Type == FillElementType.Check ? 24 : 48,
+                FontFamily = new System.Windows.Media.FontFamily(e.FontFamily),
                 CaretBrush = HexBrush(e.ColorHex)
             };
             tb.TextChanged += (_, _) => e.Text = tb.Text;
@@ -1149,13 +1570,19 @@ public class PdfMarkupWindow : Window
         var chip = new Border
         {
             Child = host, BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent,
-            CornerRadius = new CornerRadius(3), Cursor = Cursors.SizeAll, Tag = e, Background = Brushes.Transparent
+            CornerRadius = new CornerRadius(3), Cursor = Cursors.SizeAll, Tag = e, Background = Brushes.Transparent,
+            // a 2px pad makes the whole element (plus a 2px ring) hoverable / clickable, not just the glyphs
+            Padding = new Thickness(ChipPad)
         };
         chip.Opacity = System.Math.Clamp(e.Opacity / 100.0, 0.05, 1.0);
         chip.RenderTransformOrigin = new Point(0.5, 0.5);
         chip.RenderTransform = new RotateTransform(e.Rotation);
-        Canvas.SetLeft(chip, FillSignGeometry.PointsToPixels(e.X, DisplayDpi));
-        Canvas.SetTop(chip, FillSignGeometry.PointsToPixels(e.Y, DisplayDpi));
+        Canvas.SetLeft(chip, FillSignGeometry.PointsToPixels(e.X, DisplayDpi) - ChipPad);
+        Canvas.SetTop(chip, FillSignGeometry.PointsToPixels(e.Y, DisplayDpi) - ChipPad);
+
+        // hover outline + floating action bar (move / resize / delete) anywhere on the element
+        chip.MouseEnter += (_, _) => { if (_selected != e) chip.BorderBrush = HoverBrush(); ShowItemBar(e, chip); };
+        chip.MouseLeave += (_, _) => { if (_selected != e) chip.BorderBrush = Brushes.Transparent; ScheduleHideItemBar(); };
 
         chip.MouseLeftButtonDown += (s, ev) =>
         {
@@ -1175,7 +1602,7 @@ public class PdfMarkupWindow : Window
             if (!_dragMoved && (System.Math.Abs(p.X - _dragStart.X) > 4 || System.Math.Abs(p.Y - _dragStart.Y) > 4))
             {
                 _dragMoved = true; _dragSnap = Snapshot(); // snapshot before the move
-                if (textBox != null) { textBox.IsReadOnly = true; } // a drag is a move, never an edit
+                if (textBox != null) { textBox.IsReadOnly = true; textBox.IsHitTestVisible = false; } // a drag is a move, never an edit
             }
             if (_dragMoved) MoveChipTo(chip, p);
         };
@@ -1188,8 +1615,8 @@ public class PdfMarkupWindow : Window
             if (moved)
             {
                 PushSnap(_dragSnap); _dragSnap = null;
-                e.X = FillSignGeometry.PixelsToPoints(Canvas.GetLeft(chip), DisplayDpi);
-                e.Y = FillSignGeometry.PixelsToPoints(Canvas.GetTop(chip), DisplayDpi);
+                e.X = FillSignGeometry.PixelsToPoints(Canvas.GetLeft(chip) + ChipPad, DisplayDpi);
+                e.Y = FillSignGeometry.PixelsToPoints(Canvas.GetTop(chip) + ChipPad, DisplayDpi);
             }
             else if (textBox != null)
             {
@@ -1201,7 +1628,14 @@ public class PdfMarkupWindow : Window
         if (textBox != null)
             textBox.LostFocus += (_, _) =>
             {
-                textBox.IsReadOnly = true; textBox.Background = Brushes.Transparent;
+                textBox.IsReadOnly = true; textBox.IsHitTestVisible = false; textBox.Background = Brushes.Transparent;
+                // never leave an empty text field behind — clicking away from a blank field removes it
+                if (e.Type == FillElementType.Text && string.IsNullOrWhiteSpace(textBox.Text))
+                {
+                    DiscardElement(e);
+                    _editSnap = null;
+                    return;
+                }
                 if (_editSnap != null && textBox.Text != _editStartText) PushSnap(_editSnap);
                 _editSnap = null;
             };
@@ -1308,11 +1742,36 @@ public class PdfMarkupWindow : Window
         };
     }
 
+    /// <summary>The editable TextBox inside an element's chip (chips wrap their content in a host Grid).</summary>
+    private TextBox? ChipTextBox(FillElement e) =>
+        _chips.TryGetValue(e, out var chip) && chip.Child is Grid g
+            ? g.Children.OfType<TextBox>().FirstOrDefault()
+            : null;
+
+    /// <summary>Topmost editable text/date field whose chip contains the overlay-space point, or null.</summary>
+    private FillElement? TextChipAtPoint(Point p)
+    {
+        FillElement? found = null;
+        foreach (var (el, chip) in _chips)
+        {
+            if (el.Type is not (FillElementType.Text or FillElementType.DateTime)) continue;
+            double l = Canvas.GetLeft(chip), tp = Canvas.GetTop(chip);
+            if (double.IsNaN(l)) l = 0;
+            if (double.IsNaN(tp)) tp = 0;
+            double w = chip.ActualWidth > 0 ? chip.ActualWidth : chip.DesiredSize.Width;
+            double h = chip.ActualHeight > 0 ? chip.ActualHeight : chip.DesiredSize.Height;
+            if (p.X >= l && p.X <= l + w && p.Y >= tp && p.Y <= tp + h)
+                found = el;   // chips later in the dictionary draw on top → keep the last match
+        }
+        return found;
+    }
+
     /// <summary>Puts a text chip into editable mode with a reliable, deferred focus + caret.</summary>
     private void EnterEdit(TextBox tb)
     {
         _editSnap = Snapshot(); _editStartText = tb.Text;  // capture pre-edit state for undo
         tb.IsReadOnly = false;
+        tb.IsHitTestVisible = true;   // allow caret placement / selection while editing
         tb.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 124, 156, 255));
         UpdateGhost(null); // don't show the placement ghost while typing
         Dispatcher.BeginInvoke(new System.Action(() =>
@@ -1369,6 +1828,21 @@ public class PdfMarkupWindow : Window
         UpdateItemCount();
     }
 
+    /// <summary>Silently remove an abandoned element (e.g. an empty text field clicked away from).
+    /// Pops the placement snapshot so the place-then-abandon pair leaves no undo step.</summary>
+    private void DiscardElement(FillElement e)
+    {
+        _elements.Remove(e);
+        if (_chips.TryGetValue(e, out var chip)) _overlay.Children.Remove(chip);
+        _chips.Remove(e);
+        _handles.Remove(e);
+        if (_selected == e) _selected = null;
+        if (_undo.Count > 0) _undo.Pop();   // drop the snapshot PlaceText pushed before adding this field
+        UpdateUndoButtons();
+        UpdateItemCount();
+        RefreshProps();
+    }
+
     private void OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         bool editing = System.Windows.Input.Keyboard.FocusedElement is TextBox tb && !tb.IsReadOnly;
@@ -1385,14 +1859,21 @@ public class PdfMarkupWindow : Window
             if (e.Key == Key.Z && !editing) { Undo(); e.Handled = true; return; }
             if (e.Key == Key.Y && !editing) { Redo(); e.Handled = true; return; }
             if (e.Key == Key.S) { _ = Save(); e.Handled = true; return; }                 // Ctrl+S saves
-            if (e.Key == Key.OemPlus || e.Key == Key.Add) { Zoom(+0.1); e.Handled = true; return; }
-            if (e.Key == Key.OemMinus || e.Key == Key.Subtract) { Zoom(-0.1); e.Handled = true; return; }
+            if (e.Key == Key.OemPlus || e.Key == Key.Add) { Zoom(+ZoomStep); e.Handled = true; return; }
+            if (e.Key == Key.OemMinus || e.Key == Key.Subtract) { Zoom(-ZoomStep); e.Handled = true; return; }
         }
         if ((e.Key == Key.Delete || e.Key == Key.Back) && _selected != null && !editing)
         {
             DeleteSelected();
             e.Handled = true;
             return;
+        }
+        // single-key tool shortcuts (mirroring the screenshot annotation tools).
+        // never fire while a text field is being edited, so typing letters isn't hijacked.
+        if (!editing && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            var t = ToolForKey(e);
+            if (t != null) { SetTool(t); e.Handled = true; return; }
         }
         // arrow keys nudge the selected item (Shift = 10 pt steps)
         if (!editing && _selected != null &&
@@ -1414,9 +1895,38 @@ public class PdfMarkupWindow : Window
         _selected.Y = System.Math.Max(0, _selected.Y + dyPt);
         if (_chips.TryGetValue(_selected, out var chip))
         {
-            Canvas.SetLeft(chip, FillSignGeometry.PointsToPixels(_selected.X, DisplayDpi));
-            Canvas.SetTop(chip, FillSignGeometry.PointsToPixels(_selected.Y, DisplayDpi));
+            Canvas.SetLeft(chip, FillSignGeometry.PointsToPixels(_selected.X, DisplayDpi) - ChipPad);
+            Canvas.SetTop(chip, FillSignGeometry.PointsToPixels(_selected.Y, DisplayDpi) - ChipPad);
         }
+    }
+
+    /// <summary>Maps a plain key press to a tool id. Screenshot-tool actions honor the user's
+    /// configured shortcuts; PDF-only tools use fixed mnemonic keys. Returns null if no match.</summary>
+    private static string? ToolForKey(KeyEventArgs e)
+    {
+        var s = AppSettings.Instance;
+        if (ShortcutHelper.Matches(e, s.ShortcutMove)) return "select";
+        if (ShortcutHelper.Matches(e, s.ShortcutText)) return "text";
+        if (ShortcutHelper.Matches(e, s.ShortcutPen)) return "pen";
+        if (ShortcutHelper.Matches(e, s.ShortcutMarker)) return "highlight";
+        if (ShortcutHelper.Matches(e, s.ShortcutLine)) return "line";
+        if (ShortcutHelper.Matches(e, s.ShortcutArrow)) return "arrow";
+        if (ShortcutHelper.Matches(e, s.ShortcutRectangle)) return "rect";
+        if (ShortcutHelper.Matches(e, s.ShortcutEllipse)) return "ellipse";
+        if (ShortcutHelper.Matches(e, s.ShortcutBlur)) return "blur";
+        if (ShortcutHelper.Matches(e, s.ShortcutCheck)) return "check";
+        if (ShortcutHelper.Matches(e, s.ShortcutCross)) return "cross";
+        return e.Key switch
+        {
+            Key.O => "radio",
+            Key.C => "date",       // Calendar
+            Key.W => "time",       // Watch / clock
+            Key.S => "signature",  // Sign (plain S; Ctrl+S still saves)
+            Key.I => "initials",
+            Key.M => "image",      // iMage / staMp
+            Key.N => "redact",     // cover box
+            _ => null
+        };
     }
 
     private void OnCanvasWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
@@ -1444,7 +1954,24 @@ public class PdfMarkupWindow : Window
         // region tools draw a rubber-band rectangle
         if (_tool is "redact" or "blur") { BeginRegion(e.GetPosition(_overlay)); return; }
 
+        // draw tools drag a stroke / shape
+        if (IsDrawTool(_tool)) { BeginDraw(e.GetPosition(_overlay)); return; }
+
         var p = e.GetPosition(_overlay);
+
+        // clicking an existing text/date field with a text-like tool edits it in place
+        // instead of stacking a new field on top of it
+        if (_tool is "text" or "initials" or "date" or "time")
+        {
+            var hit = TextChipAtPoint(p);
+            if (hit != null)
+            {
+                Select(hit);
+                if (ChipTextBox(hit) is { } htb) EnterEdit(htb);
+                return;
+            }
+        }
+
         // click point is treated as the CENTER of the item to place
         double cx = FillSignGeometry.PixelsToPoints(p.X, DisplayDpi);
         double cy = FillSignGeometry.PixelsToPoints(p.Y, DisplayDpi);
@@ -1456,8 +1983,8 @@ public class PdfMarkupWindow : Window
             case "check": PlaceMark(cx, cy, "✓"); break;
             case "cross": PlaceMark(cx, cy, "✗"); break;
             case "radio": PlaceMark(cx, cy, "●"); break;
-            case "date": PlaceText(cx, cy, System.DateTime.Now.ToString("MMM d, yyyy"), FillElementType.DateTime); break;
-            case "time": PlaceText(cx, cy, System.DateTime.Now.ToString("h:mm tt"), FillElementType.DateTime); break;
+            case "date": PlaceText(cx, cy, SafeFormat(_dateFmt), FillElementType.DateTime); break;
+            case "time": PlaceText(cx, cy, SafeFormat(_timeFmt), FillElementType.DateTime); break;
             case "signature": await PlaceSignature(cx, cy); break;
             case "image": PlaceImage(cx, cy); break;
         }
@@ -1467,6 +1994,7 @@ public class PdfMarkupWindow : Window
     {
         var p = e.GetPosition(_overlay);
         if (_drawingRegion) { UpdateRegion(p); return; }
+        if (_drawing) { UpdateDraw(p); return; }
         UpdateGhost(p);
     }
 
@@ -1512,8 +2040,8 @@ public class PdfMarkupWindow : Window
             case "check": glyph = "✓"; fam = "Segoe UI Symbol"; sizePt = _def.FontSize + 4; break;
             case "cross": glyph = "✗"; fam = "Segoe UI Symbol"; sizePt = _def.FontSize + 4; break;
             case "radio": glyph = "●"; fam = "Segoe UI Symbol"; sizePt = _def.FontSize + 4; break;
-            case "date":  glyph = System.DateTime.Now.ToString("MMM d, yyyy"); fam = _def.FontFamily; break;
-            case "time":  glyph = System.DateTime.Now.ToString("h:mm tt"); fam = _def.FontFamily; break;
+            case "date":  glyph = SafeFormat(_dateFmt); fam = _def.FontFamily; break;
+            case "time":  glyph = SafeFormat(_timeFmt); fam = _def.FontFamily; break;
             default:      glyph = "Text"; fam = _def.FontFamily; break; // text / initials
         }
         _ghost!.Text = glyph;
@@ -1527,6 +2055,180 @@ public class PdfMarkupWindow : Window
     private void Overlay_MouseUp(object sender, MouseButtonEventArgs e)
     {
         if (_drawingRegion) EndRegion(e.GetPosition(_overlay));
+        else if (_drawing) EndDraw(e.GetPosition(_overlay));
+    }
+
+    // ---- draw tools (pen / highlight / line / arrow / rect / ellipse) ----
+    private bool IsFreehand => _tool is "pen" or "highlight";
+    private string DrawColor => _tool == "highlight" ? _highlightColor : _drawColor;
+    private int DrawWidthPt => _tool == "highlight" ? _highlightWidth : _drawWidth;
+
+    private void BeginDraw(Point start)
+    {
+        _drawing = true;
+        _drawStart = start;
+        _drawPts.Clear();
+        _drawPts.Add(start);
+
+        double wpx = FillSignGeometry.PointsToPixels(DrawWidthPt, DisplayDpi);
+        var stroke = HexBrush(DrawColor);
+        bool hi = _tool == "highlight";
+
+        System.Windows.Shapes.Shape shape = _tool switch
+        {
+            "rect" => new System.Windows.Shapes.Rectangle(),
+            "ellipse" => new System.Windows.Shapes.Ellipse(),
+            "line" or "arrow" => new System.Windows.Shapes.Line { X1 = start.X, Y1 = start.Y, X2 = start.X, Y2 = start.Y },
+            _ => new System.Windows.Shapes.Polyline { Points = new PointCollection { start } }
+        };
+        shape.Stroke = stroke;
+        shape.StrokeThickness = wpx;
+        shape.StrokeStartLineCap = PenLineCap.Round;
+        shape.StrokeEndLineCap = PenLineCap.Round;
+        shape.StrokeLineJoin = PenLineJoin.Round;
+        shape.Opacity = hi ? 0.4 : 1.0;
+        shape.IsHitTestVisible = false;
+        if (shape is System.Windows.Shapes.Rectangle or System.Windows.Shapes.Ellipse)
+        { Canvas.SetLeft(shape, start.X); Canvas.SetTop(shape, start.Y); }
+        _drawPreview = shape;
+        _overlay.Children.Add(shape);
+        _overlay.CaptureMouse();
+        UpdateGhost(null);
+    }
+
+    private void UpdateDraw(Point cur)
+    {
+        if (_drawPreview == null) return;
+        bool snap = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+        switch (_drawPreview)
+        {
+            case System.Windows.Shapes.Polyline pl:
+                _drawPts.Add(cur); pl.Points.Add(cur); break;
+            case System.Windows.Shapes.Line ln:
+                var end = snap ? SnapLine(_drawStart, cur) : cur;
+                ln.X2 = end.X; ln.Y2 = end.Y; break;
+            case var sh: // rectangle / ellipse
+                var (l, t, w, h) = RectFrom(_drawStart, cur, snap);
+                Canvas.SetLeft(sh, l); Canvas.SetTop(sh, t); sh.Width = w; sh.Height = h; break;
+        }
+    }
+
+    private static (double l, double t, double w, double h) RectFrom(Point start, Point cur, bool square)
+    {
+        double w = System.Math.Abs(cur.X - start.X), h = System.Math.Abs(cur.Y - start.Y);
+        if (square) { double s = System.Math.Min(w, h); w = h = s; }
+        double l = cur.X < start.X ? start.X - w : start.X;
+        double t = cur.Y < start.Y ? start.Y - h : start.Y;
+        return (l, t, w, h);
+    }
+
+    private FrameworkElement BuildDrawVisual(FillElement e, double wpx, double hpx)
+    {
+        var canvas = new Canvas { Width = System.Math.Max(1, wpx), Height = System.Math.Max(1, hpx), Background = Brushes.Transparent };
+        double sw = System.Math.Max(0.5, FillSignGeometry.PointsToPixels(e.StrokeWidth, DisplayDpi));
+        var stroke = HexBrush(e.ColorHex);
+        double Px(double pt) => FillSignGeometry.PointsToPixels(pt, DisplayDpi);
+
+        void Style(System.Windows.Shapes.Shape s)
+        {
+            s.Stroke = stroke; s.StrokeThickness = sw;
+            s.StrokeStartLineCap = PenLineCap.Round; s.StrokeEndLineCap = PenLineCap.Round; s.StrokeLineJoin = PenLineJoin.Round;
+            s.IsHitTestVisible = false;
+        }
+
+        switch (e.Shape)
+        {
+            case "rect":
+                var r = new System.Windows.Shapes.Rectangle { Width = wpx, Height = hpx }; Style(r); canvas.Children.Add(r); break;
+            case "ellipse":
+                var el = new System.Windows.Shapes.Ellipse { Width = wpx, Height = hpx }; Style(el); canvas.Children.Add(el); break;
+            case "line":
+                if (e.Points.Count >= 2)
+                { var ln = new System.Windows.Shapes.Line { X1 = Px(e.Points[0].X), Y1 = Px(e.Points[0].Y), X2 = Px(e.Points[1].X), Y2 = Px(e.Points[1].Y) }; Style(ln); canvas.Children.Add(ln); }
+                break;
+            case "arrow":
+                if (e.Points.Count >= 2)
+                {
+                    double sx = Px(e.Points[0].X), sy = Px(e.Points[0].Y), tx = Px(e.Points[1].X), ty = Px(e.Points[1].Y);
+                    var shaft = new System.Windows.Shapes.Line { X1 = sx, Y1 = sy, X2 = tx, Y2 = ty }; Style(shaft); canvas.Children.Add(shaft);
+                    double dx = tx - sx, dy = ty - sy, len = System.Math.Sqrt(dx * dx + dy * dy);
+                    if (len > 0.001)
+                    {
+                        dx /= len; dy /= len;
+                        double head = System.Math.Max(Px(8), sw * 3.5);
+                        const double a = 25 * System.Math.PI / 180.0; double cs = System.Math.Cos(a), sn = System.Math.Sin(a);
+                        var h1 = new System.Windows.Shapes.Line { X1 = tx, Y1 = ty, X2 = tx - head * (dx * cs - dy * sn), Y2 = ty - head * (dx * sn + dy * cs) }; Style(h1); canvas.Children.Add(h1);
+                        var h2 = new System.Windows.Shapes.Line { X1 = tx, Y1 = ty, X2 = tx - head * (dx * cs + dy * sn), Y2 = ty - head * (-dx * sn + dy * cs) }; Style(h2); canvas.Children.Add(h2);
+                    }
+                }
+                break;
+            default: // pen / highlight
+                if (e.Points.Count >= 2)
+                {
+                    var pl = new System.Windows.Shapes.Polyline { Points = new PointCollection() }; Style(pl);
+                    foreach (var p in e.Points) pl.Points.Add(new Point(Px(p.X), Px(p.Y)));
+                    canvas.Children.Add(pl);
+                }
+                break;
+        }
+        return canvas;
+    }
+
+    private static Point SnapLine(Point a, Point b)
+    {
+        double dx = b.X - a.X, dy = b.Y - a.Y;
+        double ang = System.Math.Atan2(dy, dx);
+        double step = System.Math.PI / 4; // 45°
+        double snapped = System.Math.Round(ang / step) * step;
+        double len = System.Math.Sqrt(dx * dx + dy * dy);
+        return new Point(a.X + len * System.Math.Cos(snapped), a.Y + len * System.Math.Sin(snapped));
+    }
+
+    private void EndDraw(Point end)
+    {
+        _drawing = false;
+        _overlay.ReleaseMouseCapture();
+        if (_drawPreview != null) { _overlay.Children.Remove(_drawPreview); _drawPreview = null; }
+
+        bool hi = _tool == "highlight";
+        bool freehand = IsFreehand;
+        bool snap = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+
+        // collect the path points (pixels), then compute the bounding box
+        List<Point> px;
+        if (freehand) px = new List<Point>(_drawPts);
+        else if (_tool is "line" or "arrow") px = new List<Point> { _drawStart, snap ? SnapLine(_drawStart, end) : end };
+        else // rect / ellipse — corners
+        {
+            var (l, t, w, h) = RectFrom(_drawStart, end, snap);
+            px = new List<Point> { new(l, t), new(l + w, t + h) };
+        }
+
+        double minX = px.Min(p => p.X), minY = px.Min(p => p.Y);
+        double maxX = px.Max(p => p.X), maxY = px.Max(p => p.Y);
+        if (maxX - minX < 3 && maxY - minY < 3) return; // ignore taps
+
+        var el = new FillElement
+        {
+            Page = _curPage, Type = FillElementType.Draw, Shape = _tool,
+            X = FillSignGeometry.PixelsToPoints(minX, DisplayDpi),
+            Y = FillSignGeometry.PixelsToPoints(minY, DisplayDpi),
+            Width = FillSignGeometry.PixelsToPoints(maxX - minX, DisplayDpi),
+            Height = FillSignGeometry.PixelsToPoints(maxY - minY, DisplayDpi),
+            ColorHex = DrawColor,
+            StrokeWidth = DrawWidthPt,
+            Opacity = hi ? 40 : 100,
+        };
+        // store vertices relative to the bounding box, in points
+        if (freehand || _tool is "line" or "arrow")
+            foreach (var p in px)
+                el.Points.Add((FillSignGeometry.PixelsToPoints(p.X - minX, DisplayDpi), FillSignGeometry.PixelsToPoints(p.Y - minY, DisplayDpi)));
+
+        PushSnap(Snapshot());
+        _elements.Add(el);
+        AddChip(el);
+        Select(el);
+        UpdateItemCount();
     }
 
     // ---- region (cover / blur) rubber-band ----
@@ -1585,27 +2287,34 @@ public class PdfMarkupWindow : Window
     private void PlaceText(double cx, double cy, string text, FillElementType type)
     {
         PushSnap(Snapshot());
-        double h = _def.FontSize * 1.5;
+
+        // effective style comes straight from the panel defaults (12pt unless the user changed it)
+        double fontSize = _def.FontSize; string colorHex = _def.ColorHex;
+        bool bold = _def.Bold, italic = _def.Italic;
+
+        var probe = new FillElement { FontFamily = _def.FontFamily, FontSize = fontSize, Bold = bold, Italic = italic };
+        double h = fontSize * 1.5;
         double w; double x;
         if (string.IsNullOrEmpty(text))
         {
-            w = 220; x = cx;                 // empty field: anchor caret at the cursor, grows right
+            w = 90; x = cx;                  // empty field: small caret box at the cursor, grows as you type
         }
         else
         {
-            w = MeasureWidthPt(text, _def) + 10; x = cx - w / 2;   // known content: centered
+            w = MeasureWidthPt(text, probe) + 10; x = cx - w / 2;   // known content: centered
         }
         var el = new FillElement
         {
             Page = _curPage, Type = type, X = x, Y = cy - h / 2, Width = w, Height = h,
-            Text = text, FontFamily = _def.FontFamily, FontSize = _def.FontSize,
-            Bold = _def.Bold, Italic = _def.Italic, Underline = _def.Underline, Align = _def.Align, ColorHex = _def.ColorHex
+            Text = text, FontFamily = _def.FontFamily, FontSize = fontSize,
+            Bold = bold, Italic = italic, Underline = _def.Underline, Align = _def.Align, ColorHex = colorHex
         };
         _elements.Add(el);
         AddChip(el);
         Select(el);
         UpdateItemCount();
-        if (_chips[el].Child is TextBox tb && string.IsNullOrEmpty(text)) EnterEdit(tb);
+        // start typing immediately for an empty text field (the chip wraps the TextBox in a host Grid)
+        if (string.IsNullOrEmpty(text) && ChipTextBox(el) is { } tb) EnterEdit(tb);
     }
 
     private void PlaceMark(double cx, double cy, string glyph)
@@ -1683,54 +2392,12 @@ public class PdfMarkupWindow : Window
     }
 
     // =====================================================================
-    //  Auto-detect
-    // =====================================================================
-    private async System.Threading.Tasks.Task AutoDetect()
-    {
-        if (_pdfPath == null) { ConfirmDialog.Alert(this, "No PDF", "Open a PDF first."); return; }
-        try
-        {
-            using var bmp = await FillSignRender.RenderPageToBitmapAsync(_pdfPath, _curPage, DisplayDpi);
-            var regions = FillSignDetector.DetectRegions(bmp);
-            if (regions.Count > 0) PushSnap(Snapshot());
-            int added = 0;
-            foreach (var r in regions)
-            {
-                double xPt = FillSignGeometry.PixelsToPoints(r.X + 3, DisplayDpi);
-                double yPt = FillSignGeometry.PixelsToPoints(r.Y, DisplayDpi);
-                double hPt = FillSignGeometry.PixelsToPoints(r.H, DisplayDpi);
-                bool check = r.Kind == RegionKind.Checkbox;
-                var el = new FillElement
-                {
-                    Page = _curPage, Type = check ? FillElementType.Check : FillElementType.Text,
-                    X = xPt, Y = yPt, Width = FillSignGeometry.PixelsToPoints(r.W, DisplayDpi),
-                    Height = System.Math.Max(12, hPt), Text = check ? "✓" : "",
-                    FontFamily = check ? "Segoe UI Symbol" : "Segoe UI",
-                    ColorHex = check ? "#137A3F" : "#000000",
-                    FontSize = System.Math.Max(9, System.Math.Min(16, hPt * 0.6))
-                };
-                _elements.Add(el);
-                added++;
-            }
-            LayoutChips();
-            UpdateItemCount();
-            ConfirmDialog.Alert(this, "Fields Detected",
-                added == 0 ? "No fillable fields were found on this page." : $"Added {added} field marker(s). Click one and type, or drag to reposition.",
-                added == 0 ? ConfirmDialog.AlertKind.Info : ConfirmDialog.AlertKind.Success);
-        }
-        catch (System.Exception ex)
-        {
-            ConfirmDialog.Alert(this, "Detection Failed", ex.Message, ConfirmDialog.AlertKind.Error);
-        }
-    }
-
-    // =====================================================================
     //  Save
     // =====================================================================
-    private async System.Threading.Tasks.Task Save()
+    private async System.Threading.Tasks.Task<bool> Save()
     {
-        if (_pdfPath == null) { ConfirmDialog.Alert(this, "No PDF", "Open a PDF first."); return; }
-        if (_elements.Count == 0) { ConfirmDialog.Alert(this, "Nothing to Save", "Add at least one item before saving."); return; }
+        if (_pdfPath == null) { ConfirmDialog.Alert(this, "No PDF", "Open a PDF first."); return false; }
+        if (_elements.Count == 0) { ConfirmDialog.Alert(this, "Nothing to Save", "Add at least one item before saving."); return false; }
 
         string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Llamashot", "Edited");
         Directory.CreateDirectory(folder);
@@ -1740,12 +2407,14 @@ public class PdfMarkupWindow : Window
         var prevText = _btnSave.Content;
         _btnSave.Content = "Saving…";
         string? blurDir = null;
+        bool ok = false;
         try
         {
             var src = _pdfPath;
             var els = new List<FillElement>(_elements);
             blurDir = await RenderBlursAsync(els);
             await System.Threading.Tasks.Task.Run(() => FillSignExporter.Export(src, els, outPath));
+            _dirty = false; ok = true;
             ConfirmDialog.Alert(this, "Saved", $"Saved your PDF to:\n{outPath}", ConfirmDialog.AlertKind.Success, "Done");
             try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
         }
@@ -1759,6 +2428,7 @@ public class PdfMarkupWindow : Window
             _btnSave.IsEnabled = true;
             _btnSave.Content = prevText;
         }
+        return ok;
     }
 
     /// <summary>Rasterizes each Blur element's page region, blurs it, and swaps the element to a Blur image for export.</summary>
@@ -1839,4 +2509,247 @@ public class PdfMarkupWindow : Window
         try { return (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!; }
         catch { return Brushes.Black; }
     }
+
+    private SolidColorBrush? _keycapBrush;
+    private SolidColorBrush KeycapBrush()
+    {
+        if (_keycapBrush == null)
+        {
+            var c = B("TextMutedBrush").Color;
+            _keycapBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, c.R, c.G, c.B)); // faint chip
+            _keycapBrush.Freeze();
+        }
+        return _keycapBrush;
+    }
+
+    private SolidColorBrush? _onKeycapBrush;
+    private SolidColorBrush OnKeycapBrush()   // contrasting chip for the selected tool's accent row
+    {
+        if (_onKeycapBrush == null)
+        {
+            _onKeycapBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(64, 255, 255, 255));
+            _onKeycapBrush.Freeze();
+        }
+        return _onKeycapBrush;
+    }
+
+    private SolidColorBrush? _hoverBrush;
+    private SolidColorBrush HoverBrush()
+    {
+        if (_hoverBrush == null)
+        {
+            var c = B("AccentBrush").Color;
+            _hoverBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(150, c.R, c.G, c.B));
+            _hoverBrush.Freeze();
+        }
+        return _hoverBrush;
+    }
+
+    // =====================================================================
+    //  Hover action bar  (move / resize / delete shown over the hovered item)
+    // =====================================================================
+    private void ShowItemBar(FillElement e, Border chip)
+    {
+        if (_barMoving || _barResizing) return;             // don't retarget mid-drag
+        _barHideTimer?.Stop();
+        _barTarget = e; _barChip = chip;
+        EnsureItemBar();
+        if (_itemBar!.Parent != _barLayer) _barLayer.Children.Add(_itemBar);
+        _itemBar.Visibility = Visibility.Visible;
+        PositionItemBar();
+    }
+
+    private void ScheduleHideItemBar()
+    {
+        if (_barMoving || _barResizing) return;
+        _barHideTimer ??= MakeBarHideTimer();
+        _barHideTimer.Stop(); _barHideTimer.Start();        // small grace period to move onto the bar
+    }
+
+    private System.Windows.Threading.DispatcherTimer MakeBarHideTimer()
+    {
+        var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
+        t.Tick += (_, _) => { t.Stop(); HideItemBar(); };
+        return t;
+    }
+
+    private void HideItemBar()
+    {
+        if (_barMoving || _barResizing) return;
+        if (_itemBar != null) _itemBar.Visibility = Visibility.Collapsed;
+        _barTarget = null; _barChip = null;
+    }
+
+    private void PositionItemBar()
+    {
+        if (_itemBar == null || _barChip == null || !_barChip.IsVisible) return;
+        _itemBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double bw = _itemBar.DesiredSize.Width, bh = _itemBar.DesiredSize.Height;
+        // map the chip's on-screen rect into the (un-scaled) bar layer so the bar tracks it at any zoom
+        double cw = _barChip.ActualWidth, chH = _barChip.ActualHeight;
+        System.Windows.Media.GeneralTransform tf;
+        try { tf = _barChip.TransformToVisual(_barLayer); } catch { return; }
+        Point tl = tf.Transform(new Point(0, 0));
+        Point br = tf.Transform(new Point(cw, chH));
+        double minX = System.Math.Min(tl.X, br.X), minY = System.Math.Min(tl.Y, br.Y), maxY = System.Math.Max(tl.Y, br.Y);
+        double top = minY - bh - 6;
+        if (top < 0) top = maxY + 6;                                   // not enough room above → drop below
+        double left = System.Math.Max(0, System.Math.Min(minX, System.Math.Max(0, _barLayer.ActualWidth - bw)));
+        Canvas.SetLeft(_itemBar, left);
+        Canvas.SetTop(_itemBar, top);
+    }
+
+    private void EnsureItemBar()
+    {
+        if (_itemBar != null) return;
+        var bar = new Border
+        {
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(3),
+            Background = B("SurfaceBrush"), BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            { BlurRadius = 10, ShadowDepth = 1, Opacity = 0.30, Color = System.Windows.Media.Colors.Black }
+        };
+        var row = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        bar.Child = row;
+
+        var move = ItemBarButton("✥", "Drag to move");      // ✥-style move glyph
+        var resize = ItemBarButton("⤡", "Drag to resize");  // ⤡ diagonal resize
+        var edit = ItemBarButton("✎", "Edit");              // ✎ update content
+        var del = ItemBarButton("\U0001F5D1", "Delete");         // 🗑
+        row.Children.Add(move); row.Children.Add(resize); row.Children.Add(edit); row.Children.Add(del);
+
+        WireBarMove(move);
+        WireBarResize(resize);
+        edit.MouseLeftButtonDown += (_, ev) =>
+        {
+            ev.Handled = true;
+            var t = _barTarget; var chip = _barChip; if (t == null) return;
+            _barHideTimer?.Stop();
+            Select(t);
+            if (t.Type is FillElementType.Text or FillElementType.DateTime)
+            {
+                if (chip != null && ChipTextBox(t) is { } tb) EnterEdit(tb);
+            }
+            else if (t.Type is FillElementType.Signature or FillElementType.Stamp)
+            {
+                ReplaceImage(t);
+            }
+        };
+        del.MouseLeftButtonDown += (_, ev) =>
+        {
+            ev.Handled = true;
+            var t = _barTarget; if (t == null) return;
+            HideItemBar();
+            Select(t); DeleteSelected();
+        };
+
+        bar.MouseEnter += (_, _) => _barHideTimer?.Stop();
+        bar.MouseLeave += (_, _) => ScheduleHideItemBar();
+        _itemBar = bar;
+    }
+
+    private Border ItemBarButton(string glyph, string tip)
+    {
+        var b = new Border
+        {
+            Width = 30, Height = 28, CornerRadius = new CornerRadius(6),
+            Background = Brushes.Transparent, Cursor = Cursors.Hand, Margin = new Thickness(1, 0, 1, 0), ToolTip = tip
+        };
+        var tb = new TextBlock { Text = glyph, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        Dyn(tb, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        b.Child = tb;
+        b.MouseEnter += (_, _) => b.Background = HoverBrush();
+        b.MouseLeave += (_, _) => b.Background = Brushes.Transparent;
+        return b;
+    }
+
+    private void WireBarMove(Border handle)
+    {
+        handle.MouseLeftButtonDown += (s, ev) =>
+        {
+            if (_barChip == null || _barTarget == null) return;
+            Select(_barTarget);
+            _barMoving = true; _barHideTimer?.Stop();
+            _barDragStart = ev.GetPosition(_overlay);
+            _barOrigL = Canvas.GetLeft(_barChip); if (double.IsNaN(_barOrigL)) _barOrigL = 0;
+            _barOrigT = Canvas.GetTop(_barChip); if (double.IsNaN(_barOrigT)) _barOrigT = 0;
+            _barDragSnap = Snapshot();
+            handle.CaptureMouse(); ev.Handled = true;
+        };
+        handle.MouseMove += (s, ev) =>
+        {
+            if (!_barMoving || _barChip == null) return;
+            var p = ev.GetPosition(_overlay);
+            double nl = System.Math.Max(0, System.Math.Min(_barOrigL + (p.X - _barDragStart.X), _overlay.Width - 4));
+            double nt = System.Math.Max(0, System.Math.Min(_barOrigT + (p.Y - _barDragStart.Y), _overlay.Height - 4));
+            Canvas.SetLeft(_barChip, nl); Canvas.SetTop(_barChip, nt);
+            PositionItemBar();
+            ev.Handled = true;
+        };
+        handle.MouseLeftButtonUp += (s, ev) =>
+        {
+            if (!_barMoving) return;
+            _barMoving = false; handle.ReleaseMouseCapture();
+            if (_barChip != null && _barTarget != null)
+            {
+                PushSnap(_barDragSnap);
+                _barTarget.X = FillSignGeometry.PixelsToPoints(Canvas.GetLeft(_barChip) + ChipPad, DisplayDpi);
+                _barTarget.Y = FillSignGeometry.PixelsToPoints(Canvas.GetTop(_barChip) + ChipPad, DisplayDpi);
+            }
+            _barDragSnap = null;
+            ev.Handled = true;
+        };
+    }
+
+    private void WireBarResize(Border handle)
+    {
+        handle.MouseLeftButtonDown += (s, ev) =>
+        {
+            if (_barChip == null || _barTarget == null) return;
+            Select(_barTarget);
+            _barResizing = true; _barHideTimer?.Stop();
+            _barDragStart = ev.GetPosition(_overlay);
+            _barW0 = _barTarget.Width; _barH0 = _barTarget.Height;
+            _barResizeContent = ChipContent(_barChip);
+            _barDragSnap = Snapshot();
+            handle.CaptureMouse(); ev.Handled = true;
+        };
+        handle.MouseMove += (s, ev) =>
+        {
+            if (!_barResizing || _barTarget == null) return;
+            var p = ev.GetPosition(_overlay);
+            double dxPx = p.X - _barDragStart.X, dyPx = p.Y - _barDragStart.Y;
+            double th = _barTarget.Rotation * System.Math.PI / 180.0;       // project onto the element's local axes
+            double ldx = dxPx * System.Math.Cos(th) + dyPx * System.Math.Sin(th);
+            double ldy = -dxPx * System.Math.Sin(th) + dyPx * System.Math.Cos(th);
+            double newW = System.Math.Max(14, _barW0 + FillSignGeometry.PixelsToPoints(ldx, DisplayDpi));
+            double newH;
+            if (_barTarget.Type is FillElementType.Signature or FillElementType.Stamp)
+            { double ratio = _barH0 / System.Math.Max(1, _barW0); newH = newW * ratio; }   // images keep aspect
+            else newH = System.Math.Max(10, _barH0 + FillSignGeometry.PixelsToPoints(ldy, DisplayDpi));
+            _barTarget.Width = newW; _barTarget.Height = newH;
+            if (_barResizeContent != null)
+            {
+                _barResizeContent.Width = FillSignGeometry.PointsToPixels(newW, DisplayDpi);
+                _barResizeContent.Height = FillSignGeometry.PointsToPixels(newH, DisplayDpi);
+            }
+            PositionItemBar();
+            ev.Handled = true;
+        };
+        handle.MouseLeftButtonUp += (s, ev) =>
+        {
+            if (!_barResizing) return;
+            _barResizing = false; handle.ReleaseMouseCapture();
+            PushSnap(_barDragSnap); _barDragSnap = null;
+            if (_barTarget != null && _barTarget.Type == FillElementType.Blur && _barResizeContent is Image bi)
+                bi.Source = CropPage(_barTarget);   // re-crop the blur preview at the new size
+            _barResizeContent = null;
+            RefreshProps();
+            ev.Handled = true;
+        };
+    }
+
+    private FrameworkElement? ChipContent(Border chip) =>
+        chip.Child is Grid g ? g.Children.OfType<FrameworkElement>().FirstOrDefault() : null;
+
 }

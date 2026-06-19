@@ -64,6 +64,35 @@ internal static class Program
             return;
         }
 
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_DRAWTEST") == "1")
+        {
+            await VerifyDrawAndFonts(Environment.GetEnvironmentVariable("LLAMASHOT_PDF") ?? @"C:\Users\DELL\Downloads\137.pdf");
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_DRAWUI") == "1")
+        {
+            await CaptureDrawUi(Environment.GetEnvironmentVariable("LLAMASHOT_PDF") ?? @"C:\Users\DELL\Downloads\137.pdf");
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_TEXTREPRO") == "1")
+        {
+            await ReproTextBoxes(Environment.GetEnvironmentVariable("LLAMASHOT_PDF") ?? @"C:\Users\DELL\Downloads\137.pdf");
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_COLORPICKER") == "1")
+        {
+            var dlg = new ColorPickerDialog("#1C3FAA");
+            dlg.Show(); dlg.UpdateLayout();
+            await Task.Delay(300); dlg.UpdateLayout(); await Task.Delay(150);
+            ShotRtb(dlg, "colorpicker.png");
+            dlg.Close();
+            return;
+        }
+
+
         if (Environment.GetEnvironmentVariable("LLAMASHOT_MERGEPREVIEW") == "1")
         {
             await CaptureMergePreview();
@@ -97,6 +126,18 @@ internal static class Program
         if (Environment.GetEnvironmentVariable("LLAMASHOT_COMPRESSUI") == "1")
         {
             await CaptureCompressUi();
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_HISTORYVIEWS") == "1")
+        {
+            await VerifyHistoryViews();
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_HISTORYFILTERS") == "1")
+        {
+            VerifyHistoryFilters();
             return;
         }
 
@@ -359,6 +400,35 @@ internal static class Program
             Inv(w, "PlaceMark", 140.0, 300.0, "✓");
             Count("placed 2 text + 1 mark", 3);
 
+            // empty text field must auto-enter edit mode (TextBox becomes editable) so the user can type immediately
+            Inv(w, "PlaceText", 200.0, 250.0, "", FillElementType.Text);
+            var emptyEl = els[els.Count - 1];
+            var tbox = (System.Windows.Controls.TextBox?)Inv(w, "ChipTextBox", emptyEl);
+            bool editable = tbox != null && !tbox.IsReadOnly;
+            L($"empty text auto-edit: textbox found={tbox != null}, editable={editable}  [{(editable ? "PASS" : "FAIL")}]");
+            // typing simulation — set text and confirm it flows back to the element
+            if (tbox != null) { tbox.Text = "Typed!"; L($"type into field: el.Text='{emptyEl.Text}'  [{(emptyEl.Text == "Typed!" ? "PASS" : "FAIL")}]"); }
+            Inv(w, "Select", els[0]); // leave a clean selection state
+            els.Remove(emptyEl);
+
+            // abandoned empty field must be discarded with NO leftover undo step
+            int undoBefore = ((System.Collections.ICollection)t.GetField("_undo", BF)!.GetValue(w)!).Count;
+            Inv(w, "PlaceText", 300.0, 350.0, "", FillElementType.Text);
+            int afterPlace = els.Count;
+            var blankEl = els[els.Count - 1];
+            Inv(w, "DiscardElement", blankEl);
+            int undoAfter = ((System.Collections.ICollection)t.GetField("_undo", BF)!.GetValue(w)!).Count;
+            bool discardOk = els.Count == afterPlace - 1 && undoAfter == undoBefore && !els.Contains(blankEl);
+            L($"discard empty field: count {afterPlace}->{els.Count}, undo {undoBefore}->{undoAfter}  [{(discardOk ? "PASS" : "FAIL")}]");
+
+            // Properties CONTENT edit must flow to the on-page chip (the host-Grid sync bug)
+            var contentBox = (System.Windows.Controls.TextBox)Inv(w, "ContentBox", els[0])!;
+            contentBox.Text = "Edited via props";
+            var chipTb = (System.Windows.Controls.TextBox?)Inv(w, "ChipTextBox", els[0]);
+            bool sync = els[0].Text == "Edited via props" && chipTb?.Text == "Edited via props";
+            L($"props->page sync: el='{els[0].Text}' chip='{chipTb?.Text}'  [{(sync ? "PASS" : "FAIL")}]");
+            els[0].Text = "Hello"; if (chipTb != null) chipTb.Text = "Hello"; // restore for later asserts
+
             // move element 0 (+50 X) and commit through the edit/undo pipeline
             var e0 = els[0];
             Inv(w, "Select", e0);
@@ -392,6 +462,202 @@ internal static class Program
         }
         catch (Exception ex) { L("EXCEPTION: " + ex); }
         File.WriteAllText(Path.Combine(Dir, "editorui.txt"), log.ToString());
+    }
+
+    /// <summary>Reproduces the "first text vs second text" behaviour: place a long text and a short one, log geometry + export.</summary>
+    static async Task ReproTextBoxes(string pdf)
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string s) => log.AppendLine(s);
+        const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var t = typeof(PdfMarkupWindow);
+        object? Inv(object w, string m, params object?[] a) => t.GetMethod(m, BF)!.Invoke(w, a);
+        try
+        {
+            ThemeManager.Apply(ThemeManager.Dark, persist: false);
+            var w = new PdfMarkupWindow { WindowState = WindowState.Normal, Width = 1380, Height = 880, WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true };
+            w.Show(); w.Activate(); await Task.Delay(400);
+            await (Task)Inv(w, "LoadPdfFile", pdf)!; await Task.Delay(500);
+            var els = (System.Collections.Generic.List<FillElement>)t.GetField("_elements", BF)!.GetValue(w)!;
+
+            // mimic the interactive path: click (empty) then type
+            Inv(w, "PlaceText", 120.0, 150.0, "", FillElementType.Text);
+            var tbA = (System.Windows.Controls.TextBox?)Inv(w, "ChipTextBox", els[^1]);
+            if (tbA != null) tbA.Text = "This is a long text aaaaaaaaaaa bbbbbbbbb";
+            var elA = els[^1];
+
+            Inv(w, "PlaceText", 120.0, 230.0, "", FillElementType.Text);
+            var tbB = (System.Windows.Controls.TextBox?)Inv(w, "ChipTextBox", els[^1]);
+            if (tbB != null) tbB.Text = "ass";
+            var elB = els[^1];
+
+            await Task.Delay(200); w.UpdateLayout(); await Task.Delay(150);
+            L($"A long : X={elA.X:0} W={elA.Width:0} size={elA.FontSize} bold={elA.Bold} italic={elA.Italic} color={elA.ColorHex} align={elA.Align} text='{elA.Text}'");
+            L($"B short: X={elB.X:0} W={elB.Width:0} size={elB.FontSize} bold={elB.Bold} italic={elB.Italic} color={elB.ColorHex} align={elB.Align} text='{elB.Text}'");
+            if (tbA != null) L($"A textbox: ActualWidth={tbA.ActualWidth:0} TextAlignment={tbA.TextAlignment}");
+            if (tbB != null) L($"B textbox: ActualWidth={tbB.ActualWidth:0} TextAlignment={tbB.TextAlignment}");
+            ShotRtb(w, "textrepro_editor.png");
+
+            // export + render to see how each lands on the page
+            string outPdf = Path.Combine(Dir, "textrepro.pdf");
+            FillSignExporter.Export(pdf, new List<FillElement>(els), outPdf);
+            using (var rb = await FillSignRender.RenderPageToBitmapAsync(outPdf, 0, 150))
+                rb.Save(Path.Combine(Dir, "textrepro_export.png"), SD.Imaging.ImageFormat.Png);
+            L("rendered textrepro_export.png");
+            w.Close();
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(Dir, "textrepro.txt"), log.ToString());
+    }
+
+    /// <summary>Captures the editor with the Pen tool active (DRAW rail + stroke props) and the colourful About update card.</summary>
+    static async Task CaptureDrawUi(string pdf)
+    {
+        const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var t = typeof(PdfMarkupWindow);
+
+        ThemeManager.Apply(ThemeManager.Dark, persist: false);
+        var w = new PdfMarkupWindow { WindowState = WindowState.Normal, Width = 1380, Height = 880, WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true };
+        w.Show(); w.Activate();
+        await Task.Delay(400);
+        if (File.Exists(pdf)) { await (Task)t.GetMethod("LoadPdfFile", BF)!.Invoke(w, new object?[] { pdf })!; await Task.Delay(600); }
+        // activate the Pen tool so the DRAW rail highlight + stroke-width/colour props show
+        t.GetField("_tool", BF)!.SetValue(w, "pen");
+        t.GetMethod("HighlightTool", BF)!.Invoke(w, null);
+        t.GetMethod("RefreshProps", BF)!.Invoke(w, null);
+        await Task.Delay(300);
+        w.UpdateLayout(); await Task.Delay(200);
+        ShotRtb(w, "draw_editor.png");
+
+        // date tool to show the FORMAT picker
+        t.GetField("_tool", BF)!.SetValue(w, "date");
+        t.GetMethod("HighlightTool", BF)!.Invoke(w, null);
+        t.GetMethod("RefreshProps", BF)!.Invoke(w, null);
+        await Task.Delay(250); w.UpdateLayout(); await Task.Delay(150);
+        ShotRtb(w, "draw_dateformat.png");
+
+        // text tool to show MATCH DOCUMENT toggle + font list
+        t.GetField("_tool", BF)!.SetValue(w, "text");
+        t.GetMethod("HighlightTool", BF)!.Invoke(w, null);
+        t.GetMethod("RefreshProps", BF)!.Invoke(w, null);
+        await Task.Delay(250); w.UpdateLayout(); await Task.Delay(150);
+        ShotRtb(w, "draw_textmatch.png");
+        w.Close();
+
+        // signature dialog (Type mode) — show after a tiny delay then capture
+        var sigTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        sigTimer.Tick += (_, _) =>
+        {
+            sigTimer.Stop();
+            var dlg = System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.OfType<SignatureDialog>(Application.Current.Windows));
+            if (dlg != null)
+            {
+                var dt = typeof(SignatureDialog);
+                dt.GetField("_mode", BF)!.SetValue(dlg, "type");
+                dt.GetField("_typeBox", BF)!.GetValue(dlg);
+                var box = (System.Windows.Controls.TextBox)dt.GetField("_typeBox", BF)!.GetValue(dlg)!;
+                box.Text = "Santosh Kumar";
+                dt.GetMethod("ApplyMode", BF)!.Invoke(dlg, null);
+                dlg.UpdateLayout();
+                ShotRtb(dlg, "draw_signature.png");
+                dlg.Close();
+            }
+        };
+        sigTimer.Start();
+        var sig = new SignatureDialog { Topmost = true };
+        sig.ShowDialog();
+
+        // About window update card
+        var about = new AboutWindow { WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true };
+        about.Show(); about.Activate();
+        await Task.Delay(500); about.UpdateLayout(); await Task.Delay(200);
+        ShotRtb(about, "draw_about.png");
+        about.Close();
+    }
+
+    /// <summary>Verifies the DRAW tools export, the expanded font resolver, date formats, and font detection.</summary>
+    static async Task VerifyDrawAndFonts(string pdf)
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string s) => log.AppendLine(s);
+        string outDir = Dir;
+        try
+        {
+            if (!File.Exists(pdf)) { L($"FAIL: file not found: {pdf}"); File.WriteAllText(Path.Combine(outDir, "drawtest.txt"), log.ToString()); return; }
+
+            // 1) Font resolver — every offered family must resolve to an existing font file.
+            var families = new[]
+            {
+                "Segoe UI","Arial","Calibri","Candara","Corbel","Tahoma","Trebuchet MS","Verdana",
+                "Franklin Gothic Medium","Bahnschrift","Ebrima","Times New Roman","Georgia","Constantia",
+                "Palatino Linotype","Consolas","Courier New","Lucida Console","Impact",
+                "Segoe Script","Segoe Print","Ink Free","Gabriola","Lucida Handwriting","Comic Sans MS"
+            };
+            var resolver = new FillSignFontResolver();
+            int fontOk = 0, fontFallback = 0;
+            foreach (var f in families)
+            {
+                var info = resolver.ResolveTypeface(f, false, false);
+                bool exists = info != null && File.Exists(info.FaceName);
+                bool bytes = exists && resolver.GetFont(info!.FaceName) is { Length: > 0 };
+                bool mapped = info != null && Path.GetFileName(info.FaceName).IndexOf("arial", StringComparison.OrdinalIgnoreCase) < 0;
+                if (bytes) { fontOk++; if (!mapped) fontFallback++; }
+                L($"font {f,-22} -> {(info != null ? Path.GetFileName(info.FaceName) : "null"),-18} {(bytes ? "OK" : "MISSING")}{(bytes && !mapped ? " (fallback→Arial)" : "")}");
+            }
+            L($"fonts: {fontOk}/{families.Length} embeddable, {fontFallback} fell back to Arial  [{(fontOk == families.Length ? "PASS" : "WARN")}]");
+
+            // 1b) Custom date/time format — pattern formats, invalid pattern falls back without throwing.
+            var sf = typeof(PdfMarkupWindow).GetMethod("SafeFormat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            string custom = (string)sf.Invoke(null, new object?[] { "dd-MMM-yyyy" })!;
+            string custom2 = (string)sf.Invoke(null, new object?[] { "ddd HH:mm" })!;
+            string bad = (string)sf.Invoke(null, new object?[] { "q%%z!!" })!;
+            bool okFmt = custom.Length > 0 && custom2.Length > 0 && bad.Length > 0;
+            L($"custom format: 'dd-MMM-yyyy'->{custom} · 'ddd HH:mm'->{custom2} · invalid->{bad}  [{(okFmt ? "PASS" : "FAIL")}]");
+
+            // 2) Font detection — render the page and sample the centre band for text.
+            using (var pageBmp = await FillSignRender.RenderPageToBitmapAsync(pdf, 0, 120))
+            {
+                int hits = 0;
+                for (int yy = pageBmp.Height / 5; yy < pageBmp.Height * 4 / 5; yy += Math.Max(8, pageBmp.Height / 40))
+                {
+                    var s = FillSignDetector.DetectFontAt(pageBmp, pageBmp.Width / 2, yy, 120);
+                    if (s != null) { hits++; if (hits <= 3) L($"detect @y={yy}: size≈{s.FontSizePt}pt color={s.ColorHex} bold={s.Bold} italic={s.Italic}"); }
+                }
+                L($"font detection: {hits} text rows sampled  [{(hits > 0 ? "PASS" : "WARN (no text found)")}]");
+            }
+
+            // 3) Draw + cursive + date export.
+            int pc = await FileToolsService.GetPdfPageCountAsync(pdf);
+            var els = new List<FillElement>
+            {
+                new() { Page = 0, Type = FillElementType.Draw, Shape = "rect", X = 80, Y = 90, Width = 180, Height = 70, ColorHex = "#C0392B", StrokeWidth = 3 },
+                new() { Page = 0, Type = FillElementType.Draw, Shape = "ellipse", X = 300, Y = 90, Width = 150, Height = 80, ColorHex = "#1C3FAA", StrokeWidth = 2 },
+                new() { Page = 0, Type = FillElementType.Draw, Shape = "line", X = 80, Y = 200, Width = 200, Height = 60, ColorHex = "#137A3F", StrokeWidth = 3,
+                        Points = new() { (0,0), (200,60) } },
+                new() { Page = 0, Type = FillElementType.Draw, Shape = "arrow", X = 320, Y = 200, Width = 160, Height = 50, ColorHex = "#6D28D9", StrokeWidth = 3,
+                        Points = new() { (0,50), (160,0) } },
+                new() { Page = 0, Type = FillElementType.Draw, Shape = "pen", X = 80, Y = 300, Width = 160, Height = 60, ColorHex = "#222222", StrokeWidth = 2,
+                        Points = new() { (0,30), (30,0), (60,40), (90,5), (120,35), (160,10) } },
+                new() { Page = 0, Type = FillElementType.Draw, Shape = "highlight", X = 80, Y = 400, Width = 300, Height = 18, ColorHex = "#FFE100", StrokeWidth = 16, Opacity = 40,
+                        Points = new() { (0,9), (300,9) } },
+                new() { Page = 0, Type = FillElementType.Text, X = 80, Y = 470, Width = 300, Height = 40, Text = "Santosh Kumar", FontFamily = "Segoe Script", FontSize = 28, ColorHex = "#1C3FAA" },
+                new() { Page = 0, Type = FillElementType.DateTime, X = 80, Y = 530, Width = 220, Height = 18, Text = DateTime.Now.ToString("dddd, MMMM d, yyyy"), FontFamily = "Georgia", FontSize = 13, ColorHex = "#222222" },
+            };
+
+            string outPdf = Path.Combine(outDir, "drawtest.pdf");
+            FillSignExporter.Export(pdf, els, outPdf);
+            bool ok = File.Exists(outPdf) && new FileInfo(outPdf).Length > 0;
+            int opc = ok ? await FileToolsService.GetPdfPageCountAsync(outPdf) : 0;
+            L($"drawtest.pdf: exists={ok}, pages={opc}/{pc}  [{(ok && opc == pc ? "PASS" : "FAIL")}]");
+            if (ok)
+            {
+                using var rb = await FillSignRender.RenderPageToBitmapAsync(outPdf, 0, 150);
+                rb.Save(Path.Combine(outDir, "drawtest.png"), SD.Imaging.ImageFormat.Png);
+                L("rendered drawtest.png (page 1)");
+            }
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(outDir, "drawtest.txt"), log.ToString());
     }
 
     /// <summary>Exercises the new PDF Editor element types (text, marks, date/time, cover, blur) against a real file.</summary>
@@ -527,6 +793,152 @@ internal static class Program
         }
         catch (Exception ex) { L("EXCEPTION: " + ex); }
         File.WriteAllText(Path.Combine(Dir, "cursor.txt"), log.ToString());
+    }
+
+    // ---- Harness safety: never mutate the user's real settings.json or history ----
+    // HistoryWindow's ctor calls AppSettings.Save() and HistoryManager touches the index,
+    // both at fixed real paths. Snapshot settings.json + redirect history to a temp dir.
+    static (string path, byte[]? backup) ProtectUserData()
+    {
+        string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Llamashot", "settings.json");
+        byte[]? b = File.Exists(p) ? File.ReadAllBytes(p) : null;
+        var tempHist = Path.Combine(Path.GetTempPath(), "llamashot_harness_hist");
+        Directory.CreateDirectory(tempHist);
+        Llamashot.Core.AppSettings.Instance.HistoryDirectory = tempHist; // any history write lands here
+        return (p, b);
+    }
+
+    static void RestoreUserData((string path, byte[]? backup) s)
+    {
+        try { if (s.backup != null) File.WriteAllBytes(s.path, s.backup); else if (File.Exists(s.path)) File.Delete(s.path); }
+        catch { }
+    }
+
+    // Verifies the History filter pills classify by media type (extension) and clipboard
+    // origin — not by the save/copy action — so copied screenshots show under Images.
+    static void VerifyHistoryFilters()
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string m) { log.AppendLine(m); Console.WriteLine(m); }
+
+        // (ext, isClipboard) → expected buckets.
+        var mocks = new System.Collections.Generic.List<HistoryItemViewModel>
+        {
+            new() { Ext = ".png",  IsClipboard = true  }, // Image + Clipboard
+            new() { Ext = ".jpg",  IsClipboard = false }, // Image
+            new() { Ext = ".bmp",  IsClipboard = false }, // Image
+            new() { Ext = ".mp4",  IsClipboard = false }, // Video
+            new() { Ext = ".webm", IsClipboard = false }, // Video
+            new() { Ext = ".gif",  IsClipboard = false }, // GIF
+            new() { Ext = ".gif",  IsClipboard = true  }, // GIF + Clipboard
+            new() { Ext = ".png",  IsClipboard = false }, // Image
+        };
+        var expected = new (string filter, int count)[]
+        {
+            ("All", 8), ("Images", 4), ("Videos", 2), ("GIFs", 2), ("Clipboard", 2)
+        };
+
+        var prot = ProtectUserData();
+        try
+        {
+            var win = new HistoryWindow { ShowActivated = false };
+            var t = typeof(HistoryWindow);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            t.GetField("_allItems", flags)!.SetValue(win, mocks);
+            var filterField = t.GetField("_activeFilter", flags)!;
+            var applyFilter = t.GetMethod("ApplyFilter", flags)!;
+            var itemsField = t.GetField("_items", flags)!;
+
+            bool allPass = true;
+            foreach (var (filter, count) in expected)
+            {
+                filterField.SetValue(win, filter);
+                applyFilter.Invoke(win, null);
+                var items = (System.Collections.IList)itemsField.GetValue(win)!;
+                bool pass = items.Count == count;
+                allPass &= pass;
+                L($"[{filter}] got {items.Count}, expected {count}  {(pass ? "PASS" : "FAIL")}");
+            }
+            L(allPass ? "ALL HISTORY FILTER CHECKS PASSED" : "HISTORY FILTER CHECKS FAILED");
+            win.Close();
+        }
+        finally { RestoreUserData(prot); }
+        File.WriteAllText(Path.Combine(Dir, "historyfilters.txt"), log.ToString());
+    }
+
+    // Opens the History window, injects mock items, and drives every Explorer-style
+    // view mode — asserting template/panel/header state and capturing each layout.
+    static async Task VerifyHistoryViews()
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string m) { log.AppendLine(m); Console.WriteLine(m); }
+
+        var prot = ProtectUserData();
+        try
+        {
+
+        // Gather some real PNGs to use as thumbnails.
+        var pngs = Directory.GetFiles(Dir, "*.png").Where(p => new FileInfo(p).Length > 1000).Take(6).ToArray();
+        if (pngs.Length == 0) pngs = new[] { typeof(Program).Assembly.Location };
+
+        var mocks = new System.Collections.Generic.List<HistoryItemViewModel>();
+        string[] types = { "Saved", "Video", "GIF", "Copied" };
+        string[] colors = { "#66BB6A", "#F44336", "#4CAF50", "#42A5F5" };
+        for (int i = 0; i < 11; i++)
+        {
+            mocks.Add(new HistoryItemViewModel
+            {
+                ThumbnailPath = pngs[i % pngs.Length],
+                FilePath = $@"C:\Users\DELL\Pictures\Llamashot\shot_{i:00}.png",
+                NameText = $"shot_{i:00}.png",
+                DateText = $"Jun {18 - i % 6}, 1{i % 6}:0{i % 6}",
+                SizeText = $"{1280 + i} x {720 + i}",
+                TypeText = types[i % 4],
+                TypeDescText = types[i % 4] == "Saved" ? "Image" : types[i % 4] == "Copied" ? "Clipboard" : types[i % 4],
+                TypeColor = colors[i % 4],
+                ToolTipText = $"shot_{i:00}.png"
+            });
+        }
+
+        var win = new HistoryWindow
+        {
+            WindowState = WindowState.Normal, Width = 1280, Height = 820,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true
+        };
+        win.Show(); win.Activate();
+        await Task.Delay(600);
+
+        var t = typeof(HistoryWindow);
+        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var listField = t.GetField("HistoryList", flags)!;
+        var applyMethod = t.GetMethod("ApplyViewMode", flags)!;
+
+        // Inject mocks directly into the ItemsControl.
+        var list = (System.Windows.Controls.ItemsControl)listField.GetValue(win)!;
+        list.ItemsSource = mocks;
+        await Task.Delay(200);
+
+        bool allPass = true;
+        foreach (HistoryViewMode mode in Enum.GetValues(typeof(HistoryViewMode)))
+        {
+            applyMethod.Invoke(win, new object[] { mode });
+            win.UpdateLayout();
+            await Task.Delay(250);
+
+            bool tpl = list.ItemTemplate != null;
+            bool panel = list.ItemsPanel != null;
+            bool pass = tpl && panel;
+            allPass &= pass;
+            L($"[{mode}] template={tpl} panel={panel}  {(pass ? "PASS" : "FAIL")}");
+            ShotRtb(win, $"history_{mode}.png");
+        }
+
+        L(allPass ? "ALL HISTORY VIEW CHECKS PASSED" : "HISTORY VIEW CHECKS FAILED");
+        win.Close();
+
+        }
+        finally { RestoreUserData(prot); }
+        File.WriteAllText(Path.Combine(Dir, "historyviews.txt"), log.ToString());
     }
 
     // Opens the Compress PDF workspace and captures both compression modes so the

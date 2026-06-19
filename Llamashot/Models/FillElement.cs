@@ -1,6 +1,6 @@
 namespace Llamashot.Models;
 
-public enum FillElementType { Text, Check, Signature, Stamp, DateTime, Redact, Blur }
+public enum FillElementType { Text, Check, Signature, Stamp, DateTime, Redact, Blur, Draw }
 
 /// <summary>One placed annotation. Geometry is in PDF points, top-left origin.</summary>
 public class FillElement
@@ -25,4 +25,12 @@ public class FillElement
     public double Rotation { get; set; }
     /// <summary>Opacity 0–100 (%). 100 = fully opaque.</summary>
     public double Opacity { get; set; } = 100;
+
+    // ---- Draw tools (Type == Draw) ----
+    /// <summary>For Draw elements: "pen" | "line" | "arrow" | "rect" | "ellipse" | "highlight".</summary>
+    public string Shape { get; set; } = "";
+    /// <summary>Stroke width in PDF points (Draw elements).</summary>
+    public double StrokeWidth { get; set; } = 2;
+    /// <summary>Vertices for pen/highlight/line/arrow, relative to the element's top-left (X,Y), in points.</summary>
+    public List<(double X, double Y)> Points { get; set; } = new();
 }

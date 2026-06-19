@@ -15,11 +15,17 @@ public class HistoryItemViewModel : INotifyPropertyChanged
 
     public string ThumbnailPath { get; set; } = "";
     public string FilePath { get; set; } = "";
+    public string NameText { get; set; } = "";
     public string DateText { get; set; } = "";
     public string SizeText { get; set; } = "";
     public string TypeText { get; set; } = "";
+    public string TypeDescText { get; set; } = "";
     public string TypeColor { get; set; } = "#4CAF50";
     public string ToolTipText { get; set; } = "";
+
+    // Filtering: media type comes from the file extension; clipboard from the record origin.
+    public string Ext { get; set; } = "";
+    public bool IsClipboard { get; set; }
 
     public bool IsSelected
     {
@@ -37,11 +43,42 @@ public class HistoryItemViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
+public enum HistoryViewMode
+{
+    ExtraLargeIcons, LargeIcons, MediumIcons, SmallIcons, Content
+}
+
 public partial class HistoryWindow : Window
 {
     private List<HistoryItemViewModel> _allItems = new();
     private List<HistoryItemViewModel> _items = new();
     private string _activeFilter = "All";
+    private HistoryViewMode _viewMode = HistoryViewMode.LargeIcons;
+
+    // Order used by Ctrl+wheel zoom (smallest → largest).
+    private static readonly HistoryViewMode[] ZoomOrder =
+    {
+        HistoryViewMode.Content, HistoryViewMode.SmallIcons,
+        HistoryViewMode.MediumIcons, HistoryViewMode.LargeIcons, HistoryViewMode.ExtraLargeIcons
+    };
+
+    // Thumbnail height for the on-top icon templates (bound from XAML).
+    public static readonly DependencyProperty ThumbHeightProperty =
+        DependencyProperty.Register(nameof(ThumbHeight), typeof(double), typeof(HistoryWindow), new PropertyMetadata(130.0));
+    public double ThumbHeight
+    {
+        get => (double)GetValue(ThumbHeightProperty);
+        set => SetValue(ThumbHeightProperty, value);
+    }
+
+    // WrapPanel item width (column width) for the wrap-based modes (bound from XAML).
+    public static readonly DependencyProperty ItemBoxWidthProperty =
+        DependencyProperty.Register(nameof(ItemBoxWidth), typeof(double), typeof(HistoryWindow), new PropertyMetadata(190.0));
+    public double ItemBoxWidth
+    {
+        get => (double)GetValue(ItemBoxWidthProperty);
+        set => SetValue(ItemBoxWidthProperty, value);
+    }
 
     public HistoryWindow()
     {
@@ -56,8 +93,76 @@ public partial class HistoryWindow : Window
         Width = Math.Min(cols * itemW + chromeW, screenW * 0.9);
         Height = Math.Min(rows * itemH + chromeH, screenH * 0.85);
 
+        if (Enum.TryParse<HistoryViewMode>(AppSettings.Instance.HistoryViewMode, out var saved))
+            _viewMode = saved;
+
         LoadHistory();
+        ApplyViewMode(_viewMode);
         Activated += (_, _) => LoadHistory();
+    }
+
+    // ============ VIEW MODES ============
+
+    private void ApplyViewMode(HistoryViewMode mode)
+    {
+        _viewMode = mode;
+
+        // Pick template, panel, and (for wrap modes) icon/column sizes.
+        string tpl, panel;
+        switch (mode)
+        {
+            case HistoryViewMode.ExtraLargeIcons: tpl = "TplIcon"; panel = "PanelWrapH"; ThumbHeight = 200; ItemBoxWidth = 260; break;
+            case HistoryViewMode.LargeIcons: tpl = "TplIcon"; panel = "PanelWrapH"; ThumbHeight = 130; ItemBoxWidth = 190; break;
+            case HistoryViewMode.MediumIcons: tpl = "TplIcon"; panel = "PanelWrapH"; ThumbHeight = 90; ItemBoxWidth = 150; break;
+            case HistoryViewMode.SmallIcons: tpl = "TplIcon"; panel = "PanelWrapH"; ThumbHeight = 56; ItemBoxWidth = 120; break;
+            case HistoryViewMode.Content: tpl = "TplContent"; panel = "PanelStack"; break;
+            default: tpl = "TplIcon"; panel = "PanelWrapH"; ThumbHeight = 130; ItemBoxWidth = 190; break;
+        }
+
+        HistoryList.ItemTemplate = (System.Windows.DataTemplate)Resources[tpl];
+        HistoryList.ItemsPanel = (System.Windows.Controls.ItemsPanelTemplate)Resources[panel];
+
+        // Reflect the active mode in the View menu checkmarks.
+        if (Resources["ViewMenu"] is System.Windows.Controls.ContextMenu menu)
+        {
+            foreach (var obj in menu.Items)
+                if (obj is System.Windows.Controls.MenuItem mi && mi.Tag is string t)
+                    mi.IsChecked = t == mode.ToString();
+        }
+
+        AppSettings.Instance.HistoryViewMode = mode.ToString();
+        AppSettings.Save();
+    }
+
+    private void ViewMenu_Open(object sender, RoutedEventArgs e)
+    {
+        if (Resources["ViewMenu"] is System.Windows.Controls.ContextMenu menu)
+        {
+            // Keep checkmarks current, then drop the menu under the button.
+            foreach (var obj in menu.Items)
+                if (obj is System.Windows.Controls.MenuItem mi && mi.Tag is string t)
+                    mi.IsChecked = t == _viewMode.ToString();
+            menu.PlacementTarget = BtnView;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
+    private void ViewMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.MenuItem mi && mi.Tag is string t
+            && Enum.TryParse<HistoryViewMode>(t, out var mode))
+            ApplyViewMode(mode);
+    }
+
+    private void HistoryScroller_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control) return; // normal scroll
+        e.Handled = true;
+        int idx = Array.IndexOf(ZoomOrder, _viewMode);
+        if (idx < 0) idx = Array.IndexOf(ZoomOrder, HistoryViewMode.LargeIcons);
+        idx = Math.Clamp(idx + (e.Delta > 0 ? 1 : -1), 0, ZoomOrder.Length - 1);
+        ApplyViewMode(ZoomOrder[idx]);
     }
 
     private void LoadHistory()
@@ -74,20 +179,38 @@ public partial class HistoryWindow : Window
                 RecordType.Recording => ("Video", "#F44336", "Video recording"),
                 _ => ("Saved", "#66BB6A", "Saved to file")
             };
+            string shortType = typeText switch
+            {
+                "Saved" => "Image",
+                "Copied" => "Clipboard",
+                _ => typeText // "Video" / "GIF"
+            };
+            string fileName = string.IsNullOrEmpty(r.FilePath) ? $"Clipboard {r.CapturedAt:HHmmss}" : Path.GetFileName(r.FilePath);
             return new HistoryItemViewModel
             {
                 ThumbnailPath = r.ThumbnailPath,
                 FilePath = r.FilePath ?? "",
+                NameText = fileName,
                 DateText = r.CapturedAt.ToString("MMM dd, HH:mm"),
                 SizeText = $"{r.Width} x {r.Height}",
                 TypeText = typeText,
+                TypeDescText = shortType,
                 TypeColor = typeColor,
+                Ext = Path.GetExtension(r.FilePath ?? "").ToLowerInvariant(),
+                IsClipboard = r.Type == RecordType.Clipboard,
                 ToolTipText = $"{r.FilePath}\n{r.CapturedAt:yyyy-MM-dd HH:mm:ss}\n{r.Width} x {r.Height}\n{typeDesc}"
             };
         }).ToList();
 
         ApplyFilter();
     }
+
+    // "Images" = still pictures (GIFs have their own filter, so they're excluded here).
+    private static bool IsImageExt(string ext) =>
+        ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".webp" or ".tif" or ".tiff";
+
+    private static bool IsVideoExt(string ext) =>
+        ext is ".mp4" or ".webm" or ".avi" or ".mov" or ".mkv" or ".wmv";
 
     private void Filter_Click(object sender, RoutedEventArgs e)
     {
@@ -102,10 +225,10 @@ public partial class HistoryWindow : Window
     {
         _items = _activeFilter switch
         {
-            "Images" => _allItems.Where(i => i.TypeText == "Saved").ToList(),
-            "Videos" => _allItems.Where(i => i.TypeText == "Video").ToList(),
-            "GIFs" => _allItems.Where(i => i.TypeText == "GIF").ToList(),
-            "Clipboard" => _allItems.Where(i => i.TypeText == "Copied").ToList(),
+            "Images" => _allItems.Where(i => IsImageExt(i.Ext)).ToList(),
+            "Videos" => _allItems.Where(i => IsVideoExt(i.Ext)).ToList(),
+            "GIFs" => _allItems.Where(i => i.Ext == ".gif").ToList(),
+            "Clipboard" => _allItems.Where(i => i.IsClipboard).ToList(),
             _ => _allItems.ToList()
         };
 
@@ -137,6 +260,15 @@ public partial class HistoryWindow : Window
     }
 
     private void Item_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is HistoryItemViewModel item)
+        {
+            if (File.Exists(item.FilePath))
+                Core.FilePreviewManager.Instance.ShowPreview(item.FilePath);
+        }
+    }
+
+    private void OpenPreview_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is HistoryItemViewModel item)
         {

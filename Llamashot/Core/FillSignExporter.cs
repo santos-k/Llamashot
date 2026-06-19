@@ -85,8 +85,73 @@ public static class FillSignExporter
                 if (e.Opacity < 100) c = XColor.FromArgb((byte)(255 * e.Opacity / 100.0), c.R, c.G, c.B);
                 gfx.DrawRectangle(new XSolidBrush(c), new XRect(e.X, e.Y, e.Width, e.Height));
                 break;
+            case FillElementType.Draw:
+                DrawShape(gfx, e);
+                break;
         }
         if (st != null) gfx.Restore(st);
+    }
+
+    static void DrawShape(XGraphics gfx, FillElement e)
+    {
+        var col = Color(e.ColorHex);
+        bool highlight = e.Shape == "highlight";
+        double width = e.StrokeWidth <= 0 ? 2 : e.StrokeWidth;
+        if (highlight)
+        {
+            col = XColor.FromArgb((byte)(255 * (e.Opacity < 100 ? e.Opacity : 40) / 100.0), col.R, col.G, col.B);
+        }
+        else if (e.Opacity < 100)
+        {
+            col = XColor.FromArgb((byte)(255 * e.Opacity / 100.0), col.R, col.G, col.B);
+        }
+        var pen = new XPen(col, width) { LineCap = XLineCap.Round, LineJoin = XLineJoin.Round };
+
+        switch (e.Shape)
+        {
+            case "rect":
+                gfx.DrawRectangle(pen, e.X, e.Y, e.Width, e.Height);
+                break;
+            case "ellipse":
+                gfx.DrawEllipse(pen, e.X, e.Y, e.Width, e.Height);
+                break;
+            case "line":
+                if (e.Points.Count >= 2)
+                    gfx.DrawLine(pen, e.X + e.Points[0].X, e.Y + e.Points[0].Y, e.X + e.Points[1].X, e.Y + e.Points[1].Y);
+                break;
+            case "arrow":
+                if (e.Points.Count >= 2)
+                {
+                    double sx = e.X + e.Points[0].X, sy = e.Y + e.Points[0].Y;
+                    double tx = e.X + e.Points[1].X, ty = e.Y + e.Points[1].Y;
+                    gfx.DrawLine(pen, sx, sy, tx, ty);
+                    foreach (var (hx, hy) in ArrowHead(sx, sy, tx, ty, width))
+                        gfx.DrawLine(pen, tx, ty, hx, hy);
+                }
+                break;
+            default: // pen / highlight freehand
+                if (e.Points.Count >= 2)
+                {
+                    var pts = new XPoint[e.Points.Count];
+                    for (int i = 0; i < e.Points.Count; i++) pts[i] = new XPoint(e.X + e.Points[i].X, e.Y + e.Points[i].Y);
+                    gfx.DrawLines(pen, pts);
+                }
+                break;
+        }
+    }
+
+    static IEnumerable<(double x, double y)> ArrowHead(double sx, double sy, double tx, double ty, double strokeWidth)
+    {
+        double dx = tx - sx, dy = ty - sy;
+        double len = System.Math.Sqrt(dx * dx + dy * dy);
+        if (len < 0.001) yield break;
+        dx /= len; dy /= len;
+        double head = System.Math.Max(8, strokeWidth * 3.5);
+        const double ang = 25 * System.Math.PI / 180.0;
+        double cos = System.Math.Cos(ang), sin = System.Math.Sin(ang);
+        // rotate the reversed direction by ±angle
+        yield return (tx - head * (dx * cos - dy * sin), ty - head * (dx * sin + dy * cos));
+        yield return (tx - head * (dx * cos + dy * sin), ty - head * (-dx * sin + dy * cos));
     }
 
     static void DrawText(XGraphics gfx, FillElement e, bool glyph)
@@ -148,6 +213,10 @@ public static class FillSignExporter
                             using var rb = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(a, rc.R, rc.G, rc.B));
                             g.FillRectangle(rb, (float)px, (float)py, (float)pw, (float)ph);
                         }
+                        else if (e.Type == FillElementType.Draw)
+                        {
+                            DrawShapeRaster(g, e, dpi);
+                        }
                         else
                         {
                             var col = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(e.ColorHex);
@@ -181,6 +250,53 @@ public static class FillSignExporter
             await FileToolsService.ImagesToPdfAsync(imgs.ToArray(), outPath);
         }
         finally { try { Directory.Delete(tempDir, true); } catch { } }
+    }
+
+    static void DrawShapeRaster(System.Drawing.Graphics g, FillElement e, int dpi)
+    {
+        var mc = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(e.ColorHex);
+        bool highlight = e.Shape == "highlight";
+        byte a = highlight ? (byte)(255 * (e.Opacity < 100 ? e.Opacity : 40) / 100.0)
+                           : (e.Opacity < 100 ? (byte)(255 * e.Opacity / 100.0) : mc.A);
+        float widthPx = (float)System.Math.Max(1, FillSignGeometry.PointsToPixels(e.StrokeWidth <= 0 ? 2 : e.StrokeWidth, dpi));
+        using var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(a, mc.R, mc.G, mc.B), widthPx)
+        {
+            StartCap = System.Drawing.Drawing2D.LineCap.Round,
+            EndCap = System.Drawing.Drawing2D.LineCap.Round,
+            LineJoin = System.Drawing.Drawing2D.LineJoin.Round
+        };
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        float X = (float)FillSignGeometry.PointsToPixels(e.X, dpi);
+        float Y = (float)FillSignGeometry.PointsToPixels(e.Y, dpi);
+        float W = (float)FillSignGeometry.PointsToPixels(e.Width, dpi);
+        float H = (float)FillSignGeometry.PointsToPixels(e.Height, dpi);
+        System.Drawing.PointF P(int i) => new(
+            X + (float)FillSignGeometry.PointsToPixels(e.Points[i].X, dpi),
+            Y + (float)FillSignGeometry.PointsToPixels(e.Points[i].Y, dpi));
+
+        switch (e.Shape)
+        {
+            case "rect": g.DrawRectangle(pen, X, Y, W, H); break;
+            case "ellipse": g.DrawEllipse(pen, X, Y, W, H); break;
+            case "line": if (e.Points.Count >= 2) g.DrawLine(pen, P(0), P(1)); break;
+            case "arrow":
+                if (e.Points.Count >= 2)
+                {
+                    var s = P(0); var t = P(1);
+                    g.DrawLine(pen, s, t);
+                    foreach (var (hx, hy) in ArrowHead(s.X, s.Y, t.X, t.Y, widthPx))
+                        g.DrawLine(pen, t.X, t.Y, (float)hx, (float)hy);
+                }
+                break;
+            default:
+                if (e.Points.Count >= 2)
+                {
+                    var pts = new System.Drawing.PointF[e.Points.Count];
+                    for (int i = 0; i < e.Points.Count; i++) pts[i] = P(i);
+                    g.DrawLines(pen, pts);
+                }
+                break;
+        }
     }
 
     /// <summary>Public entry — vector path with automatic rasterized fallback.</summary>

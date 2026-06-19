@@ -59,14 +59,41 @@ public partial class ConfirmDialog : Window
         IconCircle.Background = new SolidColorBrush(Color.FromArgb(0x33, color.R, color.G, color.B));
     }
 
+    /// <summary>Three-way unsaved-changes prompt: Save, Discard, or Cancel.</summary>
+    public enum CloseChoice { Cancel, Discard, Save }
+
+    public static CloseChoice PromptUnsaved(Window owner, string title, string message,
+        string saveText = "Save & Close", string discardText = "Discard", string cancelText = "Cancel")
+    {
+        var dlg = new ConfirmDialog { Owner = owner };
+        dlg.TxtTitle.Text = title;
+        dlg.TxtMessage.Text = message;
+        dlg.BtnCancel.Content = cancelText;
+        dlg.BtnConfirm.Content = discardText;
+        dlg.BtnNeutral.Content = saveText;
+        dlg.BtnNeutral.Visibility = Visibility.Visible;
+        dlg.ShowDialog();
+        return dlg._choice;
+    }
+
+    private CloseChoice _choice = CloseChoice.Cancel;
+
     private void Confirm_Click(object sender, RoutedEventArgs e)
     {
+        _choice = CloseChoice.Discard;
         DialogResult = true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
+        _choice = CloseChoice.Cancel;
         DialogResult = false;
+    }
+
+    private void Neutral_Click(object sender, RoutedEventArgs e)
+    {
+        _choice = CloseChoice.Save;
+        DialogResult = true;
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
