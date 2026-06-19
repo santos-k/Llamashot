@@ -52,6 +52,11 @@ public partial class ToolWorkspaceWindow : Window
     private string _compressLevel = "rec";
     private int _quality = 65;
     private readonly Dictionary<string, Border> _compressCards = new();
+    private bool _compressByTarget;
+    private Border _segLevel = null!, _segTarget = null!;
+    private StackPanel _levelPanel = null!, _targetPanel = null!;
+    private TextBox _targetBox = null!;
+    private ComboBox _targetUnitCombo = null!;
 
     // merge settings / state (multi-file)
     private readonly List<string> _mergeFiles = new();
@@ -521,10 +526,56 @@ public partial class ToolWorkspaceWindow : Window
     // =====================================================================
     private void BuildCompressSettings()
     {
-        SettingsHost.Children.Add(SectionTitle("Compression Level"));
-        SettingsHost.Children.Add(CompressOption("low", "Low Compression", "Best quality · larger file"));
-        SettingsHost.Children.Add(CompressOption("rec", "Recommended", "Balanced quality and size"));
-        SettingsHost.Children.Add(CompressOption("high", "High Compression", "Smallest file · lower quality"));
+        SettingsHost.Children.Add(SectionTitle("Compression Mode"));
+
+        // Segmented toggle: by quality level vs by target size.
+        var seg = new Border
+        {
+            CornerRadius = new CornerRadius(10), Background = B("SurfaceAltBrush"),
+            BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1),
+            Padding = new Thickness(3), Margin = new Thickness(0, 0, 0, 16)
+        };
+        var segGrid = new Grid();
+        segGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        segGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        _segLevel = CompressSegItem("By level", false);
+        _segTarget = CompressSegItem("By target size", true);
+        Grid.SetColumn(_segTarget, 1);
+        segGrid.Children.Add(_segLevel); segGrid.Children.Add(_segTarget);
+        seg.Child = segGrid;
+        SettingsHost.Children.Add(seg);
+
+        // Quality-level panel.
+        _levelPanel = new StackPanel();
+        _levelPanel.Children.Add(CompressOption("low", "Low Compression", "Best quality · larger file"));
+        _levelPanel.Children.Add(CompressOption("rec", "Recommended", "Balanced quality and size"));
+        _levelPanel.Children.Add(CompressOption("high", "High Compression", "Smallest file · lower quality"));
+        SettingsHost.Children.Add(_levelPanel);
+
+        // Target-size panel.
+        _targetPanel = new StackPanel { Visibility = Visibility.Collapsed };
+        _targetPanel.Children.Add(new TextBlock
+        {
+            Text = "Aim for a maximum file size. Llamashot lowers quality and, if needed, resolution to get under it.",
+            FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = B("TextMutedBrush"), Margin = new Thickness(0, 0, 0, 12)
+        });
+        var tg = new Grid();
+        tg.ColumnDefinitions.Add(new ColumnDefinition());
+        tg.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _targetBox = new TextBox
+        {
+            Text = "1", FontSize = 14, Padding = new Thickness(11), Margin = new Thickness(0, 0, 8, 0),
+            Background = B("SurfaceAltBrush"), Foreground = B("TextPrimaryBrush"),
+            BorderBrush = B("BorderSoftBrush"), BorderThickness = new Thickness(1),
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        _targetUnitCombo = new ComboBox { Width = 78, FontSize = 13, VerticalContentAlignment = VerticalAlignment.Center };
+        _targetUnitCombo.Items.Add("KB"); _targetUnitCombo.Items.Add("MB");
+        _targetUnitCombo.SelectedIndex = 1;
+        Grid.SetColumn(_targetUnitCombo, 1);
+        tg.Children.Add(_targetBox); tg.Children.Add(_targetUnitCombo);
+        _targetPanel.Children.Add(tg);
+        SettingsHost.Children.Add(_targetPanel);
 
         SettingsHost.Children.Add(MutedLabel("OUTPUT FOLDER", 22));
         var folderGrid = new Grid { Margin = new Thickness(0, 8, 0, 0) };
@@ -544,6 +595,37 @@ public partial class ToolWorkspaceWindow : Window
         SettingsHost.Children.Add(folderGrid);
 
         SelectQuality(_compressLevel);
+        SetCompressMode(_compressByTarget);
+    }
+
+    private Border CompressSegItem(string text, bool isTarget)
+    {
+        var b = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(0, 9, 0, 9), Cursor = Cursors.Hand };
+        b.Child = new TextBlock { Text = text, HorizontalAlignment = HorizontalAlignment.Center, FontSize = 13, FontWeight = FontWeights.SemiBold };
+        b.MouseLeftButtonUp += (_, _) => SetCompressMode(isTarget);
+        return b;
+    }
+
+    private void SetCompressMode(bool byTarget)
+    {
+        _compressByTarget = byTarget;
+        _levelPanel.Visibility = byTarget ? Visibility.Collapsed : Visibility.Visible;
+        _targetPanel.Visibility = byTarget ? Visibility.Visible : Visibility.Collapsed;
+        void Style(Border seg, bool on)
+        {
+            seg.Background = on ? B("AccentBrush") : Brushes.Transparent;
+            ((TextBlock)seg.Child).Foreground = on ? B("AccentTextBrush") : B("TextSecondaryBrush");
+        }
+        Style(_segLevel, !byTarget);
+        Style(_segTarget, byTarget);
+    }
+
+    // Parses the target-size box + unit into bytes; null if the input is invalid.
+    private long? GetTargetBytes()
+    {
+        if (!double.TryParse(_targetBox.Text.Trim(), out double v) || v <= 0) return null;
+        double mult = (string?)_targetUnitCombo.SelectedItem == "KB" ? 1024 : 1024 * 1024;
+        return (long)(v * mult);
     }
 
     private Border CompressOption(string key, string title, string desc)
@@ -2572,6 +2654,17 @@ public partial class ToolWorkspaceWindow : Window
         try { Directory.CreateDirectory(outDir); }
         catch { ConfirmDialog.Alert(this, "Invalid Folder", "Choose a valid output folder.", ConfirmDialog.AlertKind.Error); return; }
 
+        long? targetBytes = null;
+        if (_compressByTarget)
+        {
+            targetBytes = GetTargetBytes();
+            if (targetBytes == null)
+            {
+                ConfirmDialog.Alert(this, "Invalid Target Size", "Enter a target size greater than zero.", ConfirmDialog.AlertKind.Error);
+                return;
+            }
+        }
+
         string outPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(_pdfPath!) + "_compressed.pdf");
         long original = new FileInfo(_pdfPath!).Length;
 
@@ -2580,12 +2673,27 @@ public partial class ToolWorkspaceWindow : Window
         ShowBusy("Compressing PDF…", "Optimizing pages and images");
         try
         {
-            var compressTask = FileToolsService.CompressPdfAsync(_pdfPath!, outPath, _quality, null, _password);
-            await System.Threading.Tasks.Task.WhenAll(compressTask, System.Threading.Tasks.Task.Delay(650));
-            long newSize = await compressTask;
+            long newSize;
+            string change;
+            if (targetBytes != null)
+            {
+                var task = FileToolsService.CompressPdfToTargetAsync(_pdfPath!, outPath, targetBytes.Value, null, _password);
+                await System.Threading.Tasks.Task.WhenAll(task, System.Threading.Tasks.Task.Delay(650));
+                var res = await task;
+                newSize = res.Bytes;
+                change = res.TargetMet
+                    ? $"target {FileToolsService.FormatFileSize(targetBytes.Value)} ✓"
+                    : $"couldn't reach {FileToolsService.FormatFileSize(targetBytes.Value)} — smallest possible";
+            }
+            else
+            {
+                var compressTask = FileToolsService.CompressPdfAsync(_pdfPath!, outPath, _quality, null, _password);
+                await System.Threading.Tasks.Task.WhenAll(compressTask, System.Threading.Tasks.Task.Delay(650));
+                newSize = await compressTask;
+                double pct = original > 0 ? (1 - (double)newSize / original) * 100 : 0;
+                change = pct >= 1 ? $"{pct:0}% smaller" : "already well optimized";
+            }
             HideBusy();
-            double pct = original > 0 ? (1 - (double)newSize / original) * 100 : 0;
-            string change = pct >= 1 ? $"{pct:0}% smaller" : "already well optimized";
             ConfirmDialog.Alert(this, "Compression Complete",
                 $"{FileToolsService.FormatFileSize(original)}  →  {FileToolsService.FormatFileSize(newSize)}   ({change})\n{outPath}",
                 ConfirmDialog.AlertKind.Success, "Done");

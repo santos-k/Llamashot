@@ -2159,12 +2159,44 @@ public partial class FileToolsWindow : Window
             TxtImgQualityVal.Text = ((int)SldImgQuality.Value).ToString();
     }
 
+    private void CompressImg_ModeChanged(object sender, RoutedEventArgs e)
+    {
+        // XAML-initialized RadioButton can fire Checked before the rows exist.
+        if (ImgQualityRow == null) return;
+        bool byTarget = RbImgByTarget.IsChecked == true;
+        ImgQualityRow.Visibility = byTarget ? Visibility.Collapsed : Visibility.Visible;
+        ImgMaxDimRow.Visibility = byTarget ? Visibility.Collapsed : Visibility.Visible;
+        ImgTargetRow.Visibility = byTarget ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // Reads the target-size box + unit into bytes; null if invalid.
+    private long? ImgTargetBytes()
+    {
+        if (!double.TryParse(TxtImgTarget.Text.Trim(), out double v) || v <= 0) return null;
+        string unit = (CboImgTargetUnit.SelectedItem as ComboBoxItem)?.Content as string ?? "MB";
+        double mult = unit == "KB" ? 1024 : 1024 * 1024;
+        return (long)(v * mult);
+    }
+
     private async void CompressImg_Execute(object sender, RoutedEventArgs e)
     {
         if (_compressImgFiles.Count == 0)
         {
             ConfirmDialog.Alert(this, "No Images Added", "Add at least one image to compress.");
             return;
+        }
+
+        bool byTarget = RbImgByTarget.IsChecked == true;
+        long targetBytes = 0;
+        if (byTarget)
+        {
+            var tb = ImgTargetBytes();
+            if (tb == null)
+            {
+                ConfirmDialog.Alert(this, "Invalid Target Size", "Enter a target size greater than zero.", ConfirmDialog.AlertKind.Error);
+                return;
+            }
+            targetBytes = tb.Value;
         }
 
         int quality = (int)SldImgQuality.Value;
@@ -2175,7 +2207,7 @@ public partial class FileToolsWindow : Window
         ShowProcessing("Compressing images...");
 
         long totalOriginal = 0, totalCompressed = 0;
-        int count = _compressImgFiles.Count;
+        int count = _compressImgFiles.Count, missed = 0;
 
         try
         {
@@ -2190,8 +2222,17 @@ public partial class FileToolsWindow : Window
                 string ext = System.IO.Path.GetExtension(file.FilePath);
                 string outputPath = System.IO.Path.Combine(dir, $"{name}_compressed{ext}");
 
-                long compressedSize = await FileToolsService.CompressImageAsync(file.FilePath, outputPath, quality, maxDim);
-                totalCompressed += compressedSize;
+                if (byTarget)
+                {
+                    var res = await FileToolsService.CompressImageToTargetAsync(file.FilePath, outputPath, targetBytes);
+                    totalCompressed += res.Bytes;
+                    if (!res.TargetMet) missed++;
+                }
+                else
+                {
+                    long compressedSize = await FileToolsService.CompressImageAsync(file.FilePath, outputPath, quality, maxDim);
+                    totalCompressed += compressedSize;
+                }
 
                 MainProgress.Value = (int)((i + 1) * 100.0 / count);
                 TxtProgressPct.Text = $"{(int)((i + 1) * 100.0 / count)}%";
@@ -2199,9 +2240,20 @@ public partial class FileToolsWindow : Window
 
             long saved = totalOriginal - totalCompressed;
             double pct = totalOriginal > 0 ? (saved * 100.0 / totalOriginal) : 0;
-            string detail = saved > 0
-                ? $"{FileToolsService.FormatFileSize(totalOriginal)} \u2192 {FileToolsService.FormatFileSize(totalCompressed)} ({pct:F1}% saved)"
-                : $"Compressed {count} image(s) \u2014 no size reduction";
+            string detail;
+            if (byTarget)
+            {
+                detail = $"{FileToolsService.FormatFileSize(totalOriginal)} \u2192 {FileToolsService.FormatFileSize(totalCompressed)} " +
+                         $"(target {FileToolsService.FormatFileSize(targetBytes)} each)";
+                if (missed > 0)
+                    detail += $"\n{missed} image(s) couldn't reach the target \u2014 smallest possible kept.";
+            }
+            else
+            {
+                detail = saved > 0
+                    ? $"{FileToolsService.FormatFileSize(totalOriginal)} \u2192 {FileToolsService.FormatFileSize(totalCompressed)} ({pct:F1}% saved)"
+                    : $"Compressed {count} image(s) \u2014 no size reduction";
+            }
             string firstDir = System.IO.Path.GetDirectoryName(_compressImgFiles[0].FilePath)!;
             ShowComplete($"{count} image(s) compressed!", detail, folderPath: firstDir);
         }

@@ -55,7 +55,12 @@ public static class FileToolsService
 
     public static async Task ImagesToPdfAsync(string[] imagePaths, string outputPath, IProgress<int>? progress = null)
     {
-        await Task.Run(() =>
+        await Task.Run(() => ImagesToPdfCore(imagePaths, outputPath, progress));
+    }
+
+    // Synchronous PDF assembler. Safe to call from any thread (no UI affinity).
+    private static void ImagesToPdfCore(string[] imagePaths, string outputPath, IProgress<int>? progress)
+    {
         {
             using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
             var offsets = new List<long>();
@@ -185,7 +190,7 @@ public static class FileToolsService
 
             // Trailer
             WriteAscii($"trailer <</Size {totalObjCount} /Root 1 0 R>>\nstartxref\n{xrefOffset}\n%%EOF\n");
-        });
+        }
     }
 
     public static async Task<string[]> PdfToImagesAsync(string pdfPath, string outputDir, string format = "png", int dpi = 150, IProgress<int>? progress = null, string? password = null)
@@ -231,6 +236,7 @@ public static class FileToolsService
         await Task.Run(() =>
         {
             var source = LoadBitmapSourceFromFile(inputPath);
+            int originalWidth = source.PixelWidth, originalHeight = source.PixelHeight;
 
             if (maxDimension > 0 && (source.PixelWidth > maxDimension || source.PixelHeight > maxDimension))
             {
@@ -251,11 +257,32 @@ public static class FileToolsService
             }
 
             encoder.Frames.Add(BitmapFrame.Create(source));
-            using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-            encoder.Save(fs);
+            using var ms = new MemoryStream();
+            encoder.Save(ms);
+
+            // Never produce a file larger than the source: if re-encoding bloated it
+            // (already-optimized JPEG, low-entropy PNG, etc.) keep the original bytes.
+            bool resized = maxDimension > 0 && (source.PixelWidth != originalWidth || source.PixelHeight != originalHeight);
+            long originalLen = new FileInfo(inputPath).Length;
+            if (!resized && ms.Length >= originalLen && !PathsEqual(inputPath, outputPath))
+            {
+                File.Copy(inputPath, outputPath, overwrite: true);
+            }
+            else
+            {
+                using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+                ms.Position = 0;
+                ms.CopyTo(fs);
+            }
         });
 
         return new FileInfo(outputPath).Length;
+    }
+
+    private static bool PathsEqual(string a, string b)
+    {
+        try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
     }
 
     public static async Task ResizeImageAsync(string inputPath, string outputPath, int width, int height, bool maintainAspect = true)
@@ -1620,6 +1647,15 @@ public static class FileToolsService
 
             var imgProgress = new Progress<int>(v => progress?.Report(50 + v / 2));
             await ImagesToPdfAsync(tempImages.ToArray(), outputPath, imgProgress);
+
+            // Rasterizing pages only shrinks scanned/image-heavy PDFs. For text or
+            // already-optimized documents it bloats the file — in that case keep the
+            // original so "compress" never produces a larger result.
+            long originalLen = new FileInfo(inputPath).Length;
+            if (new FileInfo(outputPath).Length >= originalLen && !PathsEqual(inputPath, outputPath))
+            {
+                File.Copy(inputPath, outputPath, overwrite: true);
+            }
         }
         finally
         {
@@ -1627,6 +1663,228 @@ public static class FileToolsService
         }
 
         return new FileInfo(outputPath).Length;
+    }
+
+    /// <summary>Result of a target-size compression: the bytes actually achieved and whether the target was met.</summary>
+    public readonly record struct CompressResult(long Bytes, bool TargetMet);
+
+    // Shrinks an image until it fits within <paramref name="targetBytes"/>. Lowers JPEG quality
+    // first, then downscales resolution when quality alone can't get there. Best-effort: if even
+    // the floor (min quality + min dimension) is over target, the smallest result is kept and
+    // TargetMet is false. Never produces a file larger than the source.
+    public static async Task<CompressResult> CompressImageToTargetAsync(string inputPath, string outputPath, long targetBytes, IProgress<int>? progress = null)
+    {
+        return await Task.Run(() =>
+        {
+            long originalLen = new FileInfo(inputPath).Length;
+            if (originalLen <= targetBytes)
+            {
+                if (!PathsEqual(inputPath, outputPath)) File.Copy(inputPath, outputPath, overwrite: true);
+                return new CompressResult(new FileInfo(outputPath).Length, true);
+            }
+
+            var original = LoadBitmapSourceFromFile(inputPath);
+            string ext = Path.GetExtension(outputPath).ToLowerInvariant();
+            bool isPng = ext is ".png";
+
+            byte[] Encode(BitmapSource src, int quality)
+            {
+                BitmapEncoder enc = isPng ? new PngBitmapEncoder() : new JpegBitmapEncoder { QualityLevel = quality };
+                enc.Frames.Add(BitmapFrame.Create(src));
+                using var ms = new MemoryStream();
+                enc.Save(ms);
+                return ms.ToArray();
+            }
+
+            const int minQuality = 10, maxQuality = 92, minDimension = 400;
+            BitmapSource current = original;
+            byte[] best = Encode(current, minQuality); // smallest seen so far (floor of current res)
+
+            for (int round = 0; round < 24; round++)
+            {
+                byte[] candidate;
+                if (isPng)
+                {
+                    candidate = Encode(current, 0);
+                }
+                else
+                {
+                    candidate = Encode(current, minQuality);
+                    if (candidate.Length <= targetBytes)
+                    {
+                        // The floor fits — binary-search the highest quality still within target.
+                        byte[] fit = candidate;
+                        int lo = minQuality + 1, hi = maxQuality;
+                        while (lo <= hi)
+                        {
+                            int mid = (lo + hi) / 2;
+                            var enc = Encode(current, mid);
+                            if (enc.Length <= targetBytes) { fit = enc; lo = mid + 1; }
+                            else hi = mid - 1;
+                        }
+                        candidate = fit;
+                    }
+                }
+
+                if (candidate.Length < best.Length) best = candidate;
+                progress?.Report(Math.Min(95, (round + 1) * 12));
+
+                if (candidate.Length <= targetBytes)
+                {
+                    File.WriteAllBytes(outputPath, candidate);
+                    return new CompressResult(candidate.Length, true);
+                }
+
+                int minSide = Math.Min(current.PixelWidth, current.PixelHeight);
+                if (minSide <= minDimension) break; // can't shrink further — best effort
+
+                var t = new TransformedBitmap(current, new ScaleTransform(0.85, 0.85));
+                t.Freeze();
+                current = t;
+            }
+
+            // Best effort: never exceed the original; pick the smaller of original and our best.
+            if (best.Length >= originalLen && !PathsEqual(inputPath, outputPath))
+            {
+                File.Copy(inputPath, outputPath, overwrite: true);
+                return new CompressResult(new FileInfo(outputPath).Length, originalLen <= targetBytes);
+            }
+            File.WriteAllBytes(outputPath, best);
+            return new CompressResult(best.Length, best.Length <= targetBytes);
+        });
+    }
+
+    // Shrinks a PDF until it fits within <paramref name="targetBytes"/> by rasterizing pages and
+    // sweeping render DPI (high→low) with a per-DPI binary search on JPEG quality. Best-effort: if
+    // nothing fits, the smallest result is kept (and never larger than the original).
+    public static async Task<CompressResult> CompressPdfToTargetAsync(string inputPath, string outputPath, long targetBytes, IProgress<int>? progress = null, string? password = null)
+    {
+        long originalLen = new FileInfo(inputPath).Length;
+        if (originalLen <= targetBytes)
+        {
+            if (!PathsEqual(inputPath, outputPath)) File.Copy(inputPath, outputPath, overwrite: true);
+            return new CompressResult(new FileInfo(outputPath).Length, true);
+        }
+
+        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(inputPath);
+        var pdfDoc = await LoadPdfAsync(file, password);
+        uint pageCount = pdfDoc.PageCount;
+
+        string tempDir = Path.Combine(Path.GetTempPath(), "llamashot_pdf_" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tempDir);
+
+        // Render every page ONCE at the base DPI here (WinRT rendering wants the UI thread);
+        // lower DPIs are produced by cheap downscaling so we never re-render — this is what
+        // kept the old version pinned to the UI thread and frozen for detailed documents.
+        const int baseDpi = 150;
+        var basePages = new List<BitmapSource>((int)pageCount);
+        for (uint i = 0; i < pageCount; i++)
+        {
+            using var page = pdfDoc.GetPage(i);
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            var options = new Windows.Data.Pdf.PdfPageRenderOptions
+            {
+                DestinationWidth = (uint)(page.Size.Width * baseDpi / 72)
+            };
+            await page.RenderToStreamAsync(stream, options);
+            stream.Seek(0);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.StreamSource = stream.AsStreamForRead();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            basePages.Add(bmp);
+            progress?.Report((int)((i + 1) * 30 / pageCount));
+        }
+
+        // The encode/assemble/search loop is CPU-bound — run it off the UI thread so the
+        // window stays responsive (the spinner keeps animating).
+        return await Task.Run(() =>
+        {
+            string candPdf = Path.Combine(tempDir, "cand.pdf");
+            string bestPdf = Path.Combine(tempDir, "best.pdf");
+            int[] dpis = { 150, 120, 96, 72, 50 };
+            const int minQuality = 10, maxQuality = 85;
+            long smallestLen = long.MaxValue;
+
+            try
+            {
+                List<BitmapSource> PagesAt(int dpi)
+                {
+                    if (dpi == baseDpi) return basePages;
+                    double scale = (double)dpi / baseDpi;
+                    var list = new List<BitmapSource>(basePages.Count);
+                    foreach (var src in basePages)
+                    {
+                        var t = new TransformedBitmap(src, new ScaleTransform(scale, scale));
+                        t.Freeze();
+                        list.Add(t);
+                    }
+                    return list;
+                }
+
+                long Assemble(List<BitmapSource> pages, int quality)
+                {
+                    var imgs = new string[pages.Count];
+                    for (int i = 0; i < pages.Count; i++)
+                    {
+                        string f = Path.Combine(tempDir, $"p_{i}.jpg");
+                        var enc = new JpegBitmapEncoder { QualityLevel = quality };
+                        enc.Frames.Add(BitmapFrame.Create(pages[i]));
+                        using (var fsp = new FileStream(f, FileMode.Create)) enc.Save(fsp);
+                        imgs[i] = f;
+                    }
+                    ImagesToPdfCore(imgs, candPdf, null);
+                    return new FileInfo(candPdf).Length;
+                }
+
+                for (int d = 0; d < dpis.Length; d++)
+                {
+                    var pages = PagesAt(dpis[d]);
+
+                    // Floor for this DPI: if even min quality is over target, drop to a lower DPI.
+                    long floorLen = Assemble(pages, minQuality);
+                    if (floorLen < smallestLen) { smallestLen = floorLen; File.Copy(candPdf, bestPdf, true); }
+                    progress?.Report(Math.Min(95, 40 + (d + 1) * 11));
+
+                    if (floorLen > targetBytes) continue;
+
+                    // Floor fits — binary-search the highest quality still within target.
+                    long bestFitLen = floorLen;
+                    File.Copy(candPdf, bestPdf, true);
+                    int lo = minQuality + 1, hi = maxQuality;
+                    while (lo <= hi)
+                    {
+                        int mid = (lo + hi) / 2;
+                        long len = Assemble(pages, mid);
+                        if (len <= targetBytes) { bestFitLen = len; File.Copy(candPdf, bestPdf, true); lo = mid + 1; }
+                        else hi = mid - 1;
+                    }
+
+                    if (bestFitLen >= originalLen && !PathsEqual(inputPath, outputPath))
+                    {
+                        File.Copy(inputPath, outputPath, true);
+                        return new CompressResult(new FileInfo(outputPath).Length, false);
+                    }
+                    File.Copy(bestPdf, outputPath, true);
+                    return new CompressResult(bestFitLen, true);
+                }
+
+                // Nothing fit at any DPI: keep the smaller of the best rasterization and the original.
+                if (smallestLen >= originalLen && !PathsEqual(inputPath, outputPath))
+                {
+                    File.Copy(inputPath, outputPath, true);
+                    return new CompressResult(new FileInfo(outputPath).Length, false);
+                }
+                File.Copy(bestPdf, outputPath, true);
+                return new CompressResult(smallestLen, false);
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, true); } catch { }
+            }
+        });
     }
 
     public static async Task<long> CompressOfficeDocAsync(string inputPath, string outputPath, int quality = 80, IProgress<int>? progress = null)

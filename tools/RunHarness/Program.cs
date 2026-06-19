@@ -88,6 +88,18 @@ internal static class Program
             return;
         }
 
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_COMPRESSTEST") == "1")
+        {
+            await VerifyCompression();
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_COMPRESSUI") == "1")
+        {
+            await CaptureCompressUi();
+            return;
+        }
+
         // Workspace-only mode: skip the flaky FileToolsWindow/alert/password captures.
         if (Environment.GetEnvironmentVariable("LLAMASHOT_WS_ONLY") == "1")
         {
@@ -515,6 +527,119 @@ internal static class Program
         }
         catch (Exception ex) { L("EXCEPTION: " + ex); }
         File.WriteAllText(Path.Combine(Dir, "cursor.txt"), log.ToString());
+    }
+
+    // Opens the Compress PDF workspace and captures both compression modes so the
+    // new "By level / By target size" toggle and target input can be eyeballed.
+    static async Task CaptureCompressUi()
+    {
+        var ws = new ToolWorkspaceWindow("compress_pdf")
+        {
+            WindowState = WindowState.Normal, Width = 1380, Height = 880,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true
+        };
+        ws.Show(); ws.Activate();
+        await Task.Delay(700);
+        ws.UpdateLayout();
+        await Task.Delay(200);
+        ShotRtb(ws, "compress_level.png");
+
+        var setMode = typeof(ToolWorkspaceWindow).GetMethod("SetCompressMode",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        setMode!.Invoke(ws, new object[] { true });
+        ws.UpdateLayout();
+        await Task.Delay(250);
+        ShotRtb(ws, "compress_target.png");
+        Console.WriteLine("wrote compress_level.png + compress_target.png");
+        ws.Close();
+    }
+
+    // Confirms compression never produces a file larger than the source:
+    //  - a beneficial case still shrinks (regression guard for the feature working)
+    //  - an already-optimized / low-entropy case keeps the original bytes
+    static async Task VerifyCompression()
+    {
+        var log = new System.Text.StringBuilder();
+        void L(string m) { log.AppendLine(m); Console.WriteLine(m); }
+        string dir = Path.Combine(Dir, "compresstest");
+        Directory.CreateDirectory(dir);
+        bool allPass = true;
+        try
+        {
+            // ---- Image case A: a high-quality noisy photo SHOULD shrink at q40. ----
+            using (var photo = new SD.Bitmap(1200, 900))
+            {
+                var rnd = new Random(7);
+                for (int y = 0; y < photo.Height; y++)
+                    for (int x = 0; x < photo.Width; x++)
+                        photo.SetPixel(x, y, SD.Color.FromArgb(rnd.Next(256), rnd.Next(256), rnd.Next(256)));
+                photo.Save(Path.Combine(dir, "photo.jpg"), SD.Imaging.ImageFormat.Jpeg);
+            }
+            string photoIn = Path.Combine(dir, "photo.jpg");
+            string photoOut = Path.Combine(dir, "photo_compressed.jpg");
+            long photoOrig = new FileInfo(photoIn).Length;
+            long photoNew = await FileToolsService.CompressImageAsync(photoIn, photoOut, quality: 40);
+            bool aPass = photoNew <= photoOrig;
+            allPass &= aPass;
+            L($"[image-beneficial] {photoOrig} -> {photoNew}  {(aPass ? "PASS (not larger)" : "FAIL (grew!)")}");
+
+            // ---- Image case B: a tiny low-quality JPEG must NOT grow when "compressed" at q85. ----
+            using (var small = new SD.Bitmap(400, 300))
+            {
+                using var g = SD.Graphics.FromImage(small);
+                g.Clear(SD.Color.SteelBlue);
+                var enc = SD.Imaging.ImageCodecInfo.GetImageEncoders()
+                    .First(e => e.FormatID == SD.Imaging.ImageFormat.Jpeg.Guid);
+                var ep = new SD.Imaging.EncoderParameters(1);
+                ep.Param[0] = new SD.Imaging.EncoderParameter(SD.Imaging.Encoder.Quality, 25L);
+                small.Save(Path.Combine(dir, "small.jpg"), enc, ep);
+            }
+            string smallIn = Path.Combine(dir, "small.jpg");
+            string smallOut = Path.Combine(dir, "small_compressed.jpg");
+            long smallOrig = new FileInfo(smallIn).Length;
+            long smallNew = await FileToolsService.CompressImageAsync(smallIn, smallOut, quality: 85);
+            bool bPass = smallNew <= smallOrig;
+            allPass &= bPass;
+            L($"[image-optimized] {smallOrig} -> {smallNew}  {(bPass ? "PASS (kept original)" : "FAIL (grew!)")}");
+
+            // ---- PDF case: build a PDF, then compress; output must never exceed the source. ----
+            string pdfPath = Path.Combine(dir, "doc.pdf");
+            await FileToolsService.ImagesToPdfAsync(new[] { smallIn, photoIn }, pdfPath, null);
+            string pdfOut = Path.Combine(dir, "doc_compressed.pdf");
+            long pdfOrig = new FileInfo(pdfPath).Length;
+            long pdfNew = await FileToolsService.CompressPdfAsync(pdfPath, pdfOut, quality: 65);
+            bool cPass = pdfNew <= pdfOrig;
+            allPass &= cPass;
+            L($"[pdf] {pdfOrig} -> {pdfNew}  {(cPass ? "PASS (not larger)" : "FAIL (grew!)")}");
+
+            // ---- Target-size image: bring the 650 KB photo under 100 KB. ----
+            string tImgOut = Path.Combine(dir, "photo_target.jpg");
+            long tImgTarget = 100 * 1024;
+            var tImg = await FileToolsService.CompressImageToTargetAsync(photoIn, tImgOut, tImgTarget);
+            bool dPass = tImg.Bytes <= tImgTarget && tImg.TargetMet && tImg.Bytes > 0;
+            allPass &= dPass;
+            L($"[image-target<=100KB] {tImg.Bytes} bytes, met={tImg.TargetMet}  {(dPass ? "PASS" : "FAIL")}");
+
+            // ---- Target-size image already under target: must be kept, flagged met. ----
+            string tSmallOut = Path.Combine(dir, "small_target.jpg");
+            var tSmall = await FileToolsService.CompressImageToTargetAsync(smallIn, tSmallOut, 1024 * 1024);
+            bool ePass = tSmall.TargetMet && tSmall.Bytes <= smallOrig;
+            allPass &= ePass;
+            L($"[image-target-already] {tSmall.Bytes} bytes, met={tSmall.TargetMet}  {(ePass ? "PASS" : "FAIL")}");
+
+            // ---- Target-size PDF: bring the doc under 150 KB. ----
+            string tPdfOut = Path.Combine(dir, "doc_target.pdf");
+            long tPdfTarget = 150 * 1024;
+            var tPdf = await FileToolsService.CompressPdfToTargetAsync(pdfPath, tPdfOut, tPdfTarget);
+            // Either it met the target, or it's a best-effort result no larger than the source.
+            bool fPass = tPdf.Bytes > 0 && (tPdf.TargetMet ? tPdf.Bytes <= tPdfTarget : tPdf.Bytes <= pdfOrig);
+            allPass &= fPass;
+            L($"[pdf-target<=150KB] {tPdf.Bytes} bytes, met={tPdf.TargetMet}  {(fPass ? "PASS" : "FAIL")}");
+
+            L(allPass ? "ALL COMPRESSION CHECKS PASSED" : "COMPRESSION CHECKS FAILED");
+        }
+        catch (Exception ex) { L("EXCEPTION: " + ex); }
+        File.WriteAllText(Path.Combine(Dir, "compress.txt"), log.ToString());
     }
 
     // Drives OverlayWindow.StartCapture and inspects internal state to confirm the

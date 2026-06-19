@@ -794,7 +794,16 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                    <Grid Margin="0,0,0,8">
+                    <!-- Mode toggle: by quality vs by target size -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <RadioButton x:Name="RbImgByQuality" Content="By quality" GroupName="ImgCompressMode" IsChecked="True"
+                                     Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" VerticalContentAlignment="Center"
+                                     Margin="0,0,20,0" Checked="CompressImg_ModeChanged"/>
+                        <RadioButton x:Name="RbImgByTarget" Content="By target size" GroupName="ImgCompressMode"
+                                     Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" VerticalContentAlignment="Center"
+                                     Checked="CompressImg_ModeChanged"/>
+                    </StackPanel>
+                    <Grid x:Name="ImgQualityRow" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -806,7 +815,7 @@
                         <TextBlock x:Name="TxtImgQualityVal" Grid.Column="2" Text="80" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
                                    Width="30" VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </Grid>
-                    <Grid Margin="0,0,0,12">
+                    <Grid x:Name="ImgMaxDimRow" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="120"/>
@@ -818,6 +827,25 @@
                         <TextBlock Grid.Column="2" Text="px (empty = no limit)" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"
                                    VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </Grid>
+                    <StackPanel x:Name="ImgTargetRow" Visibility="Collapsed" Margin="0,0,0,12">
+                        <TextBlock Text="Each image is brought under this size — quality is lowered first, then resolution if needed."
+                                   Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Target size:" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBox x:Name="TxtImgTarget" Grid.Column="1" Text="1" Height="28" Padding="6,4" FontSize="12"
+                                     Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"/>
+                            <ComboBox x:Name="CboImgTargetUnit" Grid.Column="2" Width="72" Height="28" FontSize="12"
+                                      VerticalContentAlignment="Center" Margin="8,0,0,0">
+                                <ComboBoxItem Content="KB"/>
+                                <ComboBoxItem Content="MB" IsSelected="True"/>
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
                     <Button Content="Compress All &#x2192;" Width="280" Height="50" Margin="0,20,0,0"
                             FontSize="16" FontWeight="SemiBold" Foreground="White" Background="#26C6DA"
                             HorizontalAlignment="Center" Cursor="Hand" Click="CompressImg_Execute"
