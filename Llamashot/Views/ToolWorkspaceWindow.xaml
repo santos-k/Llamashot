@@ -4,7 +4,8 @@
         Icon="/Resources/icon32.png"
         Title="Llamashot - PDF Workspace"
         WindowState="Maximized" WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource WindowBrush}">
+        MinWidth="900" MinHeight="600"
+        Background="{DynamicResource WindowGradientBrush}">
     <Window.Resources>
         <!-- Rail tool button -->
         <ControlTemplate x:Key="RailItem" TargetType="Button">
@@ -104,7 +105,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ============ LEFT RAIL ============ -->
-        <Border x:Name="NavPanel" Grid.Column="0" Background="{DynamicResource HeaderBrush}"
+        <Border x:Name="NavPanel" Grid.Column="0" Background="{DynamicResource HeaderGradientBrush}"
                 BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,1,0">
             <DockPanel Margin="14,16">
                 <!-- brand -->
@@ -151,7 +152,7 @@
 
         <!-- collapsed sidebar rail -->
         <Border x:Name="NavRail" Grid.Column="0" Width="54" Visibility="Collapsed"
-                Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                 BorderThickness="0,0,1,0" Cursor="Hand" ToolTip="Expand sidebar" MouseLeftButtonUp="ExpandNav_Click">
             <StackPanel Margin="0,18,0,0" HorizontalAlignment="Center">
                 <Button Content="☰" Click="ExpandNav_Click" Width="34" Height="34" Template="{StaticResource SoftBtn}"
@@ -355,7 +356,7 @@
             </Grid>
 
             <!-- ACTION BAR -->
-            <Border Grid.Row="2" Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0" Padding="26,16">
+            <Border Grid.Row="2" Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0" Padding="26,16">
                 <Grid>
                     <Button HorizontalAlignment="Left" Content="🗑  Clear All" Click="Clear_Click" Template="{StaticResource SoftBtn}"
                             Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Padding="18,11" Cursor="Hand"/>

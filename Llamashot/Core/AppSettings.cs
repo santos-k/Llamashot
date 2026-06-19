@@ -101,6 +101,18 @@ public class AppSettings
     // File Tools appearance
     public string FileToolsTheme { get; set; } = "System"; // "System" | "Light" | "Dark"
 
+    // Appearance — accent gradient customizer (defaults = teal → emerald)
+    public string AccentStart { get; set; } = "#2DD4BF";
+    public string AccentEnd { get; set; } = "#34D399";
+    public int GradientAngle { get; set; } = 135;
+    public bool WindowTint { get; set; } = true;
+    public bool Enable3DTilt { get; set; } = true;
+
+    /// <summary>Factory defaults for the accent customizer (used by "Reset to defaults").</summary>
+    public const string DefaultAccentStart = "#2DD4BF";
+    public const string DefaultAccentEnd = "#34D399";
+    public const int DefaultGradientAngle = 135;
+
     public static void Load()
     {
         if (!File.Exists(SettingsPath))

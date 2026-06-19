@@ -95,7 +95,7 @@
                 MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
                 Background="Transparent">
             <Border x:Name="SelectionBorder"
-                    BorderBrush="#2196F3" BorderThickness="2"
+                    BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2"
                     Visibility="Collapsed" IsHitTestVisible="False" />
             <!-- Dashed selection for OCR mode -->
             <Rectangle x:Name="OcrDashBorder"
@@ -118,7 +118,7 @@
                     <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Color="#000020" />
                 </Border.Effect>
                 <TextBlock x:Name="CursorTooltipText"
-                           Foreground="#2196F3" FontSize="12" FontFamily="Segoe UI" />
+                           Foreground="{DynamicResource AccentBrush}" FontSize="12" FontFamily="Segoe UI" />
             </Border>
         </Canvas>
 
@@ -258,7 +258,7 @@
                 </StackPanel>
             </Border>
             <!-- Mode underline indicator -->
-            <Border x:Name="ModeIndicator" Height="3" Width="22" CornerRadius="1.5" Background="#2196F3"
+            <Border x:Name="ModeIndicator" Height="3" Width="22" CornerRadius="1.5" Background="{DynamicResource AccentBrush}"
                     IsHitTestVisible="False" />
         </Canvas>
 
@@ -463,7 +463,7 @@
                     <!-- Save - blue floppy -->
                     <Button x:Name="BtnSave" ToolTip="Save (Ctrl+S)" Click="Save_Click" Style="{StaticResource TBtn}">
                         <Canvas Width="16" Height="16">
-                            <Path Fill="#42A5F5" Data="M1,1 L12,1 L15,4 L15,15 L1,15 Z" />
+                            <Path Fill="{DynamicResource AccentBrush}" Data="M1,1 L12,1 L15,4 L15,15 L1,15 Z" />
                             <Rectangle Canvas.Left="4" Canvas.Top="1" Width="6" Height="5" Fill="#1E88E5" />
                             <Rectangle Canvas.Left="4" Canvas.Top="9" Width="8" Height="5" Fill="White" RadiusX="1" RadiusY="1" />
                         </Canvas>
@@ -557,7 +557,7 @@
                     <Button x:Name="BtnVideoStart" Click="VideoStart_Click" Cursor="Hand" Focusable="False" Margin="0,0,8,0">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" Background="#2196F3" CornerRadius="14" Padding="14,4">
+                                <Border x:Name="Bd" Background="{DynamicResource AccentBrush}" CornerRadius="14" Padding="14,4">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="10" Height="10" Stroke="White" StrokeThickness="2" Margin="0,0,6,0" VerticalAlignment="Center" />
                                         <TextBlock Text="Start" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -565,10 +565,10 @@
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#42A5F5" />
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     </Trigger>
                                     <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#1E88E5" />
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>

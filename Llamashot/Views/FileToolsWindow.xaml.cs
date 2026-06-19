@@ -253,6 +253,10 @@ public partial class FileToolsWindow : Window
     private static SolidColorBrush ThemeBrush(string key)
         => (SolidColorBrush)System.Windows.Application.Current.Resources[key];
 
+    // For keys that may resolve to a gradient (e.g. SurfaceGradientBrush).
+    private static Brush ThemeAnyBrush(string key)
+        => (Brush)System.Windows.Application.Current.Resources[key];
+
     // =====================================================================
     //  Password-protected PDF support
     // =====================================================================
@@ -331,7 +335,7 @@ public partial class FileToolsWindow : Window
         var accentColor = (Color)ColorConverter.ConvertFromString(color);
         var accentBrush = new SolidColorBrush(accentColor);
 
-        var surfaceBrush = ThemeBrush("SurfaceBrush");
+        Brush surfaceBrush = ThemeAnyBrush("SurfaceGradientBrush");
         var hoverBrush = ThemeBrush("SurfaceHoverBrush");
 
         var card = new Border
@@ -342,7 +346,7 @@ public partial class FileToolsWindow : Window
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18),
             Cursor = Cursors.Hand, Tag = id,
             Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 12, ShadowDepth = 2, Opacity = 0.12, Color = (Color)ColorConverter.ConvertFromString("#3A4A8A") },
-            RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1)
+            RenderTransformOrigin = new Point(0.5, 0.5)
         };
 
         var grid = new Grid { Margin = new Thickness(14, 0, 14, 0) };
@@ -392,17 +396,14 @@ public partial class FileToolsWindow : Window
             var b = (Border)s;
             b.Background = hoverBrush;
             b.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x88, accentColor.R, accentColor.G, accentColor.B));
-            ((ScaleTransform)b.RenderTransform).ScaleX = 1.02;
-            ((ScaleTransform)b.RenderTransform).ScaleY = 1.02;
         };
         card.MouseLeave += (s, _) =>
         {
             var b = (Border)s;
             b.Background = surfaceBrush;
             b.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x44, accentColor.R, accentColor.G, accentColor.B));
-            ((ScaleTransform)b.RenderTransform).ScaleX = 1.0;
-            ((ScaleTransform)b.RenderTransform).ScaleY = 1.0;
         };
+        Core.Tilt.Attach(card);
         return card;
     }
 

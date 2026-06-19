@@ -54,7 +54,7 @@ public partial class RecordingBorder : Window
         const double arm = 22;   // length of corner bracket arm
         const double thick = 4;  // stroke thickness
         const double bar = 18;   // length of midpoint bar
-        var cornerBrush = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5)); // blue
+        var cornerBrush = (Brush)Application.Current.FindResource("AccentBrush"); // theme accent
         var midBrush = Brushes.White;
 
         // Corner brackets (L-shaped) - blue

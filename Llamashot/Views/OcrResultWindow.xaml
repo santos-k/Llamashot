@@ -5,7 +5,7 @@
         Title="Llamashot - Extracted Text"
         Width="520" Height="400"
         WindowStartupLocation="CenterScreen"
-        Background="#1A1A1E">
+        Background="{DynamicResource WindowGradientBrush}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -14,7 +14,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Background="#222" Padding="20,14" BorderBrush="#333" BorderThickness="0,0,0,1">
+        <Border Background="{DynamicResource HeaderGradientBrush}" Padding="20,14" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Canvas Width="20" Height="20" Margin="0,0,10,0">
@@ -24,42 +24,42 @@
                         <Line X1="5" Y1="17" X2="15" Y2="17" Stroke="#00ACC1" StrokeThickness="2" />
                     </Canvas>
                     <TextBlock Text="Extracted Text" FontSize="17" FontWeight="SemiBold"
-                               Foreground="#EEE" VerticalAlignment="Center" />
+                               Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock x:Name="TxtCharCount" HorizontalAlignment="Right" VerticalAlignment="Center"
-                           Foreground="#777" FontSize="12" />
+                           Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
             </Grid>
         </Border>
 
         <!-- Text content -->
-        <Border Grid.Row="1" Margin="16,12,16,0" Background="#252528" CornerRadius="6"
-                BorderBrush="#333" BorderThickness="1" Padding="2">
+        <Border Grid.Row="1" Margin="16,12,16,0" Background="{DynamicResource SurfaceBrush}" CornerRadius="6"
+                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="2">
             <TextBox x:Name="ResultText"
-                     Background="Transparent" Foreground="#EEE"
+                     Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                      FontSize="13" FontFamily="Consolas, Segoe UI"
                      BorderThickness="0"
                      Padding="10,8" TextWrapping="Wrap"
                      AcceptsReturn="True" IsReadOnly="False"
                      VerticalScrollBarVisibility="Auto"
-                     SelectionBrush="#42A5F5"
-                     CaretBrush="#42A5F5" />
+                     SelectionBrush="{DynamicResource AccentBrush}"
+                     CaretBrush="{DynamicResource AccentBrush}" />
         </Border>
 
         <!-- Footer -->
-        <Border Grid.Row="2" Background="#222" Padding="16,10" Margin="0,12,0,0"
-                BorderBrush="#333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="2" Background="{DynamicResource HeaderGradientBrush}" Padding="16,10" Margin="0,12,0,0"
+                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <Button Content="Select All" Width="80" Height="30" Click="SelectAll_Click"
-                            Background="#333" Foreground="#CCC" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Copy All" Width="90" Height="30" Click="CopyAll_Click"
-                            Background="#42A5F5" Foreground="White" BorderBrush="#1E88E5"
+                            Background="{DynamicResource AccentGradientBrush}" Foreground="{DynamicResource AccentTextBrush}" BorderBrush="{DynamicResource AccentBrush}"
                             FontWeight="SemiBold" FontSize="12" Cursor="Hand" />
                     <Button Content="Close" Width="80" Height="30" Margin="10,0,0,0" Click="Close_Click"
-                            Background="#333" Foreground="#CCC" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" />
                 </StackPanel>
             </Grid>

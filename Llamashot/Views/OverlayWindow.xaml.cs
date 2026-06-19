@@ -566,14 +566,15 @@ public partial class OverlayWindow : Window
 
     private void UpdateCursorTooltip()
     {
+        var accent = (Color)Application.Current.FindResource("AccentColor");
         var (text, color) = _captureMode switch
         {
-            CaptureMode.Screenshot => ("Drag to select capture area", Color.FromRgb(0x21, 0x96, 0xF3)),
+            CaptureMode.Screenshot => ("Drag to select capture area", accent),
             CaptureMode.Video => ("Drag to select recording area", Color.FromRgb(0xF4, 0x43, 0x36)),
             CaptureMode.Gif => ("Drag to select GIF recording area (max 30s)", Color.FromRgb(0x4C, 0xAF, 0x50)),
             CaptureMode.Ocr => ("Drag to select text area", Color.FromRgb(0x26, 0xC6, 0xDA)),
             CaptureMode.Scroll => ("Click on a window to capture scroll", Color.FromRgb(0xFF, 0xA7, 0x26)),
-            _ => ("Drag to select area", Color.FromRgb(0x21, 0x96, 0xF3))
+            _ => ("Drag to select area", accent)
         };
         CursorTooltipText.Text = text;
         CursorTooltipText.Foreground = new SolidColorBrush(color);
@@ -772,7 +773,7 @@ public partial class OverlayWindow : Window
         var countdownText = new TextBlock
         {
             FontSize = 56, FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+            Foreground = (Brush)Application.Current.FindResource("AccentBrush"),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -1369,7 +1370,7 @@ public partial class OverlayWindow : Window
             {
                 Width = HandleSize, Height = HandleSize,
                 Fill = Brushes.White,
-                Stroke = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+                Stroke = (Brush)Application.Current.FindResource("AccentBrush"),
                 StrokeThickness = 1.5,
                 Tag = h,
             };
@@ -1797,9 +1798,14 @@ public partial class OverlayWindow : Window
 
         // Reset all tool button highlights
         ClearToolHighlights();
-        var highlightColor = ToolColors.TryGetValue(toolName, out var tc)
-            ? Color.FromArgb(80, tc.R, tc.G, tc.B)
-            : Color.FromArgb(80, 33, 150, 243);
+        Color highlightColor;
+        if (ToolColors.TryGetValue(toolName, out var tc))
+            highlightColor = Color.FromArgb(80, tc.R, tc.G, tc.B);
+        else
+        {
+            var acc = (Color)Application.Current.FindResource("AccentColor");
+            highlightColor = Color.FromArgb(80, acc.R, acc.G, acc.B);
+        }
         btn.Background = new SolidColorBrush(highlightColor);
 
         _currentToolTag = toolName;
@@ -1959,12 +1965,13 @@ public partial class OverlayWindow : Window
         {
             _interaction = Interaction.OcrSelecting;
             _ocrStart = pos;
+            var ocrAccent = (Color)Application.Current.FindResource("AccentColor");
             _ocrRect = new System.Windows.Shapes.Rectangle
             {
-                Stroke = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
+                Stroke = new SolidColorBrush(ocrAccent),
                 StrokeThickness = 2,
                 StrokeDashArray = new System.Windows.Media.DoubleCollection { 4, 2 },
-                Fill = new SolidColorBrush(Color.FromArgb(30, 33, 150, 243))
+                Fill = new SolidColorBrush(Color.FromArgb(30, ocrAccent.R, ocrAccent.G, ocrAccent.B))
             };
             Canvas.SetLeft(_ocrRect, pos.X);
             Canvas.SetTop(_ocrRect, pos.Y);

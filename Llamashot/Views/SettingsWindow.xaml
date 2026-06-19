@@ -3,39 +3,41 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Icon="/Resources/icon32.png"
         Title="Llamashot - Settings"
-        Width="500" Height="700"
+        Width="520" Height="720" MinWidth="440" MinHeight="480"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
-        Background="#1A1A1E">
+        ResizeMode="CanResize"
+        Background="{DynamicResource WindowGradientBrush}">
     <Window.Resources>
         <Style TargetType="TextBlock" x:Key="Label">
-            <Setter Property="Foreground" Value="#CCC" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
         <Style TargetType="TextBlock" x:Key="SectionTitle">
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#42A5F5" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#CCC" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Margin" Value="0,3" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
         <Style TargetType="Border" x:Key="Card">
-            <Setter Property="Background" Value="#252528" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceGradientBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="14,12" />
             <Setter Property="Margin" Value="0,0,0,12" />
         </Style>
         <!-- Hotkey input box style -->
         <Style TargetType="TextBox" x:Key="HotkeyBox">
-            <Setter Property="Background" Value="#1A1A1E" />
-            <Setter Property="Foreground" Value="#EEE" />
-            <Setter Property="BorderBrush" Value="#444" />
+            <Setter Property="Background" Value="{DynamicResource WindowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Height" Value="30" />
             <Setter Property="Padding" Value="8,4" />
@@ -43,6 +45,13 @@
             <Setter Property="IsReadOnly" Value="True" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <!-- Small neutral button (Reset / browse) -->
+        <Style TargetType="Button" x:Key="MiniBtn">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
     </Window.Resources>
 
@@ -54,6 +63,65 @@
 
         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="20,16,20,0">
             <StackPanel>
+
+                <!-- Appearance -->
+                <TextBlock Text="Appearance" Style="{StaticResource SectionTitle}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Theme" Style="{StaticResource Label}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,12">
+                            <RadioButton x:Name="RbThemeLight" Content="Light" GroupName="theme" Tag="Light"
+                                         Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand" Margin="0,0,18,0"
+                                         Checked="Theme_Checked" />
+                            <RadioButton x:Name="RbThemeDark" Content="Dark" GroupName="theme" Tag="Dark"
+                                         Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand" Margin="0,0,18,0"
+                                         Checked="Theme_Checked" />
+                            <RadioButton x:Name="RbThemeSystem" Content="System" GroupName="theme" Tag="System"
+                                         Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand"
+                                         Checked="Theme_Checked" />
+                        </StackPanel>
+
+                        <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Accent gradient" Style="{StaticResource Label}" VerticalAlignment="Center" />
+                            <Button x:Name="BtnAccentStart" Grid.Column="1" Width="40" Height="28" Cursor="Hand"
+                                    BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Click="AccentStart_Click"
+                                    ToolTip="Gradient start colour" />
+                            <TextBlock Grid.Column="2" Text="&#x2192;" Foreground="{DynamicResource TextMutedBrush}"
+                                       VerticalAlignment="Center" Margin="8,0" />
+                            <Button x:Name="BtnAccentEnd" Grid.Column="3" Width="40" Height="28" Cursor="Hand"
+                                    BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Click="AccentEnd_Click"
+                                    ToolTip="Gradient end colour" />
+                            <Button Grid.Column="5" Content="&#x21BA; Reset" Style="{StaticResource MiniBtn}"
+                                    Padding="10,0" Height="26" FontSize="11" Click="ResetAccent_Click" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Gradient angle" Style="{StaticResource Label}" VerticalAlignment="Center" />
+                            <Slider x:Name="SldAngle" Grid.Column="1" Minimum="0" Maximum="360" Value="135"
+                                    VerticalAlignment="Center" ValueChanged="Angle_Changed" />
+                            <TextBlock x:Name="TxtAngle" Grid.Column="2" Text="135&#xB0;" Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="13" Margin="8,0,0,0" Width="40" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <TextBlock Text="Presets" Style="{StaticResource Label}" Margin="0,2,0,4" />
+                        <WrapPanel x:Name="PanelAccentPresets" Margin="0,0,0,8" />
+
+                        <CheckBox x:Name="ChkTint" Content="Tint window &amp; header with accent" Click="Tint_Changed" />
+                    </StackPanel>
+                </Border>
 
                 <!-- General -->
                 <TextBlock Text="General" Style="{StaticResource SectionTitle}" />
@@ -69,7 +137,7 @@
 
                 <!-- Hotkeys -->
                 <TextBlock Text="Hotkeys" Style="{StaticResource SectionTitle}" />
-                <TextBlock Text="Click a field, then press your desired key combination" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
+                <TextBlock Text="Click a field, then press your desired key combination" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,6" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid Margin="0,0,0,8">
@@ -83,7 +151,7 @@
                                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" />
                             <Button Grid.Column="2" Content="Reset" Width="50" Height="26" Margin="6,0,0,0"
                                     Click="ResetHotkey_Click" Tag="CaptureHotkey" FontSize="11"
-                                    Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                                    Style="{StaticResource MiniBtn}" />
                         </Grid>
                         <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
@@ -96,7 +164,7 @@
                                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" />
                             <Button Grid.Column="2" Content="Reset" Width="50" Height="26" Margin="6,0,0,0"
                                     Click="ResetHotkey_Click" Tag="FullscreenSaveHotkey" FontSize="11"
-                                    Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                                    Style="{StaticResource MiniBtn}" />
                         </Grid>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -109,7 +177,7 @@
                                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" />
                             <Button Grid.Column="2" Content="Reset" Width="50" Height="26" Margin="6,0,0,0"
                                     Click="ResetHotkey_Click" Tag="FullscreenClipHotkey" FontSize="11"
-                                    Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                                    Style="{StaticResource MiniBtn}" />
                         </Grid>
                         <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
@@ -122,24 +190,24 @@
                                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" />
                             <Button Grid.Column="2" Content="Reset" Width="50" Height="26" Margin="6,0,0,0"
                                     Click="ResetHotkey_Click" Tag="HistoryHotkey" FontSize="11"
-                                    Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                                    Style="{StaticResource MiniBtn}" />
                         </Grid>
                         <!-- Duplicate warning -->
-                        <TextBlock x:Name="TxtHotkeyWarning" Foreground="#EF5350" FontSize="11"
+                        <TextBlock x:Name="TxtHotkeyWarning" Foreground="{DynamicResource DangerBrush}" FontSize="11"
                                    Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
                     </StackPanel>
                 </Border>
 
                 <!-- Annotation & Recording Shortcuts -->
                 <TextBlock Text="Annotation &amp; Recording Shortcuts" Style="{StaticResource SectionTitle}" />
-                <TextBlock Text="Shared across screenshot and recording — click a field, then press your desired key" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
+                <TextBlock Text="Shared across screenshot and recording — click a field, then press your desired key" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,6" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel x:Name="ToolShortcutsPanel" />
                 </Border>
 
                 <!-- Toolbar Shortcuts -->
                 <TextBlock Text="Toolbar Shortcuts" Style="{StaticResource SectionTitle}" />
-                <TextBlock Text="Active on the snipping toolbar before region selection" Foreground="#777" FontSize="11" Margin="0,0,0,6" />
+                <TextBlock Text="Active on the snipping toolbar before region selection" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,6" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel x:Name="ToolbarShortcutsPanel" />
                 </Border>
@@ -169,7 +237,7 @@
                             <TextBlock Text="JPEG quality" Style="{StaticResource Label}" VerticalAlignment="Center" />
                             <Slider x:Name="SldJpegQuality" Grid.Column="1" Minimum="10" Maximum="100"
                                     Value="90" VerticalAlignment="Center" />
-                            <TextBlock x:Name="TxtJpegQuality" Grid.Column="2" Text="90" Foreground="#AAA"
+                            <TextBlock x:Name="TxtJpegQuality" Grid.Column="2" Text="90" Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="13" Margin="8,0,0,0" Width="24" VerticalAlignment="Center" />
                         </Grid>
                         <Grid>
@@ -180,9 +248,9 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Save directory" Style="{StaticResource Label}" VerticalAlignment="Center" />
                             <TextBox x:Name="TxtSaveDir" Grid.Column="1" Height="28" Padding="6,4"
-                                     Background="#1A1A1E" Foreground="#CCC" BorderBrush="#444" FontSize="11" />
+                                     Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" FontSize="11" />
                             <Button Grid.Column="2" Content="..." Width="32" Height="28" Margin="6,0,0,0"
-                                    Click="BrowseDir_Click" Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                                    Click="BrowseDir_Click" Style="{StaticResource MiniBtn}" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -193,7 +261,7 @@
                     <StackPanel>
                         <CheckBox x:Name="ChkRecordAudio" Content="Enable audio recording (microphone)" />
                         <TextBlock Text="When enabled, microphone audio is captured with video. Can also be toggled during recording."
-                                   Foreground="#666" FontSize="11" Margin="20,4,0,0" TextWrapping="Wrap" />
+                                   Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="20,4,0,0" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
@@ -210,9 +278,9 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="History folder" Style="{StaticResource Label}" VerticalAlignment="Center" />
                             <TextBox x:Name="TxtHistoryDir" Grid.Column="1" Height="28" Padding="6,4"
-                                     Background="#1A1A1E" Foreground="#CCC" BorderBrush="#444" FontSize="11" />
+                                     Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" FontSize="11" />
                             <Button Grid.Column="2" Content="..." Width="32" Height="28" Margin="6,0,0,0"
-                                    Click="BrowseHistoryDir_Click" Background="#333" Foreground="#AAA" BorderBrush="#444" Cursor="Hand" />
+                                    Click="BrowseHistoryDir_Click" Style="{StaticResource MiniBtn}" />
                         </Grid>
                         <Grid Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
@@ -221,7 +289,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Max items" Style="{StaticResource Label}" VerticalAlignment="Center" />
                             <TextBox x:Name="TxtMaxHistory" Grid.Column="1" Height="28" Padding="6,4"
-                                     Background="#1A1A1E" Foreground="#CCC" BorderBrush="#444" />
+                                     Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -232,7 +300,7 @@
                     <StackPanel>
                         <CheckBox x:Name="ChkQuickPreview" Content="Enable Quick Preview (Space in Explorer)" />
                         <TextBlock Text="Press Spacebar in File Explorer to preview files. Supports images, video, audio, text, PDF, and more."
-                                   Foreground="#666" FontSize="11" Margin="20,4,0,0" TextWrapping="Wrap" />
+                                   Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="20,4,0,0" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
@@ -240,13 +308,13 @@
         </ScrollViewer>
 
         <!-- Bottom buttons -->
-        <Border Grid.Row="1" Background="#222" Padding="20,12" BorderBrush="#333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="1" Background="{DynamicResource HeaderGradientBrush}" Padding="20,12" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Save" Width="90" Height="32" Click="Save_Click"
-                        Background="#42A5F5" Foreground="White" BorderBrush="#1E88E5"
+                        Background="{DynamicResource AccentGradientBrush}" Foreground="{DynamicResource AccentTextBrush}" BorderBrush="{DynamicResource AccentBrush}"
                         FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
                 <Button Content="Cancel" Width="90" Height="32" Margin="10,0,0,0" Click="Cancel_Click"
-                        Background="#333" Foreground="#CCC" BorderBrush="#444" FontSize="13" Cursor="Hand" />
+                        Style="{StaticResource MiniBtn}" FontSize="13" />
             </StackPanel>
         </Border>
     </Grid>

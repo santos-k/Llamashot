@@ -7,7 +7,8 @@
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
-        Background="{DynamicResource WindowBrush}"
+        MinWidth="720" MinHeight="520"
+        Background="{DynamicResource WindowGradientBrush}"
         KeyDown="Window_KeyDown">
 
     <Window.Resources>
@@ -67,7 +68,7 @@
         <!-- ================================================================ -->
         <!--  Row 0: Header                                                   -->
         <!-- ================================================================ -->
-        <Border Grid.Row="0" Background="{DynamicResource HeaderBrush}" Padding="16,10"
+        <Border Grid.Row="0" Background="{DynamicResource HeaderGradientBrush}" Padding="16,10"
                 BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <Button x:Name="BtnBack" Content="&#x2190; Back" HorizontalAlignment="Left" Visibility="Collapsed"

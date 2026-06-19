@@ -66,7 +66,7 @@
             <Button x:Name="BtnStart" Click="Start_Click" Cursor="Hand" Focusable="False" Margin="0,0,6,0">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="#2196F3" CornerRadius="14" Padding="12,4">
+                        <Border x:Name="Bd" Background="{DynamicResource AccentBrush}" CornerRadius="14" Padding="12,4">
                             <StackPanel Orientation="Horizontal">
                                 <Ellipse Width="10" Height="10" Stroke="White" StrokeThickness="2" Margin="0,0,6,0" VerticalAlignment="Center" />
                                 <TextBlock Text="Start" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -74,10 +74,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#42A5F5" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1E88E5" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -249,10 +249,10 @@
 
             <!-- Saving message with progress (hidden until saving) -->
             <StackPanel x:Name="SavingPanel" Orientation="Horizontal" Visibility="Collapsed">
-                <Ellipse Width="12" Height="12" Fill="#42A5F5" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <Ellipse Width="12" Height="12" Fill="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
                 <TextBlock x:Name="SavingText" Text="Saving..." Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Border Margin="8,0,0,0" VerticalAlignment="Center" Background="#25FFFFFF" CornerRadius="3" Width="120" Height="6">
-                    <Border x:Name="SavingProgressBar" Background="#42A5F5" CornerRadius="3"
+                    <Border x:Name="SavingProgressBar" Background="{DynamicResource AccentBrush}" CornerRadius="3"
                             HorizontalAlignment="Left" Width="0" Height="6" />
                 </Border>
                 <TextBlock x:Name="SavingPercent" Text="" Foreground="#AAA" FontSize="12"

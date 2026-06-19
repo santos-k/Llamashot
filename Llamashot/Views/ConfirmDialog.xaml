@@ -20,7 +20,7 @@
             </ControlTemplate.Triggers>
         </ControlTemplate>
     </Window.Resources>
-    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="12"
+    <Border Background="{DynamicResource SurfaceGradientBrush}" CornerRadius="12"
             BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="12">
         <Border.Effect>
             <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.35" Color="#3A4A8A"/>

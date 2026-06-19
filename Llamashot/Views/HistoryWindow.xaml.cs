@@ -99,6 +99,15 @@ public partial class HistoryWindow : Window
         LoadHistory();
         ApplyViewMode(_viewMode);
         Activated += (_, _) => LoadHistory();
+
+        Core.ThemeManager.ThemeChanged += OnThemeChanged;
+        Closed += (s, e) => Core.ThemeManager.ThemeChanged -= OnThemeChanged;
+    }
+
+    private void OnThemeChanged()
+    {
+        // DynamicResource handles XAML; re-run code-set filter-button colours so they repaint.
+        UpdateFilterButtons();
     }
 
     // ============ VIEW MODES ============
@@ -241,10 +250,10 @@ public partial class HistoryWindow : Window
 
     private void UpdateFilterButtons()
     {
-        var activeBg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x42, 0xA5, 0xF5));
-        var inactiveBg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
-        var activeFg = System.Windows.Media.Brushes.White;
-        var inactiveFg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xAA, 0xAA, 0xAA));
+        var activeBg = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        var inactiveBg = (System.Windows.Media.Brush)FindResource("SurfaceAltBrush");
+        var activeFg = (System.Windows.Media.Brush)FindResource("AccentTextBrush");
+        var inactiveFg = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
 
         foreach (var child in FilterPanel.Children)
         {
@@ -389,12 +398,10 @@ public partial class HistoryWindow : Window
 
         var original = btn.Content;
         btn.Content = "Copied!";
-        btn.Foreground = new System.Windows.Media.SolidColorBrush(
-            System.Windows.Media.Color.FromRgb(0x42, 0xA5, 0xF5));
+        btn.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
         await Task.Delay(2000);
         btn.Content = original;
-        btn.Foreground = new System.Windows.Media.SolidColorBrush(
-            System.Windows.Media.Color.FromRgb(0x66, 0xBB, 0x6A));
+        btn.Foreground = (System.Windows.Media.Brush)FindResource("SuccessBrush");
     }
 
     private async void SaveSelected_Click(object sender, RoutedEventArgs e)
@@ -419,12 +426,10 @@ public partial class HistoryWindow : Window
 
         var original = btn.Content;
         btn.Content = "Saved!";
-        btn.Foreground = new System.Windows.Media.SolidColorBrush(
-            System.Windows.Media.Color.FromRgb(0x66, 0xBB, 0x6A));
+        btn.Foreground = (System.Windows.Media.Brush)FindResource("SuccessBrush");
         await Task.Delay(2000);
         btn.Content = original;
-        btn.Foreground = new System.Windows.Media.SolidColorBrush(
-            System.Windows.Media.Color.FromRgb(0x42, 0xA5, 0xF5));
+        btn.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
     }
 
     private void DeleteSelected_Click(object sender, RoutedEventArgs e)

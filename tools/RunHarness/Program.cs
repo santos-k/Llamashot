@@ -46,6 +46,79 @@ internal static class Program
     {
         ThemeManager.Initialize(ThemeManager.Light);
 
+        // Capture the redesigned windows in both themes (no settings writes — Apply persist:false).
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_THEMESHOT") == "1")
+        {
+            foreach (var theme in new[] { ThemeManager.Dark, ThemeManager.Light })
+            {
+                ThemeManager.Apply(theme, persist: false);
+                ThemeManager.ApplyAccent();
+
+                var ft = new FileToolsWindow
+                {
+                    WindowState = WindowState.Normal, Width = 1280, Height = 820,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen
+                };
+                ft.Show(); await Task.Delay(500); ShotRtb(ft, $"theme_filetools_{theme}.png"); ft.Close();
+
+                var st = new SettingsWindow { WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                st.Show(); await Task.Delay(300); ShotRtb(st, $"theme_settings_{theme}.png"); st.Close();
+
+                var ab = new AboutWindow { WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                ab.Show(); await Task.Delay(300); ShotRtb(ab, $"theme_about_{theme}.png"); ab.Close();
+            }
+            return;
+        }
+
+        // Programmatic verification of the accent/theme engine + History render.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_THEMEVERIFY") == "1")
+        {
+            var log = new List<string>();
+            void A(string name, bool ok) => log.Add($"{(ok ? "PASS" : "FAIL")}  {name}");
+            Color Hex(string h) => (Color)ColorConverter.ConvertFromString(h);
+            Color AccentNow() => ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
+
+            ThemeManager.ApplyAccent(); // defaults
+            A($"default accent is teal ({AccentNow()})", AccentNow() == Hex("#2DD4BF"));
+            A("AccentGradientBrush is a gradient", Application.Current.Resources["AccentGradientBrush"] is LinearGradientBrush);
+            A("WindowGradient tinted when tint on", Application.Current.Resources.Contains("WindowGradientBrush"));
+
+            ThemeManager.ApplyAccent("#FF0000", "#0000FF", 90, true);
+            A($"custom accent applies ({AccentNow()})", AccentNow() == Hex("#FF0000"));
+            var at = ((SolidColorBrush)Application.Current.Resources["AccentTextBrush"]).Color;
+            A($"accent-text auto-contrasts to white on red ({at})", at == Colors.White);
+
+            ThemeManager.ApplyAccent("#2DD4BF", "#34D399", 135, true);
+            var tintedStop = ((LinearGradientBrush)Application.Current.Resources["WindowGradientBrush"]).GradientStops[0].Color;
+            ThemeManager.ApplyAccent("#2DD4BF", "#34D399", 135, false);
+            var neutralStop = ((LinearGradientBrush)Application.Current.Resources["WindowGradientBrush"]).GradientStops[0].Color;
+            A($"tint ON vs OFF changes window gradient ({tintedStop} vs {neutralStop})", tintedStop != neutralStop);
+
+            ThemeManager.ResetAccent();
+            A($"reset restores teal ({AccentNow()})", AccentNow() == Hex("#2DD4BF"));
+
+            ThemeManager.Apply(ThemeManager.Light, persist: false); ThemeManager.ApplyAccent();
+            A($"accent survives theme swap ({AccentNow()})", AccentNow() == Hex("#2DD4BF"));
+            var lightWinBrush = Application.Current.Resources["WindowGradientBrush"];
+            A("WindowGradient present after swap", lightWinBrush is LinearGradientBrush);
+
+            // Render History in both themes
+            foreach (var theme in new[] { ThemeManager.Dark, ThemeManager.Light })
+            {
+                ThemeManager.Apply(theme, persist: false); ThemeManager.ApplyAccent();
+                try
+                {
+                    var hw = new HistoryWindow { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                    hw.Show(); await Task.Delay(350); ShotRtb(hw, $"theme_history_{theme}.png"); hw.Close();
+                    A($"HistoryWindow rendered ({theme})", true);
+                }
+                catch (Exception ex) { A($"HistoryWindow ({theme}): {ex.Message}", false); }
+            }
+
+            File.WriteAllText(Path.Combine(Dir, "themeverify.txt"), string.Join("\n", log));
+            return;
+        }
+
         if (Environment.GetEnvironmentVariable("LLAMASHOT_VERIFY") == "1")
         {
             await VerifyExports();

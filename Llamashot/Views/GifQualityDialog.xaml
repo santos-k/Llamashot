@@ -11,43 +11,33 @@
         Width="320" Height="260"
         PreviewKeyDown="Window_KeyDown">
     <Border CornerRadius="12" Padding="16"
-            BorderThickness="1">
-        <Border.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#F0141428" Offset="0"/>
-                <GradientStop Color="#F5101020" Offset="1"/>
-            </LinearGradientBrush>
-        </Border.Background>
-        <Border.BorderBrush>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#30FFFFFF" Offset="0"/>
-                <GradientStop Color="#12FFFFFF" Offset="1"/>
-            </LinearGradientBrush>
-        </Border.BorderBrush>
+            BorderThickness="1"
+            Background="{DynamicResource SurfaceGradientBrush}"
+            BorderBrush="{DynamicResource BorderSoftBrush}">
         <Border.Effect>
             <DropShadowEffect BlurRadius="24" Opacity="0.6" ShadowDepth="4" Color="#000020" />
         </Border.Effect>
         <StackPanel>
-            <TextBlock x:Name="TxtTitle" Text="Save Quality" Foreground="White" FontSize="16" FontWeight="SemiBold"
+            <TextBlock x:Name="TxtTitle" Text="Save Quality" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="16" FontWeight="SemiBold"
                        Margin="0,0,0,12" />
 
             <!-- Original -->
             <Button x:Name="BtnOriginal" Click="Original_Click" Cursor="Hand" Focusable="False" Margin="0,0,0,6">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="#18FFFFFF" CornerRadius="8" Padding="12,8"
-                                BorderBrush="#20FFFFFF" BorderThickness="1">
+                        <Border x:Name="Bd" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="12,8"
+                                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Original" Foreground="#4CAF50" FontSize="14" FontWeight="SemiBold" />
-                                    <TextBlock x:Name="TxtOriginalDesc" Text=" — Full resolution" Foreground="#AAA" FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="TxtOriginalDesc" Text=" — Full resolution" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock x:Name="TxtOriginalSub" Text="Best quality, larger file size" Foreground="#666" FontSize="11" Margin="0,2,0,0" />
+                                <TextBlock x:Name="TxtOriginalSub" Text="Best quality, larger file size" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#28FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="#404CAF50" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -59,19 +49,19 @@
             <Button x:Name="BtnHigh" Click="High_Click" Cursor="Hand" Focusable="False" Margin="0,0,0,6">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="#18FFFFFF" CornerRadius="8" Padding="12,8"
-                                BorderBrush="#20FFFFFF" BorderThickness="1">
+                        <Border x:Name="Bd" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="12,8"
+                                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="High" Foreground="#42A5F5" FontSize="14" FontWeight="SemiBold" />
-                                    <TextBlock Text=" — 720p" Foreground="#AAA" FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock Text=" — 720p" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock Text="Good quality, moderate file size" Foreground="#666" FontSize="11" Margin="0,2,0,0" />
+                                <TextBlock Text="Good quality, moderate file size" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#28FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="#4042A5F5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -83,19 +73,19 @@
             <Button x:Name="BtnCompact" Click="Compact_Click" Cursor="Hand" Focusable="False" Margin="0,0,0,6">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="#18FFFFFF" CornerRadius="8" Padding="12,8"
-                                BorderBrush="#20FFFFFF" BorderThickness="1">
+                        <Border x:Name="Bd" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="12,8"
+                                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Compact" Foreground="#FFA726" FontSize="14" FontWeight="SemiBold" />
-                                    <TextBlock Text=" — 480p" Foreground="#AAA" FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock Text=" — 480p" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock Text="Smallest file, good for sharing" Foreground="#666" FontSize="11" Margin="0,2,0,0" />
+                                <TextBlock Text="Smallest file, good for sharing" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#28FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="#40FFA726" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -107,10 +97,10 @@
             <Button Click="Cancel_Click" Cursor="Hand" Focusable="False" HorizontalAlignment="Right" Margin="0,4,0,0">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <TextBlock x:Name="Tb" Text="Cancel" Foreground="#666" FontSize="12" />
+                        <TextBlock x:Name="Tb" Text="Cancel" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Tb" Property="Foreground" Value="#EF5350" />
+                                <Setter TargetName="Tb" Property="Foreground" Value="{DynamicResource DangerBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

@@ -22,8 +22,11 @@ public class SignatureDialog : Window
     private readonly Border _typePanel;
     private readonly StackPanel _drawButtons;
     private readonly System.Collections.Generic.List<Border> _fontChips = new();
+    private readonly System.Collections.Generic.List<(Button btn, bool accent)> _chromeButtons = new();
     private string _mode = "draw";   // draw | type
     private string _typeFont = "Segoe Script";
+    private TextBlock? _typeLabel;
+    private Border? _previewBox;
 
     // 5 cursive faces for typed signatures
     private static readonly string[] CursiveFonts =
@@ -31,17 +34,29 @@ public class SignatureDialog : Window
 
     public string? ResultPngPath { get; private set; }
 
-    private static readonly Color Bg = Color.FromRgb(0x1A, 0x1A, 0x1E);
-    private static readonly Color Panel = Color.FromRgb(0x24, 0x24, 0x2A);
-    private static readonly Color Accent = Color.FromRgb(0x42, 0xA5, 0xF5);
-    private static readonly Color Line = Color.FromRgb(0x3A, 0x3A, 0x42);
+    // Themed brushes, read from the active theme dictionary (refreshed on ThemeChanged).
+    private static Brush WindowBg => Res("WindowGradientBrush", Color.FromRgb(0x1A, 0x1A, 0x1E));
+    private static Brush Panel => Res("SurfaceBrush", Color.FromRgb(0x24, 0x24, 0x2A));
+    private static Brush Accent => Res("AccentBrush", Color.FromRgb(0x42, 0xA5, 0xF5));
+    private static Brush Line => Res("BorderSoftBrush", Color.FromRgb(0x3A, 0x3A, 0x42));
+    private static Brush TextPrimary => Res("TextPrimaryBrush", Colors.White);
+    private static Brush TextSecondary => Res("TextSecondaryBrush", Color.FromRgb(0x99, 0x99, 0x99));
+
+    private static Brush Res(string key, Color fallback)
+    {
+        if (Application.Current?.TryFindResource(key) is Brush b) return b;
+        return new SolidColorBrush(fallback);
+    }
 
     public SignatureDialog()
     {
         Title = "Signature";
         Width = 600; Height = 380;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = new SolidColorBrush(Bg);
+        Background = WindowBg;
+
+        Core.ThemeManager.ThemeChanged += OnThemeChanged;
+        Closed += (_, _) => Core.ThemeManager.ThemeChanged -= OnThemeChanged;
 
         var root = new DockPanel { Margin = new Thickness(14) };
 
@@ -74,29 +89,30 @@ public class SignatureDialog : Window
         // ---- draw panel ----
         _ink = new InkCanvas { Background = Brushes.White };
         _ink.DefaultDrawingAttributes = new DrawingAttributes { Color = Colors.Black, Width = 3, Height = 3, FitToCurve = true };
-        _drawPanel = new Border { Child = _ink, BorderBrush = new SolidColorBrush(Line), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8) };
+        _drawPanel = new Border { Child = _ink, BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8) };
 
         // ---- type panel ----
         var typeStack = new StackPanel();
         _typeBox = new TextBox
         {
             FontSize = 15, Padding = new Thickness(11, 9, 11, 9), Margin = new Thickness(0, 0, 0, 12),
-            Background = new SolidColorBrush(Panel), Foreground = Brushes.White,
-            BorderBrush = new SolidColorBrush(Line), BorderThickness = new Thickness(1),
-            CaretBrush = Brushes.White
+            Background = Panel, Foreground = TextPrimary,
+            BorderBrush = Line, BorderThickness = new Thickness(1),
+            CaretBrush = TextPrimary
         };
         _typeBox.TextChanged += (_, _) => UpdateTypePreview();
-        typeStack.Children.Add(new TextBlock { Text = "Type your name", Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0x99)), FontSize = 12, Margin = new Thickness(2, 0, 0, 6) });
+        _typeLabel = new TextBlock { Text = "Type your name", Foreground = TextSecondary, FontSize = 12, Margin = new Thickness(2, 0, 0, 6) };
+        typeStack.Children.Add(_typeLabel);
         typeStack.Children.Add(_typeBox);
 
         var chips = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
         foreach (var f in CursiveFonts) chips.Children.Add(FontChip(f));
         typeStack.Children.Add(chips);
 
-        var previewBox = new Border
+        var previewBox = _previewBox = new Border
         {
             Height = 110, Background = Brushes.White, CornerRadius = new CornerRadius(8),
-            BorderBrush = new SolidColorBrush(Line), BorderThickness = new Thickness(1)
+            BorderBrush = Line, BorderThickness = new Thickness(1)
         };
         _typePreview = new TextBlock
         {
@@ -131,10 +147,10 @@ public class SignatureDialog : Window
         var b = new Border
         {
             CornerRadius = new CornerRadius(8), Padding = new Thickness(15, 8, 15, 8), Margin = new Thickness(0, 0, 8, 0),
-            Cursor = Cursors.Hand, Background = new SolidColorBrush(Panel), BorderThickness = new Thickness(1),
-            BorderBrush = new SolidColorBrush(Line), Tag = mode
+            Cursor = Cursors.Hand, Background = Panel, BorderThickness = new Thickness(1),
+            BorderBrush = Line, Tag = mode
         };
-        var tb = new TextBlock { Text = label, Foreground = Brushes.White, FontSize = 13 };
+        var tb = new TextBlock { Text = label, Foreground = TextPrimary, FontSize = 13 };
         b.Child = tb;
         b.MouseLeftButtonUp += (_, _) =>
         {
@@ -153,8 +169,9 @@ public class SignatureDialog : Window
             if (child is Border mb && mb.Tag is string m)
             {
                 bool on = m == _mode;
-                mb.Background = new SolidColorBrush(on ? Accent : Panel);
-                mb.BorderBrush = new SolidColorBrush(on ? Accent : Line);
+                mb.Background = on ? Accent : Panel;
+                mb.BorderBrush = on ? Accent : Line;
+                if (mb.Child is TextBlock mtb) mtb.Foreground = on ? Res("AccentTextBrush", Colors.White) : TextPrimary;
             }
     }
 
@@ -163,10 +180,10 @@ public class SignatureDialog : Window
         var b = new Border
         {
             CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(0, 0, 8, 8),
-            Cursor = Cursors.Hand, Background = new SolidColorBrush(Panel), BorderThickness = new Thickness(1),
-            BorderBrush = new SolidColorBrush(Line), Tag = font
+            Cursor = Cursors.Hand, Background = Panel, BorderThickness = new Thickness(1),
+            BorderBrush = Line, Tag = font
         };
-        b.Child = new TextBlock { Text = font, FontSize = 17, Foreground = Brushes.White, FontFamily = new FontFamily(font) };
+        b.Child = new TextBlock { Text = font, FontSize = 17, Foreground = TextPrimary, FontFamily = new FontFamily(font) };
         b.MouseLeftButtonUp += (_, _) => { _typeFont = font; HighlightFontChips(); UpdateTypePreview(); };
         _fontChips.Add(b);
         return b;
@@ -177,8 +194,9 @@ public class SignatureDialog : Window
         foreach (var c in _fontChips)
         {
             bool on = (string)c.Tag! == _typeFont;
-            c.Background = new SolidColorBrush(on ? Accent : Panel);
-            c.BorderBrush = new SolidColorBrush(on ? Accent : Line);
+            c.Background = on ? Accent : Panel;
+            c.BorderBrush = on ? Accent : Line;
+            if (c.Child is TextBlock ctb) ctb.Foreground = on ? Res("AccentTextBrush", Colors.White) : TextPrimary;
         }
     }
 
@@ -187,12 +205,21 @@ public class SignatureDialog : Window
         var btn = new Button
         {
             Content = text, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(16, 7, 16, 7),
-            Cursor = Cursors.Hand, FontSize = 13, Foreground = Brushes.White, BorderThickness = new Thickness(accent ? 0 : 1)
+            Cursor = Cursors.Hand, FontSize = 13,
+            BorderThickness = new Thickness(accent ? 0 : 1)
         };
+        SkinChromeButton(btn, accent);
+        _chromeButtons.Add((btn, accent));
+        return btn;
+    }
+
+    private void SkinChromeButton(Button btn, bool accent)
+    {
+        btn.Foreground = accent ? Res("AccentTextBrush", Colors.White) : TextPrimary;
         var bg = new FrameworkElementFactory(typeof(Border));
         bg.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
-        bg.SetValue(Border.BackgroundProperty, new SolidColorBrush(accent ? Accent : Panel));
-        bg.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Line));
+        bg.SetValue(Border.BackgroundProperty, accent ? Accent : Panel);
+        bg.SetValue(Border.BorderBrushProperty, Line);
         bg.SetValue(Border.BorderThicknessProperty, new Thickness(accent ? 0 : 1));
         bg.SetValue(Border.PaddingProperty, new Thickness(16, 7, 16, 7));
         var cp = new FrameworkElementFactory(typeof(ContentPresenter));
@@ -200,7 +227,24 @@ public class SignatureDialog : Window
         cp.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
         bg.AppendChild(cp);
         btn.Template = new ControlTemplate(typeof(Button)) { VisualTree = bg };
-        return btn;
+    }
+
+    private void OnThemeChanged()
+    {
+        Background = WindowBg;
+        if (_drawPanel != null) _drawPanel.BorderBrush = Line;
+        if (_typeBox != null)
+        {
+            _typeBox.Background = Panel;
+            _typeBox.Foreground = TextPrimary;
+            _typeBox.BorderBrush = Line;
+            _typeBox.CaretBrush = TextPrimary;
+        }
+        if (_typeLabel != null) _typeLabel.Foreground = TextSecondary;
+        if (_previewBox != null) _previewBox.BorderBrush = Line;
+        foreach (var (btn, accent) in _chromeButtons) SkinChromeButton(btn, accent);
+        HighlightFontChips();
+        ApplyMode();
     }
 
     private void Upload_Click(object sender, RoutedEventArgs e)

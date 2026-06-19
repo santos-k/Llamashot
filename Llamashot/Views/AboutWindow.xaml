@@ -6,7 +6,7 @@
         Width="420" Height="530"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="#1A1A1E">
+        Background="{DynamicResource WindowGradientBrush}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -14,46 +14,35 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Background="#222" Padding="20,18" BorderBrush="#333" BorderThickness="0,0,0,1">
+        <Border Background="{DynamicResource HeaderGradientBrush}" Padding="20,18" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
             <StackPanel HorizontalAlignment="Center">
                 <Image Source="/Resources/icon128.png" Width="80" Height="80" Margin="0,0,0,10"
                        RenderOptions.BitmapScalingMode="HighQuality" />
                 <TextBlock Text="Llamashot" FontSize="28" FontWeight="Bold"
-                           Foreground="#42A5F5" HorizontalAlignment="Center" />
+                           Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
-                           Foreground="#999" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 8.9.15" Foreground="#666"
+                           Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                <TextBlock Text="Version 8.9.16" Foreground="{DynamicResource TextMutedBrush}"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
                 <Border Margin="0,14,0,0" CornerRadius="12" Padding="16,13" Width="300"
-                        HorizontalAlignment="Center" BorderThickness="1" BorderBrush="#33FFFFFF">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#2942A5F5" Offset="0" />
-                            <GradientStop Color="#229B6BFF" Offset="1" />
-                        </LinearGradientBrush>
-                    </Border.Background>
+                        HorizontalAlignment="Center" BorderThickness="1" BorderBrush="{DynamicResource BorderSoftBrush}"
+                        Background="{DynamicResource SurfaceAltBrush}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
                             <TextBlock Text="&#x1F680;" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0" />
                             <TextBlock x:Name="TxtUpdateHeadline" Text="You're on the latest version"
-                                       Foreground="#EAEAF0" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                       Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </StackPanel>
 
                         <Button x:Name="BtnUpdate" Content="Check for Update"
                                 Click="CheckUpdate_Click" Height="34" Cursor="Hand"
-                                FontSize="12.5" FontWeight="SemiBold" Foreground="White"
+                                FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}"
                                 BorderThickness="0" HorizontalAlignment="Stretch">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="bd" CornerRadius="9">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                                <GradientStop Color="#42A5F5" Offset="0" />
-                                                <GradientStop Color="#7C6BFF" Offset="1" />
-                                            </LinearGradientBrush>
-                                        </Border.Background>
+                                    <Border x:Name="bd" CornerRadius="9" Background="{DynamicResource AccentGradientBrush}">
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
                                     <ControlTemplate.Triggers>
@@ -68,13 +57,13 @@
                             </Button.Template>
                         </Button>
 
-                        <TextBlock x:Name="TxtUpdateStatus" Foreground="#9FE6B0"
+                        <TextBlock x:Name="TxtUpdateStatus" Foreground="{DynamicResource SuccessBrush}"
                                    FontSize="11" HorizontalAlignment="Center" Margin="0,9,0,0"
                                    TextWrapping="Wrap" TextAlignment="Center"
                                    Visibility="Collapsed" />
                         <ProgressBar x:Name="PrgUpdate" Height="5" Margin="0,9,0,0"
                                      Visibility="Collapsed" Minimum="0" Maximum="100"
-                                     Background="#33000000" Foreground="#5BD0A4" BorderThickness="0" />
+                                     Background="#33000000" Foreground="{DynamicResource SuccessBrush}" BorderThickness="0" />
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -84,60 +73,60 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="24,16,24,16">
             <StackPanel>
                 <!-- Features -->
-                <TextBlock Text="Features" Foreground="#42A5F5" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" />
-                <Border Background="#252528" CornerRadius="6" Padding="14,10" Margin="0,0,0,12">
+                <TextBlock Text="Features" Foreground="{DynamicResource AccentBrush}" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Padding="14,10" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Region, fullscreen, and delayed capture with countdown" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; 12 annotation tools: pen, line, arrow, rectangle, ellipse, text, highlighter, blur, stamps, emoji, eraser" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Shift+draw: straight lines, perfect squares, circles" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; 250+ colorful emoji annotations with search" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Screen recording to MP4 with mic &amp; system audio" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; GIF recording mode with 30s limit, quality picker" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Scrolling screenshot (auto/manual) with stitching" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Text extraction from any screen area" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Quick Preview — Space in Explorer to preview 200+ file types" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Syntax highlighting for code, rendered markdown &amp; HTML" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Video/audio auto-play with seek bar, image zoom &amp; pan" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History categories (All/Images/Videos/GIFs/Clipboard)" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; PDF preview via WebView2, animated GIF playback" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Office document preview — Word, Excel, PowerPoint" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; PPTX slide renderer with embedded images" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: File Tools — image/PDF conversion, compression, crop" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Images to PDF &amp; PDF to images converter" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Image resize, rotate, flip &amp; format conversion" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: File Tools redesign — soft light/dark theme with live toggle" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF workspace — all 11 tools (Merge, Split, Compress, PDF↔Images, Rotate, Extract, Insert, Page Numbers, Watermark, Protect) with live preview, password unlock &amp; progress" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF Editor — text, check/cross/radio marks, date, time, initials, signature &amp; image with a contextual Properties panel (fonts, size, color, B/I/U, align)" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Cover (color box) &amp; Blur tools to hide/redact any area; set style before placing; live filename &amp; page info" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Undo/Redo (Ctrl+Z/Y), drag-&amp;-drop to open, centered drop zone" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — drag to move, click to edit, Delete/Esc keys, tool stays active for placing many items" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — live cursor preview of the mark/date/time/text, click places it centered on the pointer, smoother typing &amp; reliable undo/redo" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — drag-corner resize &amp; rotate (0–360°, Shift snaps 15°) for signatures/images/cover/blur, blur opacity 1–100%" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — arrow-key nudge, Enter to commit text, Ctrl+S save, Ctrl+wheel / Ctrl +/- zoom" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Draw tools: pen, highlighter, line, arrow, rectangle &amp; ellipse (Shift to snap), with stroke width, color &amp; opacity" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — 25 fonts incl. script/curly faces; 8 date + 6 time formats for date/time stamps" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Match document: placed text auto-detects the page's font size, color &amp; style under the cursor" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Signatures — Type your name in 5 cursive fonts, or draw / upload as before" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Protect PDF — add password, remove password, or break/recover an unknown password (dictionary + brute force, Stop anytime)" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; Protect PDF — the &quot;password required&quot; prompt now has a Don't-know-it? Recover option that loads the file straight into Break mode" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Fullscreen preview in PDF workspace — view pages large with ‹/› &amp; Esc" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Non-modal PDF tool windows — switch back to File Tools anytime" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Exported PDF carries into the next tool you open (no auto-switch)" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Page Numbers &amp; Watermark — live preview, fonts, sizes, colors, positions &amp; tilt" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Collapsible file panels — preview stretches to fill the space" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Collapsible sidebar, tips &amp; settings cards for a bigger preview" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Right info/settings panel collapses to a rail — preview goes full-width" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Insert Pages — manage images on the left, live merged preview, reorder by buttons or drag &amp; drop" />
-                        <TextBlock Foreground="#42A5F5" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Insert Pages accepts PDFs too — every page of an inserted PDF is added" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
-                        <TextBlock Foreground="#CCC" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Region, fullscreen, and delayed capture with countdown" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; 12 annotation tools: pen, line, arrow, rectangle, ellipse, text, highlighter, blur, stamps, emoji, eraser" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Shift+draw: straight lines, perfect squares, circles" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; 250+ colorful emoji annotations with search" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Screen recording to MP4 with mic &amp; system audio" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; GIF recording mode with 30s limit, quality picker" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Scrolling screenshot (auto/manual) with stitching" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Text extraction from any screen area" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Quick Preview — Space in Explorer to preview 200+ file types" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Syntax highlighting for code, rendered markdown &amp; HTML" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Video/audio auto-play with seek bar, image zoom &amp; pan" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; History categories (All/Images/Videos/GIFs/Clipboard)" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; PDF preview via WebView2, animated GIF playback" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Office document preview — Word, Excel, PowerPoint" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; PPTX slide renderer with embedded images" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: File Tools — image/PDF conversion, compression, crop" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Images to PDF &amp; PDF to images converter" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Image resize, rotate, flip &amp; format conversion" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: File Tools redesign — soft light/dark theme with live toggle" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF workspace — all 11 tools (Merge, Split, Compress, PDF↔Images, Rotate, Extract, Insert, Page Numbers, Watermark, Protect) with live preview, password unlock &amp; progress" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Unified PDF Editor — text, check/cross/radio marks, date, time, initials, signature &amp; image with a contextual Properties panel (fonts, size, color, B/I/U, align)" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Cover (color box) &amp; Blur tools to hide/redact any area; set style before placing; live filename &amp; page info" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Undo/Redo (Ctrl+Z/Y), drag-&amp;-drop to open, centered drop zone" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — drag to move, click to edit, Delete/Esc keys, tool stays active for placing many items" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — live cursor preview of the mark/date/time/text, click places it centered on the pointer, smoother typing &amp; reliable undo/redo" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — drag-corner resize &amp; rotate (0–360°, Shift snaps 15°) for signatures/images/cover/blur, blur opacity 1–100%" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — arrow-key nudge, Enter to commit text, Ctrl+S save, Ctrl+wheel / Ctrl +/- zoom" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Draw tools: pen, highlighter, line, arrow, rectangle &amp; ellipse (Shift to snap), with stroke width, color &amp; opacity" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — 25 fonts incl. script/curly faces; 8 date + 6 time formats for date/time stamps" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: PDF Editor — Match document: placed text auto-detects the page's font size, color &amp; style under the cursor" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Signatures — Type your name in 5 cursive fonts, or draw / upload as before" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Protect PDF — add password, remove password, or break/recover an unknown password (dictionary + brute force, Stop anytime)" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; Protect PDF — the &quot;password required&quot; prompt now has a Don't-know-it? Recover option that loads the file straight into Break mode" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Fullscreen preview in PDF workspace — view pages large with ‹/› &amp; Esc" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Non-modal PDF tool windows — switch back to File Tools anytime" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Exported PDF carries into the next tool you open (no auto-switch)" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Page Numbers &amp; Watermark — live preview, fonts, sizes, colors, positions &amp; tilt" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Collapsible file panels — preview stretches to fill the space" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Collapsible sidebar, tips &amp; settings cards for a bigger preview" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Right info/settings panel collapses to a rail — preview goes full-width" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Insert Pages — manage images on the left, live merged preview, reorder by buttons or drag &amp; drop" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Insert Pages accepts PDFs too — every page of an inserted PDF is added" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
                     </StackPanel>
                 </Border>
 
                 <!-- Hotkeys -->
-                <TextBlock Text="Default Hotkeys" Foreground="#42A5F5" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" />
-                <Border Background="#252528" CornerRadius="6" Padding="14,10" Margin="0,0,0,12">
+                <TextBlock Text="Default Hotkeys" Foreground="{DynamicResource AccentBrush}" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Padding="14,10" Margin="0,0,0,12">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -146,23 +135,23 @@
                         <Grid.RowDefinitions>
                             <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Foreground="#AAA" FontSize="12" Text="Capture region" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="PrintScreen" />
-                        <TextBlock Grid.Row="1" Foreground="#AAA" FontSize="12" Text="Fullscreen save" Margin="0,4,0,0" />
-                        <TextBlock Grid.Row="1" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="Shift+PrintScreen" Margin="0,4,0,0" />
-                        <TextBlock Grid.Row="2" Foreground="#AAA" FontSize="12" Text="Fullscreen copy" Margin="0,4,0,0" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="Ctrl+PrintScreen" Margin="0,4,0,0" />
-                        <TextBlock Grid.Row="3" Foreground="#AAA" FontSize="12" Text="History" Margin="0,4,0,0" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" Foreground="#42A5F5" FontSize="12" Text="Alt+PrintScreen" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="Capture region" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Foreground="{DynamicResource AccentBrush}" FontSize="12" Text="PrintScreen" />
+                        <TextBlock Grid.Row="1" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="Fullscreen save" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Foreground="{DynamicResource AccentBrush}" FontSize="12" Text="Shift+PrintScreen" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="2" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="Fullscreen copy" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Foreground="{DynamicResource AccentBrush}" FontSize="12" Text="Ctrl+PrintScreen" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="3" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="History" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Foreground="{DynamicResource AccentBrush}" FontSize="12" Text="Alt+PrintScreen" Margin="0,4,0,0" />
                     </Grid>
                 </Border>
 
                 <!-- Credits -->
-                <TextBlock Foreground="#666" FontSize="11"
+                <TextBlock Foreground="{DynamicResource TextMutedBrush}" FontSize="11"
                            HorizontalAlignment="Center" TextAlignment="Center"
                            Margin="0,4,0,0">
-                    <Run Text="Made with " /><Run Text="&#x2764;" Foreground="#EF5350" /><Run Text=" by " />
-                    <Run Text="Santosh Kumar" Foreground="#42A5F5" FontWeight="SemiBold" />
+                    <Run Text="Made with " /><Run Text="&#x2764;" Foreground="{DynamicResource DangerBrush}" /><Run Text=" by " />
+                    <Run Text="Santosh Kumar" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
                 </TextBlock>
             </StackPanel>
         </ScrollViewer>

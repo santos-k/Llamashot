@@ -68,13 +68,128 @@ public partial class SettingsWindow : Window
 
     private readonly Dictionary<string, TextBox> _toolShortcutBoxes = new();
 
+    // Appearance — accent customizer state. True until InitAppearance finishes so the
+    // controls' init events don't persist defaults over the user's saved values.
+    private bool _initAppearance = true;
+    private string _accentStart = AppSettings.DefaultAccentStart;
+    private string _accentEnd = AppSettings.DefaultAccentEnd;
+    private static readonly (string a, string b)[] AccentPresets =
+    {
+        ("#2DD4BF", "#34D399"), ("#6E8BFF", "#9B6BFF"), ("#42A5F5", "#26C6DA"),
+        ("#FC466B", "#3F5EFB"), ("#7C3AED", "#DB2777"), ("#FF6A00", "#EE0979"),
+    };
+
     public SettingsWindow()
     {
         InitializeComponent();
         BuildToolShortcutFields();
         BuildShortcutSection(ToolbarShortcuts, ToolbarShortcutsPanel);
         LoadSettings();
+        InitAppearance();
     }
+
+    // ============ APPEARANCE (theme + accent customizer) ============
+
+    private void InitAppearance()
+    {
+        _initAppearance = true;
+        var s = AppSettings.Instance;
+        _accentStart = s.AccentStart;
+        _accentEnd = s.AccentEnd;
+        BtnAccentStart.Background = SwatchBrush(_accentStart);
+        BtnAccentEnd.Background = SwatchBrush(_accentEnd);
+        SldAngle.Value = s.GradientAngle;
+        TxtAngle.Text = $"{s.GradientAngle}°";
+        ChkTint.IsChecked = s.WindowTint;
+
+        var pref = ThemeManager.Preference;
+        RbThemeLight.IsChecked = pref == ThemeManager.Light;
+        RbThemeDark.IsChecked = pref == ThemeManager.Dark;
+        RbThemeSystem.IsChecked = pref != ThemeManager.Light && pref != ThemeManager.Dark;
+
+        BuildAccentPresets();
+        _initAppearance = false;
+    }
+
+    private void BuildAccentPresets()
+    {
+        PanelAccentPresets.Children.Clear();
+        foreach (var (a, b) in AccentPresets)
+        {
+            var btn = new Button
+            {
+                Width = 46, Height = 26, Margin = new Thickness(0, 0, 8, 8),
+                Cursor = Cursors.Hand, BorderThickness = new Thickness(1),
+                Background = new LinearGradientBrush(ParseColor(a), ParseColor(b), 45),
+                ToolTip = $"{a}  →  {b}"
+            };
+            btn.SetResourceReference(BorderBrushProperty, "BorderSoftBrush");
+            string sa = a, sb = b;
+            btn.Click += (_, _) =>
+            {
+                _accentStart = sa; _accentEnd = sb;
+                BtnAccentStart.Background = SwatchBrush(sa);
+                BtnAccentEnd.Background = SwatchBrush(sb);
+                ApplyAccentLive();
+            };
+            PanelAccentPresets.Children.Add(btn);
+        }
+    }
+
+    private void Theme_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_initAppearance) return;
+        if (sender is System.Windows.Controls.RadioButton rb && rb.Tag is string mode)
+            ThemeManager.SetMode(mode);
+    }
+
+    private void AccentStart_Click(object sender, RoutedEventArgs e)
+    {
+        var hex = PickColor(_accentStart);
+        if (hex == null) return;
+        _accentStart = hex; BtnAccentStart.Background = SwatchBrush(hex); ApplyAccentLive();
+    }
+
+    private void AccentEnd_Click(object sender, RoutedEventArgs e)
+    {
+        var hex = PickColor(_accentEnd);
+        if (hex == null) return;
+        _accentEnd = hex; BtnAccentEnd.Background = SwatchBrush(hex); ApplyAccentLive();
+    }
+
+    private void Angle_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (TxtAngle != null) TxtAngle.Text = $"{(int)e.NewValue}°";
+        if (!_initAppearance) ApplyAccentLive();
+    }
+
+    private void Tint_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_initAppearance) ApplyAccentLive();
+    }
+
+    private void ResetAccent_Click(object sender, RoutedEventArgs e)
+    {
+        ThemeManager.ResetAccent();
+        InitAppearance();   // reload the controls from the restored defaults
+    }
+
+    private void ApplyAccentLive()
+        => ThemeManager.SaveAccent(_accentStart, _accentEnd, (int)SldAngle.Value, ChkTint.IsChecked == true);
+
+    private string? PickColor(string current)
+    {
+        var dlg = new ColorPickerDialog(current) { Owner = this };
+        return dlg.ShowDialog() == true ? dlg.ResultHex : null;
+    }
+
+    private static Color ParseColor(string hex)
+    {
+        try { return (Color)System.Windows.Media.ColorConverter.ConvertFromString(hex); }
+        catch { return Colors.Gray; }
+    }
+
+    private static Brush SwatchBrush(string hex) => new SolidColorBrush(ParseColor(hex));
 
     private void BuildToolShortcutFields()
     {
@@ -93,17 +208,14 @@ public partial class SettingsWindow : Window
             var lbl = new TextBlock
             {
                 Text = label,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            lbl.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
             Grid.SetColumn(lbl, 0);
 
             var tb = new TextBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1E)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
                 BorderThickness = new Thickness(1),
                 Height = 28,
                 Padding = new Thickness(8, 4, 8, 4),
@@ -111,6 +223,9 @@ public partial class SettingsWindow : Window
                 IsReadOnly = true,
                 Cursor = Cursors.Hand
             };
+            tb.SetResourceReference(BackgroundProperty, "WindowBrush");
+            tb.SetResourceReference(ForegroundProperty, "TextPrimaryBrush");
+            tb.SetResourceReference(BorderBrushProperty, "BorderSoftBrush");
             tb.PreviewKeyDown += HotkeyBox_PreviewKeyDown;
             tb.GotFocus += HotkeyBox_GotFocus;
             tb.LostFocus += HotkeyBox_LostFocus;
@@ -123,12 +238,12 @@ public partial class SettingsWindow : Window
                 Height = 24,
                 Margin = new Thickness(4, 0, 0, 0),
                 FontSize = 10,
-                Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
                 Cursor = Cursors.Hand,
                 Tag = key
             };
+            resetBtn.SetResourceReference(BackgroundProperty, "SurfaceAltBrush");
+            resetBtn.SetResourceReference(ForegroundProperty, "TextSecondaryBrush");
+            resetBtn.SetResourceReference(BorderBrushProperty, "BorderSoftBrush");
             resetBtn.Click += (s, e) =>
             {
                 tb.Text = def;
@@ -193,12 +308,14 @@ public partial class SettingsWindow : Window
 
     // ============ HOTKEY RECORDING ============
 
+    private Brush B(string key) => (Brush)FindResource(key);
+
     private void HotkeyBox_GotFocus(object sender, RoutedEventArgs e)
     {
         if (sender is TextBox tb)
         {
-            tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
-            tb.Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x35));
+            tb.BorderBrush = B("AccentBrush");
+            tb.SetResourceReference(BackgroundProperty, "SurfaceAltBrush");
         }
     }
 
@@ -206,8 +323,8 @@ public partial class SettingsWindow : Window
     {
         if (sender is TextBox tb)
         {
-            tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44));
-            tb.Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1E));
+            tb.SetResourceReference(BorderBrushProperty, "BorderSoftBrush");
+            tb.SetResourceReference(BackgroundProperty, "WindowBrush");
         }
         ValidateAllShortcuts();
     }
@@ -332,11 +449,11 @@ public partial class SettingsWindow : Window
     private void SetBorder(TextBox tb, bool isDuplicate)
     {
         if (isDuplicate)
-            tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+            tb.BorderBrush = B("DangerBrush");
         else if (tb.IsFocused)
-            tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
+            tb.BorderBrush = B("AccentBrush");
         else
-            tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44));
+            tb.SetResourceReference(BorderBrushProperty, "BorderSoftBrush");
     }
 
     // ============ SAVE / CANCEL ============

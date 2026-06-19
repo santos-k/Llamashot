@@ -4,43 +4,43 @@
         Icon="/Resources/icon32.png"
         Title="Llamashot - History"
         WindowStartupLocation="CenterScreen"
-        Background="#1A1A1E"
+        Background="{DynamicResource WindowGradientBrush}"
         MinWidth="520" MinHeight="360"
         SizeToContent="Manual">
 
     <Window.Resources>
         <!-- ===== Shared per-item right-click menu (works in every view mode) ===== -->
-        <ContextMenu x:Key="ItemMenu" x:Shared="False" Background="#2A2A2E" Foreground="#DDD" BorderBrush="#444">
-            <MenuItem Header="Open Preview" Click="OpenPreview_Click" Foreground="#DDD" />
-            <Separator Background="#444" />
-            <MenuItem Header="Copy to Clipboard" Click="CopyItem_Click" Foreground="#DDD" />
-            <MenuItem Header="Save As…" Click="SaveItem_Click" Foreground="#DDD" />
-            <MenuItem Header="Open in File Explorer" Click="OpenInExplorer_Click" Foreground="#DDD" />
-            <Separator Background="#444" />
-            <MenuItem Header="Delete" Click="DeleteItem_Click" Foreground="#EF9A9A" />
+        <ContextMenu x:Key="ItemMenu" x:Shared="False" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}">
+            <MenuItem Header="Open Preview" Click="OpenPreview_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Separator Background="{DynamicResource BorderSoftBrush}" />
+            <MenuItem Header="Copy to Clipboard" Click="CopyItem_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <MenuItem Header="Save As…" Click="SaveItem_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <MenuItem Header="Open in File Explorer" Click="OpenInExplorer_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Separator Background="{DynamicResource BorderSoftBrush}" />
+            <MenuItem Header="Delete" Click="DeleteItem_Click" Foreground="{DynamicResource DangerBrush}" />
         </ContextMenu>
 
         <!-- ===== Reusable little action buttons (defined inline per template) ===== -->
 
         <!-- ===== Icon view (Extra large / Large / Medium): thumbnail on top ===== -->
         <DataTemplate x:Key="TplIcon">
-            <Border Background="#252528" CornerRadius="6" Margin="4" Padding="6"
+            <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Margin="4" Padding="6"
                     Cursor="Hand" MouseLeftButtonDown="Item_Click"
-                    BorderBrush="#333" BorderThickness="1"
+                    BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
                     ContextMenu="{StaticResource ItemMenu}"
                     ToolTip="{Binding ToolTipText}">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="#42A5F5" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             </Trigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <StackPanel>
                     <Grid>
-                        <Border Background="#1A1A1E" CornerRadius="4" Padding="2">
+                        <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="4" Padding="2">
                             <Image Source="{Binding ThumbnailPath}"
                                    Height="{Binding ThumbHeight, RelativeSource={RelativeSource AncestorType=Window}}"
                                    Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
@@ -66,18 +66,18 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="{Binding DateText}" Foreground="#BBB" FontSize="11" />
-                            <TextBlock Text="{Binding SizeText}" Foreground="#666" FontSize="10" />
+                            <TextBlock Text="{Binding DateText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                            <TextBlock Text="{Binding SizeText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
                         </StackPanel>
                         <Button Grid.Column="1" Click="CopyItem_Click" Width="24" Height="24" Cursor="Hand"
-                                ToolTip="Copy to clipboard" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Copy to clipboard" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Rectangle Canvas.Left="3" Canvas.Top="3" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" />
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" Fill="#252528" />
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" Fill="{DynamicResource SurfaceBrush}" />
                             </Canvas>
                         </Button>
                         <Button Grid.Column="2" Click="SaveItem_Click" Width="24" Height="24" Cursor="Hand"
-                                ToolTip="Save to file" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Save to file" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Line X1="6" Y1="1" X2="6" Y2="8" Stroke="#42A5F5" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                                 <Polyline Points="3,6 6,9 9,6" Stroke="#42A5F5" StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
@@ -85,14 +85,14 @@
                             </Canvas>
                         </Button>
                         <Button Grid.Column="3" Click="OpenInExplorer_Click" Width="24" Height="24" Cursor="Hand"
-                                ToolTip="Open in File Explorer" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Open in File Explorer" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Rectangle Canvas.Left="0" Canvas.Top="2" Width="12" Height="9" Stroke="#FFA726" StrokeThickness="1.2" RadiusX="1" RadiusY="1" />
                                 <Rectangle Canvas.Left="0" Canvas.Top="0" Width="5" Height="3" Fill="#FFA726" RadiusX="1" RadiusY="1" />
                             </Canvas>
                         </Button>
                         <Button Grid.Column="4" Click="DeleteItem_Click" Width="24" Height="24" Cursor="Hand"
-                                ToolTip="Delete" Background="#333" BorderBrush="#444" BorderThickness="1">
+                                ToolTip="Delete" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
                             <Canvas Width="12" Height="12">
                                 <Line X1="2" Y1="2" X2="10" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
                                 <Line X1="10" Y1="2" X2="2" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
@@ -105,16 +105,16 @@
 
         <!-- ===== Content: full-width row, rich metadata + actions ===== -->
         <DataTemplate x:Key="TplContent">
-            <Border Background="#252528" CornerRadius="6" Margin="4,3" Padding="10"
+            <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Margin="4,3" Padding="10"
                     Cursor="Hand" MouseLeftButtonDown="Item_Click"
-                    BorderBrush="#333" BorderThickness="1"
+                    BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
                     ContextMenu="{StaticResource ItemMenu}"
                     ToolTip="{Binding ToolTipText}">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="#42A5F5" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             </Trigger>
                         </Style.Triggers>
                     </Style>
@@ -128,26 +128,26 @@
                     </Grid.ColumnDefinitions>
                     <CheckBox VerticalAlignment="Center" Margin="0,0,8,0"
                               IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="ItemCheckbox_Click" Cursor="Hand" />
-                    <Border Grid.Column="1" Background="#1A1A1E" CornerRadius="4" Width="96" Height="64" Margin="0,0,12,0">
+                    <Border Grid.Column="1" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="4" Width="96" Height="64" Margin="0,0,12,0">
                         <Image Source="{Binding ThumbnailPath}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
                     </Border>
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding NameText}" Foreground="#EEE" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Foreground="#9A9AA0" FontSize="11.5" Margin="0,3,0,0">
-                            <Run Text="{Binding DateText}" /><Run Text="  ·  " Foreground="#555" /><Run Text="{Binding TypeDescText}" /><Run Text="  ·  " Foreground="#555" /><Run Text="{Binding SizeText}" />
+                        <TextBlock Text="{Binding NameText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11.5" Margin="0,3,0,0">
+                            <Run Text="{Binding DateText}" /><Run Text="  ·  " Foreground="{DynamicResource TextMutedBrush}" /><Run Text="{Binding TypeDescText}" /><Run Text="  ·  " Foreground="{DynamicResource TextMutedBrush}" /><Run Text="{Binding SizeText}" />
                         </TextBlock>
-                        <TextBlock Text="{Binding FilePath}" Foreground="#5E5E64" FontSize="10.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding FilePath}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Click="CopyItem_Click" Width="26" Height="26" Cursor="Hand"
-                                ToolTip="Copy to clipboard" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Copy to clipboard" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Rectangle Canvas.Left="3" Canvas.Top="3" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" />
-                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" Fill="#252528" />
+                                <Rectangle Canvas.Left="1" Canvas.Top="1" Width="8" Height="8" Stroke="#66BB6A" StrokeThickness="1.2" Fill="{DynamicResource SurfaceBrush}" />
                             </Canvas>
                         </Button>
                         <Button Click="SaveItem_Click" Width="26" Height="26" Cursor="Hand"
-                                ToolTip="Save to file" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Save to file" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Line X1="6" Y1="1" X2="6" Y2="8" Stroke="#42A5F5" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                                 <Polyline Points="3,6 6,9 9,6" Stroke="#42A5F5" StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
@@ -155,14 +155,14 @@
                             </Canvas>
                         </Button>
                         <Button Click="OpenInExplorer_Click" Width="26" Height="26" Cursor="Hand"
-                                ToolTip="Open in File Explorer" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Open in File Explorer" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Rectangle Canvas.Left="0" Canvas.Top="2" Width="12" Height="9" Stroke="#FFA726" StrokeThickness="1.2" RadiusX="1" RadiusY="1" />
                                 <Rectangle Canvas.Left="0" Canvas.Top="0" Width="5" Height="3" Fill="#FFA726" RadiusX="1" RadiusY="1" />
                             </Canvas>
                         </Button>
                         <Button Click="DeleteItem_Click" Width="26" Height="26" Cursor="Hand"
-                                ToolTip="Delete" Background="#333" BorderBrush="#444" BorderThickness="1" Margin="2,0">
+                                ToolTip="Delete" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="2,0">
                             <Canvas Width="12" Height="12">
                                 <Line X1="2" Y1="2" X2="10" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
                                 <Line X1="10" Y1="2" X2="2" Y2="10" Stroke="#EF5350" StrokeThickness="1.5" />
@@ -182,13 +182,13 @@
         </ItemsPanelTemplate>
 
         <!-- ===== View-mode menu ===== -->
-        <ContextMenu x:Key="ViewMenu" Background="#2A2A2E" Foreground="#DDD" BorderBrush="#444">
-            <MenuItem x:Name="MiExtraLarge" Header="Extra large icons" Tag="ExtraLargeIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
-            <MenuItem x:Name="MiLarge" Header="Large icons" Tag="LargeIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
-            <MenuItem x:Name="MiMedium" Header="Medium icons" Tag="MediumIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
-            <MenuItem x:Name="MiSmall" Header="Small icons" Tag="SmallIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
-            <Separator Background="#444" />
-            <MenuItem x:Name="MiContent" Header="Content" Tag="Content" IsCheckable="True" Click="ViewMode_Click" Foreground="#DDD" />
+        <ContextMenu x:Key="ViewMenu" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}">
+            <MenuItem x:Name="MiExtraLarge" Header="Extra large icons" Tag="ExtraLargeIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <MenuItem x:Name="MiLarge" Header="Large icons" Tag="LargeIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <MenuItem x:Name="MiMedium" Header="Medium icons" Tag="MediumIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <MenuItem x:Name="MiSmall" Header="Small icons" Tag="SmallIcons" IsCheckable="True" Click="ViewMode_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Separator Background="{DynamicResource BorderSoftBrush}" />
+            <MenuItem x:Name="MiContent" Header="Content" Tag="Content" IsCheckable="True" Click="ViewMode_Click" Foreground="{DynamicResource TextPrimaryBrush}" />
         </ContextMenu>
     </Window.Resources>
 
@@ -200,49 +200,49 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Background="#222" Padding="20,10" BorderBrush="#333" BorderThickness="0,0,0,1">
+        <Border Background="{DynamicResource HeaderGradientBrush}" Padding="20,10" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
             <StackPanel>
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Canvas Width="20" Height="20" Margin="0,0,10,0">
-                            <Ellipse Width="20" Height="20" Stroke="#42A5F5" StrokeThickness="2" />
-                            <Line X1="10" Y1="5" X2="10" Y2="10" Stroke="#42A5F5" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <Line X1="10" Y1="10" X2="14" Y2="13" Stroke="#42A5F5" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Ellipse Width="20" Height="20" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" />
+                            <Line X1="10" Y1="5" X2="10" Y2="10" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="10" Y1="10" X2="14" Y2="13" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Canvas>
                         <TextBlock Text="History" FontSize="17" FontWeight="SemiBold"
-                                   Foreground="#EEE" VerticalAlignment="Center" />
+                                   Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtCount" Foreground="#777" FontSize="12"
+                        <TextBlock x:Name="TxtCount" Foreground="{DynamicResource TextMutedBrush}" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,0,12,0" />
                         <Button x:Name="BtnView" Click="ViewMenu_Open" Height="26" Padding="10,0" Margin="0,0,12,0"
-                                Cursor="Hand" FontSize="11" Background="#333" Foreground="#CCC" BorderBrush="#444" BorderThickness="1"
+                                Cursor="Hand" FontSize="11" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
                                 ToolTip="Change view (Ctrl + mouse wheel to zoom)">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="View" VerticalAlignment="Center" />
-                                <Path Data="M0,0 L8,0 L4,4 Z" Fill="#CCC" Margin="6,2,0,0" VerticalAlignment="Center" />
+                                <Path Data="M0,0 L8,0 L4,4 Z" Fill="{DynamicResource TextSecondaryBrush}" Margin="6,2,0,0" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <CheckBox x:Name="ChkSelectAll" Content="Select All" Foreground="#AAA" FontSize="11"
+                        <CheckBox x:Name="ChkSelectAll" Content="Select All" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
                                   VerticalAlignment="Center" Click="SelectAll_Click" Cursor="Hand" />
                     </StackPanel>
                 </Grid>
                 <StackPanel x:Name="FilterPanel" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button x:Name="BtnFilterAll" Content="All" Tag="All" Click="Filter_Click"
                             Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
-                            Background="#42A5F5" Foreground="White" BorderThickness="0" FontWeight="SemiBold" />
+                            Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentTextBrush}" BorderThickness="0" FontWeight="SemiBold" />
                     <Button x:Name="BtnFilterImages" Content="Images" Tag="Images" Click="Filter_Click"
                             Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
-                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" />
                     <Button x:Name="BtnFilterVideos" Content="Videos" Tag="Videos" Click="Filter_Click"
                             Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
-                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" />
                     <Button x:Name="BtnFilterGifs" Content="GIFs" Tag="GIFs" Click="Filter_Click"
                             Height="26" Padding="12,0" Margin="0,0,6,0" Cursor="Hand" FontSize="11"
-                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" />
                     <Button x:Name="BtnFilterClipboard" Content="Clipboard" Tag="Clipboard" Click="Filter_Click"
                             Height="26" Padding="12,0" Cursor="Hand" FontSize="11"
-                            Background="#333" Foreground="#AAA" BorderBrush="#444" BorderThickness="1" />
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" />
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -256,33 +256,33 @@
 
         <!-- Empty state -->
         <TextBlock x:Name="TxtEmpty" Grid.Row="1"
-                   Text="No screenshots yet" FontSize="14" Foreground="#555"
+                   Text="No screenshots yet" FontSize="14" Foreground="{DynamicResource TextMutedBrush}"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    Visibility="Collapsed" />
 
         <!-- Footer -->
-        <Border Grid.Row="2" Background="#222" Padding="16,10" BorderBrush="#333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="2" Background="{DynamicResource HeaderGradientBrush}" Padding="16,10" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <StackPanel x:Name="SelectionActions" Orientation="Horizontal" HorizontalAlignment="Left"
                             Visibility="Collapsed">
-                    <TextBlock x:Name="TxtSelected" Foreground="#42A5F5" FontSize="12"
+                    <TextBlock x:Name="TxtSelected" Foreground="{DynamicResource AccentBrush}" FontSize="12"
                                VerticalAlignment="Center" Margin="0,0,12,0" />
                     <Button Content="Copy Selected" Height="30" Padding="12,0" Click="CopySelected_Click"
-                            Background="#333" Foreground="#66BB6A" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource SuccessBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" Margin="0,0,6,0" />
                     <Button Content="Save Selected" Height="30" Padding="12,0" Click="SaveSelected_Click"
-                            Background="#333" Foreground="#42A5F5" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource AccentBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" Margin="0,0,6,0" />
                     <Button Content="Delete Selected" Height="30" Padding="12,0" Click="DeleteSelected_Click"
-                            Background="#333" Foreground="#EF5350" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource DangerBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Clear All" Width="90" Height="30" Click="ClearHistory_Click"
-                            Background="#333" Foreground="#EF5350" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource DangerBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" />
                     <Button Content="Close" Width="80" Height="30" Margin="10,0,0,0" Click="Close_Click"
-                            Background="#333" Foreground="#CCC" BorderBrush="#444"
+                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                             FontSize="12" Cursor="Hand" />
                 </StackPanel>
             </Grid>

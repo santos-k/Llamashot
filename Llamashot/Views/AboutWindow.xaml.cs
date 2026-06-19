@@ -12,17 +12,42 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
 
+        ThemeManager.ThemeChanged += OnThemeChanged;
+        Closed += (s, e) => ThemeManager.ThemeChanged -= OnThemeChanged;
+
         // If a background check already found an update, show it immediately
         if (UpdateChecker.LatestUpdate != null)
         {
             TxtUpdateHeadline.Text = $"Update available — v{UpdateChecker.LatestUpdate.Version}";
-            TxtUpdateHeadline.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x6B));
+            TxtUpdateHeadline.Foreground = AmberBrush;
             TxtUpdateStatus.Text = "A newer version is ready to install.";
-            TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x9F, 0xE6, 0xB0));
+            TxtUpdateStatus.Foreground = (Brush)FindResource("SuccessBrush");
             TxtUpdateStatus.Visibility = Visibility.Visible;
             BtnUpdate.Content = $"Update now to v{UpdateChecker.LatestUpdate.Version}";
         }
     }
+
+    // Update-available highlight — kept as a fixed amber accent across both themes.
+    private static readonly SolidColorBrush AmberBrush =
+        new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x6B));
+
+    // Re-resolve the themed status brushes when the user toggles light/dark live.
+    private void OnThemeChanged()
+    {
+        if (TxtUpdateHeadline.Foreground is SolidColorBrush hb && hb.Color != AmberBrush.Color)
+            TxtUpdateHeadline.Foreground = (Brush)FindResource("TextPrimaryBrush");
+
+        // The status line is only meaningful while visible; repaint good/error tints.
+        if (TxtUpdateStatus.Visibility == Visibility.Visible)
+        {
+            if (_statusIsError)
+                TxtUpdateStatus.Foreground = (Brush)FindResource("DangerBrush");
+            else
+                TxtUpdateStatus.Foreground = (Brush)FindResource("SuccessBrush");
+        }
+    }
+
+    private bool _statusIsError;
 
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
@@ -42,9 +67,10 @@ public partial class AboutWindow : Window
             if (update == null)
             {
                 TxtUpdateHeadline.Text = "You're on the latest version";
-                TxtUpdateHeadline.Foreground = new SolidColorBrush(Color.FromRgb(0xEA, 0xEA, 0xF0));
+                TxtUpdateHeadline.Foreground = (Brush)FindResource("TextPrimaryBrush");
                 TxtUpdateStatus.Text = "✓ Up to date";
-                TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x5B, 0xD0, 0xA4));
+                TxtUpdateStatus.Foreground = (Brush)FindResource("SuccessBrush");
+                _statusIsError = false;
                 TxtUpdateStatus.Visibility = Visibility.Visible;
                 BtnUpdate.Content = "Check for Update";
                 BtnUpdate.IsEnabled = true;
@@ -52,7 +78,7 @@ public partial class AboutWindow : Window
             }
 
             TxtUpdateHeadline.Text = $"Update available — v{update.Version}";
-            TxtUpdateHeadline.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x6B));
+            TxtUpdateHeadline.Foreground = AmberBrush;
 
             // Download silently with progress
             BtnUpdate.Content = $"Downloading v{update.Version}...";
@@ -85,7 +111,8 @@ public partial class AboutWindow : Window
     private void ShowError(string message)
     {
         TxtUpdateStatus.Text = message;
-        TxtUpdateStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+        TxtUpdateStatus.Foreground = (Brush)FindResource("DangerBrush");
+        _statusIsError = true;
         TxtUpdateStatus.Visibility = Visibility.Visible;
         PrgUpdate.Visibility = Visibility.Collapsed;
         BtnUpdate.Content = "Check for Update";

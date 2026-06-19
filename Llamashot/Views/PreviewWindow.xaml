@@ -80,7 +80,7 @@
                     <!-- Audio visual -->
                     <StackPanel x:Name="AudioVisual" Visibility="Collapsed"
                                 VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock Text="&#x266B;" FontSize="80" Foreground="#42A5F5"
+                        <TextBlock Text="&#x266B;" FontSize="80" Foreground="{DynamicResource AccentBrush}"
                                    HorizontalAlignment="Center" />
                         <TextBlock x:Name="AudioFileName" Foreground="#CCC" FontSize="16"
                                    HorizontalAlignment="Center" Margin="0,12,0,0" />
@@ -109,7 +109,7 @@
                                   MouseLeftButtonUp="SeekTrack_MouseUp">
                                 <Border Background="#44FFFFFF" Height="4" CornerRadius="2"
                                         VerticalAlignment="Center" />
-                                <Border x:Name="SeekProgress" Background="#42A5F5" Height="4"
+                                <Border x:Name="SeekProgress" Background="{DynamicResource AccentBrush}" Height="4"
                                         CornerRadius="2" VerticalAlignment="Center"
                                         HorizontalAlignment="Left" Width="0" />
                                 <Ellipse x:Name="SeekThumb" Width="12" Height="12"
@@ -156,7 +156,7 @@
                     <Button x:Name="BtnOpenWith" Content="Open with default app"
                             Margin="0,20,0,0" Padding="16,8" Cursor="Hand"
                             Click="OpenWith_Click"
-                            Background="#42A5F5" Foreground="White"
+                            Background="{DynamicResource AccentBrush}" Foreground="White"
                             BorderThickness="0" FontSize="13" />
                 </StackPanel>
 

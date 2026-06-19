@@ -255,13 +255,13 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="TxtInfo" Foreground="#777" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" />
                 <Button Content="Save" Width="80" Height="30" Click="Save_Click"
-                        Background="#42A5F5" Foreground="White" BorderBrush="#1E88E5"
+                        Background="{DynamicResource AccentGradientBrush}" Foreground="{DynamicResource AccentTextBrush}" BorderBrush="{DynamicResource AccentBrush}"
                         FontWeight="SemiBold" FontSize="13" Cursor="Hand" Margin="0,0,8,0" />
                 <Button Content="Copy" Width="80" Height="30" Click="Copy_Click"
-                        Background="#333" Foreground="#CCC" BorderBrush="#444"
+                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="#444"
                         FontSize="13" Cursor="Hand" Margin="0,0,8,0" />
                 <Button Content="Discard" Width="80" Height="30" Click="Discard_Click"
-                        Background="#333" Foreground="#EF5350" BorderBrush="#444"
+                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource DangerBrush}" BorderBrush="#444"
                         FontSize="13" Cursor="Hand" />
             </StackPanel>
         </Border>

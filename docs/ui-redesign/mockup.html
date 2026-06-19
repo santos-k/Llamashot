@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="indigo" data-grad="subtle" data-tilt="on">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Llamashot — UI Redesign Mockup</title>
+<style>
+/* ============================================================
+   THEME TOKENS  — these mirror the WPF DynamicResource brushes
+   ============================================================ */
+:root{
+  --radius-card:18px; --radius-panel:16px; --radius-ctl:10px; --radius-pill:999px;
+  --ang:135deg;
+  --shadow-card:0 6px 22px rgba(20,25,60,.18);
+  --shadow-pop:0 18px 50px rgba(0,0,0,.45);
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+
+/* ---- ACCENT families ---- */
+[data-accent="indigo"]{ --accent:#6E8BFF; --accent-2:#9B6BFF; --accent-text:#fff; }
+[data-accent="blue"]  { --accent:#2196F3; --accent-2:#26C6DA; --accent-text:#fff; }
+[data-accent="teal"]  { --accent:#0EA5A0; --accent-2:#34D399; --accent-text:#fff; }
+[data-theme="dark"][data-accent="indigo"]{ --accent:#7C9CFF; --accent-2:#A98BFF; --accent-text:#0E1018; }
+[data-theme="dark"][data-accent="blue"]  { --accent:#42A5F5; --accent-2:#26C6DA; --accent-text:#0E1018; }
+[data-theme="dark"][data-accent="teal"]  { --accent:#2DD4BF; --accent-2:#34D399; --accent-text:#06201C; }
+
+/* ---- LIGHT theme palette ---- */
+[data-theme="light"]{
+  --window:#F5F6FB; --header:#FFFFFF; --surface:#FFFFFF; --surface-alt:#EEF1F8;
+  --surface-hover:#EDF0FA; --border:#E2E6F0;
+  --text:#1F2430; --text-2:#5B6172; --text-muted:#9AA0B0;
+  --success:#22A081; --danger:#E5484D;
+  --glare:rgba(255,255,255,.85);
+  --grad-window: linear-gradient(160deg,#F5F6FB 0%,#FFFFFF 60%);
+  --grad-card:   linear-gradient(160deg,#FFFFFF 0%,#F7F9FF 100%);
+  --grad-header: linear-gradient(120deg,#FFFFFF 0%,#F4F6FF 100%);
+}
+/* ---- DARK theme palette ---- */
+[data-theme="dark"]{
+  --window:#14151A; --header:#1B1C24; --surface:#1E2029; --surface-alt:#262833;
+  --surface-hover:#2A2D38; --border:#313443;
+  --text:#E8EAF0; --text-2:#A8AEC0; --text-muted:#6B7080;
+  --success:#5BD0A4; --danger:#FF7A7A;
+  --glare:rgba(255,255,255,.18);
+  --grad-window: linear-gradient(160deg,#14151A 0%,#181A22 60%);
+  --grad-card:   linear-gradient(160deg,#1E2029 0%,#23263180 100%);
+  --grad-header: linear-gradient(120deg,#1B1C24 0%,#20222C 100%);
+}
+
+/* ---- GRADIENT intensity overrides ---- */
+[data-grad="vivid"][data-theme="light"]{
+  --grad-window: linear-gradient(150deg,#EEF1FF 0%,#FFFFFF 55%,#F3EEFF 100%);
+  --grad-header: linear-gradient(110deg,color-mix(in srgb,var(--accent) 22%,#fff) 0%,#FFFFFF 70%);
+  --grad-card:   linear-gradient(155deg,#FFFFFF 0%,color-mix(in srgb,var(--accent) 8%,#fff) 100%);
+}
+[data-grad="vivid"][data-theme="dark"]{
+  --grad-window: linear-gradient(150deg,#171826 0%,#14151A 50%,#1B1630 100%);
+  --grad-header: linear-gradient(110deg,color-mix(in srgb,var(--accent) 26%,#1B1C24) 0%,#1B1C24 70%);
+  --grad-card:   linear-gradient(155deg,#1E2029 0%,color-mix(in srgb,var(--accent) 14%,#1E2029) 100%);
+}
+[data-grad="aurora"] .window::before{ opacity:1 !important; }
+
+/* ============================================================
+   PAGE / CONTROL BAR
+   ============================================================ */
+*{box-sizing:border-box}
+body{
+  margin:0; font-family:"Segoe UI",system-ui,sans-serif; color:var(--text);
+  background:#0b0c10; padding:96px 28px 60px;
+}
+.toolbar{
+  position:fixed; top:0; left:0; right:0; z-index:50; display:flex; gap:22px;
+  align-items:center; flex-wrap:wrap; padding:12px 20px;
+  background:rgba(18,19,26,.92); backdrop-filter:blur(14px);
+  border-bottom:1px solid #2a2c38; color:#e8eaf0;
+}
+.toolbar h1{font-size:14px;margin:0 14px 0 0;font-weight:600;letter-spacing:.3px}
+.toolbar .grp{display:flex;align-items:center;gap:6px;font-size:12px;color:#9aa0b0}
+.seg{display:flex;background:#23252f;border-radius:8px;padding:3px;gap:2px}
+.seg button{
+  border:0;background:transparent;color:#aeb4c6;font-size:12px;font-weight:600;
+  padding:5px 11px;border-radius:6px;cursor:pointer;transition:.15s}
+.seg button.on{background:var(--accent);color:var(--accent-text)}
+.hint{font-size:11px;color:#6b7080;margin-left:auto}
+
+.canvas{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:46px}
+.lbl{font-size:12px;font-weight:700;letter-spacing:1.5px;color:#6b7080;text-transform:uppercase;margin:0 0 12px 4px}
+
+/* ============================================================
+   WINDOW SHELL  (each mock window)
+   ============================================================ */
+.window{
+  position:relative; border-radius:14px; overflow:hidden; isolation:isolate;
+  background:var(--grad-window); color:var(--text);
+  border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+/* aurora mesh layer (only visible in aurora mode) */
+.window::before{
+  content:""; position:absolute; inset:-40%; z-index:0; opacity:0; transition:opacity .4s;
+  background:
+    radial-gradient(40% 40% at 20% 20%, color-mix(in srgb,var(--accent) 55%,transparent), transparent 70%),
+    radial-gradient(45% 45% at 85% 25%, color-mix(in srgb,var(--accent-2) 50%,transparent), transparent 70%),
+    radial-gradient(50% 50% at 60% 90%, color-mix(in srgb,var(--accent) 35%,transparent), transparent 70%);
+  filter:blur(60px); pointer-events:none;
+}
+.window>*{position:relative;z-index:1}
+[data-grad="aurora"] .panel,[data-grad="aurora"] .card,[data-grad="aurora"] .titlebar{
+  backdrop-filter:blur(10px);
+}
+
+.titlebar{
+  display:flex;align-items:center;gap:10px;height:36px;padding:0 12px;
+  background:var(--grad-header);border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2)}
+.dots{display:flex;gap:7px}.dots i{width:11px;height:11px;border-radius:50%;display:block}
+.dots i:nth-child(1){background:#ff5f57}.dots i:nth-child(2){background:#febc2e}.dots i:nth-child(3){background:#28c840}
+.titlebar .ttl{font-weight:600;color:var(--text)}
+.win-actions{margin-left:auto;display:flex;gap:6px}
+.iconbtn{width:30px;height:26px;border-radius:7px;border:0;background:transparent;color:var(--text-2);
+  cursor:pointer;font-size:15px;display:grid;place-items:center;transition:.15s}
+.iconbtn:hover{background:var(--surface-hover);color:var(--text)}
+
+/* ---- generic header band inside window ---- */
+.appheader{display:flex;align-items:center;gap:14px;padding:14px 20px;
+  background:var(--grad-header);border-bottom:1px solid var(--border)}
+.appheader .h-title{font-size:19px;font-weight:600}
+.appheader .spacer{flex:1}
+
+/* ---- buttons ---- */
+.btn{border:0;cursor:pointer;font-family:inherit;font-weight:600;font-size:13px;
+  padding:9px 18px;border-radius:var(--radius-ctl);transition:transform .12s var(--ease),box-shadow .2s,filter .2s}
+.btn.primary{background:linear-gradient(var(--ang),var(--accent),var(--accent-2));color:var(--accent-text);
+  box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 40%,transparent)}
+.btn.primary:hover{filter:brightness(1.05);transform:translateY(-1px)}
+.btn.ghost{background:var(--surface-alt);color:var(--text-2)}
+.btn.ghost:hover{background:var(--surface-hover);color:var(--text)}
+.btn.danger{background:var(--danger);color:#fff}
+
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-pill);
+  padding:6px 14px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid transparent;
+  background:var(--surface-alt);color:var(--text-2);transition:.15s}
+.pill:hover{background:var(--surface-hover)}
+.pill.on{background:linear-gradient(var(--ang),var(--accent),var(--accent-2));color:var(--accent-text)}
+
+.search{flex:1;display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;
+  border-radius:var(--radius-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-muted)}
+.search input{flex:1;border:0;background:transparent;color:var(--text);outline:none;font-family:inherit;font-size:13px}
+
+/* ============================================================
+   CARDS  (3D tilt targets)
+   ============================================================ */
+.grid{display:grid;gap:14px;padding:18px 20px;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.card{
+  position:relative; display:flex; gap:14px; align-items:center; padding:16px;
+  border-radius:var(--radius-card); background:var(--grad-card); border:1px solid var(--border);
+  box-shadow:var(--shadow-card); cursor:pointer; overflow:hidden;
+  transform-style:preserve-3d; transition:transform .25s var(--ease),box-shadow .25s,border-color .25s;
+}
+.card .glare{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  background:radial-gradient(220px circle at var(--mx,50%) var(--my,50%),var(--glare),transparent 60%);
+  transition:opacity .2s}
+[data-tilt="on"] .card:hover .glare{opacity:1}
+.card:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));
+  box-shadow:0 16px 40px rgba(20,25,60,.28)}
+.card .ico{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:22px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--tint) 38%,transparent),color-mix(in srgb,var(--tint) 12%,transparent));
+  color:var(--tint);flex-shrink:0;transform:translateZ(24px)}
+.card .meta{flex:1;transform:translateZ(14px)}
+.card .meta b{display:block;font-size:15px;font-weight:600;margin-bottom:3px}
+.card .meta span{font-size:12px;color:var(--text-2);line-height:1.35}
+.card .arr{color:var(--text-muted);transform:translateZ(14px)}
+
+/* ============================================================
+   PANELS (settings / about etc)
+   ============================================================ */
+.body{padding:20px}
+.panel{background:var(--grad-card);border:1px solid var(--border);border-radius:var(--radius-panel);
+  padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow-card)}
+.panel h3{margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.6px;
+  color:var(--accent);text-transform:uppercase}
+.row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:0}
+.row .k{flex:1;font-size:13px}.row .k small{display:block;color:var(--text-muted);font-size:11.5px;margin-top:2px}
+.switch{width:42px;height:24px;border-radius:12px;background:var(--surface-alt);position:relative;cursor:pointer;transition:.2s;flex-shrink:0;border:1px solid var(--border)}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--text-muted);transition:.2s}
+.switch.on{background:linear-gradient(var(--ang),var(--accent),var(--accent-2));border-color:transparent}
+.switch.on::after{left:20px;background:#fff}
+
+/* segmented theme picker (the new Light/Dark/System control) */
+.themepick{display:flex;gap:8px}
+.themepick .opt{flex:1;border:1.5px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;
+  cursor:pointer;background:var(--surface);transition:.18s;font-size:12.5px;font-weight:600}
+.themepick .opt .pv{height:34px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border)}
+.themepick .opt[data-v="light"] .pv{background:linear-gradient(160deg,#F5F6FB,#fff)}
+.themepick .opt[data-v="dark"] .pv{background:linear-gradient(160deg,#14151A,#23263a)}
+.themepick .opt[data-v="system"] .pv{background:linear-gradient(120deg,#F5F6FB 50%,#14151A 50%)}
+.themepick .opt.on{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+
+/* ============================================================
+   HISTORY gallery
+   ============================================================ */
+.gal{display:grid;gap:12px;padding:18px 20px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.shot{border-radius:14px;overflow:hidden;background:var(--grad-card);border:1px solid var(--border);
+  box-shadow:var(--shadow-card);cursor:pointer;transition:transform .25s var(--ease),border-color .25s;transform-style:preserve-3d}
+.shot:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border))}
+.shot .thumb{height:96px;background:linear-gradient(135deg,#5566aa,#33446f);position:relative}
+.shot .thumb .badge{position:absolute;top:6px;right:6px;font-size:10px;font-weight:700;color:#fff;
+  padding:2px 7px;border-radius:6px;background:rgba(0,0,0,.45)}
+.shot .cap{padding:8px 10px}.shot .cap b{font-size:12px;display:block}.shot .cap span{font-size:11px;color:var(--text-muted)}
+
+/* ============================================================
+   CAPTURE OVERLAY (always dark glass)
+   ============================================================ */
+.overlay{height:300px;border-radius:14px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#3a4a6b,#222a40);display:grid;place-items:center}
+.overlay .sel{position:absolute;left:18%;top:20%;width:46%;height:48%;border:2px solid var(--accent);
+  border-radius:4px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
+.overlay .dim{position:absolute;left:18%;top:14%;background:#DD101020;color:#DDF;padding:4px 8px;border-radius:6px;font-size:12px;border:1px solid #ffffff25}
+.glassbar{display:flex;gap:4px;padding:5px;border-radius:12px;
+  background:linear-gradient(180deg,#e8141428,#f0101020);backdrop-filter:blur(10px);
+  border:1px solid;border-image:linear-gradient(180deg,#30ffffff,#12ffffff) 1;box-shadow:0 12px 30px #000020}
+.glassbar.bottom{position:absolute;bottom:16px;left:50%;transform:translateX(-50%)}
+.glassbar .tb{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;cursor:pointer;
+  color:#cdd3e6;font-size:16px;transition:.15s;background:transparent;border:0}
+.glassbar .tb:hover{background:#ffffff18}
+.glassbar .tb.act{background:color-mix(in srgb,var(--accent) 35%,transparent);color:#fff}
+.note{font-size:12px;color:var(--text-muted);margin:8px 4px 0}
+
+/* ============================================================
+   DIALOG
+   ============================================================ */
+.dialog{max-width:420px;border-radius:16px;background:var(--grad-card);border:1px solid var(--border);
+  box-shadow:var(--shadow-pop);padding:24px;margin:0 auto}
+.dialog .dh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.dialog .dh .ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:18px;
+  background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent)}
+.dialog .dh b{font-size:17px;font-weight:600}
+.dialog p{color:var(--text-2);font-size:13px;line-height:1.5;margin:0 0 20px}
+.dialog .br{display:flex;gap:10px;justify-content:flex-end}
+
+/* ============================================================
+   COMBINATION PICKER
+   ============================================================ */
+.picker{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;
+  background:var(--grad-card);border:1px solid var(--border);border-radius:var(--radius-panel);
+  padding:20px;box-shadow:var(--shadow-card)}
+@media(max-width:760px){.picker{grid-template-columns:1fr}}
+.picker .col h4{margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase}
+.stoprow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.stoprow input[type=color]{width:42px;height:38px;border:1px solid var(--border);border-radius:10px;background:none;cursor:pointer;padding:2px}
+.stoprow input[type=text]{flex:1;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  color:var(--text);font-family:"Consolas",monospace;font-size:13px;padding:0 12px;outline:none;text-transform:uppercase}
+.stoprow input[type=text]:focus{border-color:var(--accent)}
+.stoprow label{font-size:12px;color:var(--text-2);width:46px}
+.angrow{display:flex;align-items:center;gap:12px;margin:6px 0 16px}
+.angrow input[type=range]{flex:1;accent-color:var(--accent)}
+.angrow .v{font-family:Consolas,monospace;font-size:13px;color:var(--text-2);width:52px;text-align:right}
+.preview-bar{height:64px;border-radius:14px;border:1px solid var(--border);margin-bottom:14px;
+  background:linear-gradient(var(--ang),var(--accent),var(--accent-2))}
+.presets{display:flex;flex-wrap:wrap;gap:9px}
+.preset{width:46px;height:34px;border-radius:9px;cursor:pointer;border:2px solid transparent;transition:.15s}
+.preset:hover{transform:translateY(-2px)}
+.preset.on{border-color:var(--text)}
+.outbox{margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;
+  font-family:Consolas,monospace;font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre;overflow:auto;position:relative}
+.outbox .cp{position:absolute;top:8px;right:8px;font-size:11px;padding:4px 10px;border-radius:7px;border:0;
+  background:var(--accent);color:var(--accent-text);cursor:pointer;font-weight:700}
+.applybar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2);cursor:pointer}
+.chk input{accent-color:var(--accent);width:15px;height:15px}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>🦙 Llamashot — UI Redesign</h1>
+  <div class="grp">Theme
+    <div class="seg" id="seg-theme">
+      <button data-v="light">Light</button>
+      <button data-v="dark" class="on">Dark</button>
+      <button data-v="system">System</button>
+    </div>
+  </div>
+  <div class="grp">Accent
+    <div class="seg" id="seg-accent">
+      <button data-v="indigo" class="on">Indigo</button>
+      <button data-v="blue">Blue</button>
+      <button data-v="teal">Teal</button>
+    </div>
+  </div>
+  <div class="grp">Gradient
+    <div class="seg" id="seg-grad">
+      <button data-v="subtle" class="on">Subtle</button>
+      <button data-v="vivid">Vivid</button>
+      <button data-v="aurora">Aurora</button>
+    </div>
+  </div>
+  <div class="grp">3D tilt
+    <div class="seg" id="seg-tilt">
+      <button data-v="on" class="on">On</button>
+      <button data-v="off">Off</button>
+    </div>
+  </div>
+  <span class="hint">↑ flip these live · hover the cards</span>
+</div>
+
+<div class="canvas">
+
+  <!-- ============ COMBINATION PICKER ============ -->
+  <section>
+    <p class="lbl">0 · Combination picker — lives in Settings ▸ Appearance (with Reset)</p>
+    <div class="picker">
+      <div class="col">
+        <h4>Accent gradient</h4>
+        <div class="stoprow"><label>Start</label>
+          <input type="color" id="c1" value="#2DD4BF">
+          <input type="text" id="h1" value="#2DD4BF" maxlength="7"></div>
+        <div class="stoprow"><label>End</label>
+          <input type="color" id="c2" value="#34D399">
+          <input type="text" id="h2" value="#34D399" maxlength="7"></div>
+        <div class="angrow"><label style="font-size:12px;color:var(--text-2);width:46px">Angle</label>
+          <input type="range" id="ang" min="0" max="360" value="135">
+          <span class="v" id="angv">135°</span></div>
+        <div class="applybar">
+          <label class="chk"><input type="checkbox" id="tintbg" checked> tint window &amp; header with accent</label>
+          <button class="btn ghost" id="reset" style="margin-left:auto;padding:8px 14px">↺ Reset to defaults</button>
+        </div>
+      </div>
+      <div class="col">
+        <h4>Live preview</h4>
+        <div class="preview-bar" id="pvbar"></div>
+        <h4>Presets</h4>
+        <div class="presets" id="presets">
+          <div class="preset" data-c="#6E8BFF,#9B6BFF,135" style="background:linear-gradient(135deg,#6E8BFF,#9B6BFF)" title="Indigo · Violet"></div>
+          <div class="preset" data-c="#42A5F5,#26C6DA,135" style="background:linear-gradient(135deg,#42A5F5,#26C6DA)" title="Sky · Cyan"></div>
+          <div class="preset" data-c="#2DD4BF,#34D399,135" style="background:linear-gradient(135deg,#2DD4BF,#34D399)" title="Teal · Emerald"></div>
+          <div class="preset" data-c="#FC466B,#3F5EFB,135" style="background:linear-gradient(135deg,#FC466B,#3F5EFB)" title="Rose · Blue"></div>
+          <div class="preset" data-c="#F857A6,#FF5858,135" style="background:linear-gradient(135deg,#F857A6,#FF5858)" title="Pink · Red"></div>
+          <div class="preset" data-c="#FFA726,#FB6340,135" style="background:linear-gradient(135deg,#FFA726,#FB6340)" title="Amber · Orange"></div>
+          <div class="preset" data-c="#7C3AED,#DB2777,135" style="background:linear-gradient(135deg,#7C3AED,#DB2777)" title="Purple · Magenta"></div>
+          <div class="preset" data-c="#0EA5A0,#6366F1,135" style="background:linear-gradient(135deg,#0EA5A0,#6366F1)" title="Teal · Indigo"></div>
+          <div class="preset" data-c="#11998E,#38EF7D,135" style="background:linear-gradient(135deg,#11998E,#38EF7D)" title="Green"></div>
+          <div class="preset" data-c="#FF6A00,#EE0979,135" style="background:linear-gradient(135deg,#FF6A00,#EE0979)" title="Sunset"></div>
+        </div>
+        <div class="outbox" id="outbox"><button class="cp" id="copybtn">Copy</button></div>
+      </div>
+    </div>
+    <p class="note">Pick two colours + an angle (or tap a preset). It updates the accent gradient on every button, card icon, pill and the capture overlay instantly — and, if ticked, washes the window/header backgrounds with a faint accent tint. The box shows the exact token values; hit <b>Copy</b> and paste them back to me to lock it in.</p>
+  </section>
+
+  <!-- ============ FILE TOOLS HUB ============ -->
+  <section>
+    <p class="lbl">1 · File Tools — main hub</p>
+    <div class="window">
+      <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">Llamashot · File Tools</span></div>
+      <div class="appheader">
+        <div class="search">🔍<input placeholder="Search tools…"></div>
+        <div class="spacer" style="flex:0 0 8px"></div>
+        <button class="pill on">All</button>
+        <button class="pill">PDF</button>
+        <button class="pill">Image</button>
+        <button class="pill">Video</button>
+        <button class="iconbtn" title="theme">🌙</button>
+      </div>
+      <div class="grid">
+        <div class="card tilt" style="--tint:#FF8A8A"><div class="ico">📑</div><div class="meta"><b>Merge PDF</b><span>Combine files into one</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#FFB088"><div class="ico">✂️</div><div class="meta"><b>Split PDF</b><span>Separate pages</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#7C9CFF"><div class="ico">🗜️</div><div class="meta"><b>Compress PDF</b><span>Reduce file size</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#A78BFA"><div class="ico">🖼️</div><div class="meta"><b>Image Editor</b><span>Crop · filters · resize</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#5BD0A4"><div class="ico">📄</div><div class="meta"><b>PDF → Images</b><span>Export each page</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#26C6DA"><div class="ico">🔢</div><div class="meta"><b>Page Numbers</b><span>Add pagination</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#FFA726"><div class="ico">💧</div><div class="meta"><b>Watermark</b><span>Stamp text/image</span></div><div class="arr">❯</div><div class="glare"></div></div>
+        <div class="card tilt" style="--tint:#EC407A"><div class="ico">🔄</div><div class="meta"><b>Convert Format</b><span>PNG · JPG · WEBP</span></div><div class="arr">❯</div><div class="glare"></div></div>
+      </div>
+    </div>
+    <p class="note">Same theme tokens drive every per-tool brand colour (the icon tints), so cards stay vivid in light <em>and</em> dark. Hover one to see the 3D tilt + glare.</p>
+  </section>
+
+  <div class="two">
+    <!-- ============ HISTORY ============ -->
+    <section>
+      <p class="lbl">2 · History — now themed (was hardcoded dark)</p>
+      <div class="window">
+        <div class="appheader" style="padding:12px 16px">
+          <b class="h-title" style="font-size:16px">History</b>
+          <span style="color:var(--text-muted);font-size:12px">· 24 items</span>
+          <div class="spacer"></div>
+          <button class="pill on">All</button><button class="pill">Images</button><button class="pill">Videos</button>
+        </div>
+        <div class="gal">
+          <div class="shot tilt"><div class="thumb"><span class="badge" style="background:var(--accent)">PNG</span></div><div class="cap"><b>Capture 14:22</b><span>1.2 MB</span></div></div>
+          <div class="shot tilt"><div class="thumb" style="background:linear-gradient(135deg,#aa5577,#6f3355)"><span class="badge" style="background:#F44336">MP4</span></div><div class="cap"><b>Recording</b><span>8.4 MB</span></div></div>
+          <div class="shot tilt"><div class="thumb" style="background:linear-gradient(135deg,#55aa88,#337f55)"><span class="badge" style="background:#4CAF50">GIF</span></div><div class="cap"><b>Demo clip</b><span>3.1 MB</span></div></div>
+          <div class="shot tilt"><div class="thumb" style="background:linear-gradient(135deg,#8877cc,#5544a0)"><span class="badge" style="background:var(--accent)">PNG</span></div><div class="cap"><b>Snippet</b><span>620 KB</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS w/ THEME PICKER ============ -->
+    <section>
+      <p class="lbl">3 · Settings — global theme picker (default System)</p>
+      <div class="window">
+        <div class="appheader" style="padding:12px 16px"><b class="h-title" style="font-size:16px">Settings</b></div>
+        <div class="body">
+          <div class="panel">
+            <div style="display:flex;align-items:center"><h3 style="flex:1">Appearance</h3>
+              <button class="btn ghost" id="reset2" style="padding:6px 12px;font-size:12px">↺ Reset</button></div>
+            <div class="row" style="border:0;padding-bottom:4px"><div class="k" style="flex:0 0 100%">Theme</div></div>
+            <div class="themepick" id="themepick">
+              <div class="opt" data-v="light"><div class="pv"></div>Light</div>
+              <div class="opt" data-v="dark"><div class="pv"></div>Dark</div>
+              <div class="opt on" data-v="system"><div class="pv"></div>System</div>
+            </div>
+            <div class="row" style="margin-top:6px"><div class="k">Accent gradient<small>start · end colour</small></div>
+              <span style="width:34px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--accent)"></span>
+              <span style="color:var(--text-muted)">→</span>
+              <span style="width:34px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--accent-2)"></span>
+            </div>
+            <div class="row"><div class="k">Gradient angle</div>
+              <span style="font-family:Consolas,monospace;font-size:13px;color:var(--text-2)" id="angmirror">135°</span></div>
+            <div class="row" style="display:block"><div class="k" style="margin-bottom:8px">Presets</div>
+              <div class="presets">
+                <div class="preset" data-c="#6E8BFF,#9B6BFF,135" style="background:linear-gradient(135deg,#6E8BFF,#9B6BFF)"></div>
+                <div class="preset" data-c="#42A5F5,#26C6DA,135" style="background:linear-gradient(135deg,#42A5F5,#26C6DA)"></div>
+                <div class="preset" data-c="#2DD4BF,#34D399,135" style="background:linear-gradient(135deg,#2DD4BF,#34D399)"></div>
+                <div class="preset" data-c="#FC466B,#3F5EFB,135" style="background:linear-gradient(135deg,#FC466B,#3F5EFB)"></div>
+                <div class="preset" data-c="#7C3AED,#DB2777,135" style="background:linear-gradient(135deg,#7C3AED,#DB2777)"></div>
+                <div class="preset" data-c="#FF6A00,#EE0979,135" style="background:linear-gradient(135deg,#FF6A00,#EE0979)"></div>
+              </div>
+            </div>
+            <div class="row"><div class="k">Tint window &amp; header with accent</div>
+              <div class="switch on" id="tintmirror"></div></div>
+          </div>
+          <div class="panel">
+            <h3>General</h3>
+            <div class="row"><div class="k">Start with Windows</div><div class="switch on"></div></div>
+            <div class="row"><div class="k">Show cursor in recordings<small>highlight on click</small></div><div class="switch"></div></div>
+            <div class="row"><div class="k">Minimise to tray</div><div class="switch on"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="two">
+    <!-- ============ ABOUT ============ -->
+    <section>
+      <p class="lbl">4 · About — themed</p>
+      <div class="window">
+        <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">About</span></div>
+        <div class="body" style="text-align:center">
+          <div style="width:76px;height:76px;border-radius:22px;margin:6px auto 12px;display:grid;place-items:center;font-size:38px;
+            background:linear-gradient(var(--ang),var(--accent),var(--accent-2));box-shadow:0 12px 30px color-mix(in srgb,var(--accent) 40%,transparent)">🦙</div>
+          <div style="font-size:22px;font-weight:700">Llamashot</div>
+          <div style="color:var(--text-2);font-size:13px;margin:2px 0 4px">Capture · Annotate · File Tools</div>
+          <div style="color:var(--text-muted);font-size:12px;margin-bottom:16px">Version 8.9.15</div>
+          <div class="panel" style="text-align:left;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 16%,var(--surface)),color-mix(in srgb,var(--accent-2) 12%,var(--surface)))">
+            <div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">✨</span>
+              <div style="flex:1"><b style="font-size:13px">You're up to date</b><div style="color:var(--success);font-size:12px">v8.9.15 is the latest</div></div>
+              <button class="btn primary" style="padding:7px 14px">Check</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DIALOG ============ -->
+    <section>
+      <p class="lbl">5 · Dialog — themed (Confirm / unsaved)</p>
+      <div class="window" style="padding:34px 20px;display:grid;place-items:center;background:var(--grad-window)">
+        <div class="dialog">
+          <div class="dh"><div class="ic">⚠</div><b>Unsaved changes</b></div>
+          <p>You have unsaved edits to this PDF. Do you want to save before closing?</p>
+          <div class="br"><button class="btn ghost">Cancel</button><button class="btn danger">Discard</button><button class="btn primary">Save &amp; Close</button></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ CAPTURE OVERLAY ============ -->
+  <section>
+    <p class="lbl">6 · Capture overlay &amp; floating tools — always dark glass (accent follows theme)</p>
+    <div class="window" style="border:0">
+      <div class="overlay">
+        <div class="sel"></div>
+        <div class="dim">1280 × 720</div>
+        <div class="glassbar" style="position:absolute;top:16px;left:50%;transform:translateX(-50%)">
+          <button class="tb act" title="Screenshot">▢</button>
+          <button class="tb" title="Record">⏺</button>
+          <button class="tb" title="GIF">🎞</button>
+          <button class="tb" title="Long shot">📜</button>
+          <button class="tb" title="OCR">🔤</button>
+        </div>
+        <div class="glassbar bottom">
+          <button class="tb" title="Pen">✏️</button>
+          <button class="tb" title="Arrow">↗</button>
+          <button class="tb" title="Rect">▭</button>
+          <button class="tb" title="Text">A</button>
+          <button class="tb" title="Blur">▒</button>
+          <button class="tb" title="color"><span style="width:16px;height:16px;border-radius:50%;background:var(--accent);display:block;border:2px solid #fff"></span></button>
+          <button class="tb act" title="Save">💾</button>
+          <button class="tb" title="Copy">⧉</button>
+        </div>
+      </div>
+    </div>
+    <p class="note">Overlays stay dark frosted glass in both themes (best contrast over any wallpaper/app). Only the <em>accent</em> — selection border, active tool, colour dot — tracks your chosen palette so they still feel part of the suite.</p>
+  </section>
+
+</div>
+
+<script>
+const root=document.documentElement;
+function wireSeg(id,attr){
+  const seg=document.getElementById(id);
+  seg.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    seg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    let v=b.dataset.v;
+    if(attr==='data-theme'&&v==='system'){v=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';root.setAttribute('data-theme-pref','system');}
+    root.setAttribute(attr,v);
+  });
+}
+wireSeg('seg-theme','data-theme');
+wireSeg('seg-accent','data-accent');
+wireSeg('seg-grad','data-grad');
+wireSeg('seg-tilt','data-tilt');
+
+// in-settings theme picker mirrors the toolbar
+document.getElementById('themepick').addEventListener('click',e=>{
+  const o=e.target.closest('.opt');if(!o)return;
+  document.querySelectorAll('#themepick .opt').forEach(x=>x.classList.remove('on'));o.classList.add('on');
+  let v=o.dataset.v; if(v==='system')v=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+  root.setAttribute('data-theme',v);
+  // sync toolbar
+  const seg=document.getElementById('seg-theme');seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===o.dataset.v));
+});
+// accent swatches in settings
+document.querySelectorAll('.sw').forEach(s=>s.addEventListener('click',()=>{
+  document.querySelectorAll('.sw').forEach(x=>x.style.borderColor='transparent');s.style.borderColor='var(--accent)';
+  root.setAttribute('data-accent',s.dataset.a);
+  const seg=document.getElementById('seg-accent');seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===s.dataset.a));
+}));
+
+// 3D tilt
+function tilt(el,e){
+  const r=el.getBoundingClientRect();
+  const px=(e.clientX-r.left)/r.width, py=(e.clientY-r.top)/r.height;
+  const rx=(.5-py)*10, ry=(px-.5)*10;
+  el.style.transform=`perspective(700px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px) scale(1.03)`;
+  el.style.setProperty('--mx',px*100+'%');el.style.setProperty('--my',py*100+'%');
+}
+document.querySelectorAll('.tilt').forEach(el=>{
+  el.addEventListener('mousemove',e=>{if(root.getAttribute('data-tilt')==='on')tilt(el,e)});
+  el.addEventListener('mouseleave',()=>el.style.transform='');
+});
+
+/* ---------- COMBINATION PICKER ---------- */
+const c1=document.getElementById('c1'),c2=document.getElementById('c2'),
+      h1=document.getElementById('h1'),h2=document.getElementById('h2'),
+      ang=document.getElementById('ang'),angv=document.getElementById('angv'),
+      tintbg=document.getElementById('tintbg'),outbox=document.getElementById('outbox');
+const isHex=v=>/^#?[0-9a-fA-F]{6}$/.test(v);
+const norm=v=>v[0]==='#'?v:'#'+v;
+
+function applyTint(on){
+  if(on){
+    root.style.setProperty('--grad-window','linear-gradient(160deg,color-mix(in srgb,var(--accent) 8%,var(--window)) 0%,var(--window) 72%)');
+    root.style.setProperty('--grad-header','linear-gradient(110deg,color-mix(in srgb,var(--accent) 15%,var(--header)) 0%,var(--header) 78%)');
+    root.style.setProperty('--grad-card','linear-gradient(155deg,var(--surface) 0%,color-mix(in srgb,var(--accent) 7%,var(--surface)) 100%)');
+  }else{
+    root.style.removeProperty('--grad-window');
+    root.style.removeProperty('--grad-header');
+    root.style.removeProperty('--grad-card');
+  }
+}
+function apply(){
+  const a=norm(c1.value).toUpperCase(), b=norm(c2.value).toUpperCase(), deg=ang.value;
+  root.setAttribute('data-accent','custom');
+  root.style.setProperty('--accent',a);
+  root.style.setProperty('--accent-2',b);
+  root.style.setProperty('--accent-text','#fff');
+  root.style.setProperty('--ang',deg+'deg');
+  angv.textContent=deg+'°';
+  h1.value=a; h2.value=b; c1.value=a; c2.value=b;
+  applyTint(tintbg.checked);
+  // sync the in-Settings mirror controls
+  const key=(a+','+b+','+deg).toUpperCase();
+  document.querySelectorAll('.preset').forEach(x=>x.classList.toggle('on',x.dataset.c.toUpperCase()===key));
+  const am=document.getElementById('angmirror'); if(am)am.textContent=deg+'°';
+  const tm=document.getElementById('tintmirror'); if(tm)tm.classList.toggle('on',tintbg.checked);
+  // de-select the toolbar accent segment (we're in custom mode)
+  document.querySelectorAll('#seg-accent button').forEach(x=>x.classList.remove('on'));
+  outbox.innerHTML='<button class="cp" id="copybtn">Copy</button>'+
+    `--accent      : ${a};\n--accent-2    : ${b};\n--accent-text : #FFFFFF;\ngradient angle: ${deg}deg;\nwindow tint   : ${tintbg.checked?'on (~8–15% accent)':'off'};`;
+  document.getElementById('copybtn').onclick=()=>{
+    const t=`--accent: ${a}; --accent-2: ${b}; angle: ${deg}deg; tint: ${tintbg.checked?'on':'off'}`;
+    navigator.clipboard?.writeText(t); const btn=document.getElementById('copybtn');
+    btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1400);
+  };
+}
+c1.addEventListener('input',()=>{h1.value=c1.value.toUpperCase();apply();});
+c2.addEventListener('input',()=>{h2.value=c2.value.toUpperCase();apply();});
+h1.addEventListener('change',()=>{if(isHex(h1.value)){c1.value=norm(h1.value);apply();}});
+h2.addEventListener('change',()=>{if(isHex(h2.value)){c2.value=norm(h2.value);apply();}});
+ang.addEventListener('input',apply);
+tintbg.addEventListener('change',()=>applyTint(tintbg.checked));
+document.querySelectorAll('.presets').forEach(cont=>cont.addEventListener('click',e=>{
+  const p=e.target.closest('.preset');if(!p)return;
+  const[a,b,d]=p.dataset.c.split(',');c1.value=a;c2.value=b;ang.value=d;apply();
+}));
+// Reset to defaults (both the playground button and the Settings button)
+function resetDefaults(){c1.value='#2DD4BF';c2.value='#34D399';ang.value=135;tintbg.checked=true;apply();}
+document.getElementById('reset').onclick=resetDefaults;
+document.getElementById('reset2').onclick=resetDefaults;
+// in-Settings tint switch mirrors the checkbox
+document.getElementById('tintmirror').addEventListener('click',()=>{
+  tintbg.checked=!tintbg.checked;applyTint(tintbg.checked);
+  document.getElementById('tintmirror').classList.toggle('on',tintbg.checked);
+});
+// when the toolbar accent segment is used, drop custom overrides so presets take over
+document.getElementById('seg-accent').addEventListener('click',()=>{
+  root.style.removeProperty('--accent');root.style.removeProperty('--accent-2');
+  root.style.removeProperty('--accent-text');
+  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+});
+apply(); // initialise output box with defaults
+</script>
+</body>
+</html>
