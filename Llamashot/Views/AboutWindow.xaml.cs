@@ -49,6 +49,11 @@ public partial class AboutWindow : Window
 
     private bool _statusIsError;
 
+    private void Website_Click(object sender, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo(AppSettings.WebsiteUrl) { UseShellExecute = true }); } catch { }
+    }
+
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         BtnUpdate.IsEnabled = false;

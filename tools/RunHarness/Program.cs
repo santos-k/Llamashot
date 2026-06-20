@@ -279,6 +279,17 @@ internal static class Program
             return;
         }
 
+        // About window: confirm the website link renders.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_ABOUTUI") == "1")
+        {
+            var a = new AboutWindow { WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            a.Show();
+            await Task.Delay(500);
+            ShotRtb(a, "aboutui.png");
+            a.Close();
+            return;
+        }
+
         // Document scanner: synthetic correctness of perspective warp + filters + auto-detect.
         // Driven by a marker file docscan_cmd.txt (optional line1 = real image path to also process).
         string dsCmd = Path.Combine(Dir, "docscan_cmd.txt");

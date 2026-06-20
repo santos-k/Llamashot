@@ -11,6 +11,12 @@ public class AppSettings
 
     public static AppSettings Instance { get; private set; } = new();
 
+    /// <summary>The project website (shown in About and opened once on first run).</summary>
+    public const string WebsiteUrl = "https://santos-k.github.io/Llamashot/";
+
+    /// <summary>Set after the website has been opened once (first run after install).</summary>
+    public bool WelcomeShown { get; set; } = false;
+
     // Global hotkeys (system-wide, registered via RegisterHotKey)
     public string CaptureHotkey { get; set; } = "PrintScreen";
     public string FullscreenSaveHotkey { get; set; } = "Shift+PrintScreen";

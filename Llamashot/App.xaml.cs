@@ -64,6 +64,15 @@ public partial class App : Application
             ThemeManager.Initialize(AppSettings.Instance.FileToolsTheme);
             HistoryManager.Load();
 
+            // First run after install: open the project website once (skip on silent autostart).
+            if (!AppSettings.Instance.WelcomeShown && !_silentStart)
+            {
+                AppSettings.Instance.WelcomeShown = true;
+                try { AppSettings.Save(); } catch { }
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppSettings.WebsiteUrl) { UseShellExecute = true }); }
+                catch { }
+            }
+
             // Create hidden window for hotkey handling
             _hiddenWindow = new Window
             {
