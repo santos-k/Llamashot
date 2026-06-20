@@ -1712,6 +1712,111 @@ public static class FileToolsService
         return outputFile;
     }
 
+    // =====================================================================
+    //  Universal link downloader (any file via HTTP, or any media site via yt-dlp)
+    // =====================================================================
+
+    public enum LinkKind { DirectFile, Media }
+
+    private static readonly string[] DirectFileExts =
+    {
+        ".jpg",".jpeg",".png",".gif",".webp",".bmp",".tif",".tiff",".svg",".ico",".heic",".avif",
+        ".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".txt",".csv",".rtf",".odt",".ods",".odp",".epub",".mobi",
+        ".zip",".rar",".7z",".tar",".gz",".bz2",".xz",".exe",".msi",".dmg",".pkg",".apk",".iso",".deb",".rpm",".appimage",
+        ".mp3",".wav",".flac",".m4a",".aac",".ogg",".opus",".wma",
+        ".mp4",".mkv",".webm",".mov",".avi",".flv",".wmv",".m4v",".ts",
+        ".json",".xml",".yaml",".yml",".bin",".dll",".jar",".whl",".gguf",".safetensors",".onnx",
+    };
+
+    /// <summary>Heuristically classifies a URL: a path ending in a known file extension is a direct
+    /// download; otherwise it's treated as a media page (handled by yt-dlp, e.g. Instagram / Facebook / X).</summary>
+    public static LinkKind ClassifyUrl(string url)
+    {
+        try
+        {
+            string path = new Uri(url).AbsolutePath.ToLowerInvariant();
+            foreach (var ext in DirectFileExts)
+                if (path.EndsWith(ext)) return LinkKind.DirectFile;
+        }
+        catch { /* not a well-formed absolute URL */ }
+        return LinkKind.Media;
+    }
+
+    /// <summary>Streams a direct file URL to <paramref name="outputDir"/> with progress (percent + a
+    /// "12 MB / 40 MB · 8.4 MB/s" style status). Returns the saved path.</summary>
+    public static async Task<string> DownloadDirectFileAsync(string url, string outputDir,
+        IProgress<(int percent, string status)>? progress = null, System.Threading.CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(outputDir);
+        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromHours(6) };
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Llamashot/1.0");
+
+        using var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct);
+        resp.EnsureSuccessStatusCode();
+        long total = resp.Content.Headers.ContentLength ?? -1;
+
+        string fileName = ResolveFileName(resp, url);
+        string outPath = UniquePath(Path.Combine(outputDir, fileName));
+
+        await using var src = await resp.Content.ReadAsStreamAsync(ct);
+        await using var dst = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20, true);
+        var buf = new byte[1 << 20]; // 1 MB buffer
+        long read = 0; int n;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long lastReport = 0;
+        while ((n = await src.ReadAsync(buf, ct)) > 0)
+        {
+            await dst.WriteAsync(buf.AsMemory(0, n), ct);
+            read += n;
+            if (read - lastReport >= (1 << 20) || (total > 0 && read == total))
+            {
+                lastReport = read;
+                double secs = Math.Max(0.001, sw.Elapsed.TotalSeconds);
+                string speed = FormatFileSize((long)(read / secs)) + "/s";
+                int pct = total > 0 ? (int)(read * 100 / total) : 0;
+                string status = total > 0
+                    ? $"{FormatFileSize(read)} / {FormatFileSize(total)} · {speed}"
+                    : $"{FormatFileSize(read)} · {speed}";
+                progress?.Report((pct, status));
+            }
+        }
+        progress?.Report((100, $"Done · {FormatFileSize(read)}"));
+        return outPath;
+    }
+
+    private static string ResolveFileName(System.Net.Http.HttpResponseMessage resp, string url)
+    {
+        // Prefer Content-Disposition filename.
+        var cd = resp.Content.Headers.ContentDisposition;
+        string? name = cd?.FileNameStar ?? cd?.FileName;
+        if (!string.IsNullOrWhiteSpace(name)) name = name.Trim('"');
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            try { name = Path.GetFileName(new Uri(url).AbsolutePath); } catch { name = null; }
+        }
+        if (string.IsNullOrWhiteSpace(name)) name = "download";
+        foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
+        return name;
+    }
+
+    private static string UniquePath(string path)
+    {
+        if (!File.Exists(path)) return path;
+        string dir = Path.GetDirectoryName(path)!;
+        string stem = Path.GetFileNameWithoutExtension(path), ext = Path.GetExtension(path);
+        for (int i = 1; ; i++)
+        {
+            string cand = Path.Combine(dir, $"{stem} ({i}){ext}");
+            if (!File.Exists(cand)) return cand;
+        }
+    }
+
+    /// <summary>Downloads any media-site URL (YouTube, Instagram, Facebook, X/Twitter, TikTok, …) via
+    /// yt-dlp at best quality (or audio-only MP3). Returns the saved path.</summary>
+    public static Task<string?> DownloadMediaAsync(string url, string outputDir, bool audioOnly,
+        IProgress<(int percent, string status)>? progress = null)
+        => DownloadSingleVideoAsync(url, outputDir, "best", audioOnly, embedThumbnail: false, progress);
+
     public static async Task ExtractAudioWithThumbnailAsync(string videoPath, string outputPath, IProgress<int>? progress = null)
     {
         var info = await GetVideoInfoAsync(videoPath);

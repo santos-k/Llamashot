@@ -999,6 +999,8 @@
                     <TextBlock x:Name="TxtCropInfo" Text="Draw a crop area on the image" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <CheckBox x:Name="ChkCropAspect" Content="Lock ratio" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Cursor="Hand" Margin="0,0,12,0"/>
+                        <Button x:Name="BtnCropSmart" Content="&#x2728; Smart crop" Height="26" Padding="10,0" FontSize="11" Background="{DynamicResource AccentBrush}" Foreground="White"
+                                BorderThickness="0" Cursor="Hand" Click="CropSmart_Click" Margin="0,0,8,0" ToolTip="AI-detect the subject and set the crop to it"/>
                         <Button Content="Reset" Width="60" Height="26" FontSize="11" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
                                 BorderBrush="{DynamicResource BorderSoftBrush}" Cursor="Hand" Click="Crop_Reset"/>
                     </StackPanel>
@@ -1232,6 +1234,9 @@
                                 <Button x:Name="BtnIeTool_convert" Tag="convert" Click="IeToolSelect_Click" Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
                                     <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x21C4;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Convert" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="Convert to other formats" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
                                 </Button>
+                                <Button x:Name="BtnIeTool_background" Tag="background" Click="IeToolSelect_Click" Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,1" Template="{StaticResource PeToolButton}">
+                                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="&#x2728;" FontSize="14" VerticalAlignment="Center" Width="22"/><TextBlock Text="Background" FontSize="12" FontWeight="SemiBold"/></StackPanel><TextBlock Text="AI remove / blur / replace background" FontSize="9" Opacity="0.6" Margin="22,1,0,0"/></StackPanel>
+                                </Button>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -1430,6 +1435,19 @@
                                         <TextBlock x:Name="TxtIeConvertEstSize" Text="" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="SemiBold"/>
                                     </Border>
                                     <Button Content="Save As Format" Padding="0,8" FontSize="12" Background="{DynamicResource AccentBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeConvert_Save" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}"/>
+                                </StackPanel>
+                                <StackPanel x:Name="IeSecBackground" Margin="16,16" Visibility="Collapsed">
+                                    <TextBlock Text="BACKGROUND (AI)" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Detects the main subject and removes, blurs or replaces everything behind it. Downloads a model once (~168 MB)." Foreground="{DynamicResource TextMutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                    <Button Content="&#x2728;  Remove background" Padding="0,9" FontSize="12" Background="{DynamicResource AccentBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="IeBgRemove_Click" HorizontalContentAlignment="Center" Template="{StaticResource RoundedButton21}" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="Blur strength" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+                                    <Slider x:Name="SldIeBgBlur" Minimum="2" Maximum="40" Value="14" Margin="0,0,0,6"/>
+                                    <Button Content="Blur background" Padding="0,8" FontSize="12" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Cursor="Hand" Click="IeBgBlur_Click" HorizontalContentAlignment="Center" Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="Replace colour (hex)" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtIeBgColor" Text="#FFFFFF" Height="28" FontSize="11" Margin="0,0,0,6"/>
+                                    <Button Content="Replace background colour" Padding="0,8" FontSize="12" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Cursor="Hand" Click="IeBgReplace_Click" HorizontalContentAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>

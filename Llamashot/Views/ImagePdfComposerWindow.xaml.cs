@@ -485,6 +485,17 @@ public partial class ImagePdfComposerWindow : Window
         LoadPage();
     }
 
+    /// <summary>Clears the whole layout back to a single empty page (used by "Start over" after export).</summary>
+    private void StartOver()
+    {
+        _pages.Clear();
+        _pages.Add(new PageM());
+        _cur = 0;
+        Deselect();
+        RebuildThumbs();
+        LoadPage();
+    }
+
     // =====================================================================
     //  Document scan integration
     // =====================================================================
@@ -543,6 +554,63 @@ public partial class ImagePdfComposerWindow : Window
     {
         var scanner = new DocumentScanWindow(sourcePath, pickMode: true) { Owner = this };
         return scanner.ShowDialog() == true ? scanner.PickResultPath : null;
+    }
+
+    /// <summary>AI-removes the background of the selected placed image and swaps in the transparent cut-out.</summary>
+    private async void AiCutout_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sel == null) return;
+        var src = _sel;
+        BusyOverlay.Visibility = Visibility.Visible;
+        try
+        {
+            if (!AiMatting.ModelExists)
+            {
+                PrgBusy.IsIndeterminate = false;
+                var prog = new Progress<double>(p => { PrgBusy.Value = p; TxtBusy.Text = $"Downloading AI model… {p:0}%"; });
+                TxtBusy.Text = "Downloading AI model (~168 MB, one time)…";
+                await AiMatting.EnsureModelAsync(prog);
+            }
+            PrgBusy.IsIndeterminate = true;
+            TxtBusy.Text = "Removing background…";
+
+            byte[] px = LoadBgra(src.Path, out int w, out int h);
+            byte[] mask = await System.Threading.Tasks.Task.Run(() => AiMatting.ComputeMask(px, w, h));
+            AiMatting.ApplyMask(px, mask);
+            BackgroundRemover.SmoothAlpha(px, w, h, 2);
+
+            string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Llamashot", "scans");
+            Directory.CreateDirectory(dir);
+            string outPath = System.IO.Path.Combine(dir, $"cut_{Guid.NewGuid():N}.png");
+            var bmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, px, w * 4);
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(bmp));
+            using (var fs = new FileStream(outPath, FileMode.Create)) enc.Save(fs);
+
+            if (_pages[_cur].Images.Contains(src)) ReplaceContent(src, outPath);
+        }
+        catch (Exception ex)
+        {
+            ConfirmDialog.Alert(this, "Background Removal Failed",
+                $"{ex.Message}\n\nIf this is the first run, check your internet connection — the model downloads once.",
+                ConfirmDialog.AlertKind.Error);
+        }
+        finally
+        {
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            PrgBusy.IsIndeterminate = true; PrgBusy.Value = 0;
+        }
+    }
+
+    private static byte[] LoadBgra(string path, out int w, out int h)
+    {
+        var bi = new BitmapImage();
+        bi.BeginInit(); bi.CacheOption = BitmapCacheOption.OnLoad; bi.UriSource = new Uri(path); bi.EndInit(); bi.Freeze();
+        BitmapSource s = new FormatConvertedBitmap(bi, PixelFormats.Bgra32, null, 0);
+        w = s.PixelWidth; h = s.PixelHeight;
+        var px = new byte[w * h * 4];
+        s.CopyPixels(px, w * 4, 0);
+        return px;
     }
 
     private static BitmapImage LoadBitmap(string path)
@@ -815,10 +883,10 @@ public partial class ImagePdfComposerWindow : Window
         {
             await FileToolsService.ComposePdfAsync(specs, outPath);
             long size = new FileInfo(outPath).Length;
-            ConfirmDialog.Alert(this, "PDF Created",
-                $"Exported {_pages.Count} page(s) ({FileToolsService.FormatFileSize(size)}) to:\n{outPath}",
-                ConfirmDialog.AlertKind.Success, "Done");
-            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outPath}\""); } catch { }
+            var choice = ConfirmDialog.PromptSaved(this, "PDF Created",
+                $"Exported {_pages.Count} page(s) ({FileToolsService.FormatFileSize(size)}) to:\n{outPath}");
+            if (choice == ConfirmDialog.SavedChoice.Open) DocumentScanWindow.OpenSaved(outPath);
+            else if (choice == ConfirmDialog.SavedChoice.StartOver) StartOver();
         }
         catch (Exception ex)
         {

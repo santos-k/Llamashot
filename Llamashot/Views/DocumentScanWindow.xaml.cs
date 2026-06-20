@@ -613,10 +613,21 @@ public partial class DocumentScanWindow : Window
     private void Saved(string path)
     {
         long size = new FileInfo(path).Length;
-        ConfirmDialog.Alert(this, "Saved",
-            $"Saved ({FileToolsService.FormatFileSize(size)}) to:\n{path}", ConfirmDialog.AlertKind.Success, "Done");
-        try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\""); } catch { }
-        UnloadFile(); // after a successful save, close the file and return to the Open state
+        var choice = ConfirmDialog.PromptSaved(this, "Saved",
+            $"Saved ({FileToolsService.FormatFileSize(size)}) to:\n{path}");
+        switch (choice)
+        {
+            case ConfirmDialog.SavedChoice.Open: OpenSaved(path); break;
+            case ConfirmDialog.SavedChoice.StartOver: UnloadFile(); break;
+            // Done: keep the current scan on screen.
+        }
+    }
+
+    /// <summary>Opens the saved file in its default app (Explorer-selects on failure).</summary>
+    internal static void OpenSaved(string path)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch { try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\""); } catch { } }
     }
 
     // Guard against accidental close before saving.

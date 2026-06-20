@@ -59,7 +59,7 @@ public partial class RemoveBackgroundWindow : Window
         Loaded += (_, _) =>
         {
             if (_testImage != null) LoadFrom(_testImage);
-            else if (!OpenImage()) Close();
+            else SetLoadedUi(false); // start on the empty state with a centered Open button
         };
         KeyDown += OnKeyDown;
     }
@@ -123,6 +123,7 @@ public partial class RemoveBackgroundWindow : Window
             TxtHint.Visibility = Visibility.Collapsed;
             Title = $"Remove Background — {Path.GetFileName(fileName)}";
             _userZoomed = false;
+            SetLoadedUi(true);
             FitScale();
             return true;
         }
@@ -131,6 +132,42 @@ public partial class RemoveBackgroundWindow : Window
             ConfirmDialog.Alert(this, "Can't Open Image", ex.Message, ConfirmDialog.AlertKind.Error);
             return _pixels != null;
         }
+    }
+
+    private void CloseFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pixels == null) return;
+        if (_undo.Count > 0 && !ConfirmDialog.Show(this, "Close image?",
+                "Close the current image? Unsaved edits will be lost.", "Close", "Keep editing"))
+            return;
+        UnloadFile();
+    }
+
+    /// <summary>Drops the loaded image and returns to the empty state (centered Open button).</summary>
+    private void UnloadFile()
+    {
+        _pixels = null; _orig = null; _wb = null; _ghost = null; _ghostWb = null;
+        Img.Source = null; GhostImg.Source = null; GhostImg.Visibility = Visibility.Collapsed;
+        Img.Width = 0; Img.Height = 0;
+        _undo.Clear(); _redo.Clear();
+        Title = "Remove Background";
+        SetLoadedUi(false);
+    }
+
+    /// <summary>Toggles between the empty state and the editor, enabling the relevant toolbar actions.</summary>
+    private void SetLoadedUi(bool has)
+    {
+        EmptyState.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
+        TxtHint.Visibility = Visibility.Collapsed;
+        Button[] need =
+        {
+            BtnClose, BtnAuto, BtnAi, BtnWand, BtnErase, BtnRestore, BtnBlur, BtnPan,
+            BtnExportPng, BtnExportJpg, BtnBgColor,
+        };
+        foreach (var b in need) b.IsEnabled = has;
+        SldTol.IsEnabled = has; SldBrush.IsEnabled = has; SldEdge.IsEnabled = has;
+        if (has) UpdateUndoButtons();
+        else { BtnUndo.IsEnabled = false; BtnRedo.IsEnabled = false; }
     }
 
     // =====================================================================
@@ -645,6 +682,8 @@ public partial class RemoveBackgroundWindow : Window
             // Brush size
             case Key.OemOpenBrackets: NudgeBrush(-10); break;
             case Key.OemCloseBrackets: NudgeBrush(+10); break;
+            // Close file
+            case Key.Escape: CloseFile_Click(this, new RoutedEventArgs()); break;
             // Zoom
             case Key.F: case Key.D0: case Key.NumPad0: Fit_Click(this, none); break;
             case Key.D1: case Key.NumPad1: OneToOne_Click(this, none); break;
@@ -727,8 +766,13 @@ public partial class RemoveBackgroundWindow : Window
     private void Saved(string path)
     {
         long size = new FileInfo(path).Length;
-        ConfirmDialog.Alert(this, "Image Saved",
-            $"Saved ({FileToolsService.FormatFileSize(size)}) to:\n{path}", ConfirmDialog.AlertKind.Success, "Done");
-        try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\""); } catch { }
+        var choice = ConfirmDialog.PromptSaved(this, "Image Saved",
+            $"Saved ({FileToolsService.FormatFileSize(size)}) to:\n{path}");
+        switch (choice)
+        {
+            case ConfirmDialog.SavedChoice.Open: DocumentScanWindow.OpenSaved(path); break;
+            case ConfirmDialog.SavedChoice.StartOver: UnloadFile(); break;
+            // Done: keep editing.
+        }
     }
 }

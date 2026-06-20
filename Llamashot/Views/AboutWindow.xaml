@@ -23,7 +23,7 @@
                            Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 8.9.17" Foreground="{DynamicResource TextMutedBrush}"
+                <TextBlock Text="Version 8.9.18" Foreground="{DynamicResource TextMutedBrush}"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
 
                 <!-- Update -->
@@ -131,6 +131,11 @@
                         <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Document Scan — flatten a skewed photo of a card / receipt / page into a perfect rectangle; auto edge-detect, draggable corners with magnifier, rotate &amp; flip" />
                         <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Document Scan filters — None, Magic Colour, Grayscale, Black &amp; White — and save as PNG, JPG or PDF" />
                         <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Document Scan built into Images &#x2192; PDF — &#x201C;Scan &amp; Add&#x201D; a document, or &#x201C;Scan / Flatten&#x201D; any placed image" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Link Downloader — download any file (image, PDF, archive, installer&#x2026;) or video from a link, incl. Instagram / Facebook / YouTube / X / TikTok; queue many links, audio-only MP3, live speed" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Image Editor &#x2014; AI Background tool: remove, blur, or replace the background behind the subject" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Crop Image &#x2014; Smart crop snaps the selection to the AI-detected subject" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Images &#x2192; PDF &#x2014; AI &#x201C;Remove background&#x201D; on a placed photo (ID / signature onto white)" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Image tools &#x2014; initial Open page, Close with confirm, and a save-success prompt (Open / Start over)" />
                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />

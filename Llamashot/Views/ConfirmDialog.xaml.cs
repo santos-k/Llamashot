@@ -76,6 +76,32 @@ public partial class ConfirmDialog : Window
         return dlg._choice;
     }
 
+    /// <summary>Post-save success prompt offering to Open the result, Start over, or be Done.</summary>
+    public enum SavedChoice { Done, StartOver, Open }
+
+    public static SavedChoice PromptSaved(Window owner, string title, string message,
+        string openText = "Open", string startOverText = "Start over", string doneText = "Done")
+    {
+        var dlg = new ConfirmDialog { Owner = owner };
+        dlg.TxtTitle.Text = title;
+        dlg.TxtMessage.Text = message;
+        dlg.BtnCancel.Content = doneText;
+        dlg.BtnConfirm.Content = startOverText;
+        dlg.BtnNeutral.Content = openText;
+        dlg.BtnNeutral.Visibility = Visibility.Visible;
+        // Success styling — the "Start over" button isn't destructive, so drop the danger red.
+        dlg.BtnConfirm.SetResourceReference(BackgroundProperty, "SurfaceAltBrush");
+        dlg.BtnConfirm.SetResourceReference(ForegroundProperty, "TextSecondaryBrush");
+        dlg.ApplyKind(AlertKind.Success);
+        dlg.ShowDialog();
+        return dlg._choice switch
+        {
+            CloseChoice.Save => SavedChoice.Open,
+            CloseChoice.Discard => SavedChoice.StartOver,
+            _ => SavedChoice.Done,
+        };
+    }
+
     private CloseChoice _choice = CloseChoice.Cancel;
 
     private void Confirm_Click(object sender, RoutedEventArgs e)

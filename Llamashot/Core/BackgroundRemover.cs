@@ -270,6 +270,44 @@ public static class BackgroundRemover
         }
     }
 
+    /// <summary>Separable box blur over the RGB channels (alpha left untouched). Used for
+    /// background-blur compositing.</summary>
+    public static void BoxBlur(byte[] px, int w, int h, int radius)
+    {
+        if (radius <= 0 || w <= 0 || h <= 0) return;
+        int win = radius * 2 + 1;
+        var tmp = new byte[px.Length];
+        // Horizontal pass.
+        for (int y = 0; y < h; y++)
+        {
+            int row = y * w;
+            for (int ch = 0; ch < 3; ch++)
+            {
+                int sum = 0;
+                for (int k = -radius; k <= radius; k++) sum += px[(row + Math.Clamp(k, 0, w - 1)) * 4 + ch];
+                for (int x = 0; x < w; x++)
+                {
+                    tmp[(row + x) * 4 + ch] = (byte)(sum / win);
+                    int addX = Math.Clamp(x + radius + 1, 0, w - 1), remX = Math.Clamp(x - radius, 0, w - 1);
+                    sum += px[(row + addX) * 4 + ch] - px[(row + remX) * 4 + ch];
+                }
+            }
+        }
+        // Vertical pass.
+        for (int x = 0; x < w; x++)
+            for (int ch = 0; ch < 3; ch++)
+            {
+                int sum = 0;
+                for (int k = -radius; k <= radius; k++) sum += tmp[(Math.Clamp(k, 0, h - 1) * w + x) * 4 + ch];
+                for (int y = 0; y < h; y++)
+                {
+                    px[(y * w + x) * 4 + ch] = (byte)(sum / win);
+                    int addY = Math.Clamp(y + radius + 1, 0, h - 1), remY = Math.Clamp(y - radius, 0, h - 1);
+                    sum += tmp[(addY * w + x) * 4 + ch] - tmp[(remY * w + x) * 4 + ch];
+                }
+            }
+    }
+
     /// <summary>Composite the cut-out over a solid colour (for JPEG export, which has no alpha).</summary>
     public static byte[] FlattenOnto(byte[] px, byte bgB, byte bgG, byte bgR)
     {

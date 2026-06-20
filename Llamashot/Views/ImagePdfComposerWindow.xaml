@@ -153,6 +153,14 @@
                 </Border>
             </Grid>
 
+            <!-- Busy overlay (AI cut-out / model download) -->
+            <Border x:Name="BusyOverlay" Grid.Column="1" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="50">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="320">
+                    <TextBlock x:Name="TxtBusy" Text="Working…" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                    <ProgressBar x:Name="PrgBusy" Height="6" IsIndeterminate="True" />
+                </StackPanel>
+            </Border>
+
             <!-- Properties -->
             <Border Grid.Column="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                     BorderThickness="1,0,0,0">
@@ -180,8 +188,11 @@
                             <TextBlock Text="DOCUMENT" Foreground="{DynamicResource TextMutedBrush}"
                                        FontSize="11" FontWeight="SemiBold" Margin="0,16,0,8" />
                             <Button x:Name="BtnRescan" Content="&#x25A4;  Scan / Flatten this image" Style="{StaticResource Tool}"
-                                    HorizontalContentAlignment="Left" Padding="12,7" Click="Rescan_Click"
+                                    HorizontalContentAlignment="Left" Padding="12,7" Click="Rescan_Click" Margin="0,0,0,6"
                                     ToolTip="Perspective-crop this photo to a flat rectangle (great for skewed ID cards / receipts)" />
+                            <Button x:Name="BtnAiCut" Content="&#x2728;  Remove background (AI)" Style="{StaticResource Tool}"
+                                    HorizontalContentAlignment="Left" Padding="12,7" Click="AiCutout_Click"
+                                    ToolTip="AI-cut the subject out of this photo (ID / signature / product onto white)" />
 
                             <TextBlock Text="FLIP" Foreground="{DynamicResource TextMutedBrush}"
                                        FontSize="11" FontWeight="SemiBold" Margin="0,16,0,8" />

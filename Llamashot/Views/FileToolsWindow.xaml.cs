@@ -45,10 +45,11 @@ public partial class FileToolsWindow : Window
         ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",               "#C99BDB", "\u21BA", "Image Tools"),
         ("convert_format", "Convert Format",  "Change image format",                 "#F48FB1", "\u21C4", "Image Tools"),
         ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",              "#A7B6C2", "\u2263", "Office Tools"),
-        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F58F8F", "\u25B6", "Video & Audio"),
+        ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F58F8F", "\U0001F3AC", "Video & Audio"),
         ("extract_audio", "Extract Audio",    "Extract audio from video",            "#6FD3E6", "\u266B", "Video & Audio"),
         ("trim_audio",    "Trim Audio",       "Cut start and end of audio",          "#6FD0C3", "\u2702", "Video & Audio"),
         ("youtube_dl",    "YouTube Download", "Download video or audio from URL",    "#FF9B9B", "\u25B6", "Download"),
+        ("link_dl",       "Link Downloader",  "Download any file or video from a link", "#7FB2F0", "\U0001F517", "Download"),
     };
 
     // =====================================================================
@@ -886,6 +887,15 @@ public partial class FileToolsWindow : Window
             var ds = new DocumentScanWindow();
             ds.Show();
             BringToFront(ds);
+            return;
+        }
+
+        // Link Downloader opens the universal URL downloader (yt-dlp for media sites + direct file fetch).
+        if (id == "link_dl")
+        {
+            var dl = new LinkDownloaderWindow();
+            dl.Show();
+            BringToFront(dl);
             return;
         }
 
@@ -2641,6 +2651,66 @@ public partial class FileToolsWindow : Window
         }
     }
 
+    private bool _cropSmartBusy;
+    /// <summary>AI-detects the main subject and sets the crop selection to its bounding box.</summary>
+    private async void CropSmart_Click(object sender, RoutedEventArgs e)
+    {
+        if (_cropSourcePath == null || _cropSmartBusy) return;
+        _cropSmartBusy = true;
+        string prevInfo = TxtCropInfo.Text;
+        try
+        {
+            if (!AiMatting.ModelExists)
+            {
+                var prog = new Progress<double>(p => TxtCropInfo.Text = $"Downloading AI model… {p:0}%");
+                await AiMatting.EnsureModelAsync(prog);
+            }
+            TxtCropInfo.Text = "Detecting subject…";
+
+            var bi = new BitmapImage();
+            bi.BeginInit(); bi.CacheOption = BitmapCacheOption.OnLoad; bi.UriSource = new Uri(_cropSourcePath); bi.EndInit(); bi.Freeze();
+            BitmapSource s = new FormatConvertedBitmap(bi, PixelFormats.Bgra32, null, 0);
+            int w = s.PixelWidth, h = s.PixelHeight;
+            var px = new byte[w * h * 4];
+            s.CopyPixels(px, w * 4, 0);
+
+            var (minx, miny, maxx, maxy) = await Task.Run(() =>
+            {
+                var mask = AiMatting.ComputeMask(px, w, h);
+                int x0 = w, y0 = h, x1 = -1, y1 = -1;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        if (mask[y * w + x] > 40)
+                        {
+                            if (x < x0) x0 = x; if (x > x1) x1 = x;
+                            if (y < y0) y0 = y; if (y > y1) y1 = y;
+                        }
+                return (x0, y0, x1, y1);
+            });
+
+            if (maxx < 0) { TxtCropInfo.Text = "No clear subject found — drag a crop area manually."; return; }
+
+            int pad = (int)(Math.Max(w, h) * 0.02);
+            minx = Math.Max(0, minx - pad); miny = Math.Max(0, miny - pad);
+            maxx = Math.Min(w - 1, maxx + pad); maxy = Math.Min(h - 1, maxy + pad);
+
+            var disp = GetImageDisplayBounds();
+            if (disp.Width <= 0 || disp.Height <= 0) { TxtCropInfo.Text = prevInfo; return; }
+            double sx = disp.Width / w, sy = disp.Height / h;
+            _cropSelectionRect = new Rect(disp.X + minx * sx, disp.Y + miny * sy, (maxx - minx) * sx, (maxy - miny) * sy);
+            UpdateCropVisuals();
+            TxtCropInfo.Text = "Smart crop set — adjust the handles or Crop & Save.";
+        }
+        catch (Exception ex)
+        {
+            ConfirmDialog.Alert(this, "Smart Crop Failed",
+                $"{ex.Message}\n\nIf this is the first run, check your internet — the AI model downloads once.",
+                ConfirmDialog.AlertKind.Error);
+            TxtCropInfo.Text = prevInfo;
+        }
+        finally { _cropSmartBusy = false; }
+    }
+
     private Rect GetImageDisplayBounds()
     {
         var (_, _, offsetX, offsetY) = GetImageScale();
@@ -3290,7 +3360,8 @@ public partial class FileToolsWindow : Window
         System.Windows.Controls.Button[] sidebarBtns =
         {
             BtnIeTool_crop, BtnIeTool_resize, BtnIeTool_rotateflip, BtnIeTool_adjust,
-            BtnIeTool_filters, BtnIeTool_watermark, BtnIeTool_compress, BtnIeTool_convert
+            BtnIeTool_filters, BtnIeTool_watermark, BtnIeTool_compress, BtnIeTool_convert,
+            BtnIeTool_background
         };
         foreach (var btn in sidebarBtns)
         {
@@ -3303,6 +3374,7 @@ public partial class FileToolsWindow : Window
             "rotateflip" => BtnIeTool_rotateflip, "adjust" => BtnIeTool_adjust,
             "filters" => BtnIeTool_filters, "watermark" => BtnIeTool_watermark,
             "compress" => BtnIeTool_compress, "convert" => BtnIeTool_convert,
+            "background" => BtnIeTool_background,
             _ => BtnIeTool_crop
         };
         activeBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C4DFF"));
@@ -3316,6 +3388,7 @@ public partial class FileToolsWindow : Window
         IeSecWatermark.Visibility = tool == "watermark" ? Visibility.Visible : Visibility.Collapsed;
         IeSecCompress.Visibility = tool == "compress" ? Visibility.Visible : Visibility.Collapsed;
         IeSecConvert.Visibility = tool == "convert" ? Visibility.Visible : Visibility.Collapsed;
+        IeSecBackground.Visibility = tool == "background" ? Visibility.Visible : Visibility.Collapsed;
 
         if (tool != "crop") IeClearCropVisuals();
         else if (_ieWorkingImage != null) IeInitCropRect();
@@ -3748,6 +3821,106 @@ public partial class FileToolsWindow : Window
         _ieAdjustBase = wb;
         IePreviewImage.Source = wb;
         IeUpdateInfo();
+    }
+
+    // ---- Background (AI matting) ----
+    private bool _ieBgBusy;
+
+    /// <summary>Pulls the working image to a BGRA buffer and computes the AI subject mask (downloads the
+    /// model once). Returns (pixels, mask, w, h) or null on failure/cancel.</summary>
+    private async Task<(byte[] px, byte[] mask, int w, int h)?> IeComputeMaskAsync()
+    {
+        if (_ieWorkingImage == null || _ieBgBusy) return null;
+        _ieBgBusy = true;
+        try
+        {
+            if (!AiMatting.ModelExists)
+            {
+                var prog = new Progress<double>(p => TxtIeCurrentSize.Text = $"Downloading AI model… {p:0}%");
+                await AiMatting.EnsureModelAsync(prog);
+            }
+            TxtIeCurrentSize.Text = "Detecting subject…";
+            var src = IeEnsureBgra32(_ieWorkingImage);
+            int w = src.PixelWidth, h = src.PixelHeight, stride = w * 4;
+            var px = new byte[h * stride];
+            src.CopyPixels(px, stride, 0);
+            var mask = await Task.Run(() => AiMatting.ComputeMask(px, w, h));
+            return (px, mask, w, h);
+        }
+        catch (Exception ex)
+        {
+            ConfirmDialog.Alert(this, "Background AI Failed",
+                $"{ex.Message}\n\nIf this is the first run, check your internet — the model downloads once.",
+                ConfirmDialog.AlertKind.Error);
+            return null;
+        }
+        finally { _ieBgBusy = false; TxtIeCurrentSize.Text = ""; }
+    }
+
+    private void IeCommitBg(byte[] px, int w, int h)
+    {
+        IePushUndo();
+        var wb = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+        wb.WritePixels(new Int32Rect(0, 0, w, h), px, w * 4, 0);
+        wb.Freeze();
+        _ieWorkingImage = wb;
+        _ieAdjustBase = wb; _ieFilterBase = wb;
+        IePreviewImage.Source = wb;
+        IeUpdateInfo();
+    }
+
+    private async void IeBgRemove_Click(object sender, RoutedEventArgs e)
+    {
+        var r = await IeComputeMaskAsync();
+        if (r is not { } m) return;
+        AiMatting.ApplyMask(m.px, m.mask);
+        BackgroundRemover.SmoothAlpha(m.px, m.w, m.h, 2);
+        IeCommitBg(m.px, m.w, m.h);
+    }
+
+    private async void IeBgBlur_Click(object sender, RoutedEventArgs e)
+    {
+        int radius = (int)(SldIeBgBlur?.Value ?? 14);
+        var r = await IeComputeMaskAsync();
+        if (r is not { } m) return;
+        // Blur a copy, then composite the sharp subject over it using the mask as alpha.
+        var blurred = (byte[])m.px.Clone();
+        await Task.Run(() =>
+        {
+            BackgroundRemover.BoxBlur(blurred, m.w, m.h, radius);
+            for (int p = 0; p < m.w * m.h; p++)
+            {
+                double a = m.mask[p] / 255.0;
+                int i = p * 4;
+                for (int c = 0; c < 3; c++)
+                    blurred[i + c] = (byte)(m.px[i + c] * a + blurred[i + c] * (1 - a) + 0.5);
+                blurred[i + 3] = 255;
+            }
+        });
+        IeCommitBg(blurred, m.w, m.h);
+    }
+
+    private async void IeBgReplace_Click(object sender, RoutedEventArgs e)
+    {
+        byte br = 255, bg = 255, bb = 255;
+        try { var c = (Color)System.Windows.Media.ColorConverter.ConvertFromString(TxtIeBgColor.Text.Trim()); br = c.R; bg = c.G; bb = c.B; }
+        catch { ConfirmDialog.Alert(this, "Invalid Colour", "Enter a hex colour like #FFFFFF.", ConfirmDialog.AlertKind.Warning); return; }
+
+        var r = await IeComputeMaskAsync();
+        if (r is not { } m) return;
+        await Task.Run(() =>
+        {
+            for (int p = 0; p < m.w * m.h; p++)
+            {
+                double a = m.mask[p] / 255.0;
+                int i = p * 4;
+                m.px[i]     = (byte)(m.px[i]     * a + bb * (1 - a) + 0.5);
+                m.px[i + 1] = (byte)(m.px[i + 1] * a + bg * (1 - a) + 0.5);
+                m.px[i + 2] = (byte)(m.px[i + 2] * a + br * (1 - a) + 0.5);
+                m.px[i + 3] = 255;
+            }
+        });
+        IeCommitBg(m.px, m.w, m.h);
     }
 
     // ---- Watermark ----
