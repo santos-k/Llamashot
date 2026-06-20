@@ -37,6 +37,8 @@ public partial class FileToolsWindow : Window
         ("protect_pdf",    "PDF Password",     "Add, remove, or recover a password",  "#8FB0F7", "\U0001F512", "PDF Tools"),
         ("pdf_editor",     "PDF Editor",      "Fill, sign, add text, checks & dates", "#7FD1B0", "\u270E", "PDF Tools"),
         ("image_editor",   "Image Editor",    "All-in-one image editor",             "#A78BFA", "\u2B1C", "Image Tools"),
+        ("remove_bg",      "Remove Background", "Erase or replace photo backgrounds", "#9AE6C4", "\u2728", "Image Tools"),
+        ("doc_scan",       "Document Scan",   "Crop a photo to a flat rectangle",    "#7FC8E6", "\u25a4", "Image Tools"),
         ("compress_image", "Compress Image",  "Reduce image file size",              "#6FD9E6", "\u2B07", "Image Tools"),
         ("resize_image",   "Resize Image",    "Change dimensions",                   "#6FD0C3", "\u2922", "Image Tools"),
         ("crop_image",     "Crop Image",      "Crop to selection",                   "#8FBEF7", "\u2702", "Image Tools"),
@@ -859,8 +861,36 @@ public partial class FileToolsWindow : Window
             return;
         }
 
+        // Images → PDF opens the interactive page composer (page size, margins,
+        // multiple images per page, move / resize / 360° rotate).
+        if (id == "images_to_pdf")
+        {
+            var comp = new ImagePdfComposerWindow();
+            comp.Show();
+            BringToFront(comp);
+            return;
+        }
+
+        // Remove Background opens the interactive cut-out editor.
+        if (id == "remove_bg")
+        {
+            var rb = new RemoveBackgroundWindow();
+            rb.Show();
+            BringToFront(rb);
+            return;
+        }
+
+        // Document Scan opens the perspective-crop / scanner editor.
+        if (id == "doc_scan")
+        {
+            var ds = new DocumentScanWindow();
+            ds.Show();
+            BringToFront(ds);
+            return;
+        }
+
         // New unified workspace — all PDF tools live here now.
-        if (id is "merge_pdf" or "split_pdf" or "compress_pdf" or "pdf_to_images" or "images_to_pdf"
+        if (id is "merge_pdf" or "split_pdf" or "compress_pdf" or "pdf_to_images"
             or "rotate_pdf" or "extract_pages" or "insert_pages" or "page_numbers" or "watermark" or "protect_pdf")
         {
             // Non-modal + no owner so the user can freely switch back to File Tools.

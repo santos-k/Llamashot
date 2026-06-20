@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -210,6 +211,20 @@ public partial class ToolWorkspaceWindow : Window
         UpdateThemeGlyph();
         ThemeManager.ThemeChanged += OnThemeChanged;
         Closed += (_, _) => ThemeManager.ThemeChanged -= OnThemeChanged;
+    }
+
+    // Guard against accidental close once files are loaded.
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        bool hasWork = _pdfPath != null || _mergeFiles.Count > 0 || _insertImages.Count > 0;
+        if (hasWork && !ConfirmDialog.Show(this, "Close this tool?",
+                "You have files loaded here. Close this window?",
+                "Close", "Keep open"))
+        {
+            e.Cancel = true;
+            return;
+        }
+        base.OnClosing(e);
     }
 
     private void ApplyToolMeta()

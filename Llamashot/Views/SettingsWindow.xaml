@@ -1,6 +1,7 @@
 <Window x:Class="Llamashot.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:Llamashot.Core"
         Icon="/Resources/icon32.png"
         Title="Llamashot - Settings"
         Width="520" Height="720" MinWidth="440" MinHeight="480"
@@ -61,7 +62,8 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="20,16,20,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="20,16,20,0"
+                      core:SmoothScroll.Enabled="True">
             <StackPanel>
 
                 <!-- Appearance -->

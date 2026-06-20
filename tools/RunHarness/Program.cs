@@ -70,6 +70,463 @@ internal static class Program
             return;
         }
 
+        // Image→PDF composer: verify the export cm-matrix math (position, Y-flip, rotation)
+        // by rendering the produced PDF back to PNG and sampling pixels.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_COMPOSE") == "1")
+        {
+            var log = new List<string>();
+            void A(string n, bool ok) => log.Add($"{(ok ? "PASS" : "FAIL")}  {n}");
+
+            string tmp = Path.Combine(Dir, "compose");
+            Directory.CreateDirectory(tmp);
+
+            // 200×200 test image: red left half, blue right half.
+            string imgPath = Path.Combine(tmp, "halves.png");
+            using (var bmp = new SD.Bitmap(200, 200))
+            {
+                using var g = SD.Graphics.FromImage(bmp);
+                g.FillRectangle(SD.Brushes.Red, 0, 0, 100, 200);
+                g.FillRectangle(SD.Brushes.Blue, 100, 0, 100, 200);
+                bmp.Save(imgPath, SD.Imaging.ImageFormat.Png);
+            }
+
+            // Mirror of ImagePdfComposerWindow.ComputeCm — same maths the UI exports with.
+            (double x, double y) RotateVec(double vx, double vy, double deg)
+            { double r = deg * Math.PI / 180; double c = Math.Cos(r), s = Math.Sin(r); return (vx * c - vy * s, vx * s + vy * c); }
+            double[] Cm(double X, double Y, double W, double H, double Angle, double pageH, bool flipH = false, bool flipV = false)
+            {
+                (double x, double y) ToPdf(double u, double v)
+                {
+                    double ex = flipH ? (1 - u) * W : u * W;
+                    double ey = flipV ? v * H : (1 - v) * H;
+                    var (rx, ry) = RotateVec(ex - W / 2, ey - H / 2, Angle);
+                    return (X + W / 2 + rx, pageH - (Y + H / 2 + ry));
+                }
+                var p00 = ToPdf(0, 0); var p10 = ToPdf(1, 0); var p01 = ToPdf(0, 1);
+                return new[] { p10.x - p00.x, p10.y - p00.y, p01.x - p00.x, p01.y - p00.y, p00.x, p00.y };
+            }
+
+            double pageW = 595, pageH = 842;
+            bool IsRed(SD.Color c) => c.R > 150 && c.G < 100 && c.B < 100;
+            bool IsBlue(SD.Color c) => c.B > 150 && c.R < 100;
+            bool IsWhite(SD.Color c) => c.R > 200 && c.G > 200 && c.B > 200;
+            // Derive the scale from the actual render width (the renderer's DPI is its own business).
+            SD.Color At(SD.Bitmap b, double lx, double ly)
+            {
+                double s = b.Width / pageW;
+                return b.GetPixel(Math.Clamp((int)(lx * s), 0, b.Width - 1), Math.Clamp((int)(ly * s), 0, b.Height - 1));
+            }
+
+            // Test 1 — axis-aligned: 200×100 at top-left (100,50). Expect red left, blue right, upright.
+            var s1 = new FileToolsService.ComposePageSpec { WidthPt = pageW, HeightPt = pageH };
+            s1.Images.Add(new FileToolsService.ComposePlacement { SourcePath = imgPath, Cm = Cm(100, 50, 200, 100, 0, pageH) });
+            string pdf1 = Path.Combine(tmp, "axis.pdf");
+            await FileToolsService.ComposePdfAsync(new[] { s1 }, pdf1);
+            A("axis PDF created", File.Exists(pdf1) && new FileInfo(pdf1).Length > 0);
+            try
+            {
+                var png1 = (await FileToolsService.PdfToImagesAsync(pdf1, Path.Combine(tmp, "axis"), "png", 150))[0];
+                using var b1 = new SD.Bitmap(png1);
+                A($"axis: red at left quarter ({At(b1, 150, 100)})", IsRed(At(b1, 150, 100)));
+                A($"axis: blue at right quarter ({At(b1, 250, 100)})", IsBlue(At(b1, 250, 100)));
+                A($"axis: white outside image ({At(b1, 50, 50)})", IsWhite(At(b1, 50, 50)));
+                A($"axis: white below image ({At(b1, 200, 300)})", IsWhite(At(b1, 200, 300)));
+            }
+            catch (Exception ex) { A($"axis render: {ex.Message}", false); }
+
+            // Test 2 — 90° clockwise about centre. Red (left edge) should rotate to the TOP.
+            double X = (pageW - 200) / 2, Y = (pageH - 200) / 2, cx = X + 100, cy = Y + 100;
+            var s2 = new FileToolsService.ComposePageSpec { WidthPt = pageW, HeightPt = pageH };
+            s2.Images.Add(new FileToolsService.ComposePlacement { SourcePath = imgPath, Cm = Cm(X, Y, 200, 200, 90, pageH) });
+            string pdf2 = Path.Combine(tmp, "rot.pdf");
+            await FileToolsService.ComposePdfAsync(new[] { s2 }, pdf2);
+            try
+            {
+                var png2 = (await FileToolsService.PdfToImagesAsync(pdf2, Path.Combine(tmp, "rot"), "png", 150))[0];
+                using var b2 = new SD.Bitmap(png2);
+                A($"rot90: red moved to top ({At(b2, cx, cy - 60)})", IsRed(At(b2, cx, cy - 60)));
+                A($"rot90: blue moved to bottom ({At(b2, cx, cy + 60)})", IsBlue(At(b2, cx, cy + 60)));
+            }
+            catch (Exception ex) { A($"rot render: {ex.Message}", false); }
+
+            // Test 3 — horizontal flip (no rotation): red (left) should mirror to the RIGHT.
+            var s3 = new FileToolsService.ComposePageSpec { WidthPt = pageW, HeightPt = pageH };
+            s3.Images.Add(new FileToolsService.ComposePlacement { SourcePath = imgPath, Cm = Cm(100, 50, 200, 100, 0, pageH, flipH: true) });
+            string pdf3 = Path.Combine(tmp, "fliph.pdf");
+            await FileToolsService.ComposePdfAsync(new[] { s3 }, pdf3);
+            try
+            {
+                var png3 = (await FileToolsService.PdfToImagesAsync(pdf3, Path.Combine(tmp, "fliph"), "png", 150))[0];
+                using var b3 = new SD.Bitmap(png3);
+                A($"flipH: blue now at left ({At(b3, 150, 100)})", IsBlue(At(b3, 150, 100)));
+                A($"flipH: red now at right ({At(b3, 250, 100)})", IsRed(At(b3, 250, 100)));
+            }
+            catch (Exception ex) { A($"flipH render: {ex.Message}", false); }
+
+            // Test 4 — vertical flip on the 200×200 square. Halves stay L/R; assert it still renders upright-ish.
+            var s4 = new FileToolsService.ComposePageSpec { WidthPt = pageW, HeightPt = pageH };
+            s4.Images.Add(new FileToolsService.ComposePlacement { SourcePath = imgPath, Cm = Cm(100, 50, 200, 200, 0, pageH, flipV: true) });
+            string pdf4 = Path.Combine(tmp, "flipv.pdf");
+            await FileToolsService.ComposePdfAsync(new[] { s4 }, pdf4);
+            try
+            {
+                var png4 = (await FileToolsService.PdfToImagesAsync(pdf4, Path.Combine(tmp, "flipv"), "png", 150))[0];
+                using var b4 = new SD.Bitmap(png4);
+                A($"flipV: red still at left ({At(b4, 150, 150)})", IsRed(At(b4, 150, 150)));
+                A($"flipV: blue still at right ({At(b4, 250, 150)})", IsBlue(At(b4, 250, 150)));
+            }
+            catch (Exception ex) { A($"flipV render: {ex.Message}", false); }
+
+            // Composer window chrome render.
+            try
+            {
+                var cw = new ImagePdfComposerWindow { Width = 1100, Height = 760, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                cw.Show(); await Task.Delay(500); ShotRtb(cw, "compose_window.png"); cw.Close();
+                A("composer window rendered", true);
+            }
+            catch (Exception ex) { A($"composer window: {ex.Message}", false); }
+
+            File.WriteAllText(Path.Combine(Dir, "composeverify.txt"), string.Join("\n", log));
+            return;
+        }
+
+        // Remove-Background algorithms: auto flood-fill, magic wand, JPG flatten.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_BGREMOVE") == "1")
+        {
+            var log = new List<string>();
+            void A(string n, bool ok) => log.Add($"{(ok ? "PASS" : "FAIL")}  {n}");
+
+            int w = 200, h = 200;
+            byte[] Build()
+            {
+                var px = new byte[w * h * 4];
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = (y * w + x) * 4;
+                        bool center = x >= 60 && x < 140 && y >= 60 && y < 140;
+                        if (center) { px[i] = 0; px[i + 1] = 0; px[i + 2] = 255; px[i + 3] = 255; }   // red
+                        else { px[i] = 255; px[i + 1] = 255; px[i + 2] = 255; px[i + 3] = 255; }      // white
+                    }
+                return px;
+            }
+            int Ctr = (100 * w + 100) * 4;
+
+            var a = Build();
+            BackgroundRemover.AutoRemove(a, w, h, 30);
+            A($"auto: white corner removed (a={a[3]})", a[3] == 0);
+            A($"auto: red centre kept (a={a[Ctr + 3]}, R={a[Ctr + 2]})", a[Ctr + 3] == 255 && a[Ctr + 2] == 255);
+
+            var b = Build();
+            BackgroundRemover.MagicWand(b, w, h, 0, 0, 30);
+            A($"wand: clicked corner removed (a={b[3]})", b[3] == 0);
+            A($"wand: red centre kept (a={b[Ctr + 3]})", b[Ctr + 3] == 255);
+
+            var flat = BackgroundRemover.FlattenOnto(a, 0, 255, 0); // onto green
+            A($"flatten: removed area is green (B={flat[0]},G={flat[1]},R={flat[2]})", flat[1] == 255 && flat[0] == 0 && flat[2] == 0);
+            A($"flatten: subject stays red (R={flat[Ctr + 2]})", flat[Ctr + 2] == 255);
+
+            File.WriteAllText(Path.Combine(Dir, "bgremoveverify.txt"), string.Join("\n", log));
+            return;
+        }
+
+        // Headless: run AutoRemove on a real image file and dump transparent + magenta-composite results.
+        // Driven by a config file (env vars proved unreliable here): line1=src path, line2=tolerance.
+        string bgCmd = Path.Combine(Dir, "bg_cmd.txt");
+        if (File.Exists(bgCmd))
+        {
+            var lines = File.ReadAllLines(bgCmd);
+            string src = lines.Length > 0 ? lines[0].Trim() : "";
+            int tol = lines.Length > 1 && int.TryParse(lines[1].Trim(), out var tt) ? tt : 30;
+            bool ai = lines.Length > 2 && lines[2].Trim().Equals("ai", StringComparison.OrdinalIgnoreCase);
+            int smooth = lines.Length > 3 && int.TryParse(lines[3].Trim(), out var ss) ? ss : 0;
+            try { File.Delete(bgCmd); } catch { }
+            string outDir = Path.Combine(Dir, "bgfile");
+            Directory.CreateDirectory(outDir);
+            string stem = Path.GetFileNameWithoutExtension(src);
+
+            var bi = new BitmapImage();
+            bi.BeginInit(); bi.CacheOption = BitmapCacheOption.OnLoad; bi.UriSource = new Uri(src); bi.EndInit(); bi.Freeze();
+            BitmapSource bsrc = new FormatConvertedBitmap(bi, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            int w = bsrc.PixelWidth, h = bsrc.PixelHeight;
+            var px = new byte[w * h * 4];
+            bsrc.CopyPixels(px, w * 4, 0);
+
+            if (ai)
+            {
+                await AiMatting.EnsureModelAsync(new Progress<double>(p => { }));
+                var mask = AiMatting.ComputeMask(px, w, h);
+                AiMatting.ApplyMask(px, mask);
+            }
+            else
+            {
+                BackgroundRemover.AutoRemove(px, w, h, tol);
+            }
+            if (smooth > 0) BackgroundRemover.SmoothAlpha(px, w, h, smooth);
+
+            int removed = 0; for (int i = 3; i < px.Length; i += 4) if (px[i] == 0) removed++;
+            double pct = removed * 100.0 / (w * h);
+
+            void SavePng(byte[] buf, string name)
+            {
+                var bmp = BitmapSource.Create(w, h, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, buf, w * 4);
+                var enc = new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(bmp));
+                using var fs = File.Create(Path.Combine(outDir, name)); enc.Save(fs);
+            }
+            SavePng(px, $"{stem}_cut.png");
+            SavePng(BackgroundRemover.FlattenOnto(px, 255, 0, 255), $"{stem}_magenta.png");
+            File.WriteAllText(Path.Combine(outDir, $"{stem}_report.txt"), $"tol={tol}  removed={pct:0.0}% of {w}x{h}");
+            return;
+        }
+
+        // Document scanner: synthetic correctness of perspective warp + filters + auto-detect.
+        // Driven by a marker file docscan_cmd.txt (optional line1 = real image path to also process).
+        string dsCmd = Path.Combine(Dir, "docscan_cmd.txt");
+        if (File.Exists(dsCmd))
+        {
+            var dsLines = File.ReadAllLines(dsCmd);
+            try { File.Delete(dsCmd); } catch { }
+            var log = new List<string>();
+            void A(string n, bool ok) => log.Add($"{(ok ? "PASS" : "FAIL")}  {n}");
+            static void px4(byte[] a, int i, byte b, byte g, byte r) { a[i] = b; a[i + 1] = g; a[i + 2] = r; a[i + 3] = 255; }
+            static double Hyp((double x, double y) p, (double x, double y) q)
+                => System.Math.Sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
+
+            // Build a 200x200 source: white with a red 80x80 square at (60,60)-(140,140).
+            int w = 200, h = 200;
+            var src = new byte[w * h * 4];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int i = (y * w + x) * 4;
+                    bool red = x >= 60 && x < 140 && y >= 60 && y < 140;
+                    px4(src, i, red ? (byte)0 : (byte)255, red ? (byte)0 : (byte)255, (byte)255);
+                }
+
+            // 1) Identity warp (full frame) reproduces the source.
+            var full = new (double, double)[] { (0, 0), (w - 1, 0), (w - 1, h - 1), (0, h - 1) };
+            var idw = DocumentScanner.Warp(src, w, h, full, w, h, DocumentScanner.Enhance.Original);
+            int ctr = (100 * w + 100) * 4;
+            A($"identity: centre stays red (R={idw[ctr + 2]},G={idw[ctr + 1]})", idw[ctr + 2] == 255 && idw[ctr + 1] == 0);
+            A($"identity: corner stays white (R={idw[2]},G={idw[1]},B={idw[0]})", idw[0] == 255 && idw[1] == 255 && idw[2] == 255);
+
+            // 2) Crop the red square exactly (quad = its bounds) → output is all red.
+            var sq = new (double, double)[] { (60, 60), (139, 60), (139, 139), (60, 139) };
+            var cw = DocumentScanner.Warp(src, w, h, sq, 80, 80, DocumentScanner.Enhance.Original);
+            bool allRed = true;
+            for (int p = 0; p < 80 * 80 && allRed; p++) if (!(cw[p * 4 + 2] == 255 && cw[p * 4 + 1] == 0)) allRed = false;
+            A("crop-square: warped output is fully red", allRed);
+
+            // 3) Perspective: skewed quad still warps to a rectangle filled with red.
+            var skew = new (double, double)[] { (62, 60), (138, 64), (140, 138), (60, 140) };
+            var pw = DocumentScanner.Warp(src, w, h, skew, 80, 80, DocumentScanner.Enhance.Original);
+            int pc = (40 * 80 + 40) * 4;
+            A($"perspective: centre red (R={pw[pc + 2]})", pw[pc + 2] == 255 && pw[pc + 1] == 0);
+
+            // 4) Filters.
+            var gray = DocumentScanner.Warp(src, w, h, sq, 80, 80, DocumentScanner.Enhance.Grayscale);
+            A($"grayscale: r==g==b ({gray[2]},{gray[1]},{gray[0]})", gray[0] == gray[1] && gray[1] == gray[2]);
+            var bw = DocumentScanner.Warp(src, w, h, full, w, h, DocumentScanner.Enhance.BlackWhite);
+            bool binary = true; for (int p = 0; p < w * h && binary; p++) { byte v = bw[p * 4]; if (v != 0 && v != 255) binary = false; }
+            A("blackwhite: pixels are pure 0 or 255", binary);
+
+            // 5) Auto-detect the red square on white background.
+            var det = DocumentScanner.AutoDetectCorners(src, w, h);
+            bool detOk = det != null && det[0].x < 90 && det[0].y < 90 && det[2].x > 110 && det[2].y > 110;
+            A($"autodetect: found square corners ({(det == null ? "null" : $"TL=({det[0].x:0},{det[0].y:0}) BR=({det[2].x:0},{det[2].y:0})")})", detOk);
+
+            File.WriteAllText(Path.Combine(Dir, "docscanverify.txt"), string.Join("\n", log));
+
+            // Optional: process a real photo end-to-end and dump per-filter results.
+            string real = dsLines.Length > 0 ? dsLines[0].Trim() : "";
+            if (real.Length > 0 && File.Exists(real))
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit(); bi.CacheOption = BitmapCacheOption.OnLoad; bi.UriSource = new Uri(real); bi.EndInit(); bi.Freeze();
+                BitmapSource bsrc = new FormatConvertedBitmap(bi, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+                int rw = bsrc.PixelWidth, rh = bsrc.PixelHeight;
+                var rpx = new byte[rw * rh * 4]; bsrc.CopyPixels(rpx, rw * 4, 0);
+                var quad = DocumentScanner.AutoDetectCorners(rpx, rw, rh)
+                           ?? new (double, double)[] { (0, 0), (rw - 1, 0), (rw - 1, rh - 1), (0, rh - 1) };
+                double wt = System.Math.Max(Hyp(quad[0], quad[1]), Hyp(quad[3], quad[2]));
+                double ht = System.Math.Max(Hyp(quad[0], quad[3]), Hyp(quad[1], quad[2]));
+                int ow = (int)wt, oh = (int)ht;
+                string outDir = Path.Combine(Dir, "docscan"); Directory.CreateDirectory(outDir);
+                string stem = Path.GetFileNameWithoutExtension(real);
+                foreach (var en in new[] { DocumentScanner.Enhance.Original, DocumentScanner.Enhance.Magic, DocumentScanner.Enhance.Grayscale, DocumentScanner.Enhance.BlackWhite })
+                {
+                    var outp = DocumentScanner.Warp(rpx, rw, rh, quad, ow, oh, en);
+                    var bmp = BitmapSource.Create(ow, oh, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, outp, ow * 4);
+                    var enc = new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(bmp));
+                    using var fs = File.Create(Path.Combine(outDir, $"{stem}_{en}.png")); enc.Save(fs);
+                }
+                File.AppendAllText(Path.Combine(Dir, "docscanverify.txt"),
+                    $"\nreal: {stem} {rw}x{rh} -> {ow}x{oh}  quad=TL({quad[0].Item1:0},{quad[0].Item2:0}) BR({quad[2].Item1:0},{quad[2].Item2:0})");
+            }
+            return;
+        }
+
+        // Document-Scan window: empty state, loaded + auto-detected corners, crop, filters, rotate/flip.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_DOCUI") == "1")
+        {
+            string tmp = Path.Combine(Dir, "docui");
+            Directory.CreateDirectory(tmp);
+            static SD.PointF Lerp(SD.PointF a, SD.PointF b, float t) => new SD.PointF(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t);
+
+            // Synthetic angled "document": a white perspective quad with black text lines on a dark desk.
+            string imgPath = Path.Combine(tmp, "doc.png");
+            using (var bmp = new SD.Bitmap(520, 680))
+            {
+                using var g = SD.Graphics.FromImage(bmp);
+                g.SmoothingMode = SD.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(SD.Color.FromArgb(45, 42, 48)); // dark desk
+                var quad = new[]
+                {
+                    new SD.PointF(150, 90), new SD.PointF(420, 150),
+                    new SD.PointF(380, 600), new SD.PointF(110, 520),
+                };
+                using (var white = new SD.SolidBrush(SD.Color.White)) g.FillPolygon(white, quad);
+                // A few "text" lines following the top edge so de-skew is visible.
+                using var pen = new SD.Pen(SD.Color.FromArgb(30, 30, 30), 6);
+                for (int r = 0; r < 6; r++)
+                {
+                    float t = 0.18f + r * 0.11f;
+                    var a = Lerp(quad[0], quad[3], t); var b = Lerp(quad[1], quad[2], t);
+                    var a2 = Lerp(a, b, 0.1f); var b2 = Lerp(a, b, 0.85f);
+                    g.DrawLine(pen, a2, b2);
+                }
+                bmp.Save(imgPath, SD.Imaging.ImageFormat.Png);
+            }
+
+            // Empty state (no image): centered Open button + toolbar.
+            var empty = new DocumentScanWindow
+            {
+                WindowState = WindowState.Normal, Width = 1100, Height = 720,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            };
+            empty.Show();
+            await Task.Delay(400);
+            ShotRtb(empty, "docui_empty.png");
+            empty.Close();
+
+            var w0 = new DocumentScanWindow(imgPath)
+            {
+                WindowState = WindowState.Normal, Width = 1100, Height = 720,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            };
+            w0.Show();
+            await Task.Delay(500);
+            ShotRtb(w0, "docui_adjust.png");      // loaded + auto-detected corner overlay
+            w0.TestCrop();
+            await Task.Delay(300);
+            ShotRtb(w0, "docui_result.png");       // warped flat rectangle
+            w0.TestFilter("BlackWhite");
+            await Task.Delay(300);
+            ShotRtb(w0, "docui_bw.png");
+            w0.TestFilter("Magic");
+            await Task.Delay(200);
+            w0.TestRotate(true);
+            await Task.Delay(300);
+            ShotRtb(w0, "docui_rotated.png");
+            w0.TestFlip(true);
+            await Task.Delay(300);
+            ShotRtb(w0, "docui_flipped.png");
+            w0.TestClose();
+
+            // Pick mode (Images → PDF integration): toolbar shows "Use in PDF", no save/close buttons.
+            var wp = new DocumentScanWindow(imgPath)
+            {
+                WindowState = WindowState.Normal, Width = 1100, Height = 720,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            };
+            wp.Show();
+            await Task.Delay(500);
+            wp.TestPickMode();
+            wp.TestCrop();
+            await Task.Delay(300);
+            ShotRtb(wp, "docui_pick.png");
+            string? applied = wp.TestApplyToFile();
+            File.WriteAllText(Path.Combine(Dir, "docpick.txt"),
+                applied != null && File.Exists(applied)
+                    ? $"PASS  pick applied -> {Path.GetFileName(applied)} ({new FileInfo(applied).Length} bytes)"
+                    : "FAIL  pick produced no file");
+            wp.TestClose();
+            return;
+        }
+
+        // Images→PDF composer: reproduce the Rescan "Specified index already in use" bug + verify the fix.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_COMPOSERSCAN") == "1")
+        {
+            string tmp = Path.Combine(Dir, "composerscan");
+            Directory.CreateDirectory(tmp);
+            string imgA = Path.Combine(tmp, "a.png"), imgB = Path.Combine(tmp, "b.png");
+            using (var bmp = new SD.Bitmap(300, 450)) { using var g = SD.Graphics.FromImage(bmp); g.Clear(SD.Color.SteelBlue); bmp.Save(imgA); }
+            using (var bmp = new SD.Bitmap(420, 280)) { using var g = SD.Graphics.FromImage(bmp); g.Clear(SD.Color.IndianRed); bmp.Save(imgB); }
+
+            var log = new List<string>();
+            var w = new ImagePdfComposerWindow { WindowState = WindowState.Normal, Width = 1100, Height = 720 };
+            w.Show();
+            await Task.Delay(500);
+            w.TestAddImage(imgA);
+            await Task.Delay(200);
+            string? oldErr = w.TestReplaceOldStyle(imgB);
+            log.Add(oldErr == null ? "old-style: (no error)" : "old-style ERROR:\n" + oldErr);
+
+            // Re-add a clean image and verify the FIX works.
+            var w2 = new ImagePdfComposerWindow { WindowState = WindowState.Normal, Width = 1100, Height = 720 };
+            w2.Show();
+            await Task.Delay(400);
+            w2.TestAddImage(imgA);
+            await Task.Delay(200);
+            string? newErr = w2.TestReplaceContent(imgB);
+            log.Add(newErr == null ? "PASS  in-place replace: no error" : "FAIL  in-place replace:\n" + newErr);
+            await Task.Delay(200);
+            ShotRtb(w2, "composerscan_after.png");
+
+            File.WriteAllText(Path.Combine(Dir, "composerscan.txt"), string.Join("\n\n", log));
+            w.TestClose(); w2.TestClose();
+            return;
+        }
+
+        // Remove-Background window: maximize, auto-remove on a realistic photo, pixel-zoom render.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_BGUI") == "1")
+        {
+            string tmp = Path.Combine(Dir, "bgui");
+            Directory.CreateDirectory(tmp);
+
+            // Synthetic "photo": sky-blue background with a solid red subject block.
+            string imgPath = Path.Combine(tmp, "photo.png");
+            using (var bmp = new SD.Bitmap(360, 480))
+            {
+                using var g = SD.Graphics.FromImage(bmp);
+                g.Clear(SD.Color.FromArgb(150, 200, 245)); // sky blue
+                using var sub = new SD.SolidBrush(SD.Color.FromArgb(210, 40, 40));
+                g.FillRectangle(sub, 120, 150, 130, 230); // subject
+                bmp.Save(imgPath, SD.Imaging.ImageFormat.Png);
+            }
+
+            var w0 = new RemoveBackgroundWindow(imgPath)
+            {
+                WindowState = WindowState.Normal, Width = 1100, Height = 720,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            };
+            w0.Show();
+            await Task.Delay(500);
+            ShotRtb(w0, "bgui_loaded.png");
+            w0.TestAuto();
+            await Task.Delay(300);
+            ShotRtb(w0, "bgui_autoremoved.png");
+            w0.TestZoom(6);
+            await Task.Delay(300);
+            ShotRtb(w0, "bgui_zoomed.png");
+            w0.TestZoom(1);
+            w0.TestTool("Restore");
+            await Task.Delay(300);
+            ShotRtb(w0, "bgui_restoreghost.png");
+            w0.Close();
+            return;
+        }
+
         // Programmatic verification of the accent/theme engine + History render.
         if (Environment.GetEnvironmentVariable("LLAMASHOT_THEMEVERIFY") == "1")
         {

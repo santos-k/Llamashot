@@ -193,6 +193,171 @@ public static class FileToolsService
         }
     }
 
+    // =====================================================================
+    //  Page composer (Images → PDF with page size, margins, multiple images
+    //  per page, free move / resize / 360° rotate). Each placement carries a
+    //  pre-computed cm matrix that maps the image's unit square to page points.
+    // =====================================================================
+
+    /// <summary>One image placed on a page, with the affine that maps its unit square to PDF points.</summary>
+    public sealed class ComposePlacement
+    {
+        public required string SourcePath { get; init; }
+        /// <summary>PDF cm matrix [a b c d e f] mapping the image unit square → page points.</summary>
+        public required double[] Cm { get; init; }
+    }
+
+    /// <summary>A single composed page: size in PDF points (1/72"), background, and its images (back→front).</summary>
+    public sealed class ComposePageSpec
+    {
+        public double WidthPt { get; set; }
+        public double HeightPt { get; set; }
+        public (double r, double g, double b) Background { get; set; } = (1, 1, 1);
+        public List<ComposePlacement> Images { get; } = new();
+    }
+
+    public static async Task ComposePdfAsync(IReadOnlyList<ComposePageSpec> pages, string outputPath, IProgress<int>? progress = null)
+        => await Task.Run(() => ComposePdfCore(pages, outputPath, progress));
+
+    private static void ComposePdfCore(IReadOnlyList<ComposePageSpec> pages, string outputPath, IProgress<int>? progress)
+    {
+        static string F(double v) => v.ToString("0.####", CultureInfo.InvariantCulture);
+
+        // Encode every distinct source once; a placement reuses the shared XObject.
+        var encoded = new Dictionary<string, (byte[] jpeg, int w, int h)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var page in pages)
+            foreach (var img in page.Images)
+                if (!encoded.ContainsKey(img.SourcePath))
+                    encoded[img.SourcePath] = EncodeJpeg(img.SourcePath);
+
+        using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+        var offsets = new List<long>();
+        void WriteAscii(string text) { byte[] b = Encoding.ASCII.GetBytes(text); fs.Write(b, 0, b.Length); }
+
+        // --- Object-number assignment (write order == number order) ---
+        int num = 2; // 1 = catalog, 2 = pages
+        var imgObjNum = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var pageNums = new List<int>();
+        var contentNums = new List<int>();
+        foreach (var page in pages)
+        {
+            pageNums.Add(++num);
+            contentNums.Add(++num);
+        }
+        // Image XObjects are written after all pages/contents.
+        foreach (var kv in encoded) imgObjNum[kv.Key] = ++num;
+
+        WriteAscii("%PDF-1.4\n");
+
+        // 1: Catalog
+        offsets.Add(fs.Position);
+        WriteAscii("1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n");
+
+        // 2: Pages
+        offsets.Add(fs.Position);
+        var kids = new StringBuilder("[");
+        for (int i = 0; i < pageNums.Count; i++) { if (i > 0) kids.Append(' '); kids.Append($"{pageNums[i]} 0 R"); }
+        kids.Append(']');
+        WriteAscii($"2 0 obj <</Type /Pages /Kids {kids} /Count {pages.Count}>> endobj\n");
+
+        // Page objects + their content streams
+        for (int p = 0; p < pages.Count; p++)
+        {
+            var page = pages[p];
+            int pageObj = pageNums[p];
+            int contentObj = contentNums[p];
+
+            // Resources: list this page's images as /Img0, /Img1, ...
+            var xres = new StringBuilder();
+            for (int i = 0; i < page.Images.Count; i++)
+                xres.Append($"/Img{i} {imgObjNum[page.Images[i].SourcePath]} 0 R ");
+
+            offsets.Add(fs.Position);
+            WriteAscii($"{pageObj} 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 {F(page.WidthPt)} {F(page.HeightPt)}] " +
+                       $"/Contents {contentObj} 0 R /Resources <</XObject <<{xres.ToString().TrimEnd()}>>>>>> endobj\n");
+
+            // Content: background fill, then each image with its cm matrix.
+            var sb = new StringBuilder();
+            sb.Append($"{F(page.Background.r)} {F(page.Background.g)} {F(page.Background.b)} rg 0 0 {F(page.WidthPt)} {F(page.HeightPt)} re f\n");
+            for (int i = 0; i < page.Images.Count; i++)
+            {
+                var m = page.Images[i].Cm;
+                sb.Append($"q {F(m[0])} {F(m[1])} {F(m[2])} {F(m[3])} {F(m[4])} {F(m[5])} cm /Img{i} Do Q\n");
+            }
+            byte[] content = Encoding.ASCII.GetBytes(sb.ToString());
+            offsets.Add(fs.Position);
+            WriteAscii($"{contentObj} 0 obj <</Length {content.Length}>>\nstream\n");
+            fs.Write(content, 0, content.Length);
+            WriteAscii("\nendstream endobj\n");
+
+            progress?.Report((p + 1) * 90 / Math.Max(1, pages.Count));
+        }
+
+        // Image XObjects
+        foreach (var kv in encoded)
+        {
+            var (jpeg, w, h) = kv.Value;
+            offsets.Add(fs.Position);
+            WriteAscii($"{imgObjNum[kv.Key]} 0 obj <</Type /XObject /Subtype /Image /Width {w} /Height {h} " +
+                       $"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {jpeg.Length}>>\nstream\n");
+            fs.Write(jpeg, 0, jpeg.Length);
+            WriteAscii("\nendstream endobj\n");
+        }
+
+        // xref + trailer
+        long xrefOffset = fs.Position;
+        int totalObjCount = num + 1; // +1 for free object 0
+        WriteAscii($"xref\n0 {totalObjCount}\n0000000000 65535 f \n");
+        foreach (long off in offsets) WriteAscii($"{off:D10} 00000 n \n");
+        WriteAscii($"trailer <</Size {totalObjCount} /Root 1 0 R>>\nstartxref\n{xrefOffset}\n%%EOF\n");
+        progress?.Report(100);
+    }
+
+    /// <summary>Decodes any supported image to baseline-JPEG bytes (+ pixel size) for embedding in a PDF.</summary>
+    private static (byte[] jpeg, int w, int h) EncodeJpeg(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+        var frame = decoder.Frames[0];
+        int width = frame.PixelWidth, height = frame.PixelHeight;
+
+        string ext = Path.GetExtension(path);
+        bool isJpeg = string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase);
+        if (isJpeg)
+        {
+            stream.Position = 0;
+            var bytes = new byte[stream.Length];
+            stream.ReadExactly(bytes);
+            return (bytes, width, height);
+        }
+
+        BitmapSource src = frame;
+        // Flatten onto white so transparent PNGs (logos, signatures) don't turn black.
+        if (src.Format == PixelFormats.Bgra32 || src.Format == PixelFormats.Pbgra32 || src.Format == PixelFormats.Bgr32)
+        {
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, width, height));
+                dc.DrawImage(src, new Rect(0, 0, width, height));
+            }
+            var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(dv);
+            src = new FormatConvertedBitmap(rtb, PixelFormats.Rgb24, null, 0);
+        }
+        else if (src.Format != PixelFormats.Bgr24 && src.Format != PixelFormats.Rgb24)
+        {
+            src = new FormatConvertedBitmap(src, PixelFormats.Rgb24, null, 0);
+        }
+
+        var encoder = new JpegBitmapEncoder { QualityLevel = 92 };
+        encoder.Frames.Add(BitmapFrame.Create(src));
+        using var ms = new MemoryStream();
+        encoder.Save(ms);
+        return (ms.ToArray(), width, height);
+    }
+
     public static async Task<string[]> PdfToImagesAsync(string pdfPath, string outputDir, string format = "png", int dpi = 150, IProgress<int>? progress = null, string? password = null)
     {
         Directory.CreateDirectory(outputDir);

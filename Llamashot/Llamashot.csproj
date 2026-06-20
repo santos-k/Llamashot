@@ -16,12 +16,13 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <Version>8.9.16</Version>
-    <AssemblyVersion>8.9.16</AssemblyVersion>
-    <FileVersion>8.9.16</FileVersion>
+    <Version>8.9.17</Version>
+    <AssemblyVersion>8.9.17</AssemblyVersion>
+    <FileVersion>8.9.17</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
     <PackageReference Include="PdfSharp" Version="6.1.1" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.5" NoWarn="NU1510" />
