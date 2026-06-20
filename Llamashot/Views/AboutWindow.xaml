@@ -23,7 +23,7 @@
                            Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="Screenshot, Annotate, Record" FontSize="13"
                            Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
-                <TextBlock Text="Version 8.9.19" Foreground="{DynamicResource TextMutedBrush}"
+                <TextBlock Text="Version 8.9.20" Foreground="{DynamicResource TextMutedBrush}"
                            HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0" />
                 <TextBlock HorizontalAlignment="Center" Margin="0,6,0,0" FontSize="12">
                     <Hyperlink x:Name="LinkWebsite" Click="Website_Click" Foreground="{DynamicResource AccentBrush}"
@@ -143,6 +143,7 @@
                         <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Images &#x2192; PDF &#x2014; AI &#x201C;Remove background&#x201D; on a placed photo (ID / signature onto white)" />
                         <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Image tools &#x2014; initial Open page, Close with confirm, and a save-success prompt (Open / Start over)" />
                         <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Visit website link in About; the project site opens once on first run" />
+                        <TextBlock Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,2" FontWeight="SemiBold" Text="&#x2022; NEW: Redesigned project website &#x2014; animated &#x2018;living capture&#x2019; landing page covering every feature" />
                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; History with thumbnails, category filter, open in Explorer" />
                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Glass morphism UI with gradient toolbars" />
                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2" Text="&#x2022; Pin on screen, customizable shortcuts" />
