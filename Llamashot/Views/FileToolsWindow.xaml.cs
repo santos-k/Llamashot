@@ -39,12 +39,14 @@ public partial class FileToolsWindow : Window
         ("image_editor",   "Image Editor",    "All-in-one image editor",             "#A78BFA", "\u2B1C", "Image Tools"),
         ("remove_bg",      "Remove Background", "Erase or replace photo backgrounds", "#9AE6C4", "\u2728", "Image Tools"),
         ("doc_scan",       "Document Scan",   "Crop a photo to a flat rectangle",    "#7FC8E6", "\u25a4", "Image Tools"),
+        ("ocr",            "OCR \u2014 Extract Text", "Get selectable text from images & PDFs", "#6FD9C0", "\U0001F524", "Image Tools"),
         ("compress_image", "Compress Image",  "Reduce image file size",              "#6FD9E6", "\u2B07", "Image Tools"),
         ("resize_image",   "Resize Image",    "Change dimensions",                   "#6FD0C3", "\u2922", "Image Tools"),
         ("crop_image",     "Crop Image",      "Crop to selection",                   "#8FBEF7", "\u2702", "Image Tools"),
         ("rotate_flip",    "Rotate & Flip",   "Rotate or flip images",               "#C99BDB", "\u21BA", "Image Tools"),
         ("convert_format", "Convert Format",  "Change image format",                 "#F48FB1", "\u21C4", "Image Tools"),
         ("compress_office","Compress Office",  "Reduce DOCX/XLSX/PPTX",              "#A7B6C2", "\u2263", "Office Tools"),
+        ("video_editor",  "Video Editor",     "Multi-clip timeline: join, trim, audio", "#F5A08F", "\U0001F39E", "Video & Audio"),
         ("video_tools",   "Video Tools",      "Trim, crop, rotate, flip & extract",  "#F58F8F", "\U0001F3AC", "Video & Audio"),
         ("extract_audio", "Extract Audio",    "Extract audio from video",            "#6FD3E6", "\u266B", "Video & Audio"),
         ("trim_audio",    "Trim Audio",       "Cut start and end of audio",          "#6FD0C3", "\u2702", "Video & Audio"),
@@ -887,6 +889,24 @@ public partial class FileToolsWindow : Window
             var ds = new DocumentScanWindow();
             ds.Show();
             BringToFront(ds);
+            return;
+        }
+
+        // OCR opens the text-extraction tool (images & PDFs → selectable text / searchable PDF).
+        if (id == "ocr")
+        {
+            var ocr = new OcrToolWindow();
+            ocr.Show();
+            BringToFront(ocr);
+            return;
+        }
+
+        // Video Editor opens the multi-clip timeline editor (join, trim, delete, add/remove audio).
+        if (id == "video_editor")
+        {
+            var ve = new VideoEditorWindow();
+            ve.Show();
+            BringToFront(ve);
             return;
         }
 

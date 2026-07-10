@@ -16,9 +16,9 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <Version>8.9.20</Version>
-    <AssemblyVersion>8.9.20</AssemblyVersion>
-    <FileVersion>8.9.20</FileVersion>
+    <Version>8.9.21</Version>
+    <AssemblyVersion>8.9.21</AssemblyVersion>
+    <FileVersion>8.9.21</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,11 +26,38 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
     <PackageReference Include="PdfSharp" Version="6.1.1" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.5" NoWarn="NU1510" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
     <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\**" />
   </ItemGroup>
+
+  <!-- Tesseract language data ships loose next to the exe (kept out of the single-file bundle)
+       so the OCR engine can locate tessdata\ at runtime. -->
+  <ItemGroup>
+    <None Include="tessdata\**\*">
+      <Link>tessdata\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+  </ItemGroup>
+
+  <!-- The Tesseract package adds its native libs as None items linked into x64\ / x86\. Keep the
+       64-bit pair loose on disk (the native loader needs x64\*.dll next to the exe under
+       single-file publish) and drop the unused 32-bit pair. -->
+  <Target Name="ConfigureTesseractNatives" BeforeTargets="AssignTargetPaths;ComputeFilesToPublish">
+    <ItemGroup>
+      <None Update="@(None)"
+            Condition="'%(None.Link)' == 'x64\tesseract50.dll' or '%(None.Link)' == 'x64\leptonica-1.82.0.dll'">
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </None>
+      <None Remove="@(None)"
+            Condition="'%(None.Link)' == 'x86\tesseract50.dll' or '%(None.Link)' == 'x86\leptonica-1.82.0.dll'" />
+    </ItemGroup>
+  </Target>
 
 </Project>

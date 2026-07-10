@@ -1189,6 +1189,50 @@ public static class FileToolsService
         });
     }
 
+    // Cancellable variant: kills the FFmpeg process if the token fires.
+    private static async Task RunFFmpegAsync(string arguments, TimeSpan? totalDuration, IProgress<int>? progress, CancellationToken ct)
+    {
+        await Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo("ffmpeg", $"-y {arguments}")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+            using var reg = ct.Register(() => { try { if (!proc.HasExited) proc.Kill(true); } catch { } });
+
+            double totalMs = totalDuration?.TotalMilliseconds ?? 0;
+            var stderr = new StringBuilder();
+            proc.ErrorDataReceived += (s, e) =>
+            {
+                if (e.Data == null) return;
+                stderr.AppendLine(e.Data);
+                if (totalMs > 0 && progress != null && e.Data.Contains("time="))
+                {
+                    var match = Regex.Match(e.Data, @"time=(\d+):(\d+):(\d+)\.(\d+)");
+                    if (match.Success)
+                    {
+                        int h = int.Parse(match.Groups[1].Value);
+                        int m = int.Parse(match.Groups[2].Value);
+                        int sec = int.Parse(match.Groups[3].Value);
+                        double currentMs = (h * 3600 + m * 60 + sec) * 1000;
+                        progress.Report(Math.Min(99, (int)(currentMs * 100 / totalMs)));
+                    }
+                }
+            };
+            proc.BeginErrorReadLine();
+            proc.WaitForExit();
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+            if (proc.ExitCode != 0)
+                throw new Exception($"FFmpeg failed (exit code {proc.ExitCode})");
+
+            progress?.Report(100);
+        }, ct);
+    }
+
     public static async Task TrimVideoAsync(string inputPath, string outputPath, TimeSpan start, TimeSpan end, IProgress<int>? progress = null)
     {
         string startStr = start.ToString(@"hh\:mm\:ss\.ff");
@@ -1404,6 +1448,23 @@ public static class FileToolsService
         return outputPath;
     }
 
+    /// <summary>Renders a waveform PNG for just the [srcIn, srcOut] slice of an audio/video source (teal, transparent bg).</summary>
+    public static async Task<string?> GenerateWaveformAsync(string audioPath, TimeSpan srcIn, TimeSpan srcOut, int width = 900, int height = 80)
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"llamashot_wfclip_{Guid.NewGuid():N}.png");
+        try
+        {
+            double dur = Math.Max(0.1, (srcOut - srcIn).TotalSeconds);
+            string ss = srcIn.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+            string t = dur.ToString("0.###", CultureInfo.InvariantCulture);
+            await RunFFmpegAsync(
+                $"-ss {ss} -t {t} -i \"{audioPath}\" -filter_complex \"aformat=channel_layouts=mono,showwavespic=s={width}x{height}:colors=#34D399:scale=sqrt\" -frames:v 1 \"{outputPath}\"",
+                null, null);
+        }
+        catch { return null; }
+        return File.Exists(outputPath) ? outputPath : null;
+    }
+
     public static async Task<TimeSpan> GetAudioDurationAsync(string path)
     {
         var info = await GetVideoInfoAsync(path); // ffprobe works for audio too
@@ -1434,6 +1495,13 @@ public static class FileToolsService
             catch { return null; }
         }
         return File.Exists(outputPath) ? outputPath : null;
+    }
+
+    /// <summary>Grabs the frame at <paramref name="at"/> from a video and writes it as a PNG.</summary>
+    public static async Task ExtractFrameAsync(string videoPath, TimeSpan at, string outputPath)
+    {
+        string ss = at.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+        await RunFFmpegAsync($"-ss {ss} -i \"{videoPath}\" -frames:v 1 \"{outputPath}\"", null, null);
     }
 
     public static bool IsAudioExtension(string ext) =>
@@ -1513,6 +1581,377 @@ public static class FileToolsService
         string codecArgs = filters.Count > 0 ? "-c:v libx264 -crf 18 -preset fast -c:a aac" : "-c copy";
 
         await RunFFmpegAsync($"{trimArgs} -i \"{inputPath}\" {filterArg} {codecArgs} \"{outputPath}\"", duration, progress);
+    }
+
+    // =====================================================================
+    //  Multi-clip video editor (storyboard / timeline export)
+    // =====================================================================
+
+    /// <summary>One clip on the timeline: a source file trimmed to [In, Out].</summary>
+    public sealed record EditClip(string Path, TimeSpan In, TimeSpan Out);
+
+    /// <summary>How the final soundtrack is produced from the clips + an optional added track.</summary>
+    public enum ProjectAudioMode { KeepOriginal, RemoveAll, Replace, Mix }
+
+    // Canvas the project renders to. Every clip is scaled to fit and letterboxed onto it.
+    private const int ProjW = 1920, ProjH = 1080, ProjFps = 30;
+
+    /// <summary>True if the file has at least one audio stream (via ffprobe).</summary>
+    public static async Task<bool> HasAudioStreamAsync(string path)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("ffprobe",
+                    $"-v error -select_streams a -show_entries stream=index -of csv=p=0 \"{path}\"")
+                {
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                    UseShellExecute = false, CreateNoWindow = true
+                };
+                using var proc = Process.Start(psi)!;
+                string output = proc.StandardOutput.ReadToEnd().Trim();
+                proc.WaitForExit(10000);
+                return output.Length > 0;
+            }
+            catch { return false; }
+        });
+    }
+
+    // Forwards a sub-operation's 0..100 progress into a slice [lo, hi] of the overall bar.
+    private sealed class ScaledProgress : IProgress<int>
+    {
+        private readonly IProgress<int>? _inner;
+        private readonly double _lo, _hi;
+        public ScaledProgress(IProgress<int>? inner, double lo, double hi) { _inner = inner; _lo = lo; _hi = hi; }
+        public void Report(int v) => _inner?.Report((int)Math.Round(_lo + (_hi - _lo) * Math.Clamp(v, 0, 100) / 100.0));
+    }
+
+    /// <summary>
+    /// Renders a multi-clip project to a single video. Each clip is trimmed, scaled/padded onto a
+    /// common 1080p/30fps canvas and re-encoded (H.264/AAC), the segments are concatenated, and the
+    /// chosen audio treatment is applied (keep originals, mute all, replace with a track, or mix a
+    /// track over the originals). Runs off the UI thread; supports progress + cancellation.
+    /// </summary>
+    public static async Task ExportVideoProjectAsync(
+        IReadOnlyList<EditClip> clips,
+        ProjectAudioMode audioMode,
+        string? audioPath,
+        double audioVolumePct,
+        string outputPath,
+        IProgress<int>? progress = null,
+        CancellationToken ct = default)
+    {
+        if (clips == null || clips.Count == 0)
+            throw new ArgumentException("Add at least one video clip to export.");
+        if ((audioMode == ProjectAudioMode.Replace || audioMode == ProjectAudioMode.Mix)
+            && string.IsNullOrWhiteSpace(audioPath))
+            throw new ArgumentException("Choose an audio file for the selected audio mode.");
+
+        string workDir = Path.Combine(Path.GetTempPath(), $"llamashot_vedit_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workDir);
+        try
+        {
+            // ---- Phase 1: normalize each clip to a uniform, concat-safe segment (0..75%) ----
+            double totalSec = clips.Sum(c => Math.Max(0.01, (c.Out - c.In).TotalSeconds));
+            double doneSec = 0;
+            var segFiles = new List<string>();
+
+            for (int i = 0; i < clips.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var clip = clips[i];
+                double durSec = Math.Max(0.05, (clip.Out - clip.In).TotalSeconds);
+                var dur = TimeSpan.FromSeconds(durSec);
+                string seg = Path.Combine(workDir, $"seg_{i:D4}.mp4");
+                segFiles.Add(seg);
+
+                string ss = clip.In.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+                string t = dur.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+                string vf = $"scale={ProjW}:{ProjH}:force_original_aspect_ratio=decrease," +
+                            $"pad={ProjW}:{ProjH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={ProjFps}";
+
+                bool hasAudio = await HasAudioStreamAsync(clip.Path);
+                string args = hasAudio
+                    ? $"-ss {ss} -i \"{clip.Path}\" -t {t} -vf \"{vf}\" " +
+                      $"-c:v libx264 -crf 20 -preset veryfast -pix_fmt yuv420p " +
+                      $"-c:a aac -ar 48000 -ac 2 -map 0:v:0 -map 0:a:0? \"{seg}\""
+                    : $"-ss {ss} -i \"{clip.Path}\" -f lavfi -t {t} -i anullsrc=r=48000:cl=stereo " +
+                      $"-t {t} -vf \"{vf}\" -c:v libx264 -crf 20 -preset veryfast -pix_fmt yuv420p " +
+                      $"-c:a aac -ar 48000 -ac 2 -map 0:v:0 -map 1:a:0 -shortest \"{seg}\"";
+
+                double lo = doneSec / totalSec * 75.0;
+                doneSec += durSec;
+                double hi = doneSec / totalSec * 75.0;
+                await RunFFmpegAsync(args, dur, new ScaledProgress(progress, lo, hi), ct);
+            }
+
+            // ---- Phase 2: concat the uniform segments losslessly (75..82%) ----
+            ct.ThrowIfCancellationRequested();
+            string listPath = Path.Combine(workDir, "list.txt");
+            var sb = new StringBuilder();
+            foreach (var s in segFiles) sb.Append("file '").Append(s.Replace("'", "'\\''")).Append("'\n");
+            await File.WriteAllTextAsync(listPath, sb.ToString(), ct);
+
+            string joined = Path.Combine(workDir, "joined.mp4");
+            await RunFFmpegAsync($"-f concat -safe 0 -i \"{listPath}\" -c copy \"{joined}\"",
+                null, new ScaledProgress(progress, 75, 82), ct);
+
+            // ---- Phase 3: apply the audio treatment into the final output (82..100%) ----
+            ct.ThrowIfCancellationRequested();
+            double vol = Math.Clamp(audioVolumePct, 0, 400) / 100.0;
+            var finalProg = new ScaledProgress(progress, 82, 100);
+            string finalArgs = audioMode switch
+            {
+                ProjectAudioMode.RemoveAll =>
+                    $"-i \"{joined}\" -c:v copy -an \"{outputPath}\"",
+                ProjectAudioMode.Replace =>
+                    $"-i \"{joined}\" -i \"{audioPath}\" -filter_complex \"[1:a]volume={F(vol)}[a]\" " +
+                    $"-map 0:v:0 -map \"[a]\" -c:v copy -c:a aac -ar 48000 -ac 2 -shortest \"{outputPath}\"",
+                ProjectAudioMode.Mix =>
+                    $"-i \"{joined}\" -i \"{audioPath}\" -filter_complex " +
+                    $"\"[1:a]volume={F(vol)}[a1];[0:a][a1]amix=inputs=2:duration=first:dropout_transition=0[a]\" " +
+                    $"-map 0:v:0 -map \"[a]\" -c:v copy -c:a aac -ar 48000 -ac 2 \"{outputPath}\"",
+                _ => // KeepOriginal — just remux to the chosen container
+                    $"-i \"{joined}\" -c copy \"{outputPath}\"",
+            };
+            await RunFFmpegAsync(finalArgs, null, finalProg, ct);
+            progress?.Report(100);
+        }
+        finally
+        {
+            try { Directory.Delete(workDir, true); } catch { }
+        }
+    }
+
+    private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+
+    // ---- Timeline (NLE) export ----------------------------------------------------------------
+
+    /// <summary>A video-track clip: source trimmed to [SrcIn,SrcOut], with speed/volume/flip.</summary>
+    public sealed record TimelineVideoClip(string Path, TimeSpan SrcIn, TimeSpan SrcOut,
+        double Speed, double Volume, bool FlipH, bool FlipV, double Rotate,
+        double Scale = 100, double PosX = 0, double PosY = 0, double Opacity = 100,
+        double FadeIn = 0, double FadeOut = 0,
+        double Brightness = 0, double Contrast = 100, double Saturation = 100,
+        string Transition = "none", double TransitionDur = 0);
+
+    /// <summary>An audio-track clip placed at Start on the timeline.</summary>
+    public sealed record TimelineAudioClip(string Path, TimeSpan SrcIn, TimeSpan SrcOut, TimeSpan Start, double Volume,
+        double FadeIn = 0, double FadeOut = 0);
+
+    // Builds an atempo filter chain covering 0.25..4x (atempo only accepts 0.5..2 per stage).
+    private static string AtempoChain(double speed)
+    {
+        speed = Math.Clamp(speed, 0.25, 4.0);
+        var parts = new List<string>();
+        while (speed < 0.5) { parts.Add("atempo=0.5"); speed /= 0.5; }
+        while (speed > 2.0) { parts.Add("atempo=2.0"); speed /= 2.0; }
+        parts.Add($"atempo={F(speed)}");
+        return string.Join(",", parts);
+    }
+
+    /// <summary>
+    /// Renders a timeline to a single video: the video-track clips are normalized (trim → speed →
+    /// flip → scale/pad to the 1080p/30 canvas), concatenated, and any audio-track clips are mixed
+    /// in at their start offsets. Set <paramref name="audioOnly"/> to export an MP3 of the mix.
+    /// </summary>
+    public static async Task ExportTimelineAsync(
+        IReadOnlyList<TimelineVideoClip> videoClips,
+        IReadOnlyList<TimelineAudioClip> audioClips,
+        bool audioOnly,
+        string outputPath,
+        IProgress<int>? progress = null,
+        CancellationToken ct = default)
+    {
+        if (videoClips == null || videoClips.Count == 0)
+            throw new ArgumentException("Add at least one clip to the video track before exporting.");
+
+        string workDir = Path.Combine(Path.GetTempPath(), $"llamashot_tl_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workDir);
+        try
+        {
+            double totalSec = videoClips.Sum(c => Math.Max(0.02, (c.SrcOut - c.SrcIn).TotalSeconds / (c.Speed <= 0 ? 1 : c.Speed)));
+            double doneSec = 0;
+            var segFiles = new List<string>();
+            var segDur = new List<double>();   // rendered length of each segment (for transition offsets)
+
+            for (int i = 0; i < videoClips.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var c = videoClips[i];
+                double s = c.Speed <= 0 ? 1 : c.Speed;
+                double srcDur = Math.Max(0.05, (c.SrcOut - c.SrcIn).TotalSeconds);
+                double outDur = srcDur / s;
+                string seg = Path.Combine(workDir, $"seg_{i:D4}.mp4");
+                segFiles.Add(seg);
+                segDur.Add(outDur);
+
+                string ssIn = c.SrcIn.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+
+                // Transform / color / fade parameters.
+                double sf = Math.Clamp(c.Scale <= 0 ? 100 : c.Scale, 1, 1000) / 100.0;
+                int bw = Math.Max(2, (int)Math.Round(ProjW * sf));
+                int bh = Math.Max(2, (int)Math.Round(ProjH * sf));
+                double op = Math.Clamp(c.Opacity, 0, 100) / 100.0;
+                double bright = Math.Clamp(c.Brightness, -100, 100) / 100.0;
+                double contrast = Math.Clamp(c.Contrast, 0, 300) / 100.0;
+                double sat = Math.Clamp(c.Saturation, 0, 300) / 100.0;
+                double fin = Math.Clamp(c.FadeIn, 0, outDur);
+                double fout = Math.Clamp(c.FadeOut, 0, outDur);
+
+                // Foreground: flip → rotate → speed → scale(by user %) → color grade → opacity.
+                var fg = new List<string>();
+                if (c.FlipH) fg.Add("hflip");
+                if (c.FlipV) fg.Add("vflip");
+                if (Math.Abs(c.Rotate) > 0.5) fg.Add($"rotate={F(c.Rotate * Math.PI / 180.0)}:fillcolor=black");
+                fg.Add($"setpts=PTS/{F(s)}");
+                fg.Add($"scale={bw}:{bh}:force_original_aspect_ratio=decrease");
+                if (Math.Abs(bright) > 0.001 || Math.Abs(contrast - 1) > 0.001 || Math.Abs(sat - 1) > 0.001)
+                    fg.Add($"eq=brightness={F(bright)}:contrast={F(contrast)}:saturation={F(sat)}");
+                if (op < 0.999) fg.Add($"format=rgba,colorchannelmixer=aa={F(op)}");
+
+                // Composite the (possibly scaled/offset) foreground onto a black canvas, then fade.
+                var vpost = new List<string>
+                {
+                    $"overlay=x=(W-w)/2+{F(c.PosX)}:y=(H-h)/2+{F(c.PosY)}:shortest=1",
+                    "setsar=1", $"fps={ProjFps}",
+                };
+                if (fin > 0.01) vpost.Add($"fade=t=in:st=0:d={F(fin)}");
+                if (fout > 0.01) vpost.Add($"fade=t=out:st={F(Math.Max(0, outDur - fout))}:d={F(fout)}");
+
+                string fcVideo = $"color=c=black:s={ProjW}x{ProjH}:r={ProjFps}[bg];" +
+                                 $"[0:v]{string.Join(",", fg)}[fg];" +
+                                 $"[bg][fg]{string.Join(",", vpost)}[v]";
+
+                bool hasAudio = await HasAudioStreamAsync(c.Path);
+                string inputs = $"-ss {ssIn} -t {F(srcDur)} -i \"{c.Path}\"";
+                string fc, map;
+                if (hasAudio)
+                {
+                    var afl = new List<string> { AtempoChain(s), $"volume={F(Math.Clamp(c.Volume, 0, 400) / 100.0)}" };
+                    if (fin > 0.01) afl.Add($"afade=t=in:st=0:d={F(fin)}");
+                    if (fout > 0.01) afl.Add($"afade=t=out:st={F(Math.Max(0, outDur - fout))}:d={F(fout)}");
+                    fc = fcVideo + $";[0:a]{string.Join(",", afl)}[a]";
+                    map = "-map \"[v]\" -map \"[a]\"";
+                }
+                else
+                {
+                    inputs += $" -f lavfi -t {F(outDur)} -i anullsrc=r=48000:cl=stereo";
+                    fc = fcVideo;
+                    map = "-map \"[v]\" -map 1:a";
+                }
+                string args = $"{inputs} -filter_complex \"{fc}\" {map} " +
+                              $"-c:v libx264 -crf 20 -preset veryfast -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 -shortest \"{seg}\"";
+
+                double lo = doneSec / totalSec * 70.0;
+                doneSec += outDur;
+                double hi = doneSec / totalSec * 70.0;
+                await RunFFmpegAsync(args, TimeSpan.FromSeconds(srcDur), new ScaledProgress(progress, lo, hi), ct);
+            }
+
+            // Join segments. If any clip has a transition, build an xfade/acrossfade graph
+            // (overlapping adjacent segments); otherwise concat losslessly (fast, no re-encode).
+            ct.ThrowIfCancellationRequested();
+            string joined = Path.Combine(workDir, "joined.mp4");
+            bool anyTransition = false;
+            for (int i = 0; i < videoClips.Count - 1; i++)
+                if (!string.Equals(videoClips[i].Transition, "none", StringComparison.OrdinalIgnoreCase)
+                    && videoClips[i].TransitionDur > 0.02) { anyTransition = true; break; }
+
+            if (segFiles.Count == 1 || !anyTransition)
+            {
+                string listPath = Path.Combine(workDir, "list.txt");
+                var sb = new StringBuilder();
+                foreach (var seg in segFiles) sb.Append("file '").Append(seg.Replace("'", "'\\''")).Append("'\n");
+                await File.WriteAllTextAsync(listPath, sb.ToString(), ct);
+                await RunFFmpegAsync($"-f concat -safe 0 -i \"{listPath}\" -c copy \"{joined}\"",
+                    null, new ScaledProgress(progress, 70, 80), ct);
+            }
+            else
+            {
+                var inputs = new StringBuilder();
+                foreach (var seg in segFiles) inputs.Append($"-i \"{seg}\" ");
+                var fc = new StringBuilder();
+                string vcur = "[0:v]", acur = "[0:a]";
+                double runLen = segDur[0];
+                for (int i = 1; i < segFiles.Count; i++)
+                {
+                    string vlbl = $"[v{i}]", albl = $"[a{i}]";
+                    string tr = videoClips[i - 1].Transition;   // transition sits on the outgoing (left) clip
+                    double td = videoClips[i - 1].TransitionDur;
+                    bool useTr = !string.Equals(tr, "none", StringComparison.OrdinalIgnoreCase) && td > 0.02;
+                    if (useTr)
+                    {
+                        double d = Math.Min(td, Math.Min(segDur[i] * 0.9, runLen * 0.9));
+                        if (d < 0.05) { useTr = false; }
+                        else
+                        {
+                            double off = Math.Max(0, runLen - d);
+                            fc.Append($"{vcur}[{i}:v]xfade=transition={tr}:duration={F(d)}:offset={F(off)}{vlbl};");
+                            fc.Append($"{acur}[{i}:a]acrossfade=d={F(d)}{albl};");
+                            runLen += segDur[i] - d;
+                        }
+                    }
+                    if (!useTr)
+                    {
+                        fc.Append($"{vcur}[{i}:v]concat=n=2:v=1:a=0{vlbl};");
+                        fc.Append($"{acur}[{i}:a]concat=n=2:v=0:a=1{albl};");
+                        runLen += segDur[i];
+                    }
+                    vcur = vlbl; acur = albl;
+                }
+                string graph = fc.ToString().TrimEnd(';');
+                string args = $"{inputs}-filter_complex \"{graph}\" -map \"{vcur}\" -map \"{acur}\" " +
+                              $"-c:v libx264 -crf 20 -preset veryfast -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 \"{joined}\"";
+                await RunFFmpegAsync(args, TimeSpan.FromSeconds(totalSec), new ScaledProgress(progress, 70, 80), ct);
+            }
+
+            // Mix audio-track clips (if any) over the joined audio; then write the final output.
+            ct.ThrowIfCancellationRequested();
+            var finalProg = new ScaledProgress(progress, 80, 100);
+            var validAudio = (audioClips ?? Array.Empty<TimelineAudioClip>())
+                .Where(a => (a.SrcOut - a.SrcIn).TotalSeconds > 0.02).ToList();
+
+            if (validAudio.Count == 0)
+            {
+                string args = audioOnly
+                    ? $"-i \"{joined}\" -vn -c:a libmp3lame -q:a 2 \"{outputPath}\""
+                    : $"-i \"{joined}\" -c copy \"{outputPath}\"";
+                await RunFFmpegAsync(args, null, finalProg, ct);
+            }
+            else
+            {
+                var inputs = new StringBuilder($"-i \"{joined}\"");
+                var fc = new StringBuilder();
+                var mixLabels = new List<string> { "[0:a]" };
+                for (int i = 0; i < validAudio.Count; i++)
+                {
+                    var a = validAudio[i];
+                    double dur = (a.SrcOut - a.SrcIn).TotalSeconds;
+                    int idx = i + 1;
+                    inputs.Append($" -ss {a.SrcIn.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture)} -t {F(dur)} -i \"{a.Path}\"");
+                    long delayMs = (long)a.Start.TotalMilliseconds;
+                    double afin = Math.Clamp(a.FadeIn, 0, dur), afout = Math.Clamp(a.FadeOut, 0, dur);
+                    var chain = new List<string> { $"volume={F(Math.Clamp(a.Volume, 0, 400) / 100.0)}" };
+                    if (afin > 0.01) chain.Add($"afade=t=in:st=0:d={F(afin)}");
+                    if (afout > 0.01) chain.Add($"afade=t=out:st={F(Math.Max(0, dur - afout))}:d={F(afout)}");
+                    chain.Add($"adelay={delayMs}|{delayMs}");   // delay last so fades stay relative to the clip
+                    fc.Append($"[{idx}:a]{string.Join(",", chain)}[a{idx}];");
+                    mixLabels.Add($"[a{idx}]");
+                }
+                fc.Append($"{string.Join("", mixLabels)}amix=inputs={mixLabels.Count}:normalize=0:duration=first[aout]");
+                string map = audioOnly
+                    ? $"-map \"[aout]\" -c:a libmp3lame -q:a 2"
+                    : $"-map 0:v:0 -map \"[aout]\" -c:v copy -c:a aac -ar 48000 -ac 2";
+                await RunFFmpegAsync($"{inputs} -filter_complex \"{fc}\" {map} \"{outputPath}\"", null, finalProg, ct);
+            }
+            progress?.Report(100);
+        }
+        finally
+        {
+            try { Directory.Delete(workDir, true); } catch { }
+        }
     }
 
     public static bool IsVideoExtension(string ext) =>

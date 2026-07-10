@@ -46,6 +46,57 @@ internal static class Program
     {
         ThemeManager.Initialize(ThemeManager.Light);
 
+        // OCR engine + searchable-PDF smoke test (no real user data touched).
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_OCRTEST") == "1")
+        {
+            await OcrTest();
+            return;
+        }
+
+        // OCR tool window UI smoke test: open a sample image, run OCR, screenshot the result.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_OCRUI") == "1")
+        {
+            ThemeManager.Apply(ThemeManager.Dark, persist: false);
+            ThemeManager.ApplyAccent();
+
+            string imgPath = Path.Combine(Dir, "ocr_sample.png");
+            RenderTextImage("The quick brown fox jumps over the lazy dog 1234567890\nInvoice #2026-06-22  Total: $1,499.00", imgPath);
+
+            var ocrWin = new OcrToolWindow { WindowState = WindowState.Normal, Width = 1280, Height = 800,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            ocrWin.Show();
+            await Task.Delay(400);
+            await ocrWin.OpenFileAsync(imgPath);
+            await Task.Delay(300);
+            VisualShot(ocrWin, "ocr_ui_loaded.png");
+            await ocrWin.RunAsync(autoSavePdf: false); // skip the save dialog during the automated run
+            await Task.Delay(400);
+            VisualShot(ocrWin, "ocr_ui_result.png");
+            File.AppendAllText(Path.Combine(Dir, "ocrtest.txt"), "\nOCR UI smoke: result captured.\n");
+            return;
+        }
+
+        // Multi-clip video editor export smoke test (synthetic clips; no real user data).
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_VIDEDIT") == "1")
+        {
+            await VideoEditorTest();
+            return;
+        }
+
+        // Video editor window UI smoke: construct + render (catches XAML/resource/binding errors).
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_VIDEDITUI") == "1")
+        {
+            ThemeManager.Apply(ThemeManager.Dark, persist: false);
+            ThemeManager.ApplyAccent();
+            var ve = new VideoEditorWindow { WindowState = WindowState.Normal, Width = 1280, Height = 820,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            ve.Show();
+            await Task.Delay(500);
+            VisualShot(ve, "vedit_ui_empty.png");
+            File.AppendAllText(Path.Combine(Dir, "videdit.txt"), "\nVideo editor UI smoke: window rendered.\n");
+            return;
+        }
+
         // Capture the redesigned windows in both themes (no settings writes — Apply persist:false).
         if (Environment.GetEnvironmentVariable("LLAMASHOT_THEMESHOT") == "1")
         {
@@ -1844,5 +1895,296 @@ internal static class Program
             bmp.Save(Path.Combine(Dir, name), SD.Imaging.ImageFormat.Png);
         }
         catch (Exception ex) { File.AppendAllText(Path.Combine(Dir, "err.txt"), $"shot {name}: {ex}\n"); }
+    }
+
+    // Renders a window's WPF visual to PNG (z-order independent — unlike a screen grab).
+    static void VisualShot(Window win, string name)
+    {
+        try
+        {
+            win.UpdateLayout();
+            int w = (int)Math.Ceiling(win.ActualWidth), h = (int)Math.Ceiling(win.ActualHeight);
+            var rtb = new RenderTargetBitmap(Math.Max(1, w), Math.Max(1, h), 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(win);
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+            using var fs = File.Create(Path.Combine(Dir, name));
+            enc.Save(fs);
+        }
+        catch (Exception ex) { File.AppendAllText(Path.Combine(Dir, "err.txt"), $"vshot {name}: {ex}\n"); }
+    }
+
+    // ===================================================================
+    //  OCR engine + searchable-PDF smoke test  (LLAMASHOT_OCRTEST=1)
+    // ===================================================================
+    static async Task OcrTest()
+    {
+        var log = new System.Text.StringBuilder();
+        const string sample = "The quick brown fox jumps over the lazy dog 1234567890";
+
+        // Render the sample sentence to a crisp black-on-white image.
+        string imgPath = Path.Combine(Dir, "ocr_sample.png");
+        RenderTextImage(sample, imgPath);
+        log.AppendLine($"sample image: {imgPath}");
+
+        foreach (var engine in new Llamashot.Core.Ocr.IOcrEngine[]
+                 { new Llamashot.Core.Ocr.TesseractOcrEngine(), new Llamashot.Core.Ocr.WindowsOcrEngine() })
+        {
+            log.AppendLine($"\n=== {engine.DisplayName} (id={engine.Id}) available={engine.IsAvailable} ===");
+            log.AppendLine("langs: " + string.Join(", ", engine.GetLanguages().Select(l => $"{l.Code}:{l.Display}")));
+            if (!engine.IsAvailable) continue;
+            try
+            {
+                var bmp = LoadPng(imgPath);
+                string lang = engine.Id == "tesseract" ? "eng" : "en-US";
+                var page = await engine.RecognizeAsync(bmp, lang);
+                log.AppendLine($"  words={page.Lines.Sum(l => l.Words.Count)} text=\"{page.Text.Trim()}\"");
+                if (page.Error != null) log.AppendLine($"  ERROR: {page.Error}");
+            }
+            catch (Exception ex) { log.AppendLine($"  EXCEPTION: {ex.Message}"); }
+        }
+
+        // End-to-end: OcrService → searchable PDF, then verify a text layer exists.
+        try
+        {
+            string pdfOut = Path.Combine(Dir, "ocr_searchable.pdf");
+            var opts = new Llamashot.Core.OcrOptions
+            {
+                EngineId = Llamashot.Core.Ocr.OcrEngines.Default?.Id,
+                LangCode = Llamashot.Core.Ocr.OcrEngines.Default?.Id == "tesseract" ? "eng" : "en-US",
+                MakeSearchablePdf = true,
+                SearchablePdfPath = pdfOut,
+            };
+            var doc = await Llamashot.Core.OcrService.RecognizeAsync(imgPath, opts);
+            byte[] pdf = await File.ReadAllBytesAsync(pdfOut);
+            string pdfText = System.Text.Encoding.Latin1.GetString(pdf);
+            bool hasLayer = pdfText.Contains("3 Tr") && pdfText.Contains("Tj");
+            bool hasWord = pdfText.Contains("(quick)") || pdfText.Contains("(The)");
+            log.AppendLine($"\nsearchable pdf: {pdfOut} bytes={pdf.Length} engine={doc.EngineName}");
+            log.AppendLine($"  invisible-text-layer={hasLayer} contains-word={hasWord}");
+        }
+        catch (Exception ex) { log.AppendLine($"\nsearchable pdf EXCEPTION: {ex}"); }
+
+        // Large-image size check: a huge source must NOT produce a huge PDF (downscale + JPEG).
+        try
+        {
+            string bigImg = Path.Combine(Dir, "ocr_big.png");
+            RenderBigImage(bigImg, 6000, 8000);
+            string bigPdf = Path.Combine(Dir, "ocr_big.pdf");
+            var opts = new Llamashot.Core.OcrOptions
+            {
+                EngineId = Llamashot.Core.Ocr.OcrEngines.Default?.Id,
+                LangCode = Llamashot.Core.Ocr.OcrEngines.Default?.Id == "tesseract" ? "eng" : "en-US",
+                MakeSearchablePdf = true, SearchablePdfPath = bigPdf,
+            };
+            await Llamashot.Core.OcrService.RecognizeAsync(bigImg, opts);
+            long bytes = new FileInfo(bigPdf).Length;
+            log.AppendLine($"\nbig-image (6000x8000) searchable pdf: {bytes / 1024} KB  ({(bytes < 2_000_000 ? "OK" : "TOO BIG")})");
+        }
+        catch (Exception ex) { log.AppendLine($"\nbig-image EXCEPTION: {ex}"); }
+
+        string outFile = Path.Combine(Dir, "ocrtest.txt");
+        await File.WriteAllTextAsync(outFile, log.ToString());
+        Console.WriteLine(log.ToString());
+    }
+
+    // ===================================================================
+    //  Multi-clip video editor export smoke test  (LLAMASHOT_VIDEDIT=1)
+    // ===================================================================
+    static async Task VideoEditorTest()
+    {
+        var log = new System.Text.StringBuilder();
+        string work = Path.Combine(Dir, "vedit");
+        Directory.CreateDirectory(work);
+
+        // Synthetic sources: two clips with audio (different sizes/fps), one silent clip, one music track.
+        string clipA = Path.Combine(work, "clipA.mp4"); // 640x480@30, 4s, tone 440Hz
+        string clipB = Path.Combine(work, "clipB.mp4"); // 480x854@25 portrait, 3s, tone 660Hz
+        string clipC = Path.Combine(work, "clipC.mp4"); // 320x240@30, 2s, NO audio
+        string music = Path.Combine(work, "music.mp3"); // 10s tone
+
+        Ff($"-f lavfi -i testsrc=size=640x480:rate=30:duration=4 -f lavfi -i sine=frequency=440:duration=4 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest \"{clipA}\"");
+        Ff($"-f lavfi -i testsrc2=size=480x854:rate=25:duration=3 -f lavfi -i sine=frequency=660:duration=3 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest \"{clipB}\"");
+        Ff($"-f lavfi -i testsrc=size=320x240:rate=30:duration=2 -an -c:v libx264 -pix_fmt yuv420p \"{clipC}\"");
+        Ff($"-f lavfi -i sine=frequency=330:duration=10 \"{music}\"");
+        log.AppendLine($"sources: A(audio)={File.Exists(clipA)} B(portrait,audio)={File.Exists(clipB)} C(no-audio)={File.Exists(clipC)} music={File.Exists(music)}");
+        log.AppendLine($"C has audio stream? {await FileToolsService.HasAudioStreamAsync(clipC)} (expect False)");
+
+        // Project: A trimmed [1s,3s] (=2s), B full (3s), C full (2s)  => 7s total.
+        var clips = new List<FileToolsService.EditClip>
+        {
+            new(clipA, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3)),
+            new(clipB, TimeSpan.Zero, TimeSpan.FromSeconds(3)),
+            new(clipC, TimeSpan.Zero, TimeSpan.FromSeconds(2)),
+        };
+        const double expected = 7.0;
+
+        async Task Check(string label, FileToolsService.ProjectAudioMode mode, string? audio, double vol, bool expectAudio)
+        {
+            string outPath = Path.Combine(work, $"out_{label}.mp4");
+            try
+            {
+                await FileToolsService.ExportVideoProjectAsync(clips, mode, audio, vol, outPath);
+                var info = await FileToolsService.GetVideoInfoAsync(outPath);
+                bool hasAud = await FileToolsService.HasAudioStreamAsync(outPath);
+                long kb = new FileInfo(outPath).Length / 1024;
+                bool durOk = Math.Abs(info.duration.TotalSeconds - expected) < 1.0;
+                bool audOk = hasAud == expectAudio;
+                log.AppendLine($"\n[{label}] {kb} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                               $"(dur {(durOk ? "OK" : "BAD")})  audio={hasAud} (audio {(audOk ? "OK" : "BAD")})");
+            }
+            catch (Exception ex) { log.AppendLine($"\n[{label}] EXCEPTION: {ex.Message}"); }
+        }
+
+        await Check("keep", FileToolsService.ProjectAudioMode.KeepOriginal, null, 100, true);
+        await Check("remove", FileToolsService.ProjectAudioMode.RemoveAll, null, 100, false);
+        await Check("replace", FileToolsService.ProjectAudioMode.Replace, music, 80, true);
+        await Check("mix", FileToolsService.ProjectAudioMode.Mix, music, 50, true);
+
+        // ---- Timeline (NLE) export: trims + per-clip speed + an audio-track clip mixed in ----
+        try
+        {
+            // A [1s,3s] at 2x (=1s), B [0,3s] at 1x (=3s)  => 4s video; music on audio track from t=0.
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                new(clipA, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), 2.0, 100, false, false, 0),
+                new(clipB, TimeSpan.Zero, TimeSpan.FromSeconds(3), 1.0, 100, true, false, 0),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>
+            {
+                new(music, TimeSpan.Zero, TimeSpan.FromSeconds(4), TimeSpan.Zero, 60),
+            };
+            string tlOut = Path.Combine(work, "timeline.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, tlOut);
+            var info = await FileToolsService.GetVideoInfoAsync(tlOut);
+            bool aud = await FileToolsService.HasAudioStreamAsync(tlOut);
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 4.0) < 1.2;
+            log.AppendLine($"\n[timeline] {new FileInfo(tlOut).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~4s {(durOk ? "OK" : "BAD")})  audio={aud}");
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline] EXCEPTION: {ex.Message}"); }
+
+        // ---- Timeline export with transform (scale/pos/opacity) + color grade + fades ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                // clipA: 70% scale, offset, 80% opacity, warm grade, 0.5s fades
+                new(clipA, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    Scale: 70, PosX: 80, PosY: -40, Opacity: 80, FadeIn: 0.5, FadeOut: 0.5,
+                    Brightness: 8, Contrast: 108, Saturation: 125),
+                // clipC (no audio): B&W, full frame
+                new(clipC, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    Saturation: 0, Contrast: 110),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>
+            {
+                new(music, TimeSpan.Zero, TimeSpan.FromSeconds(4), TimeSpan.Zero, 60, FadeIn: 1.0, FadeOut: 1.0),
+            };
+            string fxOut = Path.Combine(work, "timeline_fx.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, fxOut);
+            var info = await FileToolsService.GetVideoInfoAsync(fxOut);
+            bool aud = await FileToolsService.HasAudioStreamAsync(fxOut);
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 4.0) < 1.2;
+            log.AppendLine($"\n[timeline-fx] {new FileInfo(fxOut).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~4s {(durOk ? "OK" : "BAD")})  audio={aud}");
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-fx] EXCEPTION: {ex.Message}"); }
+
+        // ---- Timeline export with transitions (xfade/acrossfade between clips) ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                // clipA → clipB: 0.5s zoom transition; clipB → clipC: 0.6s dissolve
+                new(clipA, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    Transition: "zoomin", TransitionDur: 0.5),
+                new(clipB, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    Transition: "dissolve", TransitionDur: 0.6),
+                new(clipC, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>();
+            string trOut = Path.Combine(work, "timeline_tr.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, trOut);
+            var info = await FileToolsService.GetVideoInfoAsync(trOut);
+            bool aud = await FileToolsService.HasAudioStreamAsync(trOut);
+            // total = 2+2+2 - 0.5 - 0.6 = 4.9s
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 4.9) < 1.0;
+            log.AppendLine($"\n[timeline-tr] {new FileInfo(trOut).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~4.9s {(durOk ? "OK" : "BAD")})  audio={aud}");
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-tr] EXCEPTION: {ex.Message}"); }
+
+        string outFile = Path.Combine(Dir, "videdit.txt");
+        await File.WriteAllTextAsync(outFile, log.ToString());
+        Console.WriteLine(log.ToString());
+    }
+
+    // Runs ffmpeg synchronously for test-media generation; throws with stderr tail on failure.
+    static void Ff(string args)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("ffmpeg", "-y " + args)
+        {
+            RedirectStandardError = true, RedirectStandardOutput = true,
+            UseShellExecute = false, CreateNoWindow = true,
+        };
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        string err = p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        if (p.ExitCode != 0)
+            throw new Exception($"ffmpeg gen failed: {args}\n{err[^Math.Min(400, err.Length)..]}");
+    }
+
+    static void RenderTextImage(string text, string path)
+    {
+        int w = 1100, h = 150;
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new System.Windows.Rect(0, 0, w, h));
+            var ft = new FormattedText(text, System.Globalization.CultureInfo.InvariantCulture,
+                System.Windows.FlowDirection.LeftToRight, new Typeface("Arial"), 40,
+                System.Windows.Media.Brushes.Black, 1.0);
+            dc.DrawText(ft, new System.Windows.Point(30, 50));
+        }
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+        using var fs = File.Create(path);
+        enc.Save(fs);
+    }
+
+    static void RenderBigImage(string path, int w, int h)
+    {
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new System.Windows.Rect(0, 0, w, h));
+            for (int row = 0; row < 40; row++)
+            {
+                var ft = new FormattedText($"Line {row + 1}: The quick brown fox jumps over the lazy dog — invoice total $1,499.00",
+                    System.Globalization.CultureInfo.InvariantCulture, System.Windows.FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 60, System.Windows.Media.Brushes.Black, 1.0);
+                dc.DrawText(ft, new System.Windows.Point(120, 150 + row * 180));
+            }
+        }
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+        using var fs = File.Create(path);
+        enc.Save(fs);
+    }
+
+    static BitmapSource LoadPng(string path)
+    {
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.UriSource = new Uri(path, UriKind.Absolute);
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.EndInit();
+        bmp.Freeze();
+        return bmp;
     }
 }
