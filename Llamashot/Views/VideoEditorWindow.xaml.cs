@@ -724,6 +724,7 @@ public partial class VideoEditorWindow : Window
         OverlayCanvas.Children.Add(phHandle);
 
         UpdateStatus();
+        UpdatePreviewComposite();   // keep the preview overlay (titles/transform) in sync with edits
     }
 
     private void DrawRuler(double cw)
@@ -1056,6 +1057,7 @@ public partial class VideoEditorWindow : Window
         _playhead = Math.Max(0, seconds);
         UpdatePlayheadVisual();
         SyncPreview();
+        UpdatePreviewComposite();
         UpdateStatus();
     }
 
@@ -1105,9 +1107,88 @@ public partial class VideoEditorWindow : Window
     {
         TxtNoPreview.Visibility = Visibility.Collapsed;
         try { Player.Position = _pendingPreviewPos; if (!_isPlaying) Player.Pause(); } catch { }
+        UpdatePreviewComposite();
     }
 
     private void Player_MediaEnded(object sender, RoutedEventArgs e) { }
+
+    private void PreviewHost_SizeChanged(object sender, SizeChangedEventArgs e) => UpdatePreviewComposite();
+
+    // The letterboxed rect (canvas aspect fit inside the preview) the video content occupies.
+    private (double offX, double offY, double w, double h) PreviewContentRect()
+    {
+        double aw = Player?.ActualWidth ?? 0, ah = Player?.ActualHeight ?? 0;
+        if (aw < 1 || ah < 1) return (0, 0, Math.Max(1, aw), Math.Max(1, ah));
+        double car = (double)Math.Max(1, _project.CanvasW) / Math.Max(1, _project.CanvasH);
+        double ar = aw / ah;
+        double w, h;
+        if (ar > car) { h = ah; w = ah * car; } else { w = aw; h = aw / car; }
+        return ((aw - w) / 2, (ah - h) / 2, w, h);
+    }
+
+    private static Brush BrushFromHex(string? hex)
+    {
+        try { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(string.IsNullOrEmpty(hex) ? "#FFFFFF" : hex)); }
+        catch { return Brushes.White; }
+    }
+
+    /// <summary>
+    /// Graceful-degrade composited preview: reflects the current video clip's transform / opacity /
+    /// blur and overlays live text titles (positioned to match the drawtext export mapping).
+    /// Colour grade, transitions and multi-track compositing remain accurate-on-export only.
+    /// </summary>
+    private void UpdatePreviewComposite()
+    {
+        if (PreviewOverlay == null || Player == null) return;
+        PreviewOverlay.Children.Clear();
+
+        var (offX, offY, cW, cH) = PreviewContentRect();
+
+        // --- current video clip transform / opacity / blur ---
+        var vclip = VideoClipAt(_playhead);
+        if (vclip != null)
+        {
+            double sf = (vclip.Scale <= 0 ? 100 : vclip.Scale) / 100.0;
+            var tg = new TransformGroup();
+            tg.Children.Add(new ScaleTransform(sf * (vclip.FlipH ? -1 : 1), sf * (vclip.FlipV ? -1 : 1)));
+            if (Math.Abs(vclip.Rotate) > 0.01) tg.Children.Add(new RotateTransform(vclip.Rotate));
+            tg.Children.Add(new TranslateTransform(
+                vclip.PosX / Math.Max(1, _project.CanvasW) * cW,
+                vclip.PosY / Math.Max(1, _project.CanvasH) * cH));
+            Player.RenderTransform = tg;
+            Player.Opacity = Math.Clamp(vclip.Opacity, 0, 100) / 100.0;
+            Player.Effect = vclip.Blur > 0.05 ? new System.Windows.Media.Effects.BlurEffect { Radius = vclip.Blur } : null;
+        }
+        else
+        {
+            Player.RenderTransform = null;
+            Player.Opacity = 1;
+            Player.Effect = null;
+        }
+
+        // --- live text titles active at the playhead (canvas-space mapping, matching drawtext) ---
+        foreach (var tr in _project.Tracks.Where(t => t.Kind == TrackKind.Text && !t.Hidden))
+            foreach (var tc in tr.Clips.Where(c => _playhead >= c.Start.TotalSeconds && _playhead < c.End.TotalSeconds))
+            {
+                if (string.IsNullOrEmpty(tc.Text)) continue;
+                var tb = new TextBlock
+                {
+                    Text = tc.Text,
+                    FontSize = Math.Max(6, tc.FontSizePct / 100.0 * cH),
+                    FontWeight = tc.Bold ? FontWeights.Bold : FontWeights.Normal,
+                    Foreground = BrushFromHex(tc.FontColor),
+                    FontFamily = new System.Windows.Media.FontFamily(string.IsNullOrEmpty(tc.FontFamily) ? "Segoe UI" : tc.FontFamily),
+                    TextWrapping = TextWrapping.NoWrap,
+                };
+                if (!string.IsNullOrEmpty(tc.BgBoxColor)) { tb.Background = BrushFromHex(tc.BgBoxColor); tb.Padding = new Thickness(6, 2, 6, 2); }
+                tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double tw = tb.DesiredSize.Width, th = tb.DesiredSize.Height;
+                // match export: x=(w-text_w)*pct, y=(h-text_h)*pct
+                Canvas.SetLeft(tb, offX + Math.Max(0, cW - tw) * (tc.PosXPct / 100.0));
+                Canvas.SetTop(tb, offY + Math.Max(0, cH - th) * (tc.PosYPct / 100.0));
+                PreviewOverlay.Children.Add(tb);
+            }
+    }
 
     private void Timer_Tick(object? sender, EventArgs e)
     {
@@ -1132,6 +1213,7 @@ public partial class VideoEditorWindow : Window
             _playhead = _previewClip.Start.TotalSeconds + (pos - _previewClip.SrcIn).TotalSeconds;
         }
         UpdatePlayheadVisual();
+        UpdatePreviewComposite();
         UpdateStatus();
     }
 
