@@ -1762,7 +1762,8 @@ public static class FileToolsService
         bool audioOnly,
         string outputPath,
         IProgress<int>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int canvasW = 1920, int canvasH = 1080, int fps = 30, int crf = 20)
     {
         if (videoClips == null || videoClips.Count == 0)
             throw new ArgumentException("Add at least one clip to the video track before exporting.");
@@ -1791,8 +1792,8 @@ public static class FileToolsService
 
                 // Transform / color / fade parameters.
                 double sf = Math.Clamp(c.Scale <= 0 ? 100 : c.Scale, 1, 1000) / 100.0;
-                int bw = Math.Max(2, (int)Math.Round(ProjW * sf));
-                int bh = Math.Max(2, (int)Math.Round(ProjH * sf));
+                int bw = Math.Max(2, (int)Math.Round(canvasW * sf));
+                int bh = Math.Max(2, (int)Math.Round(canvasH * sf));
                 double op = Math.Clamp(c.Opacity, 0, 100) / 100.0;
                 double bright = Math.Clamp(c.Brightness, -100, 100) / 100.0;
                 double contrast = Math.Clamp(c.Contrast, 0, 300) / 100.0;
@@ -1815,12 +1816,12 @@ public static class FileToolsService
                 var vpost = new List<string>
                 {
                     $"overlay=x=(W-w)/2+{F(c.PosX)}:y=(H-h)/2+{F(c.PosY)}:shortest=1",
-                    "setsar=1", $"fps={ProjFps}",
+                    "setsar=1", $"fps={fps}",
                 };
                 if (fin > 0.01) vpost.Add($"fade=t=in:st=0:d={F(fin)}");
                 if (fout > 0.01) vpost.Add($"fade=t=out:st={F(Math.Max(0, outDur - fout))}:d={F(fout)}");
 
-                string fcVideo = $"color=c=black:s={ProjW}x{ProjH}:r={ProjFps}[bg];" +
+                string fcVideo = $"color=c=black:s={canvasW}x{canvasH}:r={fps}[bg];" +
                                  $"[0:v]{string.Join(",", fg)}[fg];" +
                                  $"[bg][fg]{string.Join(",", vpost)}[v]";
 
@@ -1842,7 +1843,7 @@ public static class FileToolsService
                     map = "-map \"[v]\" -map 1:a";
                 }
                 string args = $"{inputs} -filter_complex \"{fc}\" {map} " +
-                              $"-c:v libx264 -crf 20 -preset veryfast -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 -shortest \"{seg}\"";
+                              $"-c:v libx264 -crf {crf} -preset veryfast -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 -shortest \"{seg}\"";
 
                 double lo = doneSec / totalSec * 70.0;
                 doneSec += outDur;
@@ -1903,7 +1904,7 @@ public static class FileToolsService
                 }
                 string graph = fc.ToString().TrimEnd(';');
                 string args = $"{inputs}-filter_complex \"{graph}\" -map \"{vcur}\" -map \"{acur}\" " +
-                              $"-c:v libx264 -crf 20 -preset veryfast -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 \"{joined}\"";
+                              $"-c:v libx264 -crf {crf} -preset veryfast -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 \"{joined}\"";
                 await RunFFmpegAsync(args, TimeSpan.FromSeconds(totalSec), new ScaledProgress(progress, 70, 80), ct);
             }
 

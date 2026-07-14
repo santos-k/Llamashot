@@ -69,6 +69,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Menu-bar entry (File / Edit / View / Help) -->
+        <Style TargetType="Button" x:Key="MenuBtn" BasedOn="{StaticResource Flat}">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+        <!-- Popup menu item -->
+        <Style TargetType="Button" x:Key="MenuItemBtn" BasedOn="{StaticResource Flat}">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="10,7" />
+        </Style>
         <Style TargetType="RadioButton" x:Key="Rail">
             <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
             <Setter Property="Cursor" Value="Hand" />
@@ -97,6 +108,31 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Properties Video / Audio / Text tab -->
+        <Style TargetType="RadioButton" x:Key="PropTab">
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Background="Transparent" Padding="14,9" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="TextBox" x:Key="Num">
             <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
@@ -105,6 +141,86 @@
             <Setter Property="Padding" Value="5,3" />
             <Setter Property="Width" Value="62" />
             <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <!-- Home: left-nav item -->
+        <Style TargetType="RadioButton" x:Key="HomeNav">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="8,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="8" Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{TemplateBinding Tag}" FontSize="15" Width="26" Foreground="{TemplateBinding Foreground}" />
+                                <TextBlock Text="{TemplateBinding Content}" FontSize="13" VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Home: left-nav item rendered as a Button (Settings) -->
+        <Style TargetType="Button" x:Key="HomeNavBtn" BasedOn="{StaticResource Flat}">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <!-- Home: template card -->
+        <Style TargetType="Button" x:Key="TemplateCard" BasedOn="{StaticResource Flat}">
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Width="120" Height="90" CornerRadius="10"
+                                Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Home: aspect-ratio preset card -->
+        <Style TargetType="RadioButton" x:Key="PresetCard">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Width="150" Height="150" CornerRadius="12"
+                                Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentGradientBrush}" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Media panel: swappable layout (grid ⇄ list) -->
@@ -142,398 +258,694 @@
         </DataTemplate>
     </Window.Resources>
 
+    <!-- ============ ROOT: Home view ⇄ Editor view ============ -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />  <!-- header -->
-            <RowDefinition Height="1.6*" MinHeight="240" />  <!-- media | preview | inspector -->
-            <RowDefinition Height="Auto" />  <!-- editing toolbar -->
-            <RowDefinition Height="*" MinHeight="180" />  <!-- timeline -->
-            <RowDefinition Height="Auto" />  <!-- status bar -->
-        </Grid.RowDefinitions>
 
-        <!-- ============ HEADER ============ -->
-        <Border Grid.Row="0" Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
-                BorderThickness="0,0,0,1" Padding="12,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="🎬" FontSize="16" VerticalAlignment="Center" Margin="2,0,6,0" />
-                    <TextBlock Text="Video Editor" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"
-                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,14,0" />
-                    <Button x:Name="BtnFile" Style="{StaticResource Flat}" Click="File_Click" Content="File ▾" />
-                    <Button x:Name="BtnUndo" Style="{StaticResource Flat}" Click="Undo_Click" Content="↶" ToolTip="Undo (Ctrl+Z)" FontSize="15" />
-                    <Button x:Name="BtnRedo" Style="{StaticResource Flat}" Click="Redo_Click" Content="↷" ToolTip="Redo (Ctrl+Shift+Z)" FontSize="15" />
-                </StackPanel>
+        <!-- ============================== EDITOR VIEW ============================== -->
+        <Grid x:Name="EditorViewRoot">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />  <!-- header / menu bar -->
+                <RowDefinition Height="1.6*" MinHeight="240" />  <!-- panel | preview | inspector -->
+                <RowDefinition Height="Auto" />  <!-- editing toolbar -->
+                <RowDefinition Height="*" MinHeight="180" />  <!-- timeline -->
+                <RowDefinition Height="Auto" />  <!-- status bar -->
+            </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="Project Name" Style="{StaticResource Cap}" Margin="0,0,8,0" />
-                    <TextBox x:Name="TxtProjName" Text="Untitled Project" Width="200" Background="Transparent"
-                             Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" FontSize="13"
-                             VerticalContentAlignment="Center" />
-                    <TextBlock Text="✎" Style="{StaticResource Cap}" />
-                </StackPanel>
+            <!-- ============ HEADER / MENU BAR ============ -->
+            <Border Grid.Row="0" Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                    BorderThickness="0,0,0,1" Padding="12,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="🎬" FontSize="16" VerticalAlignment="Center" Margin="2,0,6,0" />
+                        <TextBlock Text="Light Video Editor" FontSize="14.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource AccentBrush}" Margin="0,0,16,0" />
+                        <!-- File is the existing popup anchor (kept) -->
+                        <Button x:Name="BtnFile" Style="{StaticResource MenuBtn}" Click="File_Click" Content="File" />
+                        <Button x:Name="BtnEdit" Style="{StaticResource MenuBtn}" Click="EditMenu_Click" Content="Edit" />
+                        <Button x:Name="BtnMenuView" Style="{StaticResource MenuBtn}" Click="ViewMenu_Click" Content="View" />
+                        <Button x:Name="BtnHelp" Style="{StaticResource MenuBtn}" Click="HelpMenu_Click" Content="Help" />
+                    </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="BtnSaveProj" Style="{StaticResource Tool}" Click="SaveProject_Click" Content="Save Project" Margin="0,0,8,0" />
-                    <Button x:Name="BtnExport" Style="{StaticResource Accent}" Click="Export_Click" Content="▶  Export Video ▾" ToolTip="Ctrl+E" />
-                    <Button x:Name="BtnSettings" Style="{StaticResource Flat}" Click="Settings_Click" Content="⚙" FontSize="15" Margin="6,0,0,0" ToolTip="Settings" />
-                </StackPanel>
-            </Grid>
-        </Border>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBox x:Name="TxtProjName" Text="Untitled Project" Width="240" Background="Transparent"
+                                 Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" FontSize="13.5"
+                                 TextAlignment="Center" VerticalContentAlignment="Center" />
+                        <TextBlock Text="✎" Style="{StaticResource Cap}" />
+                    </StackPanel>
 
-        <!-- ============ MIDDLE: rail | media | preview | inspector ============ -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />                 <!-- rail -->
-                <ColumnDefinition Width="300" MinWidth="200" />   <!-- media panel -->
-                <ColumnDefinition Width="4" />
-                <ColumnDefinition Width="*" MinWidth="320" />     <!-- preview -->
-                <ColumnDefinition Width="4" />
-                <ColumnDefinition Width="320" MinWidth="220" />   <!-- inspector -->
-            </Grid.ColumnDefinitions>
-
-            <!-- Rail -->
-            <Border Grid.Column="0" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
-                    BorderThickness="0,0,1,0" Width="60">
-                <StackPanel x:Name="Rail" Margin="0,8">
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="🎞" Content="Media" IsChecked="True" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="♫" Content="Audio" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="T" Content="Text" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="⇄" Content="Transitions" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="✦" Content="Effects" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="◐" Content="Filters" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="▲" Content="Elements" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="▦" Content="Overlays" Checked="Rail_Changed" />
-                    <RadioButton Style="{StaticResource Rail}" GroupName="rail" Tag="…" Content="More" Checked="Rail_Changed" />
-                </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtAutosave" FontSize="10.5" VerticalAlignment="Center"
+                                   Foreground="#2DD4BF" Opacity="0.7" Margin="0,0,12,0"
+                                   ToolTip="Last auto-save time" />
+                        <Button x:Name="BtnSaveProj" Style="{StaticResource Tool}" Click="SaveProject_Click" Content="💾  Save" Margin="0,0,8,0" />
+                        <Button x:Name="BtnExport" Style="{StaticResource Accent}" Click="Export_Click" Content="▶  Export ▾" ToolTip="Ctrl+E" />
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- Media panel -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <DockPanel Grid.Row="0" Margin="12,10,12,6">
-                    <TextBlock x:Name="TxtPanelTitle" Text="Project Media" FontWeight="SemiBold" FontSize="13"
-                               Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Left" VerticalAlignment="Center" />
-                    <Button x:Name="BtnImport" Style="{StaticResource Accent}" Click="AddVideos_Click" Content="Import ▾"
-                            HorizontalAlignment="Right" />
-                </DockPanel>
-                <DockPanel Grid.Row="1" Margin="12,0,12,6">
-                    <Button x:Name="BtnView" DockPanel.Dock="Right" Style="{StaticResource Flat}" Click="ToggleView_Click"
-                            Content="☰" FontSize="14" ToolTip="Grid / list view" Margin="4,0,0,0" />
-                    <Button x:Name="BtnSort" DockPanel.Dock="Right" Style="{StaticResource Flat}" Click="SortMenu_Click"
-                            Content="⇅ Sort ▾" ToolTip="Sort media" Margin="4,0,0,0" />
-                    <TextBox x:Name="TxtSearch" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
-                             BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="6,4" FontSize="12"
-                             TextChanged="Search_Changed" />
-                </DockPanel>
-                <ScrollViewer Grid.Row="2" x:Name="MediaScroll" VerticalScrollBarVisibility="Auto" Padding="10,0,10,10">
-                    <Grid>
-                        <ListBox x:Name="MediaGrid" Background="Transparent" BorderThickness="0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 SelectionMode="Single" MouseDoubleClick="Media_DoubleClick"
-                                 PreviewMouseLeftButtonDown="Media_PreviewMouseLeftButtonDown"
-                                 PreviewMouseMove="Media_PreviewMouseMove"
-                                 ItemsPanel="{StaticResource MediaWrapTpl}" ItemTemplate="{StaticResource MediaGridTpl}">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="Margin" Value="4" />
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="ListBoxItem">
-                                                <Border x:Name="mb" CornerRadius="7" BorderThickness="2" BorderBrush="Transparent"
-                                                        Background="{DynamicResource SurfaceAltBrush}"><ContentPresenter /></Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="mb" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                        </ListBox>
-                        <StackPanel x:Name="MediaEmpty" VerticalAlignment="Top" Margin="0,30,0,0" HorizontalAlignment="Center">
-                            <Button Style="{StaticResource Tool}" Click="AddVideos_Click" Padding="18,22">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="＋" FontSize="22" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
-                                    <TextBlock Text="Add Media" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                        <TextBlock x:Name="TxtComingSoon" Visibility="Collapsed" VerticalAlignment="Top" Margin="6,26,6,0"
-                                   TextWrapping="Wrap" TextAlignment="Center" FontSize="12"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   Text="Transitions, effects, filters, text &amp; overlays arrive in the next update. Media &amp; Audio import are live now." />
-                    </Grid>
-                </ScrollViewer>
+            <!-- ============ MIDDLE: sidebar | panel | preview | inspector ============ -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />                                <!-- icon sidebar -->
+                    <ColumnDefinition Width="300" MinWidth="0" x:Name="ColPanel" />  <!-- content panel (collapsible) -->
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="*" MinWidth="320" />                     <!-- preview -->
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="320" MinWidth="220" />                   <!-- inspector -->
+                </Grid.ColumnDefinitions>
 
-                <!-- Transitions palette (shown when the Transitions rail tab is active) -->
-                <ScrollViewer Grid.Row="2" x:Name="TransScroll" VerticalScrollBarVisibility="Auto" Padding="12,0,12,10" Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock Text="Select a clip on the timeline, then click a transition. It plays between that clip and the next one."
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,8" />
-                        <DockPanel Margin="0,0,0,8">
-                            <TextBlock Text="Duration" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="60" />
-                            <TextBlock x:Name="TxtTransDur" Text="0.5s" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="40" TextAlignment="Right" />
-                            <Slider x:Name="SldTransDur" Minimum="0.2" Maximum="3" Value="0.5" ValueChanged="TransDur_Changed" />
-                        </DockPanel>
-                        <WrapPanel x:Name="TransList" />
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
-
-            <GridSplitter Grid.Column="2" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderSoftBrush}" />
-
-            <!-- Preview -->
-            <Grid Grid.Column="3">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <DockPanel Grid.Row="0" Margin="12,8" >
-                    <TextBlock Text="Preview" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0" />
-                    <TextBlock x:Name="TxtCanvas" Text="1920×1080" Style="{StaticResource Cap}" DockPanel.Dock="Right" />
-                    <TextBlock />
-                </DockPanel>
-                <Border Grid.Row="1" Background="#22000000" ClipToBounds="True" Margin="12,0">
-                    <Grid>
-                        <MediaElement x:Name="Player" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Uniform"
-                                      MediaOpened="Player_MediaOpened" MediaEnded="Player_MediaEnded" />
-                        <TextBlock x:Name="TxtNoPreview" Text="Add media and drop it on the timeline to preview"
-                                   Foreground="{DynamicResource TextMutedBrush}" FontSize="13" HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
-                <StackPanel Grid.Row="2" Margin="12,8">
+                <!-- Icon sidebar (always visible) -->
+                <Border Grid.Column="0" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                        BorderThickness="0,0,1,0" Width="64">
                     <DockPanel>
-                        <TextBlock x:Name="TxtTime" Text="00:00:00 / 00:00:00" Style="{StaticResource Cap}" DockPanel.Dock="Left" />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Style="{StaticResource Flat}" Click="Mute_Click" x:Name="BtnMute" Content="🔊" FontSize="13" />
-                            <Slider x:Name="SldPreviewVol" Minimum="0" Maximum="1" Value="1" Width="80" VerticalAlignment="Center"
-                                    ValueChanged="PreviewVol_Changed" Margin="4,0,0,0" />
+                        <Button x:Name="BtnPanelCollapse" DockPanel.Dock="Bottom" Style="{StaticResource Flat}"
+                                Click="PanelCollapse_Click" Content="‹" FontSize="16" Margin="0,6,0,8"
+                                ToolTip="Hide / show the panel" />
+                        <StackPanel x:Name="Rail" Margin="0,8">
+                            <RadioButton x:Name="RbMedia" Style="{StaticResource Rail}" GroupName="rail" Tag="🎞" Content="Media" IsChecked="True" Checked="Rail_Changed" />
+                            <RadioButton x:Name="RbText" Style="{StaticResource Rail}" GroupName="rail" Tag="T" Content="Text" Checked="Rail_Changed" />
+                            <RadioButton x:Name="RbTransitions" Style="{StaticResource Rail}" GroupName="rail" Tag="⇄" Content="Transitions" Checked="Rail_Changed" />
+                            <RadioButton x:Name="RbEffects" Style="{StaticResource Rail}" GroupName="rail" Tag="✦" Content="Effects" Checked="Rail_Changed" />
+                            <RadioButton x:Name="RbAudio" Style="{StaticResource Rail}" GroupName="rail" Tag="♫" Content="Audio" Checked="Rail_Changed" />
+                            <RadioButton x:Name="RbElements" Style="{StaticResource Rail}" GroupName="rail" Tag="▢" Content="Elements" Checked="Rail_Changed" />
                         </StackPanel>
                     </DockPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                        <Button Style="{StaticResource Flat}" Click="SkipStart_Click" Content="⏮" FontSize="14" ToolTip="Go to start" />
-                        <Button Style="{StaticResource Flat}" Click="PrevFrame_Click" Content="⏴" FontSize="14" ToolTip="Previous frame" />
-                        <Button x:Name="BtnPlay" Style="{StaticResource Accent}" Click="PlayPause_Click" Content="▶" FontSize="14" Padding="16,6" ToolTip="Play/Pause (Space)" />
-                        <Button Style="{StaticResource Flat}" Click="NextFrame_Click" Content="⏵" FontSize="14" ToolTip="Next frame" />
-                        <Button Style="{StaticResource Flat}" Click="SkipEnd_Click" Content="⏭" FontSize="14" ToolTip="Go to end" />
-                        <Button x:Name="BtnSnapshot" Style="{StaticResource Flat}" Click="Snapshot_Click" Content="📷" FontSize="13" ToolTip="Save current frame" Margin="8,0,0,0" />
+                </Border>
+
+                <!-- Content panel -->
+                <Grid Grid.Column="1" x:Name="PanelRoot">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="12,10,12,6">
+                        <TextBlock x:Name="TxtPanelTitle" Text="Project Media" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Left" VerticalAlignment="Center" />
+                        <Button x:Name="BtnImport" Style="{StaticResource Accent}" Click="AddVideos_Click" Content="＋ Add ▾"
+                                HorizontalAlignment="Right" />
+                    </DockPanel>
+                    <DockPanel Grid.Row="1" Margin="12,0,12,6" x:Name="MediaTools">
+                        <Button x:Name="BtnView" DockPanel.Dock="Right" Style="{StaticResource Flat}" Click="ToggleView_Click"
+                                Content="☰" FontSize="14" ToolTip="Grid / list view" Margin="4,0,0,0" />
+                        <Button x:Name="BtnSort" DockPanel.Dock="Right" Style="{StaticResource Flat}" Click="SortMenu_Click"
+                                Content="⇅ Sort ▾" ToolTip="Sort media" Margin="4,0,0,0" />
+                        <TextBox x:Name="TxtSearch" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="6,4" FontSize="12"
+                                 TextChanged="Search_Changed" />
+                    </DockPanel>
+                    <ScrollViewer Grid.Row="2" x:Name="MediaScroll" VerticalScrollBarVisibility="Auto" Padding="10,0,10,10">
+                        <Grid>
+                            <ListBox x:Name="MediaGrid" Background="Transparent" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     SelectionMode="Single" MouseDoubleClick="Media_DoubleClick"
+                                     PreviewMouseLeftButtonDown="Media_PreviewMouseLeftButtonDown"
+                                     PreviewMouseMove="Media_PreviewMouseMove"
+                                     ItemsPanel="{StaticResource MediaWrapTpl}" ItemTemplate="{StaticResource MediaGridTpl}">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Margin" Value="4" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="mb" CornerRadius="7" BorderThickness="2" BorderBrush="Transparent"
+                                                            Background="{DynamicResource SurfaceAltBrush}"><ContentPresenter /></Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="mb" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                            <StackPanel x:Name="MediaEmpty" VerticalAlignment="Top" Margin="0,30,0,0" HorizontalAlignment="Center">
+                                <Button Style="{StaticResource Tool}" Click="AddVideos_Click" Padding="18,22">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="＋" FontSize="22" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="Add Media" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtComingSoon" Visibility="Collapsed" VerticalAlignment="Top" Margin="6,26,6,0"
+                                       TextWrapping="Wrap" TextAlignment="Center" FontSize="12"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Text="Text, Effects &amp; Elements arrive in upcoming updates. Media, Audio &amp; Transitions are live now." />
+                        </Grid>
+                    </ScrollViewer>
+
+                    <!-- Transitions palette (shown when the Transitions tab is active) -->
+                    <ScrollViewer Grid.Row="2" x:Name="TransScroll" VerticalScrollBarVisibility="Auto" Padding="12,0,12,10" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Select a clip on the timeline, then click a transition. It plays between that clip and the next one."
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,8" />
+                            <DockPanel Margin="0,0,0,8">
+                                <TextBlock Text="Duration" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="60" />
+                                <TextBlock x:Name="TxtTransDur" Text="0.5s" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="40" TextAlignment="Right" />
+                                <Slider x:Name="SldTransDur" Minimum="0.2" Maximum="3" Value="0.5" ValueChanged="TransDur_Changed" />
+                            </DockPanel>
+                            <WrapPanel x:Name="TransList" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <GridSplitter Grid.Column="2" Width="4" HorizontalAlignment="Stretch" x:Name="PanelSplitter" Background="{DynamicResource BorderSoftBrush}" />
+
+                <!-- Preview -->
+                <Grid Grid.Column="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="12,8" >
+                        <TextBlock Text="Preview" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0" />
+                        <Button x:Name="BtnFullscreen" DockPanel.Dock="Right" Style="{StaticResource Flat}" Click="Fullscreen_Click"
+                                Content="⛶" FontSize="14" ToolTip="Fullscreen preview (F)" Margin="8,0,0,0" />
+                        <TextBlock x:Name="TxtCanvas" Text="1920×1080" Style="{StaticResource Cap}" DockPanel.Dock="Right" />
+                        <TextBlock />
+                    </DockPanel>
+                    <Border Grid.Row="1" Background="#22000000" ClipToBounds="True" Margin="12,0">
+                        <Grid>
+                            <MediaElement x:Name="Player" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Uniform"
+                                          MediaOpened="Player_MediaOpened" MediaEnded="Player_MediaEnded" />
+                            <TextBlock x:Name="TxtNoPreview" Text="Add media and drop it on the timeline to preview"
+                                       Foreground="{DynamicResource TextMutedBrush}" FontSize="13" HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <StackPanel Grid.Row="2" Margin="12,8">
+                        <DockPanel>
+                            <TextBlock x:Name="TxtTime" Text="00:00:00 / 00:00:00" Style="{StaticResource Cap}" DockPanel.Dock="Left" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource Flat}" Click="Mute_Click" x:Name="BtnMute" Content="🔊" FontSize="13" />
+                                <Slider x:Name="SldPreviewVol" Minimum="0" Maximum="1" Value="1" Width="80" VerticalAlignment="Center"
+                                        ValueChanged="PreviewVol_Changed" Margin="4,0,0,0" />
+                            </StackPanel>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                            <Button Style="{StaticResource Flat}" Click="SkipStart_Click" Content="⏮" FontSize="14" ToolTip="Go to start" />
+                            <Button Style="{StaticResource Flat}" Click="PrevFrame_Click" Content="⏴" FontSize="14" ToolTip="Previous frame" />
+                            <Button x:Name="BtnPlay" Style="{StaticResource Accent}" Click="PlayPause_Click" Content="▶" FontSize="14" Padding="16,6" ToolTip="Play/Pause (Space)" />
+                            <Button Style="{StaticResource Flat}" Click="NextFrame_Click" Content="⏵" FontSize="14" ToolTip="Next frame" />
+                            <Button Style="{StaticResource Flat}" Click="SkipEnd_Click" Content="⏭" FontSize="14" ToolTip="Go to end" />
+                            <Button x:Name="BtnSnapshot" Style="{StaticResource Flat}" Click="Snapshot_Click" Content="📷" FontSize="13" ToolTip="Save current frame" Margin="8,0,0,0" />
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
+                </Grid>
+
+                <GridSplitter Grid.Column="4" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderSoftBrush}" />
+
+                <!-- Inspector / Properties -->
+                <Border Grid.Column="5" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1,0,0,0">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="TabVideo" Style="{StaticResource PropTab}" GroupName="proptab" Tag="Video" Content="Video" Checked="PropTab_Changed" />
+                                <RadioButton x:Name="TabAudio" Style="{StaticResource PropTab}" GroupName="proptab" Tag="Audio" Content="Audio" Checked="PropTab_Changed" />
+                                <RadioButton x:Name="TabText" Style="{StaticResource PropTab}" GroupName="proptab" Tag="Text" Content="Text" Checked="PropTab_Changed" />
+                            </StackPanel>
+                        </Border>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,10">
+                            <StackPanel x:Name="Inspector">
+                                <TextBlock x:Name="TxtInspTarget" Text="No clip selected" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
+
+                                <StackPanel x:Name="InspVideo" Visibility="Collapsed">
+                                    <TextBlock Text="Transform" Style="{StaticResource SectionHead}" />
+                                    <DockPanel Margin="0,3"><TextBlock Text="Scale %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InScale" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Position" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><StackPanel Orientation="Horizontal"><TextBox x:Name="InPosX" Style="{StaticResource Num}" Width="52" TextChanged="Insp_Changed" /><TextBlock Text=" x " Style="{StaticResource Cap}" /><TextBox x:Name="InPosY" Style="{StaticResource Num}" Width="52" TextChanged="Insp_Changed" /></StackPanel></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Rotate °" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InRotate" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Flip" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><StackPanel Orientation="Horizontal"><CheckBox x:Name="InFlipH" Content="H" Foreground="{DynamicResource TextSecondaryBrush}" Click="Insp_Changed" Margin="0,0,10,0" /><CheckBox x:Name="InFlipV" Content="V" Foreground="{DynamicResource TextSecondaryBrush}" Click="Insp_Changed" /></StackPanel></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Opacity %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InOpacity" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+
+                                    <TextBlock Text="Speed" Style="{StaticResource SectionHead}" />
+                                    <DockPanel Margin="0,3">
+                                        <TextBlock x:Name="TxtSpeed" Text="1.00x" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="46" TextAlignment="Right" />
+                                        <Slider x:Name="InSpeed" Minimum="0.25" Maximum="4" Value="1" ValueChanged="Speed_Changed" />
+                                    </DockPanel>
+                                    <TextBlock Text="Speed a section (ramp)" Style="{StaticResource Cap}" Margin="0,7,0,3" />
+                                    <DockPanel Margin="0,2">
+                                        <TextBlock Text="From" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="40" />
+                                        <TextBlock Text="To" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="26" Margin="6,0,0,0" />
+                                        <TextBox x:Name="InSpeedTo" Style="{StaticResource Num}" Width="60" DockPanel.Dock="Right" HorizontalAlignment="Right" />
+                                        <TextBox x:Name="InSpeedFrom" Style="{StaticResource Num}" Width="60" HorizontalAlignment="Left" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,2">
+                                        <TextBlock Text="Speed ×" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
+                                        <Button Content="Apply" Style="{StaticResource Tool}" Click="SpeedRange_Click" DockPanel.Dock="Right" Padding="12,4" />
+                                        <TextBox x:Name="InSpeedX" Style="{StaticResource Num}" Width="50" Text="2" HorizontalAlignment="Left" Margin="0,0,8,0" />
+                                    </DockPanel>
+                                    <TextBlock Text="Times are within this clip (e.g. 2:00 to 3:00). Splits the clip and speeds just that part."
+                                               Style="{StaticResource Cap}" TextWrapping="Wrap" Margin="0,2,0,0" />
+
+                                    <TextBlock Text="Fade (seconds)" Style="{StaticResource SectionHead}" />
+                                    <DockPanel Margin="0,3"><TextBlock Text="Fade In" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFadeIn" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Fade Out" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFadeOut" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+
+                                    <TextBlock Text="Color" Style="{StaticResource SectionHead}" />
+                                    <DockPanel Margin="0,3">
+                                        <TextBlock x:Name="TxtBright" Text="0" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
+                                        <TextBlock Text="Bright" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
+                                        <Slider x:Name="InBright" Minimum="-100" Maximum="100" Value="0" ValueChanged="Color_Changed" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,3">
+                                        <TextBlock x:Name="TxtContrast" Text="100" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
+                                        <TextBlock Text="Contrast" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
+                                        <Slider x:Name="InContrast" Minimum="0" Maximum="300" Value="100" ValueChanged="Color_Changed" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,3">
+                                        <TextBlock x:Name="TxtSat" Text="100" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
+                                        <TextBlock Text="Saturate" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
+                                        <Slider x:Name="InSat" Minimum="0" Maximum="300" Value="100" ValueChanged="Color_Changed" />
+                                    </DockPanel>
+                                    <TextBlock Text="Filter presets" Style="{StaticResource Cap}" Margin="0,6,0,3" />
+                                    <WrapPanel>
+                                        <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="none" Content="Original" Margin="0,0,5,5" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="bw" Content="B&amp;W" Margin="0,0,5,5" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="warm" Content="Warm" Margin="0,0,5,5" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="cool" Content="Cool" Margin="0,0,5,5" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="vivid" Content="Vivid" Margin="0,0,5,5" Padding="7,4" />
+                                    </WrapPanel>
+
+                                    <TextBlock Text="Transition (to next clip)" Style="{StaticResource SectionHead}" />
+                                    <TextBlock x:Name="TxtInspTrans" Text="None" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11.5" Margin="0,0,0,3" />
+                                    <TextBlock Text="Pick one from the Transitions tab in the left sidebar." Style="{StaticResource Cap}" TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel x:Name="InspAudio" Visibility="Collapsed">
+                                    <TextBlock Text="Audio" Style="{StaticResource SectionHead}" />
+                                    <DockPanel Margin="0,3">
+                                        <TextBlock x:Name="TxtVol" Text="100%" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="46" TextAlignment="Right" />
+                                        <Slider x:Name="InVol" Minimum="0" Maximum="200" Value="100" ValueChanged="Vol_Changed" />
+                                    </DockPanel>
+                                    <StackPanel x:Name="InspAudioFade">
+                                        <DockPanel Margin="0,3"><TextBlock Text="Fade In (s)" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="88" /><TextBox x:Name="InAFadeIn" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+                                        <DockPanel Margin="0,3"><TextBlock Text="Fade Out (s)" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="88" /><TextBox x:Name="InAFadeOut" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel x:Name="InspText" Visibility="Collapsed">
+                                    <TextBlock Text="Text" Style="{StaticResource SectionHead}" />
+                                    <TextBlock Text="Add a title from the Text tab in the left sidebar, then edit its font, colour and position here."
+                                               Style="{StaticResource Cap}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
             </Grid>
 
-            <GridSplitter Grid.Column="4" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderSoftBrush}" />
-
-            <!-- Inspector -->
-            <Border Grid.Column="5" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1,0,0,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,10">
-                    <StackPanel x:Name="Inspector">
-                        <TextBlock x:Name="TxtInspTarget" Text="No clip selected" Foreground="{DynamicResource TextSecondaryBrush}"
-                                   FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
-
-                        <StackPanel x:Name="InspVideo" Visibility="Collapsed">
-                            <TextBlock Text="Transform" Style="{StaticResource SectionHead}" />
-                            <DockPanel Margin="0,3"><TextBlock Text="Scale %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InScale" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-                            <DockPanel Margin="0,3"><TextBlock Text="Position" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><StackPanel Orientation="Horizontal"><TextBox x:Name="InPosX" Style="{StaticResource Num}" Width="52" TextChanged="Insp_Changed" /><TextBlock Text=" x " Style="{StaticResource Cap}" /><TextBox x:Name="InPosY" Style="{StaticResource Num}" Width="52" TextChanged="Insp_Changed" /></StackPanel></DockPanel>
-                            <DockPanel Margin="0,3"><TextBlock Text="Rotate °" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InRotate" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-                            <DockPanel Margin="0,3"><TextBlock Text="Flip" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><StackPanel Orientation="Horizontal"><CheckBox x:Name="InFlipH" Content="H" Foreground="{DynamicResource TextSecondaryBrush}" Click="Insp_Changed" Margin="0,0,10,0" /><CheckBox x:Name="InFlipV" Content="V" Foreground="{DynamicResource TextSecondaryBrush}" Click="Insp_Changed" /></StackPanel></DockPanel>
-                            <DockPanel Margin="0,3"><TextBlock Text="Opacity %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InOpacity" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-
-                            <TextBlock Text="Speed" Style="{StaticResource SectionHead}" />
-                            <DockPanel Margin="0,3">
-                                <TextBlock x:Name="TxtSpeed" Text="1.00x" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="46" TextAlignment="Right" />
-                                <Slider x:Name="InSpeed" Minimum="0.25" Maximum="4" Value="1" ValueChanged="Speed_Changed" />
-                            </DockPanel>
-
-                            <TextBlock Text="Fade (seconds)" Style="{StaticResource SectionHead}" />
-                            <DockPanel Margin="0,3"><TextBlock Text="Fade In" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFadeIn" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-                            <DockPanel Margin="0,3"><TextBlock Text="Fade Out" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFadeOut" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-
-                            <TextBlock Text="Color" Style="{StaticResource SectionHead}" />
-                            <DockPanel Margin="0,3">
-                                <TextBlock x:Name="TxtBright" Text="0" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
-                                <TextBlock Text="Bright" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
-                                <Slider x:Name="InBright" Minimum="-100" Maximum="100" Value="0" ValueChanged="Color_Changed" />
-                            </DockPanel>
-                            <DockPanel Margin="0,3">
-                                <TextBlock x:Name="TxtContrast" Text="100" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
-                                <TextBlock Text="Contrast" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
-                                <Slider x:Name="InContrast" Minimum="0" Maximum="300" Value="100" ValueChanged="Color_Changed" />
-                            </DockPanel>
-                            <DockPanel Margin="0,3">
-                                <TextBlock x:Name="TxtSat" Text="100" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
-                                <TextBlock Text="Saturate" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="52" />
-                                <Slider x:Name="InSat" Minimum="0" Maximum="300" Value="100" ValueChanged="Color_Changed" />
-                            </DockPanel>
-                            <TextBlock Text="Filter presets" Style="{StaticResource Cap}" Margin="0,6,0,3" />
-                            <WrapPanel>
-                                <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="none" Content="Original" Margin="0,0,5,5" Padding="7,4" />
-                                <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="bw" Content="B&amp;W" Margin="0,0,5,5" Padding="7,4" />
-                                <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="warm" Content="Warm" Margin="0,0,5,5" Padding="7,4" />
-                                <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="cool" Content="Cool" Margin="0,0,5,5" Padding="7,4" />
-                                <Button Style="{StaticResource Tool}" Click="Preset_Click" Tag="vivid" Content="Vivid" Margin="0,0,5,5" Padding="7,4" />
-                            </WrapPanel>
-
-                            <TextBlock Text="Transition (to next clip)" Style="{StaticResource SectionHead}" />
-                            <TextBlock x:Name="TxtInspTrans" Text="None" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11.5" Margin="0,0,0,3" />
-                            <TextBlock Text="Pick one from the Transitions tab in the left rail." Style="{StaticResource Cap}" TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <StackPanel x:Name="InspAudio" Visibility="Collapsed">
-                            <TextBlock Text="Audio" Style="{StaticResource SectionHead}" />
-                            <DockPanel Margin="0,3">
-                                <TextBlock x:Name="TxtVol" Text="100%" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="46" TextAlignment="Right" />
-                                <Slider x:Name="InVol" Minimum="0" Maximum="200" Value="100" ValueChanged="Vol_Changed" />
-                            </DockPanel>
-                            <StackPanel x:Name="InspAudioFade">
-                                <DockPanel Margin="0,3"><TextBlock Text="Fade In (s)" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="88" /><TextBox x:Name="InAFadeIn" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-                                <DockPanel Margin="0,3"><TextBlock Text="Fade Out (s)" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="88" /><TextBox x:Name="InAFadeOut" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>
-                            </StackPanel>
-                        </StackPanel>
+            <!-- ============ EDITING TOOLBAR ============ -->
+            <Border Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                    BorderThickness="0,1,0,1" Padding="10,5">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                        <Button x:Name="BtnUndo" Style="{StaticResource Flat}" Click="Undo_Click" Content="↶ Undo" ToolTip="Undo (Ctrl+Z)" />
+                        <Button x:Name="BtnRedo" Style="{StaticResource Flat}" Click="Redo_Click" Content="↷ Redo" ToolTip="Redo (Ctrl+Y)" />
+                        <Border Width="1" Margin="6,3" Background="{DynamicResource BorderSoftBrush}" />
+                        <Button Style="{StaticResource Flat}" Click="Split_Click" Content="✂ Split" ToolTip="Split at playhead (S)" />
+                        <Button x:Name="BtnTrim" Style="{StaticResource Flat}" Click="Trim_Click" Content="⇥ Trim ▾" />
+                        <Button Style="{StaticResource Flat}" Click="Delete_Click" Content="🗑 Delete" ToolTip="Delete clip (Del)" />
+                        <Button Style="{StaticResource Flat}" Click="RippleDelete_Click" Content="⇤ Ripple" ToolTip="Delete &amp; close the gap" />
+                        <Button Style="{StaticResource Flat}" Click="Duplicate_Click" Content="⧉ Duplicate" ToolTip="Duplicate (Ctrl+D)" />
+                        <Border Width="1" Margin="6,3" Background="{DynamicResource BorderSoftBrush}" />
+                        <Button Style="{StaticResource Flat}" Click="Crop_Click" Content="◱ Crop" ToolTip="Crop (Properties ▸ Video)" />
+                        <Button Style="{StaticResource Flat}" Click="TextTool_Click" Content="T Text" ToolTip="Add text / title" />
+                        <Button Style="{StaticResource Flat}" Click="TransitionTool_Click" Content="⇄ Transition" ToolTip="Add a transition" />
+                        <Button Style="{StaticResource Flat}" Click="EffectTool_Click" Content="✦ Effect" ToolTip="Add an effect" />
                     </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                        <Button Style="{StaticResource Flat}" Click="AddTrack_Click" Content="⊞ Add Track" Margin="0,0,6,0" />
+                        <Button Style="{StaticResource Flat}" Click="Fit_Click" Content="⤢ Fit" ToolTip="Zoom to fit whole timeline" Margin="0,0,4,0" />
+                        <Button Style="{StaticResource Flat}" Click="ZoomOut_Click" Content="－" FontSize="14" ToolTip="Zoom out (-)" />
+                        <Slider x:Name="SldZoom" Minimum="0.2" Maximum="220" Value="50" Width="140" VerticalAlignment="Center"
+                                ValueChanged="Zoom_Changed" ToolTip="Timeline zoom (drag right to zoom in, left for whole-timeline overview)" />
+                        <Button Style="{StaticResource Flat}" Click="ZoomIn_Click" Content="＋" FontSize="14" ToolTip="Zoom in (+)" />
+                    </StackPanel>
+                    <Grid />
+                </DockPanel>
+            </Border>
+
+            <!-- ============ TIMELINE ============ -->
+            <Grid Grid.Row="3" Background="#14000000">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <!-- track headers -->
+                <ScrollViewer Grid.Column="0" x:Name="HeaderScroll" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled"
+                              Background="{DynamicResource SurfaceAltBrush}">
+                    <StackPanel x:Name="TrackHeaders" Margin="0,28,0,0" />
                 </ScrollViewer>
+                <!-- timeline content -->
+                <ScrollViewer Grid.Column="1" x:Name="TimelineScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                              ScrollChanged="TimelineScroll_ScrollChanged" PreviewMouseWheel="Timeline_PreviewMouseWheel"
+                              AllowDrop="True" DragOver="Timeline_DragOver" Drop="Timeline_Drop">
+                    <Grid x:Name="TimelineRoot" Background="Transparent" Focusable="True" FocusVisualStyle="{x:Null}"
+                          MouseLeftButtonDown="Timeline_MouseDown">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="28" />    <!-- ruler -->
+                            <RowDefinition Height="Auto" />  <!-- tracks -->
+                        </Grid.RowDefinitions>
+                        <Canvas x:Name="RulerCanvas" Grid.Row="0" Background="{DynamicResource SurfaceAltBrush}" Height="28" ClipToBounds="True"
+                                Cursor="Hand" ToolTip="Click or drag to move the playhead" MouseLeftButtonDown="Ruler_MouseDown" />
+                        <StackPanel x:Name="TracksPanel" Grid.Row="1" />
+                        <!-- playhead spans both rows -->
+                        <Canvas x:Name="OverlayCanvas" Grid.RowSpan="2" IsHitTestVisible="False" ClipToBounds="True" />
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ============ STATUS BAR ============ -->
+            <Border Grid.Row="4" Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                    BorderThickness="0,1,0,0" Padding="12,4">
+                <DockPanel>
+                    <TextBlock x:Name="TxtStatus" Style="{StaticResource Cap}" DockPanel.Dock="Left"
+                               Text="Duration 0:00   •   Playhead 0:00" />
+                    <TextBlock x:Name="TxtStatusRight" Style="{StaticResource Cap}" DockPanel.Dock="Right"
+                               Text="Zoom 50 px/s   •   30 fps   •   1920×1080" />
+                    <Grid />
+                </DockPanel>
+            </Border>
+
+            <!-- Trim popup -->
+            <Popup x:Name="TrimPopup" PlacementTarget="{Binding ElementName=BtnTrim}" Placement="Bottom"
+                   StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                        BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="230">
+                        <Button Style="{StaticResource Flat}" Click="TrimStart_Click" HorizontalContentAlignment="Left">
+                            <StackPanel><TextBlock Text="Trim Start" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" /><TextBlock Text="Remove from the beginning to the playhead" Style="{StaticResource Cap}" /></StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Flat}" Click="TrimMiddleHint_Click" HorizontalContentAlignment="Left">
+                            <StackPanel><TextBlock Text="Trim Middle (Split)" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" /><TextBlock Text="Cut out the middle: split, then delete the piece" Style="{StaticResource Cap}" /></StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Flat}" Click="TrimEnd_Click" HorizontalContentAlignment="Left">
+                            <StackPanel><TextBlock Text="Trim End" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" /><TextBlock Text="Remove from the playhead to the end" Style="{StaticResource Cap}" /></StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- Sort menu popup -->
+            <Popup x:Name="SortPopup" PlacementTarget="{Binding ElementName=BtnSort}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="170">
+                        <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Name" Content="Name (A–Z)" HorizontalContentAlignment="Left" />
+                        <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Duration" Content="Duration (longest)" HorizontalContentAlignment="Left" />
+                        <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Type" Content="Type" HorizontalContentAlignment="Left" />
+                        <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Added" Content="Recently added" HorizontalContentAlignment="Left" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- File menu popup -->
+            <Popup x:Name="FilePopup" PlacementTarget="{Binding ElementName=BtnFile}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="180">
+                        <Button Style="{StaticResource MenuItemBtn}" Click="NewProject_Click" Content="New Project" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="OpenProject_Click" Content="Open Project…" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="SaveProject_Click" Content="Save Project" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="SaveProjectAs_Click" Content="Save As…" />
+                        <Border Height="1" Margin="4,4" Background="{DynamicResource BorderSoftBrush}" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="GoHome_Click" Content="🏠 Home" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- Edit menu popup -->
+            <Popup x:Name="EditPopup" PlacementTarget="{Binding ElementName=BtnEdit}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="180">
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Undo_Click" Content="↶  Undo" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Redo_Click" Content="↷  Redo" />
+                        <Border Height="1" Margin="4,4" Background="{DynamicResource BorderSoftBrush}" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Split_Click" Content="✂  Split" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Duplicate_Click" Content="⧉  Duplicate" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Delete_Click" Content="🗑  Delete" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- View menu popup -->
+            <Popup x:Name="ViewPopup" PlacementTarget="{Binding ElementName=BtnMenuView}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="190">
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Fit_Click" Content="⤢  Fit timeline" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="ZoomIn_Click" Content="＋  Zoom in" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="ZoomOut_Click" Content="－  Zoom out" />
+                        <Border Height="1" Margin="4,4" Background="{DynamicResource BorderSoftBrush}" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="PanelCollapse_Click" Content="⇔  Hide / show panel" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Fullscreen_Click" Content="⛶  Fullscreen preview" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- Help menu popup -->
+            <Popup x:Name="HelpPopup" PlacementTarget="{Binding ElementName=BtnHelp}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="180">
+                        <Button Style="{StaticResource MenuItemBtn}" Click="Settings_Click" Content="⚙  Settings" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="About_Click" Content="ℹ  About" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- Export format popup -->
+            <Popup x:Name="ExportPopup" PlacementTarget="{Binding ElementName=BtnExport}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                    <StackPanel Width="160">
+                        <Button Style="{StaticResource MenuItemBtn}" Click="ExportMp4_Click" Content="Export MP4" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="ExportMkv_Click" Content="Export MKV" />
+                        <Button Style="{StaticResource MenuItemBtn}" Click="ExportAudio_Click" Content="Audio only (MP3)" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- Busy overlay -->
+            <Border x:Name="BusyOverlay" Grid.RowSpan="5" Background="#99000000" Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="400">
+                    <TextBlock x:Name="TxtBusy" Text="Exporting…" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                    <ProgressBar x:Name="PrgBusy" Height="6" Minimum="0" Maximum="100" />
+                    <Button x:Name="BtnCancel" Style="{StaticResource Tool}" Click="Cancel_Click" Margin="0,14,0,0" HorizontalAlignment="Center" Padding="18,7" Content="Cancel" />
+                </StackPanel>
             </Border>
         </Grid>
 
-        <!-- ============ EDITING TOOLBAR ============ -->
-        <Border Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
-                BorderThickness="0,1,0,1" Padding="10,5">
-            <DockPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                    <Button Style="{StaticResource Flat}" Click="AddTrack_Click" Content="⊞ Add Track" />
-                    <Border Width="1" Margin="6,3" Background="{DynamicResource BorderSoftBrush}" />
-                    <Button Style="{StaticResource Flat}" Click="Split_Click" Content="✂ Split" ToolTip="Split at playhead (S)" />
-                    <Button x:Name="BtnTrim" Style="{StaticResource Flat}" Click="Trim_Click" Content="⇥ Trim ▾" />
-                    <Button Style="{StaticResource Flat}" Click="Delete_Click" Content="🗑 Delete" ToolTip="Delete clip (Del)" />
-                    <Button Style="{StaticResource Flat}" Click="RippleDelete_Click" Content="⇤ Ripple Delete" ToolTip="Delete &amp; close the gap" />
-                    <Border Width="1" Margin="6,3" Background="{DynamicResource BorderSoftBrush}" />
-                    <Button Style="{StaticResource Flat}" Click="Duplicate_Click" Content="⧉ Duplicate" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                    <Button Style="{StaticResource Flat}" Click="Fit_Click" Content="⤢ Fit" ToolTip="Zoom to fit whole timeline" Margin="0,0,4,0" />
-                    <Button Style="{StaticResource Flat}" Click="ZoomOut_Click" Content="－" FontSize="14" ToolTip="Zoom out (-)" />
-                    <Slider x:Name="SldZoom" Minimum="0.2" Maximum="220" Value="50" Width="140" VerticalAlignment="Center"
-                            ValueChanged="Zoom_Changed" ToolTip="Timeline zoom (drag right to zoom in, left for whole-timeline overview)" />
-                    <Button Style="{StaticResource Flat}" Click="ZoomIn_Click" Content="＋" FontSize="14" ToolTip="Zoom in (+)" />
-                </StackPanel>
-                <Grid />
-            </DockPanel>
-        </Border>
-
-        <!-- ============ TIMELINE ============ -->
-        <Grid Grid.Row="3" Background="#14000000">
+        <!-- ============================== HOME VIEW ============================== -->
+        <Grid x:Name="HomeViewRoot" Visibility="Collapsed" Background="{DynamicResource WindowGradientBrush}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="230" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <!-- track headers -->
-            <ScrollViewer Grid.Column="0" x:Name="HeaderScroll" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled"
-                          Background="{DynamicResource SurfaceAltBrush}">
-                <StackPanel x:Name="TrackHeaders" Margin="0,28,0,0" />
-            </ScrollViewer>
-            <!-- timeline content -->
-            <ScrollViewer Grid.Column="1" x:Name="TimelineScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                          ScrollChanged="TimelineScroll_ScrollChanged" PreviewMouseWheel="Timeline_PreviewMouseWheel"
-                          AllowDrop="True" DragOver="Timeline_DragOver" Drop="Timeline_Drop">
-                <Grid x:Name="TimelineRoot" Background="Transparent" Focusable="True" FocusVisualStyle="{x:Null}"
-                      MouseLeftButtonDown="Timeline_MouseDown">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="28" />    <!-- ruler -->
-                        <RowDefinition Height="Auto" />  <!-- tracks -->
-                    </Grid.RowDefinitions>
-                    <Canvas x:Name="RulerCanvas" Grid.Row="0" Background="{DynamicResource SurfaceAltBrush}" Height="28" ClipToBounds="True"
-                            Cursor="Hand" ToolTip="Click or drag to move the playhead" MouseLeftButtonDown="Ruler_MouseDown" />
-                    <StackPanel x:Name="TracksPanel" Grid.Row="1" />
-                    <!-- playhead spans both rows -->
-                    <Canvas x:Name="OverlayCanvas" Grid.RowSpan="2" IsHitTestVisible="False" ClipToBounds="True" />
+
+            <!-- Left nav -->
+            <Border Grid.Column="0" Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="16,18,16,20">
+                        <TextBlock Text="🎬" FontSize="20" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="Light Video Editor" FontSize="14.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" Width="150" />
+                    </StackPanel>
+                    <Button DockPanel.Dock="Bottom" Style="{StaticResource HomeNavBtn}" Click="HomeSettings_Click" Content="⚙   Settings" Margin="8,2,8,14" />
+                    <StackPanel x:Name="HomeNav">
+                        <RadioButton x:Name="NavHome" Style="{StaticResource HomeNav}" GroupName="homenav" Tag="🏠" Content="Home" IsChecked="True" Checked="HomeNav_Changed" />
+                        <RadioButton x:Name="NavRecent" Style="{StaticResource HomeNav}" GroupName="homenav" Tag="🕓" Content="Recent Projects" Checked="HomeNav_Changed" />
+                        <RadioButton x:Name="NavTemplates" Style="{StaticResource HomeNav}" GroupName="homenav" Tag="▦" Content="Templates" Checked="HomeNav_Changed" />
+                        <RadioButton x:Name="NavSamples" Style="{StaticResource HomeNav}" GroupName="homenav" Tag="▶" Content="Sample Media" Checked="HomeNav_Changed" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== HOME page (create new + templates + settings) ===== -->
+            <Grid Grid.Column="1" x:Name="HomePage">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="340" />
+                </Grid.ColumnDefinitions>
+                <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="34,28">
+                    <StackPanel>
+                        <TextBlock Text="Welcome to Light Video Editor" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="Create a new project or open an existing one to start editing." FontSize="13"
+                                   Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,22" />
+
+                        <TextBlock Text="Create New Project" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12" />
+                        <StackPanel Orientation="Horizontal" x:Name="PresetRow">
+                            <RadioButton x:Name="PresetWide" Style="{StaticResource PresetCard}" GroupName="preset" Tag="1920x1080" IsChecked="True" Checked="PresetCard_Changed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="🎬" FontSize="26" HorizontalAlignment="Center" Foreground="{DynamicResource AccentTextBrush}" />
+                                    <TextBlock Text="New Project" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="{DynamicResource AccentTextBrush}" />
+                                    <TextBlock Text="16:9 Widescreen" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{DynamicResource AccentTextBrush}" Opacity="0.85" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="PresetPortrait" Style="{StaticResource PresetCard}" GroupName="preset" Tag="1080x1920" Checked="PresetCard_Changed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border Width="30" Height="46" CornerRadius="4" BorderBrush="{DynamicResource TextMutedBrush}" BorderThickness="2"><TextBlock Text="9:16" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" /></Border>
+                                    <TextBlock Text="Portrait" HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="1080 × 1920" FontSize="10" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="PresetSquare" Style="{StaticResource PresetCard}" GroupName="preset" Tag="1080x1080" Checked="PresetCard_Changed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border Width="40" Height="40" CornerRadius="4" BorderBrush="{DynamicResource TextMutedBrush}" BorderThickness="2"><TextBlock Text="1:1" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" /></Border>
+                                    <TextBlock Text="Square" HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="1080 × 1080" FontSize="10" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="PresetStd" Style="{StaticResource PresetCard}" GroupName="preset" Tag="1440x1080" Checked="PresetCard_Changed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border Width="48" Height="36" CornerRadius="4" BorderBrush="{DynamicResource TextMutedBrush}" BorderThickness="2"><TextBlock Text="4:3" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" /></Border>
+                                    <TextBlock Text="Standard" HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="1440 × 1080" FontSize="10" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="PresetCinema" Style="{StaticResource PresetCard}" GroupName="preset" Tag="2560x1080" Checked="PresetCard_Changed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border Width="54" Height="24" CornerRadius="4" BorderBrush="{DynamicResource TextMutedBrush}" BorderThickness="2"><TextBlock Text="21:9" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" /></Border>
+                                    <TextBlock Text="Cinema" HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="2560 × 1080" FontSize="10" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+
+                        <DockPanel Margin="0,26,0,12">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource Flat}" Click="OpenProject_Click" Content="Open Project…" Foreground="{DynamicResource AccentBrush}" />
+                            <TextBlock Text="Start with a Template" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <WrapPanel x:Name="TemplateStrip">
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Blank|1920x1080"><StackPanel><TextBlock Text="＋" FontSize="24" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Margin="0,10,0,0" /><TextBlock Text="Blank" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Travel Vlog|1920x1080"><StackPanel><TextBlock Text="🏔" FontSize="24" HorizontalAlignment="Center" Margin="0,10,0,0" /><TextBlock Text="Travel Vlog" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Birthday|1920x1080"><StackPanel><TextBlock Text="🎂" FontSize="24" HorizontalAlignment="Center" Margin="0,10,0,0" /><TextBlock Text="Birthday" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Cinematic Intro|2560x1080"><StackPanel><TextBlock Text="🎞" FontSize="24" HorizontalAlignment="Center" Margin="0,10,0,0" /><TextBlock Text="Cinematic" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="YouTube Intro|1920x1080"><StackPanel><TextBlock Text="▶" FontSize="24" HorizontalAlignment="Center" Foreground="#FF5252" Margin="0,10,0,0" /><TextBlock Text="YouTube" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Instagram Reel|1080x1920"><StackPanel><TextBlock Text="📸" FontSize="24" HorizontalAlignment="Center" Margin="0,10,0,0" /><TextBlock Text="Reel" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                            <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Slideshow|1920x1080"><StackPanel><TextBlock Text="🖼" FontSize="24" HorizontalAlignment="Center" Margin="0,10,0,0" /><TextBlock Text="Slideshow" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Project settings panel -->
+                <Border Grid.Column="1" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1,0,0,0">
+                    <StackPanel Margin="22,28">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                            <TextBlock Text="⚙" FontSize="16" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" />
+                            <TextBlock Text="Project Settings" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <TextBlock Text="Project Name" Style="{StaticResource Cap}" Margin="0,0,0,4" />
+                        <TextBox x:Name="HomeProjName" Text="My Video Project" Background="{DynamicResource WindowGradientBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="8,6" FontSize="13" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Frame Rate" Style="{StaticResource Cap}" Margin="0,0,0,4" />
+                        <ComboBox x:Name="HomeFps" SelectedIndex="1" Padding="8,5" Margin="0,0,0,16">
+                            <ComboBoxItem Content="24 fps" /><ComboBoxItem Content="30 fps" /><ComboBoxItem Content="60 fps" />
+                        </ComboBox>
+
+                        <TextBlock Text="Resolution" Style="{StaticResource Cap}" Margin="0,0,0,4" />
+                        <TextBox x:Name="HomeReso" Text="1920 × 1080 (Full HD)" IsReadOnly="True" Background="{DynamicResource WindowGradientBrush}"
+                                 Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="8,6" FontSize="12.5" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Background" Style="{StaticResource Cap}" Margin="0,0,0,4" />
+                        <ComboBox x:Name="HomeBg" SelectedIndex="0" Padding="8,5" Margin="0,0,0,22">
+                            <ComboBoxItem Content="Black" /><ComboBoxItem Content="White" /><ComboBoxItem Content="Dark Gray" />
+                        </ComboBox>
+
+                        <Button Style="{StaticResource Accent}" Click="CreateProject_Click" Content="Create Project" Padding="12,10" FontSize="13.5" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ===== RECENT PROJECTS page ===== -->
+            <Grid Grid.Column="1" x:Name="RecentPage" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="34,28,34,10">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Recent Projects" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="Quickly open your previous projects." FontSize="12.5" Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBox x:Name="RecentSearch" Width="240" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="8,6" FontSize="12"
+                                 TextChanged="RecentSearch_Changed" ToolTip="Search projects" />
+                    </StackPanel>
                 </Grid>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="34,0,34,24">
+                    <StackPanel>
+                        <ItemsControl x:Name="HomeRecentList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
+                                            CornerRadius="10" Margin="0,0,0,10" Padding="10" MouseLeftButtonUp="RecentItem_Click" Cursor="Hand">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Width="96" Height="56" CornerRadius="6" Background="#33000000" ClipToBounds="True">
+                                                <Grid>
+                                                    <Image Source="{Binding ThumbPath}" Stretch="UniformToFill" />
+                                                    <TextBlock Text="🎬" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.4" />
+                                                </Grid>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                <TextBlock Foreground="{DynamicResource TextMutedBrush}" FontSize="11.5" Margin="0,3,0,0">
+                                                    <Run Text="{Binding Width, Mode=OneWay}" /><Run Text=" × " /><Run Text="{Binding Height, Mode=OneWay}" /><Run Text="   •   " /><Run Text="{Binding Fps, Mode=OneWay}" /><Run Text=" fps" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Path, Mode=OneWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Opacity="0.7" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Style="{StaticResource Flat}" Click="RecentReveal_Click" Tag="{Binding Path}" Content="📂" FontSize="14" ToolTip="Reveal in folder" />
+                                                <Button Style="{StaticResource Flat}" Click="RecentRemove_Click" Tag="{Binding Path}" Content="✕" FontSize="13" ToolTip="Remove from list" />
+                                                <Button Style="{StaticResource Accent}" Click="RecentOpen_Click" Tag="{Binding Path}" Content="Open" Margin="8,0,0,0" Padding="16,7" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="RecentEmpty" Text="No recent projects yet. Create or open a project to see it here."
+                                   Foreground="{DynamicResource TextMutedBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,60,0,0" Visibility="Collapsed" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ===== TEMPLATES page ===== -->
+            <ScrollViewer Grid.Column="1" x:Name="TemplatesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="34,28">
+                <StackPanel>
+                    <TextBlock Text="Templates" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Text="Start from a ready-made layout. Each template opens a new project at the right aspect ratio."
+                               FontSize="12.5" Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,20" />
+                    <WrapPanel>
+                        <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Travel Vlog|1920x1080"><StackPanel><TextBlock Text="🏔" FontSize="26" HorizontalAlignment="Center" Margin="0,12,0,0" /><TextBlock Text="Travel Vlog" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                        <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Birthday|1920x1080"><StackPanel><TextBlock Text="🎂" FontSize="26" HorizontalAlignment="Center" Margin="0,12,0,0" /><TextBlock Text="Birthday" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                        <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Cinematic Intro|2560x1080"><StackPanel><TextBlock Text="🎞" FontSize="26" HorizontalAlignment="Center" Margin="0,12,0,0" /><TextBlock Text="Cinematic" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                        <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="YouTube Intro|1920x1080"><StackPanel><TextBlock Text="▶" FontSize="26" HorizontalAlignment="Center" Foreground="#FF5252" Margin="0,12,0,0" /><TextBlock Text="YouTube" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                        <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Instagram Reel|1080x1920"><StackPanel><TextBlock Text="📸" FontSize="26" HorizontalAlignment="Center" Margin="0,12,0,0" /><TextBlock Text="Reel" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                        <Button Style="{StaticResource TemplateCard}" Click="Template_Click" Tag="Slideshow|1920x1080"><StackPanel><TextBlock Text="🖼" FontSize="26" HorizontalAlignment="Center" Margin="0,12,0,0" /><TextBlock Text="Slideshow" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" /></StackPanel></Button>
+                    </WrapPanel>
+                </StackPanel>
             </ScrollViewer>
+
+            <!-- ===== SAMPLE MEDIA page ===== -->
+            <Grid Grid.Column="1" x:Name="SamplesPage" Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420">
+                    <TextBlock Text="▶" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
+                    <TextBlock Text="Sample Media" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,10,0,0" />
+                    <TextBlock Text="Start a project, then import your own videos, images and audio from the Media panel. Drag-and-drop is supported too."
+                               FontSize="12.5" Foreground="{DynamicResource TextMutedBrush}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,18" />
+                    <Button Style="{StaticResource Accent}" Click="CreateProject_Click" Content="Create a Project" Padding="16,9" HorizontalAlignment="Center" />
+                </StackPanel>
+            </Grid>
         </Grid>
-
-        <!-- ============ STATUS BAR ============ -->
-        <Border Grid.Row="4" Background="{DynamicResource HeaderGradientBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
-                BorderThickness="0,1,0,0" Padding="12,4">
-            <DockPanel>
-                <TextBlock x:Name="TxtStatus" Style="{StaticResource Cap}" DockPanel.Dock="Left"
-                           Text="Duration 0:00   •   Playhead 0:00" />
-                <TextBlock x:Name="TxtStatusRight" Style="{StaticResource Cap}" DockPanel.Dock="Right"
-                           Text="Zoom 50 px/s   •   30 fps   •   1920×1080" />
-                <Grid />
-            </DockPanel>
-        </Border>
-
-        <!-- Trim popup -->
-        <Popup x:Name="TrimPopup" PlacementTarget="{Binding ElementName=BtnTrim}" Placement="Bottom"
-               StaysOpen="False" AllowsTransparency="True">
-            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
-                    BorderThickness="1" CornerRadius="8" Padding="6">
-                <StackPanel Width="230">
-                    <Button Style="{StaticResource Flat}" Click="TrimStart_Click" HorizontalContentAlignment="Left">
-                        <StackPanel><TextBlock Text="Trim Start" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" /><TextBlock Text="Remove from the beginning to the playhead" Style="{StaticResource Cap}" /></StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource Flat}" Click="TrimMiddleHint_Click" HorizontalContentAlignment="Left">
-                        <StackPanel><TextBlock Text="Trim Middle (Split)" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" /><TextBlock Text="Cut out the middle: split, then delete the piece" Style="{StaticResource Cap}" /></StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource Flat}" Click="TrimEnd_Click" HorizontalContentAlignment="Left">
-                        <StackPanel><TextBlock Text="Trim End" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" /><TextBlock Text="Remove from the playhead to the end" Style="{StaticResource Cap}" /></StackPanel>
-                    </Button>
-                </StackPanel>
-            </Border>
-        </Popup>
-
-        <!-- Sort menu popup -->
-        <Popup x:Name="SortPopup" PlacementTarget="{Binding ElementName=BtnSort}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
-                <StackPanel Width="170">
-                    <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Name" Content="Name (A–Z)" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Duration" Content="Duration (longest)" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Type" Content="Type" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="Sort_Click" Tag="Added" Content="Recently added" HorizontalContentAlignment="Left" />
-                </StackPanel>
-            </Border>
-        </Popup>
-
-        <!-- File menu popup -->
-        <Popup x:Name="FilePopup" PlacementTarget="{Binding ElementName=BtnFile}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
-                <StackPanel Width="170">
-                    <Button Style="{StaticResource Flat}" Click="NewProject_Click" Content="New Project" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="OpenProject_Click" Content="Open Project…" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="SaveProject_Click" Content="Save Project" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="SaveProjectAs_Click" Content="Save As…" HorizontalContentAlignment="Left" />
-                </StackPanel>
-            </Border>
-        </Popup>
-
-        <!-- Export format popup -->
-        <Popup x:Name="ExportPopup" PlacementTarget="{Binding ElementName=BtnExport}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
-                <StackPanel Width="150">
-                    <Button Style="{StaticResource Flat}" Click="ExportMp4_Click" Content="Export MP4" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="ExportMkv_Click" Content="Export MKV" HorizontalContentAlignment="Left" />
-                    <Button Style="{StaticResource Flat}" Click="ExportAudio_Click" Content="Audio only (MP3)" HorizontalContentAlignment="Left" />
-                </StackPanel>
-            </Border>
-        </Popup>
-
-        <!-- Busy overlay -->
-        <Border x:Name="BusyOverlay" Grid.RowSpan="5" Background="#99000000" Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="400">
-                <TextBlock x:Name="TxtBusy" Text="Exporting…" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,10" />
-                <ProgressBar x:Name="PrgBusy" Height="6" Minimum="0" Maximum="100" />
-                <Button x:Name="BtnCancel" Style="{StaticResource Tool}" Click="Cancel_Click" Margin="0,14,0,0" HorizontalAlignment="Center" Padding="18,7" Content="Cancel" />
-            </StackPanel>
-        </Border>
     </Grid>
 </Window>

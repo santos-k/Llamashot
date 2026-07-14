@@ -2115,6 +2115,91 @@ internal static class Program
         }
         catch (Exception ex) { log.AppendLine($"\n[timeline-tr] EXCEPTION: {ex.Message}"); }
 
+        // ---- Speed ramp: one clip split into 3 pieces, middle sped up 2x (like the ramp UI) ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                new(clipA, TimeSpan.Zero, TimeSpan.FromSeconds(1), 1.0, 100, false, false, 0),          // 0-1s @1x -> 1.0s
+                new(clipA, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), 2.0, 100, false, false, 0), // 1-2s @2x -> 0.5s
+                new(clipA, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3), 1.0, 100, false, false, 0), // 2-3s @1x -> 1.0s
+            };
+            string rmpOut = Path.Combine(work, "timeline_ramp.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, new List<FileToolsService.TimelineAudioClip>(), false, rmpOut);
+            var info = await FileToolsService.GetVideoInfoAsync(rmpOut);
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 2.5) < 0.6;   // 1 + 0.5 + 1
+            log.AppendLine($"\n[timeline-ramp] {new FileInfo(rmpOut).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~2.5s {(durOk ? "OK" : "BAD")})");
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-ramp] EXCEPTION: {ex.Message}"); }
+
+        // ---- Timeline export at 720p with CRF 28: assert output dimensions are 1280x720 ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                new(clipA, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), 1.0, 100, false, false, 0),
+                new(clipB, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>();
+            string t720Out = Path.Combine(work, "timeline_720p.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, t720Out,
+                canvasW: 1280, canvasH: 720, crf: 28);
+            var info = await FileToolsService.GetVideoInfoAsync(t720Out);
+            bool sizeOk = info.width == 1280 && info.height == 720;
+            bool durOk  = Math.Abs(info.duration.TotalSeconds - 4.0) < 1.2;
+            log.AppendLine($"\n[timeline-720p] {new FileInfo(t720Out).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(size {(sizeOk ? "OK" : $"BAD want 1280x720")})  (dur {(durOk ? "OK" : "BAD")})  " +
+                           (sizeOk && durOk ? "OK" : "FAIL"));
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-720p] EXCEPTION: {ex.Message}"); }
+
+        // ---- ProjectLibrary: recent-projects persistence + dedup + ordering ----
+        string rpLine;
+        string rpTmp = Path.Combine(Path.GetTempPath(), $"llamashot_rp_test_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(rpTmp);
+
+            // Redirect ProjectLibrary to the temp dir — MUST happen before any call.
+            Llamashot.Core.VideoEditor.ProjectLibrary.DataDirOverride = rpTmp;
+
+            var t0 = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            var t1 = new DateTime(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc);   // newer
+
+            // Add the same path twice (different Modified) → dedup to 1 entry.
+            Llamashot.Core.VideoEditor.ProjectLibrary.Add(new(
+                @"C:\Projects\myfilm.llama", "MyFilm", 1920, 1080, 30, 120.0, null, t0));
+            Llamashot.Core.VideoEditor.ProjectLibrary.Add(new(
+                @"C:\Projects\myfilm.llama", "MyFilm Updated", 1920, 1080, 30, 125.0, null, t1));
+
+            // Add a second, older entry (t0).
+            Llamashot.Core.VideoEditor.ProjectLibrary.Add(new(
+                @"C:\Projects\shorts.llama", "Shorts", 1080, 1920, 60, 30.0, null, t0));
+
+            var result = Llamashot.Core.VideoEditor.ProjectLibrary.Load();
+
+            bool dedupeOk = result.Count == 2;  // not 3
+            bool orderOk  = result.Count >= 2
+                && string.Equals(result[0].Path, @"C:\Projects\shorts.llama", StringComparison.OrdinalIgnoreCase);
+
+            if (dedupeOk && orderOk)
+                rpLine = "\n[recent-projects] OK";
+            else
+                rpLine = $"\n[recent-projects] FAIL  count={result.Count} (want 2)  first={result[0].Path} (want shorts)";
+        }
+        catch (Exception ex)
+        {
+            rpLine = $"\n[recent-projects] EXCEPTION: {ex.Message}";
+        }
+        finally
+        {
+            // Always reset the override so it doesn't bleed into other tests.
+            Llamashot.Core.VideoEditor.ProjectLibrary.DataDirOverride = null;
+            try { Directory.Delete(rpTmp, recursive: true); } catch { }
+        }
+        log.AppendLine(rpLine);
+
         string outFile = Path.Combine(Dir, "videdit.txt");
         await File.WriteAllTextAsync(outFile, log.ToString());
         Console.WriteLine(log.ToString());

@@ -50,6 +50,10 @@ public partial class VideoEditorWindow : Window
     // undo/redo
     private readonly Stack<string> _undo = new(), _redo = new();
 
+    // autosave
+    private bool _dirty;
+    private readonly DispatcherTimer _autosaveTimer;
+
     public VideoEditorWindow()
     {
         InitializeComponent();
@@ -58,11 +62,17 @@ public partial class VideoEditorWindow : Window
         _project.Tracks.Add(new Track { Name = "Audio Track 1", Kind = TrackKind.Audio });
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += Timer_Tick;
+        _autosaveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+        _autosaveTimer.Tick += AutosaveTimer_Tick;
+        _autosaveTimer.Start();
         BuildTransitionPalette();
         _ready = true;
         RenderTimeline();
         UpdateInspector();
         UpdateUndoButtons();
+        Loaded += VideoEditorWindow_Loaded;
+        RefreshRecent();
+        SwitchView(false);   // start on the Home view
     }
 
     // =============================================================== media
@@ -157,6 +167,8 @@ public partial class VideoEditorWindow : Window
     private void Rail_Changed(object sender, RoutedEventArgs e)
     {
         if (!(sender is RadioButton rb) || TxtPanelTitle == null) return;
+        // Clicking any sidebar tab re-expands the panel if it was collapsed.
+        if (_panelCollapsed) SetPanelCollapsed(false);
         string tab = rb.Content?.ToString() ?? "Media";
         bool live = tab is "Media" or "Audio";
         bool isTrans = tab == "Transitions";
@@ -167,6 +179,251 @@ public partial class VideoEditorWindow : Window
         MediaGrid.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
         if (live) { UpdateMediaEmpty(); MediaGrid.Items.Filter = tab == "Audio" ? o => o is MediaAsset m && m.Kind == ClipKind.Audio : null; }
         else MediaEmpty.Visibility = Visibility.Collapsed;
+    }
+
+    // =============================================================== shell (menus / view switch / panel / property tabs)
+
+    private void EditMenu_Click(object sender, RoutedEventArgs e) => EditPopup.IsOpen = !EditPopup.IsOpen;
+    private void ViewMenu_Click(object sender, RoutedEventArgs e) => ViewPopup.IsOpen = !ViewPopup.IsOpen;
+    private void HelpMenu_Click(object sender, RoutedEventArgs e) => HelpPopup.IsOpen = !HelpPopup.IsOpen;
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        HelpPopup.IsOpen = false;
+        MessageBox.Show(this, "Light Video Editor\nPart of Llamashot.\n\nA lightweight timeline editor: import, trim, arrange, add transitions, effects and titles, then export.",
+            "About", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>Switches between the Home view and the Editor view.</summary>
+    private void SwitchView(bool showEditor)
+    {
+        EditorViewRoot.Visibility = showEditor ? Visibility.Visible : Visibility.Collapsed;
+        HomeViewRoot.Visibility = showEditor ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void GoHome_Click(object sender, RoutedEventArgs e)
+    {
+        FilePopup.IsOpen = false;
+        SwitchView(false);
+    }
+
+    // ---- collapsible content panel ----
+    private bool _panelCollapsed;
+    private GridLength _panelWidth = new(300);
+    private void PanelCollapse_Click(object sender, RoutedEventArgs e)
+    {
+        ViewPopup.IsOpen = false;
+        SetPanelCollapsed(!_panelCollapsed);
+    }
+    private void SetPanelCollapsed(bool collapsed)
+    {
+        if (collapsed && !_panelCollapsed) _panelWidth = ColPanel.Width;
+        _panelCollapsed = collapsed;
+        ColPanel.Width = collapsed ? new GridLength(0) : (_panelWidth.Value > 0 ? _panelWidth : new GridLength(300));
+        ColPanel.MinWidth = collapsed ? 0 : 200;
+        if (PanelSplitter != null) PanelSplitter.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        if (BtnPanelCollapse != null) BtnPanelCollapse.Content = collapsed ? "›" : "‹";
+    }
+
+    // ---- Properties Video / Audio / Text tabs ----
+    private void PropTab_Changed(object sender, RoutedEventArgs e)
+    {
+        if (sender is RadioButton rb) SetPropTab(rb.Tag?.ToString() ?? "Video");
+    }
+    private void SetPropTab(string tab)
+    {
+        if (InspVideo == null) return;
+        InspVideo.Visibility = tab == "Video" ? Visibility.Visible : Visibility.Collapsed;
+        InspAudio.Visibility = tab == "Audio" ? Visibility.Visible : Visibility.Collapsed;
+        InspText.Visibility = tab == "Text" ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ---- toolbar tools that route to a sidebar tab / property section ----
+    private void Crop_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sel != null && _selTrack?.Kind == TrackKind.Video && TabVideo != null) TabVideo.IsChecked = true;
+        else MessageBox.Show(this, "Select a video clip to crop it (Crop lives under Properties ▸ Video).");
+    }
+    private void TextTool_Click(object sender, RoutedEventArgs e) { if (RbText != null) RbText.IsChecked = true; }
+    private void TransitionTool_Click(object sender, RoutedEventArgs e) { if (RbTransitions != null) RbTransitions.IsChecked = true; }
+    private void EffectTool_Click(object sender, RoutedEventArgs e) { if (RbEffects != null) RbEffects.IsChecked = true; }
+
+    // ---- fullscreen (whole-window borderless; refined to preview-only in a later phase) ----
+    private WindowStyle _prevStyle;
+    private WindowState _prevState;
+    private bool _fullscreen;
+    private void Fullscreen_Click(object sender, RoutedEventArgs e)
+    {
+        ViewPopup.IsOpen = false;
+        if (!_fullscreen)
+        {
+            _prevStyle = WindowStyle; _prevState = WindowState;
+            WindowStyle = WindowStyle.None;
+            WindowState = WindowState.Normal;   // force a state change so Maximized covers the taskbar
+            WindowState = WindowState.Maximized;
+            _fullscreen = true;
+        }
+        else
+        {
+            WindowStyle = _prevStyle;
+            WindowState = _prevState;
+            _fullscreen = false;
+        }
+    }
+
+    // =============================================================== Home view
+
+    private int _pendingW = 1920, _pendingH = 1080;
+    private List<RecentProject> _recentAll = new();
+
+    private void HomeNav_Changed(object sender, RoutedEventArgs e)
+    {
+        if (HomePage == null) return; // during InitializeComponent
+        bool home = NavHome.IsChecked == true;
+        bool recent = NavRecent.IsChecked == true;
+        bool templates = NavTemplates.IsChecked == true;
+        bool samples = NavSamples.IsChecked == true;
+        HomePage.Visibility = home ? Visibility.Visible : Visibility.Collapsed;
+        RecentPage.Visibility = recent ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesPage.Visibility = templates ? Visibility.Visible : Visibility.Collapsed;
+        SamplesPage.Visibility = samples ? Visibility.Visible : Visibility.Collapsed;
+        if (recent) RefreshRecent();
+    }
+
+    private void PresetCard_Changed(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton rb || HomeReso == null) return;
+        var parts = (rb.Tag?.ToString() ?? "1920x1080").Split('x');
+        if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
+        {
+            _pendingW = w; _pendingH = h;
+            string label = (w, h) switch
+            {
+                (1920, 1080) => "1920 × 1080 (Full HD)",
+                (1080, 1920) => "1080 × 1920 (Portrait)",
+                (1080, 1080) => "1080 × 1080 (Square)",
+                (1440, 1080) => "1440 × 1080 (Standard)",
+                (2560, 1080) => "2560 × 1080 (Cinema)",
+                _ => $"{w} × {h}",
+            };
+            HomeReso.Text = label;
+        }
+    }
+
+    private int HomeFpsValue() => HomeFps?.SelectedIndex switch { 0 => 24, 2 => 60, _ => 30 };
+    private string HomeBgValue() => HomeBg?.SelectedIndex switch { 1 => "#FFFFFF", 2 => "#202020", _ => "#000000" };
+
+    private void CreateProject_Click(object sender, RoutedEventArgs e)
+    {
+        string name = string.IsNullOrWhiteSpace(HomeProjName?.Text) ? "Untitled Project" : HomeProjName.Text.Trim();
+        StartNewProject(name, _pendingW, _pendingH, HomeFpsValue(), HomeBgValue());
+        SwitchView(true);
+    }
+
+    private void Template_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b) return;
+        var spec = (b.Tag?.ToString() ?? "Blank|1920x1080").Split('|');
+        string name = spec.Length > 0 ? spec[0] : "Untitled Project";
+        int w = 1920, h = 1080;
+        if (spec.Length > 1)
+        {
+            var wh = spec[1].Split('x');
+            if (wh.Length == 2) { int.TryParse(wh[0], out w); int.TryParse(wh[1], out h); }
+        }
+        StartNewProject(name, w, h, 30, "#000000");
+        SwitchView(true);
+    }
+
+    /// <summary>Resets the (single, readonly) project to a blank one with the given settings.</summary>
+    private void StartNewProject(string name, int w, int h, int fps, string bg)
+    {
+        StopPlayback();
+        _project.Name = name;
+        _project.CanvasW = w; _project.CanvasH = h; _project.Fps = fps; _project.BackgroundColor = bg;
+        _project.Tracks.Clear();
+        _project.Tracks.Add(new Track { Name = "Video Track 1", Kind = TrackKind.Video });
+        _project.Tracks.Add(new Track { Name = "Audio Track 1", Kind = TrackKind.Audio });
+        _media.Clear(); UpdateMediaEmpty();
+        _undo.Clear(); _redo.Clear(); UpdateUndoButtons();
+        _projectPath = null; _dirty = false; _playhead = 0;
+        _loadedPath = null; _previewClip = null;
+        if (TxtProjName != null) TxtProjName.Text = name;
+        SelectClip(null, null);
+        RenderTimeline();
+    }
+
+    private void HomeSettings_Click(object sender, RoutedEventArgs e) => Settings_Click(sender, e);
+
+    // ---- recent projects ----
+    private void RefreshRecent()
+    {
+        _recentAll = ProjectLibrary.Load().ToList();
+        ApplyRecentFilter();
+    }
+    private void ApplyRecentFilter()
+    {
+        if (HomeRecentList == null) return;
+        string q = RecentSearch?.Text?.Trim() ?? "";
+        var view = string.IsNullOrEmpty(q)
+            ? _recentAll
+            : _recentAll.Where(r => r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                                    || r.Path.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        HomeRecentList.ItemsSource = view;
+        if (RecentEmpty != null) RecentEmpty.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void RecentSearch_Changed(object sender, TextChangedEventArgs e) => ApplyRecentFilter();
+
+    private void RecentItem_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is RecentProject rp) LoadProjectFile(rp.Path);
+    }
+    private void RecentOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is string path) LoadProjectFile(path);
+    }
+    private void RecentReveal_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is string path && File.Exists(path))
+            try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+    }
+    private void RecentRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is string path) { ProjectLibrary.Remove(path); RefreshRecent(); }
+    }
+
+    /// <summary>Loads a .lsproj from disk and switches to the editor. Offers to drop missing entries.</summary>
+    private void LoadProjectFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            if (MessageBox.Show(this, "That project file could not be found. Remove it from the recent list?",
+                    "Open project", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            { ProjectLibrary.Remove(path); RefreshRecent(); }
+            return;
+        }
+        try
+        {
+            Deserialize(File.ReadAllText(path));
+            _projectPath = path; _dirty = false;
+            if (TxtProjName != null) TxtProjName.Text = _project.Name;
+            RenderTimeline();
+            AddToRecent();
+            SwitchView(true);
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Open failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    /// <summary>Records the current saved project in the recent-projects library.</summary>
+    private void AddToRecent()
+    {
+        if (_projectPath == null) return;
+        try
+        {
+            ProjectLibrary.Add(new RecentProject(
+                _projectPath, _project.Name, _project.CanvasW, _project.CanvasH, _project.Fps,
+                _project.Duration.TotalSeconds, null, DateTime.Now));
+        }
+        catch { }
     }
 
     // =============================================================== media: sort / view / drag-out
@@ -812,14 +1069,15 @@ public partial class VideoEditorWindow : Window
         if (_sel == null)
         {
             TxtInspTarget.Text = "No clip selected";
-            InspVideo.Visibility = InspAudio.Visibility = Visibility.Collapsed;
+            TabVideo.IsChecked = TabAudio.IsChecked = TabText.IsChecked = false;
+            SetPropTab("");
         }
         else
         {
             TxtInspTarget.Text = _sel.Name;
             bool isVideo = _selTrack?.Kind == TrackKind.Video;
-            InspVideo.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
-            InspAudio.Visibility = Visibility.Visible;
+            if (isVideo) TabVideo.IsChecked = true; else TabAudio.IsChecked = true;
+            SetPropTab(isVideo ? "Video" : "Audio");
             if (isVideo)
             {
                 InScale.Text = ((int)_sel.Scale).ToString();
@@ -836,6 +1094,8 @@ public partial class VideoEditorWindow : Window
                 InSat.Value = _sel.Saturation; TxtSat.Text = ((int)_sel.Saturation).ToString();
                 TxtInspTrans.Text = _sel.Transition == "none" ? "None" : $"{TransitionLabel(_sel.Transition)} · {_sel.TransitionDur:0.0}s";
                 SldTransDur.Value = _sel.TransitionDur <= 0 ? 0.5 : _sel.TransitionDur;
+                InSpeedFrom.Text = "0:00";
+                InSpeedTo.Text = TimelineProject.Fmt(_sel.TimelineDuration);
             }
             InVol.Value = _sel.Volume; TxtVol.Text = $"{(int)_sel.Volume}%";
             InspAudioFade.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
@@ -910,7 +1170,73 @@ public partial class VideoEditorWindow : Window
         _sel.Volume = e.NewValue;
     }
 
+    // Speed ramp: apply a new speed to just the [from,to] section (in timeline seconds within the clip)
+    // by splitting the clip into up to three pieces and speeding only the middle one.
+    private void SpeedRange_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sel == null || _selTrack?.Kind != TrackKind.Video) { MessageBox.Show(this, "Select a video clip first."); return; }
+        double dur = _sel.TimelineDuration.TotalSeconds;
+        double from = ParseTime(InSpeedFrom.Text, 0);
+        double to = ParseTime(InSpeedTo.Text, dur);
+        double x = ParseD(InSpeedX.Text, 2);
+        from = Math.Clamp(from, 0, dur); to = Math.Clamp(to, 0, dur);
+        if (to - from < 0.1) { MessageBox.Show(this, "Pick a section of at least 0.1s (\"To\" after \"From\")."); return; }
+        if (x < 0.25 || x > 4) { MessageBox.Show(this, "Speed must be between 0.25× and 4×."); return; }
+        ApplySpeedRange(_sel, _selTrack, from, to, x);
+    }
+
+    private void ApplySpeedRange(ClipItem clip, Track track, double fromSec, double toSec, double speed)
+    {
+        PushUndo();
+        double dur = clip.TimelineDuration.TotalSeconds;
+        double origSpeed = clip.Speed <= 0 ? 1 : clip.Speed;
+        var srcIn = clip.SrcIn; var srcOut = clip.SrcOut;
+        var cut1 = srcIn + TimeSpan.FromSeconds(fromSec * origSpeed);   // source time at section start
+        var cut2 = srcIn + TimeSpan.FromSeconds(toSec * origSpeed);     // source time at section end
+        string outgoing = clip.Transition; double outgoingDur = clip.TransitionDur;
+
+        var pieces = new List<ClipItem>();
+        if (fromSec > 0.02) { var a = clip.Clone(); a.SrcIn = srcIn; a.SrcOut = cut1; a.Speed = origSpeed; a.Transition = "none"; pieces.Add(a); }
+        var b = clip.Clone(); b.SrcIn = cut1; b.SrcOut = cut2; b.Speed = speed; b.Transition = "none"; pieces.Add(b);
+        if (toSec < dur - 0.02) { var c = clip.Clone(); c.SrcIn = cut2; c.SrcOut = srcOut; c.Speed = origSpeed; c.Transition = "none"; pieces.Add(c); }
+
+        // Fades belong only to the outer edges; the original outgoing transition stays on the last piece.
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            if (i != 0) pieces[i].FadeIn = 0;
+            if (i != pieces.Count - 1) pieces[i].FadeOut = 0;
+        }
+        pieces[^1].Transition = outgoing; pieces[^1].TransitionDur = outgoingDur;
+
+        int idx = track.Clips.IndexOf(clip);
+        track.Clips.Remove(clip);
+        for (int i = 0; i < pieces.Count; i++) track.Clips.Insert(idx + i, pieces[i]);
+        ReflowTrack(track);
+        RenderTimeline();
+        SelectClip(b, track);
+    }
+
     private static double ParseD(string s, double fallback) => double.TryParse(s, out var v) ? v : fallback;
+
+    // Accepts plain seconds ("135"), mm:ss ("2:15") or h:mm:ss.
+    private static double ParseTime(string s, double fallback)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return fallback;
+        s = s.Trim();
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var ns = System.Globalization.NumberStyles.Any;
+        if (s.Contains(':'))
+        {
+            double total = 0;
+            foreach (var seg in s.Split(':'))
+            {
+                if (!double.TryParse(seg, ns, ci, out var val)) return fallback;
+                total = total * 60 + val;
+            }
+            return total;
+        }
+        return double.TryParse(s, ns, ci, out var v) ? v : fallback;
+    }
 
     // =============================================================== editing ops
 
@@ -1070,7 +1396,7 @@ public partial class VideoEditorWindow : Window
 
     // =============================================================== undo / redo
 
-    private void PushUndo() { _preDrag = ""; _undo.Push(Serialize()); _redo.Clear(); UpdateUndoButtons(); }
+    private void PushUndo() { _preDrag = ""; _undo.Push(Serialize()); _redo.Clear(); UpdateUndoButtons(); _dirty = true; }
     private void UpdateUndoButtons() { BtnUndo.IsEnabled = _undo.Count > 0; BtnRedo.IsEnabled = _redo.Count > 0; }
 
     private void Undo_Click(object sender, RoutedEventArgs e)
@@ -1088,13 +1414,91 @@ public partial class VideoEditorWindow : Window
         SelectClip(null, null); RenderTimeline(); UpdateUndoButtons();
     }
 
+    // =============================================================== autosave
+
+    /// <summary>
+    /// Returns the app-data directory using the same resolution as ProjectLibrary
+    /// (honours ProjectLibrary.DataDirOverride so tests can redirect it).
+    /// </summary>
+    private static string AutosaveDataDir =>
+        ProjectLibrary.DataDirOverride
+        ?? System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Llamashot");
+
+    private static string UnsavedRecoveryPath =>
+        System.IO.Path.Combine(AutosaveDataDir, "recovery.autosave");
+
+    private static string AutosavePathFor(string projectPath) => projectPath + ".autosave";
+
+    /// <summary>Deletes the autosave for a given project path, or the unsaved recovery if null.</summary>
+    private static void DeleteAutosave(string? projectPath)
+    {
+        try
+        {
+            string path = projectPath != null ? AutosavePathFor(projectPath) : UnsavedRecoveryPath;
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch { }
+    }
+
+    private void AutosaveTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_dirty) return;
+        bool hasClips = _project.Tracks.Any(t => t.Clips.Count > 0);
+        if (!hasClips) return;
+
+        try
+        {
+            string json = Serialize();
+            string target = _projectPath != null
+                ? AutosavePathFor(_projectPath)
+                : UnsavedRecoveryPath;
+
+            if (_projectPath == null)
+                Directory.CreateDirectory(AutosaveDataDir);
+
+            File.WriteAllText(target, json);
+            _dirty = false;
+            if (TxtAutosave != null)
+                TxtAutosave.Text = "Auto Save: " + DateTime.Now.ToString("HH:mm:ss");
+        }
+        catch { /* autosave must never crash or interrupt the user */ }
+    }
+
+    private void VideoEditorWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Check for an unsaved-project recovery file on startup
+        string recoveryPath = UnsavedRecoveryPath;
+        if (_projectPath == null && File.Exists(recoveryPath))
+        {
+            var res = MessageBox.Show(this,
+                "A more recent auto-saved version was found. Recover it?",
+                "Recover Auto-Save", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (res == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    Deserialize(File.ReadAllText(recoveryPath));
+                    RenderTimeline();
+                    _dirty = false;
+                }
+                catch { /* ignore corrupt recovery */ }
+            }
+            else
+            {
+                try { File.Delete(recoveryPath); } catch { }
+            }
+        }
+    }
+
     // =============================================================== project save / load
 
     private sealed record ClipDto(string Path, string Name, int Kind, double SrcIn, double SrcOut, double Start, double Speed, double Volume, double Scale, double PosX, double PosY, double Rotate, double Opacity, bool FlipH, bool FlipV, double SourceDur,
         double FadeIn = 0, double FadeOut = 0, double Brightness = 0, double Contrast = 100, double Saturation = 100,
         string Transition = "none", double TransitionDur = 0.5);
     private sealed record TrackDto(string Name, int Kind, List<ClipDto> Clips);
-    private sealed record ProjectDto(string Name, int Fps, int CanvasW, int CanvasH, List<TrackDto> Tracks);
+    private sealed record ProjectDto(string Name, int Fps, int CanvasW, int CanvasH, List<TrackDto> Tracks, string BackgroundColor = "#000000");
 
     private string Serialize()
     {
@@ -1102,7 +1506,8 @@ public partial class VideoEditorWindow : Window
             _project.Tracks.Select(t => new TrackDto(t.Name, (int)t.Kind,
                 t.Clips.Select(c => new ClipDto(c.SourcePath, c.Name, (int)c.Kind, c.SrcIn.TotalSeconds, c.SrcOut.TotalSeconds,
                     c.Start.TotalSeconds, c.Speed, c.Volume, c.Scale, c.PosX, c.PosY, c.Rotate, c.Opacity, c.FlipH, c.FlipV, c.SourceDuration.TotalSeconds,
-                    c.FadeIn, c.FadeOut, c.Brightness, c.Contrast, c.Saturation, c.Transition, c.TransitionDur)).ToList())).ToList());
+                    c.FadeIn, c.FadeOut, c.Brightness, c.Contrast, c.Saturation, c.Transition, c.TransitionDur)).ToList())).ToList(),
+            BackgroundColor: _project.BackgroundColor);
         return JsonSerializer.Serialize(dto);
     }
 
@@ -1111,7 +1516,7 @@ public partial class VideoEditorWindow : Window
         if (string.IsNullOrWhiteSpace(json)) return;
         var dto = JsonSerializer.Deserialize<ProjectDto>(json);
         if (dto == null) return;
-        _project.Name = dto.Name; _project.Fps = dto.Fps; _project.CanvasW = dto.CanvasW; _project.CanvasH = dto.CanvasH;
+        _project.Name = dto.Name; _project.Fps = dto.Fps; _project.CanvasW = dto.CanvasW; _project.CanvasH = dto.CanvasH; _project.BackgroundColor = dto.BackgroundColor;
         TxtProjName.Text = dto.Name;
         _project.Tracks.Clear();
         foreach (var t in dto.Tracks)
@@ -1158,7 +1563,36 @@ public partial class VideoEditorWindow : Window
         FilePopup.IsOpen = false;
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Llamashot project|*.lsproj|All files|*.*" };
         if (dlg.ShowDialog(this) != true) return;
-        try { Deserialize(File.ReadAllText(dlg.FileName)); RenderTimeline(); }
+        try
+        {
+            string chosenPath = dlg.FileName;
+            string autosavePath = chosenPath + ".autosave";
+            bool usedAutosave = false;
+            if (File.Exists(autosavePath) &&
+                File.GetLastWriteTime(autosavePath) > File.GetLastWriteTime(chosenPath))
+            {
+                var res = MessageBox.Show(this,
+                    "A more recent auto-saved version was found. Recover it?",
+                    "Recover Auto-Save", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (res == MessageBoxResult.Yes)
+                {
+                    Deserialize(File.ReadAllText(autosavePath));
+                    usedAutosave = true;
+                }
+                else
+                {
+                    try { File.Delete(autosavePath); } catch { }
+                }
+            }
+            if (!usedAutosave)
+                Deserialize(File.ReadAllText(chosenPath));
+            _projectPath = chosenPath;
+            _dirty = false;
+            if (TxtProjName != null) TxtProjName.Text = _project.Name;
+            RenderTimeline();
+            AddToRecent();
+            SwitchView(true);
+        }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Open failed", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
@@ -1168,7 +1602,14 @@ public partial class VideoEditorWindow : Window
         FilePopup.IsOpen = false;
         _project.Name = TxtProjName.Text;
         if (_projectPath == null) { SaveProjectAs_Click(sender, e); return; }
-        try { File.WriteAllText(_projectPath, Serialize()); }
+        try
+        {
+            File.WriteAllText(_projectPath, Serialize());
+            _dirty = false;
+            // Delete any lingering autosave for this path
+            DeleteAutosave(_projectPath);
+            AddToRecent();
+        }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Save failed", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
     private void SaveProjectAs_Click(object sender, RoutedEventArgs e)
@@ -1177,7 +1618,15 @@ public partial class VideoEditorWindow : Window
         _project.Name = TxtProjName.Text;
         var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Llamashot project|*.lsproj", FileName = _project.Name };
         if (dlg.ShowDialog(this) != true) return;
-        try { File.WriteAllText(dlg.FileName, Serialize()); _projectPath = dlg.FileName; }
+        try
+        {
+            File.WriteAllText(dlg.FileName, Serialize());
+            _projectPath = dlg.FileName;
+            _dirty = false;
+            // Delete the unsaved recovery file now that we have a real path
+            DeleteAutosave(null);
+            AddToRecent();
+        }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Save failed", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
@@ -1207,6 +1656,15 @@ public partial class VideoEditorWindow : Window
             .SelectMany(t => t.Clips)
             .Select(c => new FileToolsService.TimelineAudioClip(c.SourcePath, c.SrcIn, c.SrcOut, c.Start, c.Volume, c.FadeIn, c.FadeOut)).ToList();
 
+        // For video exports, ask the user for resolution/fps/quality before the save dialog.
+        int exportW = _project.CanvasW, exportH = _project.CanvasH, exportFps = _project.Fps, exportCrf = 18;
+        if (!audioOnly)
+        {
+            var optDlg = new ExportOptionsWindow(_project.CanvasW, _project.CanvasH, _project.Fps) { Owner = this };
+            if (optDlg.ShowDialog() != true) return;
+            exportW = optDlg.OutWidth; exportH = optDlg.OutHeight; exportFps = optDlg.Fps; exportCrf = optDlg.Crf;
+        }
+
         var dlg = new Microsoft.Win32.SaveFileDialog { Filter = $"{ext.ToUpper()}|*.{ext}", FileName = _project.Name.Replace(' ', '_') };
         if (dlg.ShowDialog(this) != true) return;
 
@@ -1216,7 +1674,8 @@ public partial class VideoEditorWindow : Window
         TxtBusy.Text = "Exporting video…"; PrgBusy.Value = 0; BusyOverlay.Visibility = Visibility.Visible;
         try
         {
-            await FileToolsService.ExportTimelineAsync(vids, auds, audioOnly, dlg.FileName, progress, _cts.Token);
+            await FileToolsService.ExportTimelineAsync(vids, auds, audioOnly, dlg.FileName, progress, _cts.Token,
+                canvasW: exportW, canvasH: exportH, fps: exportFps, crf: exportCrf);
             BusyOverlay.Visibility = Visibility.Collapsed;
             var info = new FileInfo(dlg.FileName);
             if (MessageBox.Show(this, $"Saved {Path.GetFileName(dlg.FileName)} ({FileToolsService.FormatFileSize(info.Length)}).\n\nOpen its folder?",

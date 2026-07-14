@@ -6,7 +6,7 @@ using System.Windows.Media.Imaging;
 namespace Llamashot.Core.VideoEditor;
 
 public enum TrackKind { Video, Audio }
-public enum ClipKind { Video, Audio, Image }
+public enum ClipKind { Video, Audio, Image, Text }
 
 /// <summary>A media asset imported into the project (shown in the Project Media panel).</summary>
 public sealed class MediaAsset : INotifyPropertyChanged
@@ -110,6 +110,7 @@ public sealed class TimelineProject
     public int Fps { get; set; } = 30;
     public int CanvasW { get; set; } = 1920;
     public int CanvasH { get; set; } = 1080;
+    public string BackgroundColor { get; set; } = "#000000";
     public ObservableCollection<Track> Tracks { get; } = new();
 
     public TimeSpan Duration

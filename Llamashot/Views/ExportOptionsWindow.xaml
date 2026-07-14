@@ -1,0 +1,80 @@
+<Window x:Class="Llamashot.Views.ExportOptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Export Options"
+        Width="400" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False"
+        PreviewKeyDown="Window_KeyDown">
+    <Window.Resources>
+        <ControlTemplate x:Key="DlgButton" TargetType="Button">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                    Padding="{TemplateBinding Padding}">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Bd" Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+        <Style TargetType="ComboBox" x:Key="Cmb">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Height" Value="36"/>
+        </Style>
+    </Window.Resources>
+    <Border Background="{DynamicResource WindowGradientBrush}" CornerRadius="12"
+            BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Margin="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.55" Color="#000020"/>
+        </Border.Effect>
+        <StackPanel Margin="24,22,24,22">
+            <!-- Title -->
+            <TextBlock Text="Export Options" FontSize="17" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,18"/>
+
+            <!-- Resolution -->
+            <TextBlock Text="RESOLUTION" FontSize="10.5" FontWeight="SemiBold"                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+            <ComboBox x:Name="CmbResolution" Style="{StaticResource Cmb}" Margin="0,0,0,14"
+                      SelectionChanged="CmbResolution_SelectionChanged"/>
+
+            <!-- Frame Rate -->
+            <TextBlock Text="FRAME RATE" FontSize="10.5" FontWeight="SemiBold"                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+            <ComboBox x:Name="CmbFps" Style="{StaticResource Cmb}" Margin="0,0,0,14"
+                      SelectionChanged="CmbFps_SelectionChanged"/>
+
+            <!-- Quality -->
+            <TextBlock Text="QUALITY" FontSize="10.5" FontWeight="SemiBold"                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+            <ComboBox x:Name="CmbQuality" Style="{StaticResource Cmb}" Margin="0,0,0,22"
+                      SelectionChanged="CmbQuality_SelectionChanged"/>
+
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" MinWidth="90" Padding="16,9"
+                        FontSize="13" FontWeight="SemiBold"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Background="{DynamicResource SurfaceAltBrush}"
+                        BorderThickness="1" BorderBrush="{DynamicResource BorderSoftBrush}"
+                        Cursor="Hand" Template="{StaticResource DlgButton}"
+                        IsCancel="True" Click="Cancel_Click" Margin="0,0,10,0"/>
+                <Button Content="Export" MinWidth="100" Padding="16,9"
+                        FontSize="13" FontWeight="SemiBold"
+                        Foreground="{DynamicResource AccentTextBrush}"
+                        Background="{DynamicResource AccentGradientBrush}"
+                        BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
+                        Cursor="Hand" Template="{StaticResource DlgButton}"
+                        IsDefault="True" Click="OK_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
