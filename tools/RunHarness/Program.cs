@@ -2120,6 +2120,33 @@ internal static class Program
         }
         catch (Exception ex) { log.AppendLine($"\n[timeline-fx] EXCEPTION: {ex.Message}"); }
 
+        // ---- Effect presets (Phase 3): Blur, B&W, Vintage — proves the effect filters are valid ffmpeg ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                // clipA: box blur 8
+                new(clipA, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    Blur: 8),
+                // clipB: black & white preset
+                new(clipB, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    EffectPreset: "bw"),
+                // clipC (no audio): vintage preset + a touch of blur
+                new(clipC, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    EffectPreset: "vintage", Blur: 3),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>();
+            string fx2Out = Path.Combine(work, "timeline_fx2.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, fx2Out);
+            var info = await FileToolsService.GetVideoInfoAsync(fx2Out);
+            // total = 2+2+2 = 6s
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 6.0) < 1.2;
+            bool exists = File.Exists(fx2Out) && new FileInfo(fx2Out).Length > 0;
+            log.AppendLine($"\n[timeline-fx2] {new FileInfo(fx2Out).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~6s {((durOk && exists) ? "OK" : "BAD")})  [blur/bw/vintage]");
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-fx2] EXCEPTION: {ex.Message}"); }
+
         // ---- Timeline export with transitions (xfade/acrossfade between clips) ----
         try
         {

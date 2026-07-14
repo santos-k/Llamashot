@@ -45,6 +45,8 @@ public sealed class ClipItem : INotifyPropertyChanged
     private string _transition = "none";
     private double _transitionDur = 0.5;
     private bool _flipH, _flipV;
+    private double _blur;
+    private string _effect = "none";
     // text (used when Kind == Text)
     private string _text = "Title";
     private string _fontFamily = "Segoe UI";
@@ -72,6 +74,10 @@ public sealed class ClipItem : INotifyPropertyChanged
     public double TransitionDur { get => _transitionDur; set { _transitionDur = value < 0 ? 0 : value; Raise(); } }
     public bool FlipH { get => _flipH; set { _flipH = value; Raise(); } }
     public bool FlipV { get => _flipV; set { _flipV = value; Raise(); } }
+    /// <summary>Gaussian/box blur amount (0..25); 0 = no blur.</summary>
+    public double Blur { get => _blur; set { _blur = Math.Clamp(value, 0, 25); Raise(); } }
+    /// <summary>Effect preset applied to the clip: "none", "bw", "vintage".</summary>
+    public string EffectPreset { get => _effect; set { _effect = string.IsNullOrEmpty(value) ? "none" : value; Raise(); } }
     // --- text ---
     public string Text { get => _text; set { _text = value ?? ""; Raise(); } }
     public string FontFamily { get => _fontFamily; set { _fontFamily = string.IsNullOrEmpty(value) ? "Segoe UI" : value; Raise(); } }
@@ -103,7 +109,8 @@ public sealed class ClipItem : INotifyPropertyChanged
         Scale = Scale, PosX = PosX, PosY = PosY, Rotate = Rotate, Opacity = Opacity,
         FadeIn = FadeIn, FadeOut = FadeOut, Brightness = Brightness, Contrast = Contrast, Saturation = Saturation,
         Transition = Transition, TransitionDur = TransitionDur,
-        FlipH = FlipH, FlipV = FlipV, Thumb = Thumb, Waveform = Waveform, WaveKey = WaveKey,
+        FlipH = FlipH, FlipV = FlipV, Blur = Blur, EffectPreset = EffectPreset,
+        Thumb = Thumb, Waveform = Waveform, WaveKey = WaveKey,
         Text = Text, FontFamily = FontFamily, FontSizePct = FontSizePct, FontColor = FontColor, Bold = Bold,
         AlignH = AlignH, AlignV = AlignV, PosXPct = PosXPct, PosYPct = PosYPct, BgBoxColor = BgBoxColor,
     };

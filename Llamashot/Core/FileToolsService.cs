@@ -1734,7 +1734,8 @@ public static class FileToolsService
         double Scale = 100, double PosX = 0, double PosY = 0, double Opacity = 100,
         double FadeIn = 0, double FadeOut = 0,
         double Brightness = 0, double Contrast = 100, double Saturation = 100,
-        string Transition = "none", double TransitionDur = 0);
+        string Transition = "none", double TransitionDur = 0,
+        double Blur = 0, string EffectPreset = "none");
 
     /// <summary>An audio-track clip placed at Start on the timeline.</summary>
     public sealed record TimelineAudioClip(string Path, TimeSpan SrcIn, TimeSpan SrcOut, TimeSpan Start, double Volume,
@@ -1850,6 +1851,19 @@ public static class FileToolsService
                 fg.Add($"scale={bw}:{bh}:force_original_aspect_ratio=decrease");
                 if (Math.Abs(bright) > 0.001 || Math.Abs(contrast - 1) > 0.001 || Math.Abs(sat - 1) > 0.001)
                     fg.Add($"eq=brightness={F(bright)}:contrast={F(contrast)}:saturation={F(sat)}");
+                // Effect presets (bw / vintage), then blur — applied after the manual color grade.
+                string effect = (c.EffectPreset ?? "none").Trim().ToLowerInvariant();
+                if (effect == "bw")
+                {
+                    fg.Add("hue=s=0");
+                }
+                else if (effect == "vintage")
+                {
+                    fg.Add("curves=r='0/0.05 0.5/0.55 1/0.95':b='0/0.05 0.5/0.45 1/0.9'");
+                    fg.Add("eq=saturation=0.75:contrast=0.95");
+                    fg.Add("vignette=PI/5");
+                }
+                if (c.Blur > 0.05) fg.Add($"boxblur={F(Math.Clamp(c.Blur, 0, 25))}:1");
                 if (op < 0.999) fg.Add($"format=rgba,colorchannelmixer=aa={F(op)}");
 
                 // Composite the (possibly scaled/offset) foreground onto a black canvas, then fade.

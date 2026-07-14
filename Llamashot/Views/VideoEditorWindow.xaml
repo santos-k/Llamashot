@@ -423,6 +423,22 @@
                             <Button Style="{StaticResource Tool}" Click="AddTextPreset_Click" Tag="lower" Content="Lower Third" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="10,9" />
                         </StackPanel>
                     </ScrollViewer>
+
+                    <!-- Effects presets (shown when the Effects tab is active) -->
+                    <ScrollViewer Grid.Row="2" x:Name="EffectsScroll" VerticalScrollBarVisibility="Auto" Padding="12,0,12,10" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Select a clip, then apply an effect."
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,10" />
+                            <Button Style="{StaticResource Tool}" Click="Effect_Click" Tag="none" Content="None" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="10,9" />
+                            <Button Style="{StaticResource Tool}" Click="Effect_Click" Tag="bw" Content="Black &amp; White" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="10,9" />
+                            <Button Style="{StaticResource Tool}" Click="Effect_Click" Tag="vintage" Content="Vintage" HorizontalAlignment="Stretch" Margin="0,0,0,10" Padding="10,9" />
+                            <DockPanel Margin="0,4,0,8">
+                                <TextBlock Text="Blur" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="40" />
+                                <TextBlock x:Name="TxtBlur" Text="0" Style="{StaticResource Cap}" DockPanel.Dock="Right" Width="34" TextAlignment="Right" />
+                                <Slider x:Name="SldBlur" Minimum="0" Maximum="25" Value="0" ValueChanged="Blur_Changed" />
+                            </DockPanel>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
 
                 <GridSplitter Grid.Column="2" Width="4" HorizontalAlignment="Stretch" x:Name="PanelSplitter" Background="{DynamicResource BorderSoftBrush}" />
