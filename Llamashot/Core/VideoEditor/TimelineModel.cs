@@ -47,6 +47,8 @@ public sealed class ClipItem : INotifyPropertyChanged
     private bool _flipH, _flipV;
     private double _blur;
     private string _effect = "none";
+    private bool _reverse;
+    private double _cropL, _cropT, _cropR, _cropB;
     // text (used when Kind == Text)
     private string _text = "Title";
     private string _fontFamily = "Segoe UI";
@@ -78,6 +80,13 @@ public sealed class ClipItem : INotifyPropertyChanged
     public double Blur { get => _blur; set { _blur = Math.Clamp(value, 0, 25); Raise(); } }
     /// <summary>Effect preset applied to the clip: "none", "bw", "vintage".</summary>
     public string EffectPreset { get => _effect; set { _effect = string.IsNullOrEmpty(value) ? "none" : value; Raise(); } }
+    /// <summary>Play the clip in reverse (video via reverse, audio via areverse).</summary>
+    public bool Reverse { get => _reverse; set { _reverse = value; Raise(); } }
+    /// <summary>Percentage cropped off each edge (0..45).</summary>
+    public double CropL { get => _cropL; set { _cropL = Math.Clamp(value, 0, 45); Raise(); } }
+    public double CropT { get => _cropT; set { _cropT = Math.Clamp(value, 0, 45); Raise(); } }
+    public double CropR { get => _cropR; set { _cropR = Math.Clamp(value, 0, 45); Raise(); } }
+    public double CropB { get => _cropB; set { _cropB = Math.Clamp(value, 0, 45); Raise(); } }
     // --- text ---
     public string Text { get => _text; set { _text = value ?? ""; Raise(); } }
     public string FontFamily { get => _fontFamily; set { _fontFamily = string.IsNullOrEmpty(value) ? "Segoe UI" : value; Raise(); } }
@@ -110,6 +119,7 @@ public sealed class ClipItem : INotifyPropertyChanged
         FadeIn = FadeIn, FadeOut = FadeOut, Brightness = Brightness, Contrast = Contrast, Saturation = Saturation,
         Transition = Transition, TransitionDur = TransitionDur,
         FlipH = FlipH, FlipV = FlipV, Blur = Blur, EffectPreset = EffectPreset,
+        Reverse = Reverse, CropL = CropL, CropT = CropT, CropR = CropR, CropB = CropB,
         Thumb = Thumb, Waveform = Waveform, WaveKey = WaveKey,
         Text = Text, FontFamily = FontFamily, FontSizePct = FontSizePct, FontColor = FontColor, Bold = Bold,
         AlignH = AlignH, AlignV = AlignV, PosXPct = PosXPct, PosYPct = PosYPct, BgBoxColor = BgBoxColor,

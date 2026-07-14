@@ -2210,6 +2210,44 @@ internal static class Program
         }
         catch (Exception ex) { log.AppendLine($"\n[timeline-720p] EXCEPTION: {ex.Message}"); }
 
+        // ---- Reverse: a clip played backwards (video reverse + audio areverse) ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                new(clipA, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0, Reverse: true),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>();
+            string revOut = Path.Combine(work, "timeline_reverse.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, revOut);
+            var info = await FileToolsService.GetVideoInfoAsync(revOut);
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 2.0) < 0.8;
+            bool ok = File.Exists(revOut) && new FileInfo(revOut).Length > 0 && durOk;
+            log.AppendLine($"\n[timeline-reverse] {new FileInfo(revOut).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~2.0s {(durOk ? "OK" : "BAD")})  {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-reverse] EXCEPTION: {ex.Message}"); }
+
+        // ---- Crop: 10% off each edge, then scaled back to the 1920x1080 canvas ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                new(clipA, TimeSpan.Zero, TimeSpan.FromSeconds(2), 1.0, 100, false, false, 0,
+                    CropL: 10, CropT: 10, CropR: 10, CropB: 10),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>();
+            string crpOut = Path.Combine(work, "timeline_crop.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, crpOut);
+            var info = await FileToolsService.GetVideoInfoAsync(crpOut);
+            bool sizeOk = info.width == 1920 && info.height == 1080;
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 2.0) < 0.8;
+            log.AppendLine($"\n[timeline-crop] {new FileInfo(crpOut).Length / 1024} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(size {(sizeOk ? "OK" : "BAD want 1920x1080")})  (dur {(durOk ? "OK" : "BAD")})  " +
+                           (sizeOk && durOk ? "OK" : "FAIL"));
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-crop] EXCEPTION: {ex.Message}"); }
+
         // ---- ProjectLibrary: recent-projects persistence + dedup + ordering ----
         string rpLine;
         string rpTmp = Path.Combine(Path.GetTempPath(), $"llamashot_rp_test_{Guid.NewGuid():N}");

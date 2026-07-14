@@ -1735,7 +1735,8 @@ public static class FileToolsService
         double FadeIn = 0, double FadeOut = 0,
         double Brightness = 0, double Contrast = 100, double Saturation = 100,
         string Transition = "none", double TransitionDur = 0,
-        double Blur = 0, string EffectPreset = "none");
+        double Blur = 0, string EffectPreset = "none",
+        bool Reverse = false, double CropL = 0, double CropT = 0, double CropR = 0, double CropB = 0);
 
     /// <summary>An audio-track clip placed at Start on the timeline.</summary>
     public sealed record TimelineAudioClip(string Path, TimeSpan SrcIn, TimeSpan SrcOut, TimeSpan Start, double Volume,
@@ -1842,12 +1843,17 @@ public static class FileToolsService
                 double fin = Math.Clamp(c.FadeIn, 0, outDur);
                 double fout = Math.Clamp(c.FadeOut, 0, outDur);
 
-                // Foreground: flip → rotate → speed → scale(by user %) → color grade → opacity.
+                // Foreground: crop → flip → rotate → speed → (reverse) → scale(by user %) → color grade → opacity.
                 var fg = new List<string>();
+                double cropL = Math.Clamp(c.CropL, 0, 45), cropT = Math.Clamp(c.CropT, 0, 45);
+                double cropR = Math.Clamp(c.CropR, 0, 45), cropB = Math.Clamp(c.CropB, 0, 45);
+                if (cropL + cropR + cropT + cropB > 0.01)
+                    fg.Add($"crop=w=iw*(1-{F((cropL + cropR) / 100)}):h=ih*(1-{F((cropT + cropB) / 100)}):x=iw*{F(cropL / 100)}:y=ih*{F(cropT / 100)}");
                 if (c.FlipH) fg.Add("hflip");
                 if (c.FlipV) fg.Add("vflip");
                 if (Math.Abs(c.Rotate) > 0.5) fg.Add($"rotate={F(c.Rotate * Math.PI / 180.0)}:fillcolor=black");
                 fg.Add($"setpts=PTS/{F(s)}");
+                if (c.Reverse) fg.Add("reverse");
                 fg.Add($"scale={bw}:{bh}:force_original_aspect_ratio=decrease");
                 if (Math.Abs(bright) > 0.001 || Math.Abs(contrast - 1) > 0.001 || Math.Abs(sat - 1) > 0.001)
                     fg.Add($"eq=brightness={F(bright)}:contrast={F(contrast)}:saturation={F(sat)}");
@@ -1885,6 +1891,7 @@ public static class FileToolsService
                 if (hasAudio)
                 {
                     var afl = new List<string> { AtempoChain(s), $"volume={F(Math.Clamp(c.Volume, 0, 400) / 100.0)}" };
+                    if (c.Reverse) afl.Insert(0, "areverse");
                     if (fin > 0.01) afl.Add($"afade=t=in:st=0:d={F(fin)}");
                     if (fout > 0.01) afl.Add($"afade=t=out:st={F(Math.Max(0, outDur - fout))}:d={F(fout)}");
                     fc = fcVideo + $";[0:a]{string.Join(",", afl)}[a]";

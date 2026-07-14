@@ -531,6 +531,13 @@
                                     </DockPanel>
                                     <TextBlock Text="Times are within this clip (e.g. 2:00 to 3:00). Splits the clip and speeds just that part."
                                                Style="{StaticResource Cap}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    <DockPanel Margin="0,7,0,0"><CheckBox x:Name="InReverse" Content="Reverse clip" Foreground="{DynamicResource TextSecondaryBrush}" Click="Reverse_Changed" /></DockPanel>
+
+                                    <TextBlock Text="Crop" Style="{StaticResource SectionHead}" />
+                                    <DockPanel Margin="0,3"><TextBlock Text="Left %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InCropL" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Crop_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Top %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InCropT" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Crop_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Right %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InCropR" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Crop_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Bottom %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InCropB" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Crop_Changed" /></DockPanel>
 
                                     <TextBlock Text="Fade (seconds)" Style="{StaticResource SectionHead}" />
                                     <DockPanel Margin="0,3"><TextBlock Text="Fade In" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFadeIn" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Insp_Changed" /></DockPanel>

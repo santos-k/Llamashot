@@ -33,8 +33,10 @@ public partial class VideoEditorWindow : Window
 
     private double _px = 50;               // pixels per second (zoom)
     private double _playhead;              // seconds
-    private ClipItem? _sel;                // selected clip
+    private ClipItem? _sel;                // selected clip (PRIMARY — drives the inspector)
     private Track? _selTrack;
+    private readonly HashSet<ClipItem> _selection = new();  // all selected clips (multi-select)
+    private readonly List<ClipItem> _clipboard = new();     // copy/paste buffer
     private ClipItem? _previewClip;        // clip currently loaded in the player
     private bool _isPlaying, _muted, _suppressInsp, _ready;
     private readonly DispatcherTimer _timer;
@@ -762,7 +764,8 @@ public partial class VideoEditorWindow : Window
     {
         double left = clip.Start.TotalSeconds * _px;
         double w = Math.Max(6, clip.TimelineDuration.TotalSeconds * _px);
-        bool selected = clip == _sel;
+        bool selected = _selection.Contains(clip);
+        bool primary = clip == _sel;
         bool isText = track.Kind == TrackKind.Text || clip.Kind == ClipKind.Text;
         var bg = isText
             ? new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#6D5AE6"), (Color)ColorConverter.ConvertFromString("#5647C4"), 90)
@@ -773,7 +776,7 @@ public partial class VideoEditorWindow : Window
         var border = new Border
         {
             Width = w, Height = RowH - 8, CornerRadius = new CornerRadius(5),
-            Background = bg, BorderThickness = new Thickness(2),
+            Background = bg, BorderThickness = new Thickness(selected && primary ? 3 : 2),
             BorderBrush = selected ? (Brush)FindResource("AccentBrush") : Brushes.Transparent,
             Cursor = Cursors.SizeAll, ClipToBounds = true, Tag = clip,
         };
@@ -857,6 +860,35 @@ public partial class VideoEditorWindow : Window
         TimelineRoot.Focus();
         var track = _project.Tracks.First(t => t.Clips.Contains(clip));
         if (track.Locked) return;
+
+        var mods = Keyboard.Modifiers;
+        if ((mods & ModifierKeys.Control) != 0)
+        {
+            // Ctrl+click: toggle this clip in the selection set (pure selection — no drag).
+            if (!_selection.Add(clip)) _selection.Remove(clip);
+            if (_selection.Contains(clip)) { _sel = clip; _selTrack = track; }
+            else { _sel = _selection.FirstOrDefault(); _selTrack = _sel == null ? null : _project.Tracks.FirstOrDefault(t => t.Clips.Contains(_sel)); }
+            RenderTimeline();
+            UpdateInspector();
+            e.Handled = true;
+            return;
+        }
+        if ((mods & ModifierKeys.Shift) != 0)
+        {
+            // Shift+click: range-select on the clicked clip's track between the current primary and this clip.
+            double a = (_sel != null && track.Clips.Contains(_sel)) ? _sel.Start.TotalSeconds : clip.Start.TotalSeconds;
+            double bb = clip.Start.TotalSeconds;
+            double lo = Math.Min(a, bb), hi = Math.Max(a, bb);
+            foreach (var c in track.Clips)
+                if (c.Start.TotalSeconds >= lo - 1e-6 && c.Start.TotalSeconds <= hi + 1e-6) _selection.Add(c);
+            _sel = clip; _selTrack = track;
+            RenderTimeline();
+            UpdateInspector();
+            e.Handled = true;
+            return;
+        }
+
+        // Plain click: single-select (resets _selection to just this clip) and proceed to drag.
         SelectClip(clip, track);
 
         string? grip = (e.OriginalSource as FrameworkElement)?.Tag as string;
@@ -1163,6 +1195,8 @@ public partial class VideoEditorWindow : Window
     private void SelectClip(ClipItem? clip, Track? track)
     {
         _sel = clip; _selTrack = track;
+        _selection.Clear();
+        if (clip != null) _selection.Add(clip);
         RenderTimeline();
         UpdateInspector();
     }
@@ -1216,6 +1250,11 @@ public partial class VideoEditorWindow : Window
                 TxtInspTrans.Text = _sel.Transition == "none" ? "None" : $"{TransitionLabel(_sel.Transition)} · {_sel.TransitionDur:0.0}s";
                 SldTransDur.Value = _sel.TransitionDur <= 0 ? 0.5 : _sel.TransitionDur;
                 SldBlur.Value = _sel.Blur; TxtBlur.Text = ((int)_sel.Blur).ToString();
+                InReverse.IsChecked = _sel.Reverse;
+                InCropL.Text = ((int)_sel.CropL).ToString();
+                InCropT.Text = ((int)_sel.CropT).ToString();
+                InCropR.Text = ((int)_sel.CropR).ToString();
+                InCropB.Text = ((int)_sel.CropB).ToString();
                 InSpeedFrom.Text = "0:00";
                 InSpeedTo.Text = TimelineProject.Fmt(_sel.TimelineDuration);
             }
@@ -1248,6 +1287,26 @@ public partial class VideoEditorWindow : Window
         }
     }
     private void Insp_Changed(object sender, TextChangedEventArgs e) => Insp_Changed(sender, (RoutedEventArgs)e);
+
+    private void Reverse_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressInsp || _sel == null || _selTrack?.Kind != TrackKind.Video) return;
+        if (InReverse.IsChecked == true && _sel.TimelineDuration.TotalSeconds > 30)
+            MessageBox.Show(this, "Reversing long clips can be slow and memory-heavy.", "Reverse clip", MessageBoxButton.OK, MessageBoxImage.Information);
+        PushUndo();
+        _sel.Reverse = InReverse.IsChecked == true;
+        RenderTimeline();
+    }
+
+    private void Crop_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressInsp || _sel == null || _selTrack?.Kind != TrackKind.Video) return;
+        _sel.CropL = ParseD(InCropL.Text, _sel.CropL);
+        _sel.CropT = ParseD(InCropT.Text, _sel.CropT);
+        _sel.CropR = ParseD(InCropR.Text, _sel.CropR);
+        _sel.CropB = ParseD(InCropB.Text, _sel.CropB);
+        RenderTimeline();
+    }
 
     private void Color_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -1427,6 +1486,22 @@ public partial class VideoEditorWindow : Window
 
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
+        if (_selection.Count > 1)
+        {
+            PushUndo();
+            var affected = new HashSet<Track>();
+            foreach (var c in _selection.ToList())
+            {
+                var t = _project.Tracks.FirstOrDefault(t => t.Clips.Contains(c));
+                if (t == null) continue;
+                t.Clips.Remove(c);
+                if (t.Kind != TrackKind.Text) affected.Add(t);
+            }
+            foreach (var t in affected) ReflowTrack(t);
+            SelectClip(null, null);
+            RenderTimeline();
+            return;
+        }
         if (_sel == null || _selTrack == null) return;
         PushUndo();
         var track = _selTrack;
@@ -1451,15 +1526,75 @@ public partial class VideoEditorWindow : Window
 
     private void Duplicate_Click(object sender, RoutedEventArgs e)
     {
+        if (_selection.Count > 1)
+        {
+            PushUndo();
+            var affected = new HashSet<Track>();
+            var clones = new List<ClipItem>();
+            foreach (var c in _selection.ToList())
+            {
+                var t = _project.Tracks.FirstOrDefault(t => t.Clips.Contains(c));
+                if (t == null) continue;
+                var dup = c.Clone();
+                dup.Start = c.End;
+                int i = t.Clips.IndexOf(c);
+                t.Clips.Insert(i + 1, dup);
+                clones.Add(dup);
+                if (t.Kind != TrackKind.Text) affected.Add(t);
+            }
+            foreach (var t in affected) ReflowTrack(t);
+            // select the new clones (primary = first)
+            _selection.Clear();
+            foreach (var c in clones) _selection.Add(c);
+            _sel = clones.FirstOrDefault();
+            _selTrack = _sel == null ? null : _project.Tracks.FirstOrDefault(t => t.Clips.Contains(_sel));
+            RenderTimeline();
+            UpdateInspector();
+            return;
+        }
         if (_sel == null || _selTrack == null) return;
         PushUndo();
-        var dup = _sel.Clone();
-        dup.Start = _sel.End;
-        int i = _selTrack.Clips.IndexOf(_sel);
-        _selTrack.Clips.Insert(i + 1, dup);
+        var one = _sel.Clone();
+        one.Start = _sel.End;
+        int idx = _selTrack.Clips.IndexOf(_sel);
+        _selTrack.Clips.Insert(idx + 1, one);
         ReflowTrack(_selTrack);
-        SelectClip(dup, _selTrack);
+        SelectClip(one, _selTrack);
         RenderTimeline();
+    }
+
+    // =============================================================== copy / paste
+
+    private void CopySelection()
+    {
+        _clipboard.Clear();
+        foreach (var c in _selection) _clipboard.Add(c.Clone());
+    }
+
+    private void PasteClipboard()
+    {
+        if (_clipboard.Count == 0) return;
+        PushUndo();
+        double anchor = _clipboard.Min(c => c.Start.TotalSeconds);
+        var affected = new HashSet<Track>();
+        var pasted = new List<ClipItem>();
+        foreach (var src in _clipboard)
+        {
+            var clone = src.Clone();
+            clone.Start = TimeSpan.FromSeconds(_playhead + (src.Start.TotalSeconds - anchor));
+            TrackKind wantKind = clone.Kind switch { ClipKind.Audio => TrackKind.Audio, ClipKind.Text => TrackKind.Text, _ => TrackKind.Video };
+            var track = _project.Tracks.FirstOrDefault(t => t.Kind == wantKind) ?? AddTrackInternal(wantKind);
+            track.Clips.Add(clone);
+            pasted.Add(clone);
+            if (track.Kind != TrackKind.Text) affected.Add(track);
+        }
+        foreach (var t in affected) ReflowTrack(t);
+        _selection.Clear();
+        foreach (var c in pasted) _selection.Add(c);
+        _sel = pasted.FirstOrDefault();
+        _selTrack = _sel == null ? null : _project.Tracks.FirstOrDefault(t => t.Clips.Contains(_sel));
+        RenderTimeline();
+        UpdateInspector();
     }
 
     private void Trim_Click(object sender, RoutedEventArgs e) => TrimPopup.IsOpen = !TrimPopup.IsOpen;
@@ -1630,7 +1765,8 @@ public partial class VideoEditorWindow : Window
         string Transition = "none", double TransitionDur = 0.5,
         string Text = "Title", string FontFamily = "Segoe UI", double FontSizePct = 8, string FontColor = "#FFFFFF", bool Bold = true,
         string AlignH = "C", string AlignV = "M", double PosXPct = 50, double PosYPct = 50, string? BgBoxColor = null,
-        double Blur = 0, string EffectPreset = "none");
+        double Blur = 0, string EffectPreset = "none",
+        bool Reverse = false, double CropL = 0, double CropT = 0, double CropR = 0, double CropB = 0);
     private sealed record TrackDto(string Name, int Kind, List<ClipDto> Clips);
     private sealed record ProjectDto(string Name, int Fps, int CanvasW, int CanvasH, List<TrackDto> Tracks, string BackgroundColor = "#000000");
 
@@ -1642,7 +1778,8 @@ public partial class VideoEditorWindow : Window
                     c.Start.TotalSeconds, c.Speed, c.Volume, c.Scale, c.PosX, c.PosY, c.Rotate, c.Opacity, c.FlipH, c.FlipV, c.SourceDuration.TotalSeconds,
                     c.FadeIn, c.FadeOut, c.Brightness, c.Contrast, c.Saturation, c.Transition, c.TransitionDur,
                     c.Text, c.FontFamily, c.FontSizePct, c.FontColor, c.Bold, c.AlignH, c.AlignV, c.PosXPct, c.PosYPct, c.BgBoxColor,
-                    c.Blur, c.EffectPreset)).ToList())).ToList(),
+                    c.Blur, c.EffectPreset,
+                    c.Reverse, c.CropL, c.CropT, c.CropR, c.CropB)).ToList())).ToList(),
             BackgroundColor: _project.BackgroundColor);
         return JsonSerializer.Serialize(dto);
     }
@@ -1670,6 +1807,7 @@ public partial class VideoEditorWindow : Window
                     Text = c.Text, FontFamily = c.FontFamily, FontSizePct = c.FontSizePct, FontColor = c.FontColor, Bold = c.Bold,
                     AlignH = c.AlignH, AlignV = c.AlignV, PosXPct = c.PosXPct, PosYPct = c.PosYPct, BgBoxColor = c.BgBoxColor,
                     Blur = c.Blur, EffectPreset = c.EffectPreset,
+                    Reverse = c.Reverse, CropL = c.CropL, CropT = c.CropT, CropR = c.CropR, CropB = c.CropB,
                 };
                 if (clip.Kind == ClipKind.Video && File.Exists(clip.SourcePath))
                     _ = LoadClipThumbAsync(clip);
@@ -1789,8 +1927,12 @@ public partial class VideoEditorWindow : Window
 
         var vids = videoTrackClips.Select(c => new FileToolsService.TimelineVideoClip(
             c.SourcePath, c.SrcIn, c.SrcOut, c.Speed, c.Volume, c.FlipH, c.FlipV, c.Rotate,
-            c.Scale, c.PosX, c.PosY, c.Opacity, c.FadeIn, c.FadeOut, c.Brightness, c.Contrast, c.Saturation,
-            c.Transition, c.TransitionDur, c.Blur, c.EffectPreset)).ToList();
+            Scale: c.Scale, PosX: c.PosX, PosY: c.PosY, Opacity: c.Opacity,
+            FadeIn: c.FadeIn, FadeOut: c.FadeOut,
+            Brightness: c.Brightness, Contrast: c.Contrast, Saturation: c.Saturation,
+            Transition: c.Transition, TransitionDur: c.TransitionDur,
+            Blur: c.Blur, EffectPreset: c.EffectPreset,
+            Reverse: c.Reverse, CropL: c.CropL, CropT: c.CropT, CropR: c.CropR, CropB: c.CropB)).ToList();
         var auds = _project.Tracks.Where(t => t.Kind == TrackKind.Audio && !t.Muted)
             .SelectMany(t => t.Clips)
             .Select(c => new FileToolsService.TimelineAudioClip(c.SourcePath, c.SrcIn, c.SrcOut, c.Start, c.Volume, c.FadeIn, c.FadeOut)).ToList();
@@ -1909,9 +2051,14 @@ public partial class VideoEditorWindow : Window
         else if (e.Key == Key.S && !ctrl) { Split_Click(this, new()); e.Handled = true; }
         else if (e.Key == Key.Delete || e.Key == Key.Back) { Delete_Click(this, new()); e.Handled = true; }
         else if (ctrl && e.Key == Key.D) { Duplicate_Click(this, new()); e.Handled = true; }
+        else if (ctrl && e.Key == Key.C) { CopySelection(); e.Handled = true; }
+        else if (ctrl && e.Key == Key.V) { PasteClipboard(); e.Handled = true; }
+        else if (ctrl && e.Key == Key.S) { SaveProject_Click(this, new()); e.Handled = true; }
         else if (ctrl && e.Key == Key.Z && !shift) { Undo_Click(this, new()); e.Handled = true; }
         else if (ctrl && (e.Key == Key.Y || (e.Key == Key.Z && shift))) { Redo_Click(this, new()); e.Handled = true; }
         else if (ctrl && e.Key == Key.E) { _ = DoExport("mp4", false); e.Handled = true; }
+        else if (e.Key == Key.F && !ctrl) { Fullscreen_Click(this, new()); e.Handled = true; }
+        else if (e.Key == Key.Escape && _fullscreen) { Fullscreen_Click(this, new()); e.Handled = true; }
         else if (e.Key == Key.OemPlus || e.Key == Key.Add) { ZoomIn_Click(this, new()); e.Handled = true; }
         else if (e.Key == Key.OemMinus || e.Key == Key.Subtract) { ZoomOut_Click(this, new()); e.Handled = true; }
         else if (e.Key == Key.Left || (e.Key == Key.OemComma)) { StepPlayhead(-1, shift, ctrl); e.Handled = true; }
