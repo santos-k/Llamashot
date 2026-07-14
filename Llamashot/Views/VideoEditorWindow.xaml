@@ -412,6 +412,17 @@
                             <WrapPanel x:Name="TransList" />
                         </StackPanel>
                     </ScrollViewer>
+
+                    <!-- Text / Titles presets (shown when the Text tab is active) -->
+                    <ScrollViewer Grid.Row="2" x:Name="TextScroll" VerticalScrollBarVisibility="Auto" Padding="12,0,12,10" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Add a title to the timeline, then style it under Properties ▸ Text."
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,10" />
+                            <Button Style="{StaticResource Tool}" Click="AddTextPreset_Click" Tag="title" Content="Title" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="10,9" />
+                            <Button Style="{StaticResource Tool}" Click="AddTextPreset_Click" Tag="subtitle" Content="Subtitle" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="10,9" />
+                            <Button Style="{StaticResource Tool}" Click="AddTextPreset_Click" Tag="lower" Content="Lower Third" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="10,9" />
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
 
                 <GridSplitter Grid.Column="2" Width="4" HorizontalAlignment="Stretch" x:Name="PanelSplitter" Background="{DynamicResource BorderSoftBrush}" />
@@ -553,8 +564,35 @@
 
                                 <StackPanel x:Name="InspText" Visibility="Collapsed">
                                     <TextBlock Text="Text" Style="{StaticResource SectionHead}" />
-                                    <TextBlock Text="Add a title from the Text tab in the left sidebar, then edit its font, colour and position here."
-                                               Style="{StaticResource Cap}" TextWrapping="Wrap" />
+                                    <TextBlock Text="Caption" Style="{StaticResource Cap}" Margin="0,0,0,3" />
+                                    <TextBox x:Name="InText" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="46"
+                                             Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                             BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" Padding="5,3" FontSize="12"
+                                             TextChanged="Text_Changed" Margin="0,0,0,6" />
+                                    <DockPanel Margin="0,3"><TextBlock Text="Font" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" />
+                                        <ComboBox x:Name="InFont" SelectionChanged="Text_Changed" HorizontalAlignment="Left" Width="140">
+                                            <ComboBoxItem Content="Segoe UI" /><ComboBoxItem Content="Arial" /><ComboBoxItem Content="Verdana" />
+                                            <ComboBoxItem Content="Georgia" /><ComboBoxItem Content="Impact" /><ComboBoxItem Content="Consolas" />
+                                        </ComboBox></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Size %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFontSize" Style="{StaticResource Num}" HorizontalAlignment="Left" TextChanged="Text_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Colour" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><TextBox x:Name="InFontColor" Style="{StaticResource Num}" Width="90" HorizontalAlignment="Left" TextChanged="Text_Changed" /></DockPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,3">
+                                        <Button Style="{StaticResource Tool}" Click="TextSwatch_Click" Tag="#FFFFFF" Content="White" Margin="0,0,5,0" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="TextSwatch_Click" Tag="#000000" Content="Black" Margin="0,0,5,0" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="TextSwatch_Click" Tag="#FFD400" Content="Yellow" Margin="0,0,5,0" Padding="7,4" />
+                                        <Button Style="{StaticResource Tool}" Click="TextSwatch_Click" Tag="#FF3B30" Content="Red" Padding="7,4" />
+                                    </StackPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Style" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><CheckBox x:Name="InBold" Content="Bold" Foreground="{DynamicResource TextSecondaryBrush}" Click="Text_Changed" /></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Position %" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><StackPanel Orientation="Horizontal"><TextBox x:Name="InTextX" Style="{StaticResource Num}" Width="52" TextChanged="Text_Changed" /><TextBlock Text=" x " Style="{StaticResource Cap}" /><TextBox x:Name="InTextY" Style="{StaticResource Num}" Width="52" TextChanged="Text_Changed" /></StackPanel></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Align H" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" />
+                                        <ComboBox x:Name="InAlignH" SelectionChanged="Text_Changed" HorizontalAlignment="Left" Width="100">
+                                            <ComboBoxItem Content="Left" /><ComboBoxItem Content="Center" /><ComboBoxItem Content="Right" />
+                                        </ComboBox></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Align V" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" />
+                                        <ComboBox x:Name="InAlignV" SelectionChanged="Text_Changed" HorizontalAlignment="Left" Width="100">
+                                            <ComboBoxItem Content="Top" /><ComboBoxItem Content="Middle" /><ComboBoxItem Content="Bottom" />
+                                        </ComboBox></DockPanel>
+                                    <DockPanel Margin="0,3"><TextBlock Text="Box" Style="{StaticResource Cap}" DockPanel.Dock="Left" Width="70" /><CheckBox x:Name="InTextBox" Content="Background box" Foreground="{DynamicResource TextSecondaryBrush}" Click="Text_Changed" /></DockPanel>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>

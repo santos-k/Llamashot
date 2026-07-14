@@ -2064,6 +2064,35 @@ internal static class Program
         }
         catch (Exception ex) { log.AppendLine($"\n[timeline] EXCEPTION: {ex.Message}"); }
 
+        // ---- Timeline export with a text/title overlay (drawtext) ----
+        try
+        {
+            var vids = new List<FileToolsService.TimelineVideoClip>
+            {
+                new(clipA, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), 2.0, 100, false, false, 0),
+                new(clipB, TimeSpan.Zero, TimeSpan.FromSeconds(3), 1.0, 100, true, false, 0),
+            };
+            var auds = new List<FileToolsService.TimelineAudioClip>
+            {
+                new(music, TimeSpan.Zero, TimeSpan.FromSeconds(4), TimeSpan.Zero, 60),
+            };
+            var texts = new List<FileToolsService.TimelineTextClip>
+            {
+                new("Hello", "Arial", 10, "#FFFFFF", true, "C", "M", 50, 50, null, 0.0, 2.0),
+            };
+            string txtOut = Path.Combine(work, "timeline_text.mp4");
+            await FileToolsService.ExportTimelineAsync(vids, auds, false, txtOut, textClips: texts);
+            var info = await FileToolsService.GetVideoInfoAsync(txtOut);
+            bool aud = await FileToolsService.HasAudioStreamAsync(txtOut);
+            long kb = new FileInfo(txtOut).Length / 1024;
+            bool durOk = Math.Abs(info.duration.TotalSeconds - 4.0) < 1.2;
+            bool sizeOk = kb > 20;   // drawtext re-encode produced a real file
+            log.AppendLine($"\n[timeline-text] {kb} KB  {info.width}x{info.height}  dur={info.duration.TotalSeconds:0.00}s " +
+                           $"(expect ~4s {(durOk ? "OK" : "BAD")})  audio={aud}  " +
+                           (durOk && sizeOk ? "OK" : "FAIL"));
+        }
+        catch (Exception ex) { log.AppendLine($"\n[timeline-text] EXCEPTION: {ex.Message}"); }
+
         // ---- Timeline export with transform (scale/pos/opacity) + color grade + fades ----
         try
         {

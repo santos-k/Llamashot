@@ -172,10 +172,12 @@ public partial class VideoEditorWindow : Window
         string tab = rb.Content?.ToString() ?? "Media";
         bool live = tab is "Media" or "Audio";
         bool isTrans = tab == "Transitions";
+        bool isText = tab == "Text";
         TxtPanelTitle.Text = live ? "Project Media" : tab;
         TransScroll.Visibility = isTrans ? Visibility.Visible : Visibility.Collapsed;
-        MediaScroll.Visibility = isTrans ? Visibility.Collapsed : Visibility.Visible;
-        TxtComingSoon.Visibility = (live || isTrans) ? Visibility.Collapsed : Visibility.Visible;
+        TextScroll.Visibility = isText ? Visibility.Visible : Visibility.Collapsed;
+        MediaScroll.Visibility = (isTrans || isText) ? Visibility.Collapsed : Visibility.Visible;
+        TxtComingSoon.Visibility = (live || isTrans || isText) ? Visibility.Collapsed : Visibility.Visible;
         MediaGrid.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
         if (live) { UpdateMediaEmpty(); MediaGrid.Items.Filter = tab == "Audio" ? o => o is MediaAsset m && m.Kind == ClipKind.Audio : null; }
         else MediaEmpty.Visibility = Visibility.Collapsed;
@@ -570,6 +572,58 @@ public partial class VideoEditorWindow : Window
         if (_sel.Transition != "none") { _sel.TransitionDur = e.NewValue; RenderTimeline(); }
     }
 
+    // =============================================================== text / titles
+
+    private void AddTextPreset_Click(object sender, RoutedEventArgs e)
+    {
+        PushUndo();
+        var track = _project.Tracks.FirstOrDefault(t => t.Kind == TrackKind.Text) ?? AddTrackInternal(TrackKind.Text);
+        string preset = (sender as FrameworkElement)?.Tag as string ?? "title";
+        var dur = TimeSpan.FromSeconds(3);
+        (string name, string text, double sizePct, double posY, string alignH, double posX) = preset switch
+        {
+            "subtitle" => ("Subtitle", "Subtitle", 6.0, 75.0, "C", 50.0),
+            "lower" => ("Lower Third", "Lower third", 5.0, 82.0, "L", 12.0),
+            _ => ("Title", "Your Title", 10.0, 50.0, "C", 50.0),
+        };
+        var clip = new ClipItem
+        {
+            Kind = ClipKind.Text, Name = name,
+            SourceDuration = dur, SrcIn = TimeSpan.Zero, SrcOut = dur,
+            Start = TimeSpan.FromSeconds(_playhead),
+            Text = text, FontSizePct = sizePct, PosYPct = posY, AlignH = alignH, PosXPct = posX,
+        };
+        track.Clips.Add(clip);   // text clips sit anywhere — no reflow
+        SelectClip(clip, track);
+        RenderTimeline();
+    }
+
+    private void Text_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressInsp || _sel == null || _sel.Kind != ClipKind.Text) return;
+        _sel.Text = InText.Text;
+        _sel.FontFamily = (InFont.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? _sel.FontFamily;
+        _sel.FontSizePct = ParseD(InFontSize.Text, _sel.FontSizePct);
+        if (!string.IsNullOrWhiteSpace(InFontColor.Text)) _sel.FontColor = InFontColor.Text.Trim();
+        _sel.Bold = InBold.IsChecked == true;
+        _sel.PosXPct = ParseD(InTextX.Text, _sel.PosXPct);
+        _sel.PosYPct = ParseD(InTextY.Text, _sel.PosYPct);
+        _sel.AlignH = (InAlignH.SelectedItem as ComboBoxItem)?.Content?.ToString() switch { "Left" => "L", "Right" => "R", _ => "C" };
+        _sel.AlignV = (InAlignV.SelectedItem as ComboBoxItem)?.Content?.ToString() switch { "Top" => "T", "Bottom" => "B", _ => "M" };
+        _sel.BgBoxColor = InTextBox.IsChecked == true ? "#80000000" : null;
+        _dirty = true;
+        RenderTimeline();
+    }
+    private void Text_Changed(object sender, TextChangedEventArgs e) => Text_Changed(sender, (RoutedEventArgs)e);
+    private void Text_Changed(object sender, SelectionChangedEventArgs e) => Text_Changed(sender, (RoutedEventArgs)e);
+
+    private void TextSwatch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sel == null || _sel.Kind != ClipKind.Text) return;
+        string hex = (sender as FrameworkElement)?.Tag as string ?? "#FFFFFF";
+        InFontColor.Text = hex;   // triggers Text_Changed
+    }
+
     // =============================================================== timeline render
 
     private double ContentWidth()
@@ -605,7 +659,7 @@ public partial class VideoEditorWindow : Window
             TrackHeaders.Children.Add(head);
 
             // row
-            var rowBg = track.Kind == TrackKind.Video ? "#1C1C22" : "#16221F";
+            var rowBg = track.Kind switch { TrackKind.Video => "#1C1C22", TrackKind.Audio => "#16221F", _ => "#241C2E" };
             var canvas = new Canvas { Height = RowH, Width = cw, Background = (Brush)new BrushConverter().ConvertFromString(rowBg)! };
             var rowBorder = new Border { Height = RowH, BorderBrush = (Brush)FindResource("BorderSoftBrush"), BorderThickness = new Thickness(0, 0, 0, 1), Child = canvas };
             TracksPanel.Children.Add(rowBorder);
@@ -689,9 +743,12 @@ public partial class VideoEditorWindow : Window
         double left = clip.Start.TotalSeconds * _px;
         double w = Math.Max(6, clip.TimelineDuration.TotalSeconds * _px);
         bool selected = clip == _sel;
-        var bg = track.Kind == TrackKind.Video
-            ? new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#2E4C6B"), (Color)ColorConverter.ConvertFromString("#24405C"), 90)
-            : new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#1F5C4E"), (Color)ColorConverter.ConvertFromString("#1A4C40"), 90);
+        bool isText = track.Kind == TrackKind.Text || clip.Kind == ClipKind.Text;
+        var bg = isText
+            ? new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#6D5AE6"), (Color)ColorConverter.ConvertFromString("#5647C4"), 90)
+            : track.Kind == TrackKind.Video
+                ? new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#2E4C6B"), (Color)ColorConverter.ConvertFromString("#24405C"), 90)
+                : new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#1F5C4E"), (Color)ColorConverter.ConvertFromString("#1A4C40"), 90);
 
         var border = new Border
         {
@@ -704,19 +761,31 @@ public partial class VideoEditorWindow : Window
         Canvas.SetTop(border, 4);
 
         var grid = new Grid();
-        if (clip.Thumb != null && track.Kind == TrackKind.Video)
+        if (!isText && clip.Thumb != null && track.Kind == TrackKind.Video)
             grid.Children.Add(new Image { Source = clip.Thumb, Stretch = Stretch.UniformToFill, Opacity = 0.5 });
-        if (track.Kind == TrackKind.Audio)
+        if (!isText && track.Kind == TrackKind.Audio)
         {
             if (clip.Waveform != null)
                 grid.Children.Add(new Image { Source = clip.Waveform, Stretch = Stretch.Fill, Opacity = 0.85 });
             EnsureWaveform(clip);
         }
-        grid.Children.Add(new TextBlock
+        if (isText)
         {
-            Text = clip.Name, Foreground = Brushes.White, FontSize = 11, Margin = new Thickness(8, 3, 8, 0),
-            VerticalAlignment = VerticalAlignment.Top, TextTrimming = TextTrimming.CharacterEllipsis,
-        });
+            grid.Children.Add(new TextBlock
+            {
+                Text = "T  " + clip.Text, Foreground = Brushes.White, FontSize = 11, FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+        }
+        else
+        {
+            grid.Children.Add(new TextBlock
+            {
+                Text = clip.Name, Foreground = Brushes.White, FontSize = 11, Margin = new Thickness(8, 3, 8, 0),
+                VerticalAlignment = VerticalAlignment.Top, TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+        }
         // resize grips
         var gl = new Rectangle { Width = GripW, Fill = Brushes.White, Opacity = 0.35, HorizontalAlignment = HorizontalAlignment.Left, Cursor = Cursors.SizeWE, Tag = "L" };
         var gr = new Rectangle { Width = GripW, Fill = Brushes.White, Opacity = 0.35, HorizontalAlignment = HorizontalAlignment.Right, Cursor = Cursors.SizeWE, Tag = "R" };
@@ -768,7 +837,7 @@ public partial class VideoEditorWindow : Window
     // Magnetic timeline: pack a track's clips contiguously from 0 in their current visual order.
     private void ReflowTrack(Track? t)
     {
-        if (t == null) return;
+        if (t == null || t.Kind == TrackKind.Text) return;   // text clips can overlap / sit anywhere
         var ordered = t.Clips.OrderBy(c => c.Start.TotalSeconds).ToList();
         t.Clips.Clear();
         double cursor = 0;
@@ -1072,6 +1141,23 @@ public partial class VideoEditorWindow : Window
             TabVideo.IsChecked = TabAudio.IsChecked = TabText.IsChecked = false;
             SetPropTab("");
         }
+        else if (_selTrack?.Kind == TrackKind.Text || _sel.Kind == ClipKind.Text)
+        {
+            TxtInspTarget.Text = _sel.Name;
+            TabVideo.IsChecked = TabAudio.IsChecked = false;
+            TabText.IsChecked = true;
+            SetPropTab("Text");
+            InText.Text = _sel.Text;
+            SelectComboByContent(InFont, _sel.FontFamily);
+            InFontSize.Text = _sel.FontSizePct.ToString("0.##");
+            InFontColor.Text = _sel.FontColor;
+            InBold.IsChecked = _sel.Bold;
+            InTextX.Text = ((int)_sel.PosXPct).ToString();
+            InTextY.Text = ((int)_sel.PosYPct).ToString();
+            SelectComboByContent(InAlignH, _sel.AlignH switch { "L" => "Left", "R" => "Right", _ => "Center" });
+            SelectComboByContent(InAlignV, _sel.AlignV switch { "T" => "Top", "B" => "Bottom", _ => "Middle" });
+            InTextBox.IsChecked = _sel.BgBoxColor != null;
+        }
         else
         {
             TxtInspTarget.Text = _sel.Name;
@@ -1218,6 +1304,14 @@ public partial class VideoEditorWindow : Window
 
     private static double ParseD(string s, double fallback) => double.TryParse(s, out var v) ? v : fallback;
 
+    private static void SelectComboByContent(ComboBox cb, string content)
+    {
+        foreach (var it in cb.Items)
+            if (it is ComboBoxItem ci && string.Equals(ci.Content?.ToString(), content, StringComparison.OrdinalIgnoreCase))
+            { cb.SelectedItem = ci; return; }
+        cb.SelectedIndex = 0;
+    }
+
     // Accepts plain seconds ("135"), mm:ss ("2:15") or h:mm:ss.
     private static double ParseTime(string s, double fallback)
     {
@@ -1243,7 +1337,8 @@ public partial class VideoEditorWindow : Window
     private Track AddTrackInternal(TrackKind kind)
     {
         int n = _project.Tracks.Count(t => t.Kind == kind) + 1;
-        var t = new Track { Name = $"{(kind == TrackKind.Video ? "Video" : "Audio")} Track {n}", Kind = kind };
+        string kindName = kind switch { TrackKind.Video => "Video", TrackKind.Audio => "Audio", _ => "Text" };
+        var t = new Track { Name = $"{kindName} Track {n}", Kind = kind };
         _project.Tracks.Add(t);
         return t;
     }
@@ -1496,7 +1591,9 @@ public partial class VideoEditorWindow : Window
 
     private sealed record ClipDto(string Path, string Name, int Kind, double SrcIn, double SrcOut, double Start, double Speed, double Volume, double Scale, double PosX, double PosY, double Rotate, double Opacity, bool FlipH, bool FlipV, double SourceDur,
         double FadeIn = 0, double FadeOut = 0, double Brightness = 0, double Contrast = 100, double Saturation = 100,
-        string Transition = "none", double TransitionDur = 0.5);
+        string Transition = "none", double TransitionDur = 0.5,
+        string Text = "Title", string FontFamily = "Segoe UI", double FontSizePct = 8, string FontColor = "#FFFFFF", bool Bold = true,
+        string AlignH = "C", string AlignV = "M", double PosXPct = 50, double PosYPct = 50, string? BgBoxColor = null);
     private sealed record TrackDto(string Name, int Kind, List<ClipDto> Clips);
     private sealed record ProjectDto(string Name, int Fps, int CanvasW, int CanvasH, List<TrackDto> Tracks, string BackgroundColor = "#000000");
 
@@ -1506,7 +1603,8 @@ public partial class VideoEditorWindow : Window
             _project.Tracks.Select(t => new TrackDto(t.Name, (int)t.Kind,
                 t.Clips.Select(c => new ClipDto(c.SourcePath, c.Name, (int)c.Kind, c.SrcIn.TotalSeconds, c.SrcOut.TotalSeconds,
                     c.Start.TotalSeconds, c.Speed, c.Volume, c.Scale, c.PosX, c.PosY, c.Rotate, c.Opacity, c.FlipH, c.FlipV, c.SourceDuration.TotalSeconds,
-                    c.FadeIn, c.FadeOut, c.Brightness, c.Contrast, c.Saturation, c.Transition, c.TransitionDur)).ToList())).ToList(),
+                    c.FadeIn, c.FadeOut, c.Brightness, c.Contrast, c.Saturation, c.Transition, c.TransitionDur,
+                    c.Text, c.FontFamily, c.FontSizePct, c.FontColor, c.Bold, c.AlignH, c.AlignV, c.PosXPct, c.PosYPct, c.BgBoxColor)).ToList())).ToList(),
             BackgroundColor: _project.BackgroundColor);
         return JsonSerializer.Serialize(dto);
     }
@@ -1531,6 +1629,8 @@ public partial class VideoEditorWindow : Window
                     Speed = c.Speed, Volume = c.Volume, Scale = c.Scale, PosX = c.PosX, PosY = c.PosY, Rotate = c.Rotate, Opacity = c.Opacity, FlipH = c.FlipH, FlipV = c.FlipV,
                     FadeIn = c.FadeIn, FadeOut = c.FadeOut, Brightness = c.Brightness, Contrast = c.Contrast, Saturation = c.Saturation,
                     Transition = c.Transition, TransitionDur = c.TransitionDur,
+                    Text = c.Text, FontFamily = c.FontFamily, FontSizePct = c.FontSizePct, FontColor = c.FontColor, Bold = c.Bold,
+                    AlignH = c.AlignH, AlignV = c.AlignV, PosXPct = c.PosXPct, PosYPct = c.PosYPct, BgBoxColor = c.BgBoxColor,
                 };
                 if (clip.Kind == ClipKind.Video && File.Exists(clip.SourcePath))
                     _ = LoadClipThumbAsync(clip);
@@ -1655,6 +1755,9 @@ public partial class VideoEditorWindow : Window
         var auds = _project.Tracks.Where(t => t.Kind == TrackKind.Audio && !t.Muted)
             .SelectMany(t => t.Clips)
             .Select(c => new FileToolsService.TimelineAudioClip(c.SourcePath, c.SrcIn, c.SrcOut, c.Start, c.Volume, c.FadeIn, c.FadeOut)).ToList();
+        var texts = _project.Tracks.Where(t => t.Kind == TrackKind.Text && !t.Hidden)
+            .SelectMany(t => t.Clips).Where(c => c.Kind == ClipKind.Text)
+            .Select(c => new FileToolsService.TimelineTextClip(c.Text, c.FontFamily, c.FontSizePct, c.FontColor, c.Bold, c.AlignH, c.AlignV, c.PosXPct, c.PosYPct, c.BgBoxColor, c.Start.TotalSeconds, c.End.TotalSeconds)).ToList();
 
         // For video exports, ask the user for resolution/fps/quality before the save dialog.
         int exportW = _project.CanvasW, exportH = _project.CanvasH, exportFps = _project.Fps, exportCrf = 18;
@@ -1675,7 +1778,7 @@ public partial class VideoEditorWindow : Window
         try
         {
             await FileToolsService.ExportTimelineAsync(vids, auds, audioOnly, dlg.FileName, progress, _cts.Token,
-                canvasW: exportW, canvasH: exportH, fps: exportFps, crf: exportCrf);
+                canvasW: exportW, canvasH: exportH, fps: exportFps, crf: exportCrf, textClips: texts);
             BusyOverlay.Visibility = Visibility.Collapsed;
             var info = new FileInfo(dlg.FileName);
             if (MessageBox.Show(this, $"Saved {Path.GetFileName(dlg.FileName)} ({FileToolsService.FormatFileSize(info.Length)}).\n\nOpen its folder?",

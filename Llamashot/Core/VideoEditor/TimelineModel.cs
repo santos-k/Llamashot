@@ -5,7 +5,7 @@ using System.Windows.Media.Imaging;
 
 namespace Llamashot.Core.VideoEditor;
 
-public enum TrackKind { Video, Audio }
+public enum TrackKind { Video, Audio, Text }
 public enum ClipKind { Video, Audio, Image, Text }
 
 /// <summary>A media asset imported into the project (shown in the Project Media panel).</summary>
@@ -45,6 +45,16 @@ public sealed class ClipItem : INotifyPropertyChanged
     private string _transition = "none";
     private double _transitionDur = 0.5;
     private bool _flipH, _flipV;
+    // text (used when Kind == Text)
+    private string _text = "Title";
+    private string _fontFamily = "Segoe UI";
+    private double _fontSizePct = 8;              // % of canvas height
+    private string _fontColor = "#FFFFFF";
+    private bool _bold = true;
+    private string _alignH = "C";                // L / C / R
+    private string _alignV = "M";                // T / M / B
+    private double _posXPct = 50, _posYPct = 50;  // centre point, 0..100 of canvas
+    private string? _bgBoxColor;                  // null = no background box
     public double Speed { get => _speed; set { _speed = value <= 0 ? 1 : value; Raise(); Raise(nameof(TimelineDuration)); Raise(nameof(End)); } }
     public double Volume { get => _volume; set { _volume = value; Raise(); } }
     public double Scale { get => _scale; set { _scale = value; Raise(); } }
@@ -62,6 +72,17 @@ public sealed class ClipItem : INotifyPropertyChanged
     public double TransitionDur { get => _transitionDur; set { _transitionDur = value < 0 ? 0 : value; Raise(); } }
     public bool FlipH { get => _flipH; set { _flipH = value; Raise(); } }
     public bool FlipV { get => _flipV; set { _flipV = value; Raise(); } }
+    // --- text ---
+    public string Text { get => _text; set { _text = value ?? ""; Raise(); } }
+    public string FontFamily { get => _fontFamily; set { _fontFamily = string.IsNullOrEmpty(value) ? "Segoe UI" : value; Raise(); } }
+    public double FontSizePct { get => _fontSizePct; set { _fontSizePct = Math.Clamp(value, 1, 50); Raise(); } }
+    public string FontColor { get => _fontColor; set { _fontColor = string.IsNullOrEmpty(value) ? "#FFFFFF" : value; Raise(); } }
+    public bool Bold { get => _bold; set { _bold = value; Raise(); } }
+    public string AlignH { get => _alignH; set { _alignH = string.IsNullOrEmpty(value) ? "C" : value; Raise(); } }
+    public string AlignV { get => _alignV; set { _alignV = string.IsNullOrEmpty(value) ? "M" : value; Raise(); } }
+    public double PosXPct { get => _posXPct; set { _posXPct = Math.Clamp(value, 0, 100); Raise(); } }
+    public double PosYPct { get => _posYPct; set { _posYPct = Math.Clamp(value, 0, 100); Raise(); } }
+    public string? BgBoxColor { get => _bgBoxColor; set { _bgBoxColor = value; Raise(); } }
 
     private BitmapImage? _thumb;
     public BitmapImage? Thumb { get => _thumb; set { _thumb = value; Raise(); } }
@@ -83,6 +104,8 @@ public sealed class ClipItem : INotifyPropertyChanged
         FadeIn = FadeIn, FadeOut = FadeOut, Brightness = Brightness, Contrast = Contrast, Saturation = Saturation,
         Transition = Transition, TransitionDur = TransitionDur,
         FlipH = FlipH, FlipV = FlipV, Thumb = Thumb, Waveform = Waveform, WaveKey = WaveKey,
+        Text = Text, FontFamily = FontFamily, FontSizePct = FontSizePct, FontColor = FontColor, Bold = Bold,
+        AlignH = AlignH, AlignV = AlignV, PosXPct = PosXPct, PosYPct = PosYPct, BgBoxColor = BgBoxColor,
     };
 
     public event PropertyChangedEventHandler? PropertyChanged;

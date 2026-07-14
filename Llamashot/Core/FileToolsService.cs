@@ -1740,6 +1740,45 @@ public static class FileToolsService
     public sealed record TimelineAudioClip(string Path, TimeSpan SrcIn, TimeSpan SrcOut, TimeSpan Start, double Volume,
         double FadeIn = 0, double FadeOut = 0);
 
+    /// <summary>A text/title overlay shown between StartSec and EndSec on the timeline (rendered via drawtext).</summary>
+    public sealed record TimelineTextClip(string Text, string FontFamily, double FontSizePct, string FontColor,
+        bool Bold, string AlignH, string AlignV, double PosXPct, double PosYPct, string? BgBoxColor,
+        double StartSec, double EndSec);
+
+    // Picks a Windows TTF for a drawtext overlay, honouring bold; falls back to Arial if missing.
+    private static string DrawtextFontFile(string family, bool bold)
+    {
+        string fontsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Fonts");
+        string file = (family ?? "").Trim().ToLowerInvariant() switch
+        {
+            "impact" => "impact.ttf",
+            "georgia" => bold ? "georgiab.ttf" : "georgia.ttf",
+            "consolas" => bold ? "consolab.ttf" : "consola.ttf",
+            "verdana" => bold ? "verdanab.ttf" : "verdana.ttf",
+            _ => bold ? "arialbd.ttf" : "arial.ttf",
+        };
+        string full = Path.Combine(fontsDir, file);
+        if (!File.Exists(full))
+        {
+            full = Path.Combine(fontsDir, bold ? "arialbd.ttf" : "arial.ttf");
+            if (!File.Exists(full)) full = Path.Combine(fontsDir, "arial.ttf");
+        }
+        return full;
+    }
+
+    // Converts "#RRGGBB" / "#AARRGGBB" to a drawtext colour (0xRRGGBB); named colours pass through.
+    private static string DrawtextColor(string hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return "white";
+        hex = hex.Trim();
+        if (!hex.StartsWith("#")) return hex;
+        hex = hex.Substring(1);
+        if (hex.Length == 8) hex = hex.Substring(2);   // drop leading alpha, keep RRGGBB
+        if (hex.Length != 6) return "white";
+        return "0x" + hex.ToUpperInvariant();
+    }
+
     // Builds an atempo filter chain covering 0.25..4x (atempo only accepts 0.5..2 per stage).
     private static string AtempoChain(double speed)
     {
@@ -1763,7 +1802,8 @@ public static class FileToolsService
         string outputPath,
         IProgress<int>? progress = null,
         CancellationToken ct = default,
-        int canvasW = 1920, int canvasH = 1080, int fps = 30, int crf = 20)
+        int canvasW = 1920, int canvasH = 1080, int fps = 30, int crf = 20,
+        IReadOnlyList<TimelineTextClip>? textClips = null)
     {
         if (videoClips == null || videoClips.Count == 0)
             throw new ArgumentException("Add at least one clip to the video track before exporting.");
@@ -1946,6 +1986,50 @@ public static class FileToolsService
                     ? $"-map \"[aout]\" -c:a libmp3lame -q:a 2"
                     : $"-map 0:v:0 -map \"[aout]\" -c:v copy -c:a aac -ar 48000 -ac 2";
                 await RunFFmpegAsync($"{inputs} -filter_complex \"{fc}\" {map} \"{outputPath}\"", null, finalProg, ct);
+            }
+
+            // Final drawtext pass: burn any text/title overlays onto the finished video.
+            var validText = (textClips ?? Array.Empty<TimelineTextClip>())
+                .Where(t => !string.IsNullOrEmpty(t.Text) && t.EndSec > t.StartSec).ToList();
+            if (!audioOnly && validText.Count > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                var drawParts = new List<string>();
+                for (int i = 0; i < validText.Count; i++)
+                {
+                    var t = validText[i];
+                    // Write the caption to a UTF-8 temp file so we don't have to escape the text itself.
+                    string txtFile = Path.Combine(workDir, $"text_{i:D4}.txt");
+                    await File.WriteAllTextAsync(txtFile, t.Text, new UTF8Encoding(false), ct);
+                    string txtPath = txtFile.Replace('\\', '/').Replace(":", "\\:");
+
+                    string font = DrawtextFontFile(t.FontFamily, t.Bold);
+                    string fontPath = font.Replace('\\', '/').Replace(":", "\\:");
+
+                    int fontSize = Math.Max(1, (int)Math.Round(Math.Clamp(t.FontSizePct, 1, 50) / 100.0 * canvasH));
+                    string color = DrawtextColor(t.FontColor);
+                    double px = Math.Clamp(t.PosXPct, 0, 100) / 100.0;
+                    double py = Math.Clamp(t.PosYPct, 0, 100) / 100.0;
+                    // (w-text_w)*pct maps 0→left/top, 50→centre, 100→right/bottom.
+                    string x = $"(w-text_w)*{F(px)}";
+                    string y = $"(h-text_h)*{F(py)}";
+
+                    var dt = new StringBuilder();
+                    dt.Append($"drawtext=fontfile='{fontPath}':textfile='{txtPath}'");
+                    dt.Append($":fontcolor={color}:fontsize={fontSize}:x={x}:y={y}");
+                    if (!string.IsNullOrEmpty(t.BgBoxColor))
+                        dt.Append($":box=1:boxcolor={DrawtextColor(t.BgBoxColor!)}@0.5:boxborderw=12");
+                    dt.Append($":enable='between(t\\,{F(t.StartSec)}\\,{F(t.EndSec)})'");
+                    drawParts.Add(dt.ToString());
+                }
+
+                string vf = string.Join(",", drawParts);
+                string pre = Path.Combine(workDir, "pretext" + Path.GetExtension(outputPath));
+                if (File.Exists(pre)) { try { File.Delete(pre); } catch { } }
+                File.Move(outputPath, pre);
+                await RunFFmpegAsync(
+                    $"-i \"{pre}\" -vf \"{vf}\" -c:v libx264 -crf {crf} -preset veryfast -pix_fmt yuv420p -c:a copy \"{outputPath}\"",
+                    null, finalProg, ct);
             }
             progress?.Report(100);
         }
