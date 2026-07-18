@@ -6010,7 +6010,12 @@ public partial class FileToolsWindow : Window
         if (string.IsNullOrEmpty(url)) { ConfirmDialog.Alert(this, "URL Required", "Enter a YouTube URL or a search term."); return; }
         if (!FileToolsService.IsYtDlpAvailable())
         {
-            ConfirmDialog.Alert(this, "yt-dlp Required", "yt-dlp is required.\n\nInstall: https://github.com/yt-dlp/yt-dlp");
+            ConfirmDialog.Alert(this, "yt-dlp Required",
+                "yt-dlp is required.\n\n" +
+                "Install or update it:\n" +
+                "  winget install yt-dlp.yt-dlp\n" +
+                "  yt-dlp -U\n\n" +
+                "An outdated yt-dlp can fail with a “confirm you’re not a bot” error — update it if downloads stop working.");
             return;
         }
 
