@@ -125,6 +125,18 @@ internal static class Program
             Assert(musicUrl.Contains("lofi%20beats"), "music url query encoded");
             Assert(musicUrl.Contains("sp=EgWKAQIIAWoKEAoQCRAFEAMQBA%3D%3D"), "music songs filter token");
 
+            // Pagination helpers
+            Assert(FileToolsService.ClampPageSize(0) == 1, "clamp 0 -> 1");
+            Assert(FileToolsService.ClampPageSize(12) == 12, "clamp 12 -> 12");
+            Assert(FileToolsService.ClampPageSize(50) == 50, "clamp 50 -> 50");
+            Assert(FileToolsService.ClampPageSize(99) == 50, "clamp 99 -> 50");
+            Assert(FileToolsService.ClampPageSize(-5) == 1, "clamp negative -> 1");
+            Assert(FileToolsService.TotalPages(0, 12) == 0, "totalpages 0 items -> 0");
+            Assert(FileToolsService.TotalPages(12, 12) == 1, "totalpages exact multiple");
+            Assert(FileToolsService.TotalPages(13, 12) == 2, "totalpages remainder");
+            Assert(FileToolsService.TotalPages(25, 12) == 3, "totalpages 25/12 -> 3");
+            Assert(FileToolsService.TotalPages(10, 0) == 0, "totalpages zero size -> 0");
+
             File.WriteAllText(Path.Combine(Dir, "ytmusic.txt"), sb.ToString());
             if (fails > 0) throw new Exception($"YTMusic arg tests: {fails} failure(s)\n{sb}");
             return;

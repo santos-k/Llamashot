@@ -2082,6 +2082,13 @@ public static class FileToolsService
     public static string BuildMusicSearchUrl(string query)
         => $"https://music.youtube.com/search?q={Uri.EscapeDataString(query)}&sp={YtMusicSongsFilter}";
 
+    /// <summary>Clamps a requested page size to the supported range (1–50).</summary>
+    public static int ClampPageSize(int n) => Math.Clamp(n, 1, 50);
+
+    /// <summary>Total pages for a bounded item count. 0 when there are no items or an invalid page size.</summary>
+    public static int TotalPages(int totalItems, int pageSize)
+        => pageSize <= 0 || totalItems <= 0 ? 0 : (totalItems + pageSize - 1) / pageSize;
+
     /// <summary>Builds the yt-dlp argument string for an audio-only ("music") download:
     /// extracts audio to the chosen format at best quality and always embeds metadata + album art.</summary>
     public static string BuildAudioDownloadArgs(string outputDir, string audioFormat, string videoUrl)
