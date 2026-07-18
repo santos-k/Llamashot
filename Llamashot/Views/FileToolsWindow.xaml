@@ -3068,7 +3068,7 @@
                         <RadioButton x:Name="RbYtVideo" Content="Video" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
                                      IsChecked="True" GroupName="YtMode" Margin="0,0,12,0" Cursor="Hand"
                                      Checked="YtMode_Changed"/>
-                        <RadioButton x:Name="RbYtAudio" Content="MP3" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                        <RadioButton x:Name="RbYtAudio" Content="Audio" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
                                      GroupName="YtMode" Cursor="Hand" Checked="YtMode_Changed"/>
                     </StackPanel>
 
@@ -3082,9 +3082,14 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <CheckBox x:Name="ChkYtEmbedThumb" Grid.Column="1" Content="Embed thumbnail"
-                              Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" IsChecked="True" Cursor="Hand"
-                              Visibility="Collapsed" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    <StackPanel x:Name="YtAudioOptions" Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0" Visibility="Collapsed">
+                        <TextBlock Text="Format" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="CmbYtAudioFormat" Width="90" Height="28" FontSize="11" SelectedIndex="0">
+                            <ComboBoxItem Content="M4A"/>
+                            <ComboBoxItem Content="OPUS"/>
+                            <ComboBoxItem Content="MP3"/>
+                        </ComboBox>
+                    </StackPanel>
 
                     <TextBlock x:Name="TxtYtOverallProgress" Grid.Column="2" Text="" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13"
                                FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>

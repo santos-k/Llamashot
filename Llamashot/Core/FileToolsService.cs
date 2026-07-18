@@ -2384,7 +2384,7 @@ public static class FileToolsService
     /// yt-dlp at best quality (or audio-only MP3). Returns the saved path.</summary>
     public static Task<string?> DownloadMediaAsync(string url, string outputDir, bool audioOnly,
         IProgress<(int percent, string status)>? progress = null)
-        => DownloadSingleVideoAsync(url, outputDir, "best", audioOnly, "mp3", progress);
+        => DownloadSingleVideoAsync(url, outputDir, "best", audioOnly, audioFormat: "mp3", progress);
 
     public static async Task ExtractAudioWithThumbnailAsync(string videoPath, string outputPath, IProgress<int>? progress = null)
     {

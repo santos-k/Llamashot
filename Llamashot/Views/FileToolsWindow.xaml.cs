@@ -6401,10 +6401,10 @@ public partial class FileToolsWindow : Window
 
     private void YtMode_Changed(object sender, RoutedEventArgs e)
     {
-        if (YtVideoOptions == null || ChkYtEmbedThumb == null) return;
+        if (YtVideoOptions == null || YtAudioOptions == null) return;
         bool isVideo = RbYtVideo?.IsChecked == true;
         YtVideoOptions.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
-        ChkYtEmbedThumb.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
+        YtAudioOptions.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
         UpdateYtSelectedCount();
     }
 
@@ -6415,8 +6415,9 @@ public partial class FileToolsWindow : Window
 
         bool confirmAudio = RbYtAudio.IsChecked == true;
         string confirmQuality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Best";
+        string confirmFormat = (CmbYtAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "M4A";
         string confirmMsg = confirmAudio
-            ? $"Download {selected.Count} video(s) as MP3 audio?"
+            ? $"Download {selected.Count} song(s) as {confirmFormat}?"
             : $"Download {selected.Count} video(s) as Video — {confirmQuality}?";
         if (!ConfirmDialog.Show(this, "Confirm Download", confirmMsg, "Download", "Cancel"))
             return;
@@ -6435,7 +6436,7 @@ public partial class FileToolsWindow : Window
 
         bool isAudio = RbYtAudio.IsChecked == true;
         string quality = (CmbYtQuality.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "best";
-        bool embedThumb = ChkYtEmbedThumb.IsChecked == true;
+        string audioFormat = (CmbYtAudioFormat.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "m4a";
 
         int total = selected.Count;
         int completed = 0;
@@ -6462,7 +6463,7 @@ public partial class FileToolsWindow : Window
                     });
 
                     await FileToolsService.DownloadSingleVideoAsync(
-                        video.VideoUrl, folderDlg.SelectedPath, quality, isAudio, embedThumb, progress);
+                        video.VideoUrl, folderDlg.SelectedPath, quality, isAudio, audioFormat, progress);
 
                     video.Status = "Downloaded";
                     video.Progress = 100;
