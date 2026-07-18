@@ -115,8 +115,15 @@ internal static class Program
             Assert(!vidBest.Contains("--audio-format"), "video has no audio-format");
             string vid720 = FileToolsService.BuildVideoDownloadArgs(@"C:\out", "720p", "u");
             Assert(vid720.Contains("height<=720"), "video 720p height cap");
+            string vid480 = FileToolsService.BuildVideoDownloadArgs(@"C:\out", "480p", "u");
+            Assert(vid480.Contains("height<=480"), "video 480p height cap");
+            string vid360 = FileToolsService.BuildVideoDownloadArgs(@"C:\out", "360p", "u");
+            Assert(vid360.Contains("height<=360"), "video 360p height cap");
 
-            // (Task 3 appends YouTube Music URL assertions here.)
+            string musicUrl = FileToolsService.BuildMusicSearchUrl("lofi beats");
+            Assert(musicUrl.StartsWith("https://music.youtube.com/search?q="), "music url base");
+            Assert(musicUrl.Contains("lofi%20beats"), "music url query encoded");
+            Assert(musicUrl.Contains("sp=EgWKAQIIAWoKEAoQCRAFEAMQBA%3D%3D"), "music songs filter token");
 
             File.WriteAllText(Path.Combine(Dir, "ytmusic.txt"), sb.ToString());
             if (fails > 0) throw new Exception($"YTMusic arg tests: {fails} failure(s)\n{sb}");

@@ -2073,6 +2073,15 @@ public static class FileToolsService
     /// </summary>
     public const string YtDlpClientArgs = "--extractor-args \"youtube:player_client=web_embedded\"";
 
+    /// <summary>YouTube Music "Songs" search-filter token. Without it, a music.youtube.com search
+    /// returns artist/album browse pages (ie_key=YoutubeTab, no titles); with it, yt-dlp returns
+    /// single-song entries (ie_key=Youtube, music.youtube.com/watch?v=…) the fetch path handles.</summary>
+    public const string YtMusicSongsFilter = "EgWKAQIIAWoKEAoQCRAFEAMQBA%3D%3D";
+
+    /// <summary>Builds a YouTube Music songs-search URL for a keyword query.</summary>
+    public static string BuildMusicSearchUrl(string query)
+        => $"https://music.youtube.com/search?q={Uri.EscapeDataString(query)}&sp={YtMusicSongsFilter}";
+
     /// <summary>Builds the yt-dlp argument string for an audio-only ("music") download:
     /// extracts audio to the chosen format at best quality and always embeds metadata + album art.</summary>
     public static string BuildAudioDownloadArgs(string outputDir, string audioFormat, string videoUrl)
