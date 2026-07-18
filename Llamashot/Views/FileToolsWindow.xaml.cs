@@ -193,6 +193,7 @@ public partial class FileToolsWindow : Window
     // Snapshot of the download list's natural (playlist) order, for the "Playlist order" sort option.
     private readonly List<YtVideoItem> _ytDownloadOriginal = new();
     private bool _ytDownloadSortSyncing;
+    private bool _ytMusicMode;   // true when the YouTube/Music source toggle is on Music
 
     // =====================================================================
     //  Video crop state
@@ -6789,6 +6790,16 @@ public partial class FileToolsWindow : Window
         UpdateYtSelectedCount();
     }
 
+    // Source toggle (YouTube / Music). Music routes keyword searches to YouTube Music songs;
+    // playlist search doesn't apply there, so that toggle is hidden while Music is active.
+    private void YtSource_Changed(object sender, RoutedEventArgs e)
+    {
+        _ytMusicMode = RbYtSourceMusic?.IsChecked == true;
+        if (RbYtModePlaylists != null)
+            RbYtModePlaylists.Visibility = _ytMusicMode ? Visibility.Collapsed : Visibility.Visible;
+        if (_ytMusicMode && RbYtModeVideos != null) RbYtModeVideos.IsChecked = true;
+    }
+
     // Upload-date radio changed → re-query video search.
     private async void Yt_FilterChanged(object sender, RoutedEventArgs e)
     {
@@ -6831,10 +6842,13 @@ public partial class FileToolsWindow : Window
         await RunYtFetchAsync(_ytUrl, playlistMode: false, fromHero: false);
     }
 
-    // Builds a video-search target for the first `end` results (ytsearch, or the
-    // results page + sp= token when a filter/sort is active).
+    // Builds a video-search target for the first `end` results. In Music mode, routes to the
+    // YouTube Music songs search; otherwise ytsearch (or the results page + sp= token when a
+    // filter/sort is active).
     private string BuildVideoSearchTarget(string query, int end)
     {
+        if (_ytMusicMode)
+            return FileToolsService.BuildMusicSearchUrl(query);
         string sp = BuildYtSp(_ytUploadDate, _ytSort);
         return string.IsNullOrEmpty(sp)
             ? $"ytsearch{end}:{query}"

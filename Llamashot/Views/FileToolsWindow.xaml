@@ -2551,6 +2551,16 @@
                                          GroupName="YtSearchMode"/>
                         </StackPanel>
                     </Border>
+                    <!-- Source: YouTube / Music. Music routes searches to YouTube Music songs. -->
+                    <Border HorizontalAlignment="Center" Background="{DynamicResource SurfaceBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSoftBrush}"
+                            BorderThickness="1" Padding="3" Margin="0,10,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="RbYtSourceYouTube" Style="{StaticResource YtSegment}" Content="YouTube"
+                                         GroupName="YtSource" IsChecked="True" Checked="YtSource_Changed"/>
+                            <RadioButton x:Name="RbYtSourceMusic" Style="{StaticResource YtSegment}" Content="Music"
+                                         GroupName="YtSource" Checked="YtSource_Changed"/>
+                        </StackPanel>
+                    </Border>
                     <TextBlock Text="Tip: paste a URL to download directly, or type keywords to search"
                                FontSize="12" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,16,0,0"/>
                     <!-- Loading spinner (shown while fetching) -->
