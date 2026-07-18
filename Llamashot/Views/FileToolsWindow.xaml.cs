@@ -6800,9 +6800,17 @@ public partial class FileToolsWindow : Window
     private void YtSource_Changed(object sender, RoutedEventArgs e)
     {
         _ytMusicMode = RbYtSourceMusic?.IsChecked == true;
-        if (RbYtModePlaylists != null)
-            RbYtModePlaylists.Visibility = _ytMusicMode ? Visibility.Collapsed : Visibility.Visible;
-        if (_ytMusicMode && RbYtModeVideos != null) RbYtModeVideos.IsChecked = true;
+        // Hide the "Playlists" toggle in both the hero and the top search bar — playlist
+        // search doesn't apply to YouTube Music, and the top-bar path (Yt_FetchTop) would
+        // otherwise let a music session issue a playlist search that bypasses music mode.
+        var playlistVis = _ytMusicMode ? Visibility.Collapsed : Visibility.Visible;
+        if (RbYtModePlaylists != null) RbYtModePlaylists.Visibility = playlistVis;
+        if (RbYtModePlaylistsTop != null) RbYtModePlaylistsTop.Visibility = playlistVis;
+        if (_ytMusicMode)
+        {
+            if (RbYtModeVideos != null) RbYtModeVideos.IsChecked = true;
+            if (RbYtModeVideosTop != null) RbYtModeVideosTop.IsChecked = true;
+        }
     }
 
     // Upload-date radio changed → re-query video search.
