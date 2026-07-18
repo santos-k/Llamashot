@@ -2142,7 +2142,7 @@ public static class FileToolsService
             // Use --flat-playlist with a unique separator (tabs are unreliable across process boundaries).
             // %(ie_key)s reports the extractor: "YoutubeTab" = a playlist entry, "Youtube" = a single video.
             var psi = new ProcessStartInfo(ytdlp,
-                $"--flat-playlist {itemsArg}--print \"{printFmt}\" --no-warnings \"{inputUrl}\"")
+                $"{YtDlpClientArgs} --flat-playlist {itemsArg}--print \"{printFmt}\" --no-warnings \"{inputUrl}\"")
             {
                 RedirectStandardOutput = true, RedirectStandardError = true,
                 UseShellExecute = false, CreateNoWindow = true
@@ -2183,7 +2183,7 @@ public static class FileToolsService
             if (results.Count == 0)
             {
                 var psi2 = new ProcessStartInfo(ytdlp,
-                    $"--print \"{printFmt}\" --no-download --no-warnings \"{inputUrl}\"")
+                    $"{YtDlpClientArgs} --print \"{printFmt}\" --no-download --no-warnings \"{inputUrl}\"")
                 {
                     RedirectStandardOutput = true, RedirectStandardError = true,
                     UseShellExecute = false, CreateNoWindow = true
@@ -2244,30 +2244,16 @@ public static class FileToolsService
         int y = (int)(days / 365); return $"{y} year{(y != 1 ? "s" : "")} ago";
     }
 
-    public static async Task<string?> DownloadSingleVideoAsync(string videoUrl, string outputDir, string quality, bool audioOnly, bool embedThumbnail, IProgress<(int percent, string status)>? progress = null)
+    public static async Task<string?> DownloadSingleVideoAsync(string videoUrl, string outputDir, string quality, bool audioOnly, string audioFormat = "mp3", IProgress<(int percent, string status)>? progress = null)
     {
         Directory.CreateDirectory(outputDir);
         string? outputFile = null;
 
         await Task.Run(() =>
         {
-            string args;
-            if (audioOnly)
-            {
-                string thumbArg = embedThumbnail ? "--embed-thumbnail" : "";
-                args = $"-x --audio-format mp3 --audio-quality 0 {thumbArg} -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{videoUrl}\"";
-            }
-            else
-            {
-                string formatArg = quality switch
-                {
-                    "720p" => "-f \"bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best\"",
-                    "480p" => "-f \"bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best\"",
-                    "360p" => "-f \"bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best\"",
-                    _ => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\""
-                };
-                args = $"{formatArg} --merge-output-format mp4 -o \"{Path.Combine(outputDir, "%(title)s.%(ext)s")}\" --newline \"{videoUrl}\"";
-            }
+            string args = audioOnly
+                ? BuildAudioDownloadArgs(outputDir, audioFormat, videoUrl)
+                : BuildVideoDownloadArgs(outputDir, quality, videoUrl);
 
             var psi = new ProcessStartInfo(FindYtDlpPath(), args)
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
@@ -2398,7 +2384,7 @@ public static class FileToolsService
     /// yt-dlp at best quality (or audio-only MP3). Returns the saved path.</summary>
     public static Task<string?> DownloadMediaAsync(string url, string outputDir, bool audioOnly,
         IProgress<(int percent, string status)>? progress = null)
-        => DownloadSingleVideoAsync(url, outputDir, "best", audioOnly, embedThumbnail: false, progress);
+        => DownloadSingleVideoAsync(url, outputDir, "best", audioOnly, "mp3", progress);
 
     public static async Task ExtractAudioWithThumbnailAsync(string videoPath, string outputPath, IProgress<int>? progress = null)
     {
