@@ -83,6 +83,46 @@ internal static class Program
             return;
         }
 
+        // yt-dlp argument-construction assertions (no network). Verifies the audio/video arg
+        // builders, the shared bot-check client arg, and (Task 3) the YouTube Music search URL.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_YTMUSIC") == "1")
+        {
+            var sb = new System.Text.StringBuilder();
+            int fails = 0;
+            void Assert(bool cond, string label)
+            {
+                sb.AppendLine((cond ? "PASS " : "FAIL ") + label);
+                if (!cond) fails++;
+            }
+
+            string audioM4a = FileToolsService.BuildAudioDownloadArgs(@"C:\out", "m4a", "https://music.youtube.com/watch?v=X");
+            Assert(audioM4a.Contains("--audio-format m4a"), "audio m4a format");
+            Assert(audioM4a.Contains("--audio-quality 0"), "audio quality 0");
+            Assert(audioM4a.Contains("--embed-metadata"), "audio embed-metadata");
+            Assert(audioM4a.Contains("--embed-thumbnail"), "audio embed-thumbnail");
+            Assert(audioM4a.Contains("player_client=web_embedded"), "audio client arg");
+
+            string audioOpus = FileToolsService.BuildAudioDownloadArgs(@"C:\out", "opus", "u");
+            Assert(audioOpus.Contains("--audio-format opus"), "audio opus format");
+            string audioMp3 = FileToolsService.BuildAudioDownloadArgs(@"C:\out", "mp3", "u");
+            Assert(audioMp3.Contains("--audio-format mp3"), "audio mp3 format");
+            string audioBad = FileToolsService.BuildAudioDownloadArgs(@"C:\out", "flac", "u");
+            Assert(audioBad.Contains("--audio-format mp3"), "audio unknown->mp3 fallback");
+
+            string vidBest = FileToolsService.BuildVideoDownloadArgs(@"C:\out", "best", "u");
+            Assert(vidBest.Contains("--merge-output-format mp4"), "video mp4 merge");
+            Assert(vidBest.Contains("player_client=web_embedded"), "video client arg");
+            Assert(!vidBest.Contains("--audio-format"), "video has no audio-format");
+            string vid720 = FileToolsService.BuildVideoDownloadArgs(@"C:\out", "720p", "u");
+            Assert(vid720.Contains("height<=720"), "video 720p height cap");
+
+            // (Task 3 appends YouTube Music URL assertions here.)
+
+            File.WriteAllText(Path.Combine(Dir, "ytmusic.txt"), sb.ToString());
+            if (fails > 0) throw new Exception($"YTMusic arg tests: {fails} failure(s)\n{sb}");
+            return;
+        }
+
         // Video editor window UI smoke: construct + render (catches XAML/resource/binding errors).
         if (Environment.GetEnvironmentVariable("LLAMASHOT_VIDEDITUI") == "1")
         {

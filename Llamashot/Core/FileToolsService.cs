@@ -2066,6 +2066,44 @@ public static class FileToolsService
     public static string FormatTimeSpan(TimeSpan ts) =>
         ts.TotalHours >= 1 ? ts.ToString(@"h\:mm\:ss") : ts.ToString(@"m\:ss");
 
+    /// <summary>
+    /// Shared yt-dlp extractor args for every YouTube call (fetch + download). YouTube gates
+    /// downloads behind a "confirm you're not a bot" challenge; the web_embedded player client is
+    /// the one client that clears it without cookies. If YouTube shifts again, change it here only.
+    /// </summary>
+    public const string YtDlpClientArgs = "--extractor-args \"youtube:player_client=web_embedded\"";
+
+    /// <summary>Builds the yt-dlp argument string for an audio-only ("music") download:
+    /// extracts audio to the chosen format at best quality and always embeds metadata + album art.</summary>
+    public static string BuildAudioDownloadArgs(string outputDir, string audioFormat, string videoUrl)
+    {
+        string fmt = audioFormat.ToLowerInvariant() switch
+        {
+            "m4a" => "m4a",
+            "opus" => "opus",
+            _ => "mp3",
+        };
+        string outTemplate = Path.Combine(outputDir, "%(title)s.%(ext)s");
+        return $"{YtDlpClientArgs} -x --audio-format {fmt} --audio-quality 0 " +
+               $"--embed-metadata --embed-thumbnail " +
+               $"-o \"{outTemplate}\" --newline \"{videoUrl}\"";
+    }
+
+    /// <summary>Builds the yt-dlp argument string for a video download at the given quality, merged to mp4.</summary>
+    public static string BuildVideoDownloadArgs(string outputDir, string quality, string videoUrl)
+    {
+        string formatArg = quality.ToLowerInvariant() switch
+        {
+            "720p" => "-f \"bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best\"",
+            "480p" => "-f \"bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best\"",
+            "360p" => "-f \"bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best\"",
+            _ => "-f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\"",
+        };
+        string outTemplate = Path.Combine(outputDir, "%(title)s.%(ext)s");
+        return $"{YtDlpClientArgs} {formatArg} --merge-output-format mp4 " +
+               $"-o \"{outTemplate}\" --newline \"{videoUrl}\"";
+    }
+
     public static bool IsYtDlpAvailable()
     {
         try
