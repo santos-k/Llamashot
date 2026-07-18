@@ -2765,8 +2765,7 @@
                          PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
                          Background="{DynamicResource WindowBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         ScrollViewer.ScrollChanged="Yt_GridScrollChanged">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -2873,8 +2872,7 @@
                          PreviewKeyDown="Yt_ListPreviewKeyDown" MouseDoubleClick="Yt_ItemDoubleClick"
                          Background="{DynamicResource WindowBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         ScrollViewer.ScrollChanged="Yt_GridScrollChanged">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="4"/>
@@ -3021,14 +3019,34 @@
                 </ListBox>
 
                 <!-- "Loading more…" loader, overlaid at the bottom of the results while paging -->
-                <Border x:Name="YtLoadMoreBar" Grid.Row="2" Grid.Column="1" Visibility="Collapsed"
-                        VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Height="44"
+                <!-- Pagination bar: First / Prev / indicator / Next / Last + page-size input -->
+                <Border x:Name="YtPager" Grid.Row="2" Grid.Column="1" Visibility="Collapsed"
+                        VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Height="48"
                         Background="{DynamicResource ScrimBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,1,0,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <ProgressBar IsIndeterminate="True" Width="120" Height="4" Foreground="{DynamicResource DangerBrush}"
-                                     Background="{DynamicResource SurfaceAltBrush}" BorderThickness="0" Margin="0,0,12,0"/>
-                        <TextBlock Text="Loading more…" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Grid Margin="16,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Button x:Name="BtnYtFirst" Content="⏮ First" Click="Yt_FirstPage" Cursor="Hand"
+                                    Height="30" Padding="10,0" Margin="0,0,6,0" Template="{StaticResource RoundedButton}"
+                                    Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <Button x:Name="BtnYtPrev" Content="◀ Prev" Click="Yt_PrevPage" Cursor="Hand"
+                                    Height="30" Padding="10,0" Margin="0,0,12,0" Template="{StaticResource RoundedButton}"
+                                    Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock x:Name="TxtYtPageIndicator" Text="Page 1" VerticalAlignment="Center" MinWidth="90"
+                                       TextAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"/>
+                            <Button x:Name="BtnYtNext" Content="Next ▶" Click="Yt_NextPage" Cursor="Hand"
+                                    Height="30" Padding="10,0" Margin="12,0,6,0" Template="{StaticResource RoundedButton}"
+                                    Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <Button x:Name="BtnYtLast" Content="Last ⏭" Click="Yt_LastPage" Cursor="Hand"
+                                    Height="30" Padding="10,0" Template="{StaticResource RoundedButton}"
+                                    Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock Text="Per page" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBox x:Name="TxtYtPageSize" Text="12" Width="52" Height="30" VerticalContentAlignment="Center"
+                                     TextAlignment="Center" FontSize="13" MaxLength="2"
+                                     TextChanged="Yt_PageSizeChanged" LostFocus="Yt_PageSizeLostFocus"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <!-- Bottom action bar (search screens): selected count + est. size + Continue -->

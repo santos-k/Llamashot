@@ -195,6 +195,13 @@ public partial class FileToolsWindow : Window
     private bool _ytDownloadSortSyncing;
     private bool _ytMusicMode;   // true when the YouTube/Music source toggle is on Music
 
+    // Pagination (replaces infinite scroll). _ytVideos stays the full master; the pager
+    // windows the *display* via a CollectionView filter. _ytTotalPages is 0 for lazy search.
+    private int _ytPage = 1;
+    private int _ytPageSize = 12;
+    private int _ytTotalPages;
+    private readonly HashSet<YtVideoItem> _ytPageSet = new();
+
     // =====================================================================
     //  Video crop state
     // =====================================================================
@@ -6031,13 +6038,13 @@ public partial class FileToolsWindow : Window
         {
             // Playlist keyword search: first batch of 12 (more on scroll).
             target = BuildPlaylistSearchTarget(url);
-            batchItems = $"1-{YtBatchSize}";
+            batchItems = $"1-{_ytPageSize}";
         }
         else
         {
             // Video keyword search: first batch of 12 (more on scroll).
-            target = BuildVideoSearchTarget(url, YtBatchSize);
-            batchItems = $"1-{YtBatchSize}";
+            target = BuildVideoSearchTarget(url, _ytPageSize);
+            batchItems = $"1-{_ytPageSize}";
         }
         _ytFiltersReady = false; // suppress filter handlers while this fetch mutates UI
 
@@ -6103,11 +6110,10 @@ public partial class FileToolsWindow : Window
 
             PopulateYtItems(videos);
 
-            if (isSearch)
-            {
-                _ytLoadedCount = videos.Count;
-                _ytNoMore = videos.Count < YtBatchSize;
-            }
+            _ytPage = 1;
+            _ytLoadedCount = videos.Count;
+            // Search is lazy (more may exist); a pasted playlist/URL is fully in hand (bounded).
+            _ytNoMore = !isSearch || videos.Count < _ytPageSize;
 
             if (isSearch)
             {
@@ -6237,6 +6243,7 @@ public partial class FileToolsWindow : Window
         YtVideoGrid.SelectionMode = mode;
         YtVideoList.SelectionMode = mode;
 
+        RenderYtPager();
         UpdateYtGoDownloadEnabled();
     }
 
@@ -6271,6 +6278,7 @@ public partial class FileToolsWindow : Window
         ApplyYtViewMode();
         ApplyYtScreen();
         UpdateYtSelectedCount();
+        _ytPage = 1;
         ResetYtDownloadFilter();
     }
 
@@ -6643,24 +6651,18 @@ public partial class FileToolsWindow : Window
     {
         if (TxtYtDownloadFilter != null) TxtYtDownloadFilter.Text = "";
         if (TxtYtDownloadFilterPh != null) TxtYtDownloadFilterPh.Visibility = Visibility.Visible;
-        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos);
-        if (view != null) view.Filter = null;
+        _ytPage = 1;
+        RefreshYtPagination();
     }
 
-    // Download page: filter the loaded videos by title (does not re-query YouTube).
+    // Download page: filter the loaded videos by title (does not re-query YouTube). Re-paginates.
     private void Yt_DownloadFilterChanged(object sender, TextChangedEventArgs e)
     {
         if (TxtYtDownloadFilterPh != null)
             TxtYtDownloadFilterPh.Visibility =
                 string.IsNullOrEmpty(TxtYtDownloadFilter.Text) ? Visibility.Visible : Visibility.Collapsed;
-
-        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos);
-        if (view == null) return;
-
-        string q = TxtYtDownloadFilter.Text.Trim();
-        view.Filter = string.IsNullOrEmpty(q)
-            ? null
-            : o => o is YtVideoItem v && v.Title.Contains(q, StringComparison.OrdinalIgnoreCase);
+        _ytPage = 1;
+        RefreshYtPagination();
     }
 
     // Captures the current order as the "natural" order and resets the sort combo.
@@ -6704,6 +6706,8 @@ public partial class FileToolsWindow : Window
             int cur = _ytVideos.IndexOf(ordered[i]);
             if (cur != i) _ytVideos.Move(cur, i);
         }
+        _ytPage = 1;
+        RefreshYtPagination();
     }
 
     private void YtItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -6784,13 +6788,150 @@ public partial class FileToolsWindow : Window
             int cur = _ytVideos.IndexOf(ordered[i]);
             if (cur != i) _ytVideos.Move(cur, i);
         }
+        RefreshYtPagination();
     }
 
-    // Header "Select All" tri-state checkbox: check/uncheck every (non-playlist) item.
+    // True when the item passes the download-screen title filter (always true when the box is empty).
+    private bool YtTitleMatches(YtVideoItem v)
+    {
+        string q = TxtYtDownloadFilter?.Text?.Trim() ?? "";
+        return q.Length == 0 || v.Title.Contains(q, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Title-filtered pages already loaded into _ytVideos.
+    private int YtLoadedPages() => FileToolsService.TotalPages(_ytVideos.Count(YtTitleMatches), _ytPageSize);
+
+    // Recompute the current page's item set and the bounded total-page count.
+    private void RecomputeYtPage()
+    {
+        var filtered = _ytVideos.Where(YtTitleMatches).ToList();
+        bool bounded = _ytScreen == YtScreen.Download;
+        _ytTotalPages = bounded ? FileToolsService.TotalPages(filtered.Count, _ytPageSize) : 0;
+
+        int maxPage = bounded ? Math.Max(1, _ytTotalPages) : Math.Max(1, YtLoadedPages());
+        _ytPage = Math.Clamp(_ytPage, 1, maxPage);
+
+        _ytPageSet.Clear();
+        foreach (var v in filtered.Skip((_ytPage - 1) * _ytPageSize).Take(_ytPageSize))
+            _ytPageSet.Add(v);
+    }
+
+    // The grid shows only the current page: title filter AND page membership.
+    private void ApplyYtPageFilter()
+    {
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos);
+        if (view != null)
+            view.Filter = o => o is YtVideoItem v && YtTitleMatches(v) && _ytPageSet.Contains(v);
+    }
+
+    // Update the pager bar's indicator text and button enabled-states.
+    private void RenderYtPager()
+    {
+        if (YtPager == null) return;
+        bool showPager = _ytScreen == YtScreen.SearchVideos || _ytScreen == YtScreen.SearchPlaylists || _ytScreen == YtScreen.Download;
+        YtPager.Visibility = showPager ? Visibility.Visible : Visibility.Collapsed;
+        if (!showPager) return;
+
+        bool bounded = _ytTotalPages > 0;
+        TxtYtPageIndicator.Text = bounded ? $"Page {_ytPage} of {_ytTotalPages}" : $"Page {_ytPage}";
+
+        bool hasPrev = _ytPage > 1;
+        bool hasNext = bounded ? _ytPage < _ytTotalPages : (_ytPage < YtLoadedPages() || !_ytNoMore);
+        BtnYtFirst.IsEnabled = hasPrev;
+        BtnYtPrev.IsEnabled = hasPrev;
+        BtnYtNext.IsEnabled = hasNext && !_ytLoadingMore;
+        BtnYtLast.IsEnabled = bounded && _ytPage < _ytTotalPages;
+        if (TxtYtPageSize != null && !TxtYtPageSize.IsKeyboardFocused) TxtYtPageSize.Text = _ytPageSize.ToString();
+    }
+
+    // Recompute page, re-apply the filter, refresh the view, redraw the pager.
+    private void RefreshYtPagination()
+    {
+        RecomputeYtPage();
+        ApplyYtPageFilter();
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos)?.Refresh();
+        RenderYtPager();
+    }
+
+    // Lazy search: fetch the next page-sized batch and append to _ytVideos (no auto-advance).
+    private async Task YtFetchNextAsync()
+    {
+        if (_ytLoadingMore || _ytNoMore) return;
+        if (!YtOnSearchScreen() || string.IsNullOrWhiteSpace(_ytSearchQuery)) return;
+        if (_ytLoadedCount >= YtMaxResults) { _ytNoMore = true; return; }
+
+        _ytLoadingMore = true;
+        RenderYtPager(); // disables Next while loading
+        try
+        {
+            int start = _ytLoadedCount + 1;
+            int end = _ytLoadedCount + _ytPageSize;
+            string target = BuildSearchTarget(_ytSearchQuery, end);
+            var more = await FileToolsService.FetchYouTubeVideosAsync(target, $"{start}-{end}");
+
+            var existing = new HashSet<string>(_ytVideos.Select(v => v.VideoUrl), StringComparer.OrdinalIgnoreCase);
+            var fresh = more.Where(m => !existing.Contains(m.url)).ToList();
+            PopulateYtItems(fresh);
+
+            _ytLoadedCount += more.Count;
+            if (more.Count < _ytPageSize || _ytLoadedCount >= YtMaxResults) _ytNoMore = true;
+            _ytSearchCache.Clear();
+            _ytSearchCache.AddRange(_ytVideos);
+        }
+        catch { /* keep what we have */ }
+        finally { _ytLoadingMore = false; }
+    }
+
+    // Pager navigation.
+    private void Yt_FirstPage(object sender, RoutedEventArgs e) { _ytPage = 1; RefreshYtPagination(); }
+
+    private void Yt_PrevPage(object sender, RoutedEventArgs e)
+    {
+        if (_ytPage > 1) { _ytPage--; RefreshYtPagination(); }
+    }
+
+    private void Yt_LastPage(object sender, RoutedEventArgs e)
+    {
+        if (_ytTotalPages > 0) { _ytPage = _ytTotalPages; RefreshYtPagination(); }
+    }
+
+    private async void Yt_NextPage(object sender, RoutedEventArgs e)
+    {
+        // Lazy search: at the last loaded page with more possibly available → fetch the next batch.
+        if (_ytTotalPages == 0 && _ytPage >= YtLoadedPages() && !_ytNoMore)
+            await YtFetchNextAsync();
+
+        int lastPage = _ytTotalPages > 0 ? _ytTotalPages : YtLoadedPages();
+        if (_ytPage < lastPage) { _ytPage++; RefreshYtPagination(); }
+        else RenderYtPager();
+    }
+
+    // Page-size box changed: clamp to 1–50, reset to page 1, re-window.
+    private void Yt_PageSizeChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TxtYtPageSize == null) return;
+        string t = TxtYtPageSize.Text.Trim();
+        if (!int.TryParse(t, out int n)) return; // wait for a valid number
+        int clamped = FileToolsService.ClampPageSize(n);
+        _ytPageSize = clamped;
+        _ytPage = 1;
+        RefreshYtPagination();
+    }
+
+    // Normalize the box to the clamped value when focus leaves (e.g. "99" -> "50", "" -> "12").
+    private void Yt_PageSizeLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (TxtYtPageSize == null) return;
+        if (!int.TryParse(TxtYtPageSize.Text.Trim(), out int n)) n = _ytPageSize;
+        _ytPageSize = FileToolsService.ClampPageSize(n);
+        TxtYtPageSize.Text = _ytPageSize.ToString();
+    }
+
+    // Header "Select page" tri-state checkbox: check/uncheck the current page's (non-playlist) items.
     private void Yt_SelectAllToggle(object sender, RoutedEventArgs e)
     {
         bool check = ChkYtSelectAll.IsChecked == true;
-        foreach (var v in _ytVideos)
+        foreach (var v in _ytPageSet)
             if (!v.IsPlaylist) v.IsSelected = check;
         UpdateYtSelectedCount();
     }
@@ -6876,54 +7017,6 @@ public partial class FileToolsWindow : Window
         => _ytSearchIsPlaylist ? BuildPlaylistSearchTarget(query) : BuildVideoSearchTarget(query, end);
 
     private bool YtOnSearchScreen() => _ytScreen == YtScreen.SearchVideos || _ytScreen == YtScreen.SearchPlaylists;
-
-    // Infinite scroll: fetch the next batch of 12 and append (selection preserved).
-    private async Task YtLoadMoreAsync()
-    {
-        if (_ytLoadingMore || _ytNoMore) return;
-        if (!YtOnSearchScreen() || string.IsNullOrWhiteSpace(_ytSearchQuery)) return;
-        if (_ytLoadedCount >= YtMaxResults) { _ytNoMore = true; return; }
-
-        _ytLoadingMore = true;
-        if (YtLoadMoreBar != null) YtLoadMoreBar.Visibility = Visibility.Visible;
-        try
-        {
-            int start = _ytLoadedCount + 1;
-            int end = _ytLoadedCount + YtBatchSize;
-            string target = BuildSearchTarget(_ytSearchQuery, end);
-            var more = await FileToolsService.FetchYouTubeVideosAsync(target, $"{start}-{end}");
-
-            // De-dupe against what's already loaded, then append.
-            var existing = new HashSet<string>(_ytVideos.Select(v => v.VideoUrl), StringComparer.OrdinalIgnoreCase);
-            var fresh = more.Where(m => !existing.Contains(m.url)).ToList();
-            PopulateYtItems(fresh);
-
-            _ytLoadedCount += more.Count;
-            if (more.Count < YtBatchSize || _ytLoadedCount >= YtMaxResults) _ytNoMore = true;
-
-            string noun = _ytSearchIsPlaylist ? "playlists" : "videos";
-            _ytResultsDetail = $"{_ytVideos.Count} {noun} loaded";
-            TxtYtDetail.Text = _ytResultsDetail;
-            UpdateYtSelectedCount();
-            _ytSearchCache.Clear();
-            _ytSearchCache.AddRange(_ytVideos); // keep Back in sync
-        }
-        catch { /* keep what we already have */ }
-        finally
-        {
-            if (YtLoadMoreBar != null) YtLoadMoreBar.Visibility = Visibility.Collapsed;
-            _ytLoadingMore = false;
-        }
-    }
-
-    // Load the next batch when the results are scrolled near the bottom.
-    private async void Yt_GridScrollChanged(object sender, ScrollChangedEventArgs e)
-    {
-        if (!YtOnSearchScreen() || _ytNoMore || _ytLoadingMore) return;
-        if (e.ExtentHeight <= 0 || e.VerticalChange <= 0) return;
-        if (e.VerticalOffset + e.ViewportHeight >= e.ExtentHeight - 250)
-            await YtLoadMoreAsync();
-    }
 
     // Card "⋯" menu: Open on YouTube / Copy link.
     private void Yt_CardMenu(object sender, RoutedEventArgs e)
