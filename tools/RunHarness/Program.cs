@@ -215,6 +215,58 @@ internal static class Program
             return;
         }
 
+        // LIVE network smoke: exercise the real yt-dlp path the UI uses — keyword search,
+        // the lazy "Next" batch, YouTube Music search, a public playlist, a private playlist
+        // (empty -> friendly message), and an actual audio download. Requires network + yt-dlp.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_YTLIVE") == "1")
+        {
+            var sb = new System.Text.StringBuilder();
+            void Line(string s) { sb.AppendLine(s); File.WriteAllText(Path.Combine(Dir, "ytlive.txt"), sb.ToString()); }
+
+            // 1) Keyword video search — first page (ytsearch, items 1-12), the app's default path.
+            var page1 = await FileToolsService.FetchYouTubeVideosAsync("ytsearch12:lofi hip hop", "1-12");
+            Line($"1. keyword search page1: {page1.Count} items" + (page1.Count > 0 ? $" (e.g. \"{page1[0].title}\")" : ""));
+
+            // 2) Lazy "Next" — the next batch (items 13-24), what Yt_NextPage fetches.
+            var page2 = await FileToolsService.FetchYouTubeVideosAsync("ytsearch24:lofi hip hop", "13-24");
+            Line($"2. lazy Next batch (13-24): {page2.Count} items");
+
+            // 3) YouTube Music songs search — validates the Music source + songs filter token.
+            var music = await FileToolsService.FetchYouTubeVideosAsync(FileToolsService.BuildMusicSearchUrl("lofi"), "1-12");
+            Line($"3. music search: {music.Count} items" + (music.Count > 0 ? $" (e.g. \"{music[0].title}\")" : ""));
+
+            // 4) Public playlist track list.
+            var pub = await FileToolsService.FetchYouTubeVideosAsync("https://www.youtube.com/playlist?list=PLbpi6ZahtOH6Blw3RGYpWkSByi_T7Rygb");
+            Line($"4. public playlist: {pub.Count} tracks" + (pub.Count > 0 ? $" (e.g. \"{pub[0].title}\")" : ""));
+
+            // 5) Private/nonexistent playlist -> empty (drives the "private or unavailable" message).
+            int privCount;
+            try { privCount = (await FileToolsService.FetchYouTubeVideosAsync("https://www.youtube.com/playlist?list=PLzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")).Count; }
+            catch { privCount = 0; }
+            Line($"5. private/invalid playlist: {privCount} tracks (0 or throw => friendly message path) " + (privCount == 0 ? "OK" : "UNEXPECTED"));
+
+            // 6) Real audio download of the first search result -> M4A with tags/art.
+            if (page1.Count > 0)
+            {
+                string dlDir = Path.Combine(Dir, "ytlive_dl");
+                Directory.CreateDirectory(dlDir);
+                foreach (var f in Directory.GetFiles(dlDir)) { try { File.Delete(f); } catch { } }
+                string? saved = null;
+                try { saved = await FileToolsService.DownloadSingleVideoAsync(page1[0].url, dlDir, "Best", audioOnly: true, audioFormat: "m4a"); }
+                catch (Exception ex) { Line($"6. download threw: {ex.Message}"); }
+                var files = Directory.GetFiles(dlDir);
+                if (files.Length > 0)
+                {
+                    var fi = new FileInfo(files[0]);
+                    Line($"6. audio download: OK -> {fi.Name} ({fi.Length / 1024} KB)");
+                }
+                else Line($"6. audio download: NO FILE (saved={saved ?? "null"})");
+            }
+
+            Line("done.");
+            return;
+        }
+
         // Capture the redesigned windows in both themes (no settings writes — Apply persist:false).
         if (Environment.GetEnvironmentVariable("LLAMASHOT_THEMESHOT") == "1")
         {
