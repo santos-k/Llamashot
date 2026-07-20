@@ -2260,7 +2260,7 @@ public static class FileToolsService
         int y = (int)(days / 365); return $"{y} year{(y != 1 ? "s" : "")} ago";
     }
 
-    public static async Task<string?> DownloadSingleVideoAsync(string videoUrl, string outputDir, string quality, bool audioOnly, string audioFormat = "mp3", IProgress<(int percent, string status)>? progress = null)
+    public static async Task<string?> DownloadSingleVideoAsync(string videoUrl, string outputDir, string quality, bool audioOnly, string audioFormat = "mp3", IProgress<(int percent, string status)>? progress = null, CancellationToken cancel = default)
     {
         Directory.CreateDirectory(outputDir);
         string? outputFile = null;
@@ -2275,6 +2275,9 @@ public static class FileToolsService
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
 
             using var proc = Process.Start(psi)!;
+            // Cancellation kills the yt-dlp process (and any children, e.g. ffmpeg) so Stop
+            // aborts the in-flight download immediately instead of waiting for it to finish.
+            using var reg = cancel.Register(() => { try { proc.Kill(entireProcessTree: true); } catch { } });
             proc.OutputDataReceived += (s, e) =>
             {
                 if (e.Data == null) return;
@@ -2290,9 +2293,11 @@ public static class FileToolsService
             proc.BeginOutputReadLine();
             proc.WaitForExit();
 
+            // A killed process reports cancellation, not a generic failure.
+            cancel.ThrowIfCancellationRequested();
             if (proc.ExitCode != 0)
                 throw new Exception("Download failed");
-        });
+        }, cancel);
 
         return outputFile;
     }

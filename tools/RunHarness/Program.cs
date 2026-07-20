@@ -137,6 +137,19 @@ internal static class Program
             Assert(FileToolsService.TotalPages(25, 12) == 3, "totalpages 25/12 -> 3");
             Assert(FileToolsService.TotalPages(10, 0) == 0, "totalpages zero size -> 0");
 
+            // Cancellation wiring: a pre-cancelled token aborts the download up-front (no network/yt-dlp).
+            bool cancelledThrew = false;
+            try
+            {
+                using var cts = new System.Threading.CancellationTokenSource();
+                cts.Cancel();
+                await FileToolsService.DownloadSingleVideoAsync("https://youtu.be/dQw4w9WgXcQ",
+                    Path.Combine(Dir, "cancel_probe"), "best", true, "m4a", null, cts.Token);
+            }
+            catch (OperationCanceledException) { cancelledThrew = true; }
+            catch { /* any other exception means the token was not honored before work started */ }
+            Assert(cancelledThrew, "download honors pre-cancelled token");
+
             File.WriteAllText(Path.Combine(Dir, "ytmusic.txt"), sb.ToString());
             if (fails > 0) throw new Exception($"YTMusic arg tests: {fails} failure(s)\n{sb}");
             return;

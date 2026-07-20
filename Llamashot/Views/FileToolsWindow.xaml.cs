@@ -984,6 +984,14 @@ public partial class FileToolsWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        // An in-progress YouTube download gets its own confirm that also stops it; on confirm
+        // we close directly (skipping the generic "unsaved changes" prompt to avoid a double ask).
+        if (_currentToolId == "youtube_dl" && _ytCancelSource != null)
+        {
+            if (!ConfirmStopYtDownload()) { e.Cancel = true; return; }
+            base.OnClosing(e);
+            return;
+        }
         if (!ConfirmDiscardWork())
         {
             e.Cancel = true;
@@ -6415,11 +6423,27 @@ public partial class FileToolsWindow : Window
 
     // Handles the global Back button for the YouTube tool's internal levels.
     // Returns true when it consumed the back (so the caller doesn't return to the tool grid).
+    // A download is running when the cancel source is live. Leaving the screen (Back or close)
+    // must confirm first and, on confirm, actually stop it (which kills the yt-dlp process).
+    // Returns true when it's OK to leave: no active download, or the user chose to stop it.
+    private bool ConfirmStopYtDownload()
+    {
+        if (_ytCancelSource == null) return true;
+        bool stop = ConfirmDialog.Show(this, "Stop Download?",
+            "A download is still in progress.\n\nLeaving now will stop it — any file still downloading will be incomplete.",
+            "Stop & Leave", "Keep Downloading");
+        if (!stop) return false;
+        _ytCancelSource.Cancel();
+        TxtYtOverallProgress.Text = "Stopping…";
+        return true;
+    }
+
     private bool YtTryGoBack()
     {
         switch (_ytScreen)
         {
             case YtScreen.Download:
+                if (!ConfirmStopYtDownload()) return true; // keep downloading → stay on this screen
                 Yt_BackToResults(this, new RoutedEventArgs());
                 return true;
             case YtScreen.SearchVideos:
@@ -6495,11 +6519,15 @@ public partial class FileToolsWindow : Window
                     });
 
                     await FileToolsService.DownloadSingleVideoAsync(
-                        video.VideoUrl, folderDlg.SelectedPath, quality, isAudio, audioFormat, progress);
+                        video.VideoUrl, folderDlg.SelectedPath, quality, isAudio, audioFormat, progress, _ytCancelSource.Token);
 
                     video.Status = "Downloaded";
                     video.Progress = 100;
                     completed++;
+                }
+                catch (OperationCanceledException)
+                {
+                    video.Status = "Cancelled";
                 }
                 catch
                 {
@@ -7009,17 +7037,19 @@ public partial class FileToolsWindow : Window
     public string DebugYtPagerState()
         => $"[{TxtYtPageIndicator.Text}] first={BtnYtFirst.IsEnabled} prev={BtnYtPrev.IsEnabled} next={BtnYtNext.IsEnabled} last={BtnYtLast.IsEnabled} shown={_ytPageSet.Count} total={_ytVideos.Count}";
 
-    // Source toggle (YouTube / Music). Music routes keyword searches to YouTube Music songs;
-    // playlist search doesn't apply there, so that toggle is hidden while Music is active.
+    // Source toggle (YouTube / Music). Music routes keyword searches to YouTube Music songs.
+    // YouTube Music has no playlist-search concept, so the whole Videos/Playlists toggle is
+    // hidden in Music mode; the search defaults to Music (songs) via the video-search path.
     private void YtSource_Changed(object sender, RoutedEventArgs e)
     {
         _ytMusicMode = RbYtSourceMusic?.IsChecked == true;
-        // Hide the "Playlists" toggle in both the hero and the top search bar — playlist
-        // search doesn't apply to YouTube Music, and the top-bar path (Yt_FetchTop) would
-        // otherwise let a music session issue a playlist search that bypasses music mode.
-        var playlistVis = _ytMusicMode ? Visibility.Collapsed : Visibility.Visible;
-        if (RbYtModePlaylists != null) RbYtModePlaylists.Visibility = playlistVis;
-        if (RbYtModePlaylistsTop != null) RbYtModePlaylistsTop.Visibility = playlistVis;
+        // Hidden (not Collapsed) so the hero's centered layout keeps its height — the title and
+        // search box don't drift when the Videos/Playlists row disappears in Music mode. The
+        // top-bar toggle can collapse since it's on a single fixed-height row.
+        if (YtSearchModeToggle != null) YtSearchModeToggle.Visibility = _ytMusicMode ? Visibility.Hidden : Visibility.Visible;
+        if (YtSearchModeToggleTop != null) YtSearchModeToggleTop.Visibility = _ytMusicMode ? Visibility.Collapsed : Visibility.Visible;
+        // Force the "Videos" (non-playlist) path so the Music-search URL is used, not a
+        // playlist search left over from a prior selection.
         if (_ytMusicMode)
         {
             if (RbYtModeVideos != null) RbYtModeVideos.IsChecked = true;
