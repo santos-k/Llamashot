@@ -6100,6 +6100,15 @@ public partial class FileToolsWindow : Window
                 ProcessingOverlay.Opacity = 1;
             }
 
+            // A pasted playlist/album URL that yields nothing is almost always private, deleted,
+            // or region-locked (yt-dlp returns HTTP 404 for private YouTube Music playlists).
+            if (!isSearch && videos.Count == 0)
+            {
+                ConfirmDialog.Alert(this, "Playlist Unavailable",
+                    "This playlist is private or unavailable.\n\nOnly public playlists and albums can be downloaded.");
+                return;
+            }
+
             string headerTitle = playlistSearch
                 ? $"Playlist results \u2014 \u201c{url}\u201d"
                 : isSearch
@@ -6159,7 +6168,9 @@ public partial class FileToolsWindow : Window
                 ProcessingOverlay.Opacity = 1;
             }
             TxtYtTitle.Text = "Failed to fetch";
-            TxtYtDetail.Text = ex.Message;
+            TxtYtDetail.Text = !isSearch
+                ? "This playlist is private or unavailable. Only public playlists and albums can be downloaded."
+                : ex.Message;
         }
     }
 
