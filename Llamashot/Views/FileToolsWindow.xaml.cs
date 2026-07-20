@@ -184,7 +184,6 @@ public partial class FileToolsWindow : Window
     private int _ytLoadedCount;                     // results fetched so far for the current query
     private bool _ytLoadingMore;
     private bool _ytNoMore = true;                  // true until a keyword search starts
-    private const int YtBatchSize = 12;   // 4 columns × 3 rows per batch
     private const int YtMaxResults = 120;
     // Cached search results + header text, so "Back" restores the search page without re-fetching.
     private readonly List<YtVideoItem> _ytSearchCache = new();
@@ -193,6 +192,7 @@ public partial class FileToolsWindow : Window
     // Snapshot of the download list's natural (playlist) order, for the "Playlist order" sort option.
     private readonly List<YtVideoItem> _ytDownloadOriginal = new();
     private bool _ytDownloadSortSyncing;
+    private bool _ytPageSizeSyncing;   // guards programmatic writes to TxtYtPageSize from re-firing the page reset
     private bool _ytMusicMode;   // true when the YouTube/Music source toggle is on Music
 
     // Pagination (replaces infinite scroll). _ytVideos stays the full master; the pager
@@ -6059,6 +6059,7 @@ public partial class FileToolsWindow : Window
         _ytSearchCache.Clear();
         foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
         _ytVideos.Clear();
+        _ytPageSet.Clear();
         TxtYtSearch.Text = "";
         System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
         _ytGridView = true;
@@ -6516,7 +6517,8 @@ public partial class FileToolsWindow : Window
 
     private void Yt_SelectAll(object sender, RoutedEventArgs e)
     {
-        foreach (var v in System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Cast<YtVideoItem>())
+        // Iterate the master list directly — the default view is now windowed to the current page.
+        foreach (var v in _ytVideos)
             v.IsSelected = true;
         UpdateYtSelectedCount();
     }
@@ -6528,7 +6530,8 @@ public partial class FileToolsWindow : Window
 
     private void Yt_DeselectAll(object sender, RoutedEventArgs e)
     {
-        foreach (var v in System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Cast<YtVideoItem>())
+        // Iterate the master list directly — the default view is now windowed to the current page.
+        foreach (var v in _ytVideos)
             v.IsSelected = false;
         UpdateYtSelectedCount();
     }
@@ -6731,8 +6734,14 @@ public partial class FileToolsWindow : Window
         if (_ytScreen == YtScreen.Download && TxtYtDetail != null && _ytCancelSource == null)
             TxtYtDetail.Text = $"{sel} of {total} selected · ~{FormatYtSize(EstimateYtSizeMb())}";
 
+        // The header checkbox toggles only the current page (Yt_SelectAllToggle), so its
+        // tri-state must reflect the page's selection, not the whole list.
         if (ChkYtSelectAll != null)
-            ChkYtSelectAll.IsChecked = total == 0 ? false : (sel == total ? true : (sel == 0 ? false : (bool?)null));
+        {
+            int pageTotal = _ytPageSet.Count(v => !v.IsPlaylist);
+            int pageSel = _ytPageSet.Count(v => v.IsSelected && !v.IsPlaylist);
+            ChkYtSelectAll.IsChecked = pageTotal == 0 ? false : (pageSel == pageTotal ? true : (pageSel == 0 ? false : (bool?)null));
+        }
 
         UpdateYtGoDownloadEnabled();
     }
@@ -6788,6 +6797,7 @@ public partial class FileToolsWindow : Window
             int cur = _ytVideos.IndexOf(ordered[i]);
             if (cur != i) _ytVideos.Move(cur, i);
         }
+        _ytPage = 1;   // reordering is a sort change → snap to page 1 (matches ApplyYtDownloadSort)
         RefreshYtPagination();
     }
 
@@ -6841,7 +6851,12 @@ public partial class FileToolsWindow : Window
         BtnYtPrev.IsEnabled = hasPrev;
         BtnYtNext.IsEnabled = hasNext && !_ytLoadingMore;
         BtnYtLast.IsEnabled = bounded && _ytPage < _ytTotalPages;
-        if (TxtYtPageSize != null && !TxtYtPageSize.IsKeyboardFocused) TxtYtPageSize.Text = _ytPageSize.ToString();
+        if (TxtYtPageSize != null && !TxtYtPageSize.IsKeyboardFocused)
+        {
+            _ytPageSizeSyncing = true;
+            TxtYtPageSize.Text = _ytPageSize.ToString();
+            _ytPageSizeSyncing = false;
+        }
     }
 
     // Recompute page, re-apply the filter, refresh the view, redraw the pager.
@@ -6909,7 +6924,7 @@ public partial class FileToolsWindow : Window
     // Page-size box changed: clamp to 1–50, reset to page 1, re-window.
     private void Yt_PageSizeChanged(object sender, TextChangedEventArgs e)
     {
-        if (TxtYtPageSize == null) return;
+        if (TxtYtPageSize == null || _ytPageSizeSyncing) return;
         string t = TxtYtPageSize.Text.Trim();
         if (!int.TryParse(t, out int n)) return; // wait for a valid number
         int clamped = FileToolsService.ClampPageSize(n);

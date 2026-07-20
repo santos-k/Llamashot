@@ -2683,7 +2683,7 @@
                                 </Grid>
                             </Grid>
                         </Border>
-                        <CheckBox x:Name="ChkYtSelectAll" Content="Select All" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                        <CheckBox x:Name="ChkYtSelectAll" Content="Select page" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
                                   VerticalAlignment="Center" Cursor="Hand" Margin="0,0,14,0" Click="Yt_SelectAllToggle"/>
                         <ComboBox x:Name="CmbYtSortHeader" Width="150" Height="32" FontSize="12" Margin="0,0,10,0"
                                   SelectedIndex="0" SelectionChanged="Yt_SortChanged">
