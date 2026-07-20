@@ -6104,6 +6104,7 @@ public partial class FileToolsWindow : Window
             // or region-locked (yt-dlp returns HTTP 404 for private YouTube Music playlists).
             if (!isSearch && videos.Count == 0)
             {
+                _ytFiltersReady = true; // re-arm filter/sort handlers we suppressed for this fetch
                 ConfirmDialog.Alert(this, "Playlist Unavailable",
                     "This playlist is private or unavailable.\n\nOnly public playlists and albums can be downloaded.");
                 return;
@@ -6171,6 +6172,7 @@ public partial class FileToolsWindow : Window
             TxtYtDetail.Text = !isSearch
                 ? "This playlist is private or unavailable. Only public playlists and albums can be downloaded."
                 : ex.Message;
+            _ytFiltersReady = true; // re-arm filter/sort handlers we suppressed for this fetch
         }
     }
 
@@ -6383,9 +6385,9 @@ public partial class FileToolsWindow : Window
             return;
         }
 
-        ResetYtDownloadFilter();
         foreach (var v in _ytVideos) v.PropertyChanged -= YtItem_PropertyChanged;
         _ytVideos.Clear();
+        _ytPageSet.Clear();
         System.Windows.Data.CollectionViewSource.GetDefaultView(_ytVideos).Filter = null;
         TxtYtSearch.Text = "";
         foreach (var v in _ytSearchCache)
@@ -6399,6 +6401,10 @@ public partial class FileToolsWindow : Window
 
         ApplyYtViewMode();
         ApplyYtScreen();
+        // The screen is now the (lazy) search screen. Re-window pagination *here* — after the
+        // screen switch — so the pager reflects search state, not the download screen's bounded
+        // "Page 1 of N". ResetYtDownloadFilter clears the title box, resets to page 1, and refreshes.
+        ResetYtDownloadFilter();
         UpdateYtSelectedCount();
     }
 
@@ -6684,6 +6690,9 @@ public partial class FileToolsWindow : Window
     {
         _ytDownloadOriginal.Clear();
         _ytDownloadOriginal.AddRange(_ytVideos);
+        // A fresh download list built from a Music-source session defaults to Audio
+        // (setting the radio fires YtMode_Changed, which swaps in the audio-format options).
+        if (_ytMusicMode && RbYtAudio != null) RbYtAudio.IsChecked = true;
         if (CmbYtDownloadSort != null)
         {
             _ytDownloadSortSyncing = true;
