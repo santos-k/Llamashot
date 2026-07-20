@@ -156,6 +156,65 @@ internal static class Program
             return;
         }
 
+        // YouTube pager UI smoke: drive the download screen with synthetic tracks (no network),
+        // screenshot each page, and assert the indicator text + button enabled-states.
+        if (Environment.GetEnvironmentVariable("LLAMASHOT_YTUI") == "1")
+        {
+            ThemeManager.Apply(ThemeManager.Dark, persist: false);
+            ThemeManager.ApplyAccent();
+            var ft = new FileToolsWindow { WindowState = WindowState.Normal, Width = 1280, Height = 820,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            ft.Show();
+            await Task.Delay(400);
+
+            var sb = new System.Text.StringBuilder();
+            int fails = 0;
+            void Check(bool cond, string label)
+            {
+                sb.AppendLine((cond ? "PASS " : "FAIL ") + label);
+                if (!cond) fails++;
+            }
+
+            // 25 tracks, 12 per page -> 3 pages (12 + 12 + 1).
+            ft.DebugShowYtDownloadSample(25, 12);
+            await Task.Delay(400);
+            string p1 = ft.DebugYtPagerState();
+            sb.AppendLine("p1 " + p1);
+            Check(p1.Contains("[Page 1 of 3]"), "page1 indicator");
+            Check(p1.Contains("first=False prev=False"), "page1 first/prev disabled");
+            Check(p1.Contains("next=True last=True"), "page1 next/last enabled");
+            Check(p1.Contains("shown=12"), "page1 shows 12");
+            VisualShot(ft, "ytui_page1.png");
+
+            ft.DebugYtGoToPage(2); await Task.Delay(300);
+            string p2 = ft.DebugYtPagerState();
+            sb.AppendLine("p2 " + p2);
+            Check(p2.Contains("[Page 2 of 3]"), "page2 indicator");
+            Check(p2.Contains("first=True prev=True next=True last=True"), "page2 all enabled");
+            Check(p2.Contains("shown=12"), "page2 shows 12");
+            VisualShot(ft, "ytui_page2.png");
+
+            ft.DebugYtGoToPage(3); await Task.Delay(300);
+            string p3 = ft.DebugYtPagerState();
+            sb.AppendLine("p3 " + p3);
+            Check(p3.Contains("[Page 3 of 3]"), "page3 indicator");
+            Check(p3.Contains("next=False last=False"), "page3 next/last disabled");
+            Check(p3.Contains("shown=1"), "page3 shows remainder (1)");
+            VisualShot(ft, "ytui_page3.png");
+
+            ft.DebugYtSetPageSize(30); await Task.Delay(300);
+            string s30 = ft.DebugYtPagerState();
+            sb.AppendLine("size30 " + s30);
+            Check(s30.Contains("[Page 1 of 1]"), "size30 single page");
+            Check(s30.Contains("first=False prev=False next=False last=False"), "size30 all nav disabled");
+            Check(s30.Contains("shown=25"), "size30 shows all 25");
+            VisualShot(ft, "ytui_size30.png");
+
+            File.WriteAllText(Path.Combine(Dir, "ytui.txt"), sb.ToString());
+            if (fails > 0) throw new Exception($"YT pager UI: {fails} failure(s)\n{sb}");
+            return;
+        }
+
         // Capture the redesigned windows in both themes (no settings writes — Apply persist:false).
         if (Environment.GetEnvironmentVariable("LLAMASHOT_THEMESHOT") == "1")
         {

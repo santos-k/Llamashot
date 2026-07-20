@@ -6971,6 +6971,44 @@ public partial class FileToolsWindow : Window
         UpdateYtSelectedCount();
     }
 
+    // ---- Diagnostic hooks (RunHarness LLAMASHOT_YTUI) ---------------------------------
+    // Drive the paginated YouTube download screen with synthetic tracks (no network), so the
+    // pager UI can be screenshotted and asserted. Not referenced by any production code path.
+    public void DebugShowYtDownloadSample(int count, int pageSize = 12)
+    {
+        _currentToolId = "youtube_dl";
+        HomePanel.Visibility = Visibility.Collapsed;
+        BtnBack.Visibility = Visibility.Visible;
+        TxtToolTitle.Text = _toolTitles.GetValueOrDefault("youtube_dl", "File Tools");
+        PanelYouTubeDl.Visibility = Visibility.Visible;
+        PanelYouTubeDl.Opacity = 1;
+        // YtSelectView is the hero/landing; YtConfigView is the results+download area.
+        YtSelectView.Visibility = Visibility.Collapsed;
+        YtConfigView.Visibility = Visibility.Visible;
+        YtConfigView.Opacity = 1;
+
+        var items = new List<(string, string, string, string, bool, string, string, string)>();
+        for (int i = 1; i <= count; i++)
+            items.Add(($"Sample track {i}", $"3:{i % 6}{i % 10}", $"https://youtu.be/vid{i:D8}", "", false, "Test Channel", $"{i}K views", $"{i}d ago"));
+        PopulateYtItems(items);
+
+        _ytPageSize = FileToolsService.ClampPageSize(pageSize);
+        _ytPage = 1;
+        _ytLoadedCount = _ytVideos.Count;
+        _ytNoMore = true; // bounded (a fully-in-hand list, like a pasted playlist)
+        _ytScreen = YtScreen.Download;
+        CaptureYtDownloadOrder();
+        ApplyYtViewMode();
+        ApplyYtScreen();
+        UpdateYtSelectedCount();
+        ResetYtDownloadFilter(); // resets to page 1 + first RefreshYtPagination
+    }
+
+    public void DebugYtGoToPage(int page) { _ytPage = page; RefreshYtPagination(); }
+    public void DebugYtSetPageSize(int size) { _ytPageSize = FileToolsService.ClampPageSize(size); _ytPage = 1; RefreshYtPagination(); }
+    public string DebugYtPagerState()
+        => $"[{TxtYtPageIndicator.Text}] first={BtnYtFirst.IsEnabled} prev={BtnYtPrev.IsEnabled} next={BtnYtNext.IsEnabled} last={BtnYtLast.IsEnabled} shown={_ytPageSet.Count} total={_ytVideos.Count}";
+
     // Source toggle (YouTube / Music). Music routes keyword searches to YouTube Music songs;
     // playlist search doesn't apply there, so that toggle is hidden while Music is active.
     private void YtSource_Changed(object sender, RoutedEventArgs e)
